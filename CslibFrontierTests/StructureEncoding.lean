@@ -37,6 +37,13 @@ enc_structure ePoint : Point where x : encNat, y : encBits, z : (encList encUnar
 example (p : Point) : ePoint p = ePointFields (p.x, p.y, p.z) := ePoint_apply p
 example {p q : Point} (h : ePoint p = ePoint q) : p = q := ePoint.injective h
 
+-- Clients can bound selected fields without unfolding the record's tuple layout.
+example (p : Point) : (encNat p.x).length + (encList encUnary p.z).length ≤
+    2 * (ePoint p).length := by
+  have hx := ePoint_x_length_le p
+  have hz := ePoint_z_length_le p
+  omega
+
 /-! The field and constructor rules assemble programs over the structure. -/
 
 example : ComputableInDegree (fun p : Point => Point.mk p.x p.y p.z) ePoint ePoint 1 1 := by
@@ -128,6 +135,9 @@ structure Single where
 
 /-- Single-field records, encoded directly by their field encoding. -/
 enc_structure eSingle : Single where items : (encList encNat)
+
+example (s : Single) : (encList encNat s.items).length ≤ (eSingle s).length :=
+  eSingle_items_length_le s
 
 example : ComputableInPolyTime Single.items eSingle (encList encNat) := by
   fun_prop
@@ -253,7 +263,8 @@ example :
 /-! Listing the fields of a parent instead of the parent field flattens them into the tuple. -/
 
 /-- Triples, as the flat tuple of their three fields. -/
-enc_structure eFlat : Triple where fst : encNat, snd : encBool, w : encUnary
+enc_structure eFlat : Triple flattened toPair : ePair where
+  fst : encNat, snd : encBool, w : encUnary
 
 example (t : Triple) : eFlat t = encPair encNat (encPair encBool encUnary) (t.fst, t.snd, t.w) :=
   rfl
@@ -266,6 +277,10 @@ example : ComputableInDegree (fun p : ℕ × Bool × ℕ => Triple.mk ⟨p.1, p.
 -- The flattened field rules read through the parent projection.
 example {α : Type} {enc : α ↪ List Bool} {f : α → Triple} (hf : ComputableInPolyTime f enc eFlat) :
     ComputableInPolyTime (fun a => Triple.mk ⟨(f a).fst, (f a).snd⟩ (f a).w) enc eFlat := by
+  fun_prop
+
+example {α : Type} {enc : α ↪ List Bool} {f : α → Triple} (hf : ComputableInPolyTime f enc eFlat) :
+    ComputableInPolyTime (fun a => (f a).toPair) enc ePair := by
   fun_prop
 
 /-! A field whose type depends on an earlier field is encoded by an injective word function of the
@@ -316,7 +331,7 @@ structure ElementPair (F : Family) extends Element F where
   other : F.Carrier desc
 
 /-- Element pairs, flattening the parent: byte-compatible with a hand-written five-word tuple. -/
-enc_structure eElementPair (F : Family) : ElementPair F where
+enc_structure eElementPair (F : Family) : ElementPair F flattened toElement : (eElement F) where
   size : encUnary, desc : F.encDesc, elt : (F.encode desc) using (F.encode_injective desc),
   other : (F.encode desc) using (F.encode_injective desc)
 
@@ -324,6 +339,11 @@ example (F : Family) (x : ElementPair F) :
     eElementPair F x = encPair encUnary (encPair F.encDesc (encPair encBits encBits))
       (x.size, x.desc, F.encode x.desc x.elt, F.encode x.desc x.other) :=
   rfl
+
+-- Dependent values are charged by their encoded word, including through flattened parents.
+example (F : Family) (x : ElementPair F) :
+    (F.encode x.desc x.other).length ≤ (eElementPair F x).length := by
+  simpa only [encBits_apply] using eElementPair_other_length_le F x
 
 -- Swapping the two elements uses the dependent field rules and the dependent constructor rule.
 example (F : Family) :
@@ -337,12 +357,26 @@ example (F : Family) {α : Type} {enc : α ↪ List Bool} {S : α → ℕ} {f : 
     ComputableInSpace (fun a => F.encode (f a).desc (f a).other) enc encBits S :=
   eElementPair_other_budget F hf
 
--- The parent projection follows from the parent's constructor rule and the flattened field rules.
+-- The explicit flattened-parent metadata generates the projection rule directly.
+example (F : Family) :
+    ComputableInDegree (fun x : ElementPair F => x.toElement)
+      (eElementPair F) (eElement F) 1 1 := by
+  fun_prop
+
+example (F : Family) :
+    ComputableInO (fun x : ElementPair F => x.toElement) (eElementPair F) (eElement F)
+      (fun x => (eElementPair F x).length) (fun x => (eElementPair F x).length) := by
+  fun_prop
+
+example (F : Family) {α : Type} {enc : α ↪ List Bool} {S : α → ℕ} {f : α → ElementPair F}
+    (hf : ComputableInSpace f enc (eElementPair F) S) :
+    ComputableInSpace (fun a => (f a).toElement) enc (eElement F) S := by
+  fun_prop
+
 example (F : Family) {α : Type} {enc : α ↪ List Bool} {f : α → ElementPair F}
     (hf : ComputableInPolyTime f enc (eElementPair F)) :
-    ComputableInPolyTime (fun a => (f a).toElement) enc (eElement F) :=
-  eElement_mk_polyTime F (eElementPair_size_polyTime F hf) (eElementPair_desc_polyTime F hf)
-    (eElementPair_elt_polyTime F hf)
+    ComputableInPolyTime (fun a => (f a).toElement) enc (eElement F) := by
+  fun_prop
 
 /-- An element with a second element of the same type, keeping the parent as one field. -/
 structure ElementTagged (F : Family) extends Element F where
@@ -392,6 +426,44 @@ enc_structure eSizedShadow (Carrier : ℕ → Type) (encode : ∀ n, Carrier n �
 set_option linter.hashCommand false in
 #guard_msgs in
 #lint- only unusedArguments
+
+/-! Encoded fields can belong to a larger universe than their word slots. -/
+
+universe u
+
+/-- A universe-polymorphic image followed by a public flag. -/
+structure TaggedImage (Image : Type u) where
+  /-- The image represented by its chosen word. -/
+  image : Image
+  /-- A flag in the base universe. -/
+  flag : Bool
+
+/-- The image word is framed before the flag, independently of the image's universe. -/
+enc_structure eTaggedImage (Image : Type u) (encodeImage : Image ↪ List Bool) :
+    TaggedImage Image where
+  image : encodeImage using encodeImage.injective, flag : encBool
+
+example (Image : Type u) (encodeImage : Image ↪ List Bool) (x : TaggedImage Image) :
+    eTaggedImage Image encodeImage x = encPair encBits encBool (encodeImage x.image, x.flag) :=
+  rfl
+
+-- Both projections cross from the record's universe to the word/Boolean universe.
+example (Image : Type u) (encodeImage : Image ↪ List Bool) :
+    ComputableInDegree (fun x : TaggedImage Image => (encodeImage x.image).reverse)
+      (eTaggedImage Image encodeImage) encBits 1 1 :=
+  ComputableInDegree.bitsReverse.comp (eTaggedImage_image_deg Image encodeImage)
+
+example (Image : Type u) (encodeImage : Image ↪ List Bool) :
+    ComputableInDegree (fun x : TaggedImage Image => x.flag)
+      (eTaggedImage Image encodeImage) encBool 1 1 := by
+  fun_prop
+
+-- A caller in Type can pass through a larger intermediate record without changing its budget.
+example (Image : Type u) (encodeImage : Image ↪ List Bool)
+    {α : Type} {enc : α ↪ List Bool} {S : α → ℕ} {f : α → TaggedImage Image}
+    (hf : ComputableInSpace f enc (eTaggedImage Image encodeImage) S) :
+    ComputableInSpace (fun a => (f a).flag) enc encBool S := by
+  fun_prop
 
 /-! A parameter that nothing uses leaves `…Fields` linted: alone, next to a parameter that only a
 dependent field uses, or when a proof-local binder shares its name. These come after the `#lint-`
@@ -488,6 +560,27 @@ error: enc_structure: missing field `snd` of `Triple`; the fields of `Triple` in
 -/
 #guard_msgs in
 enc_structure eFlatMissing : Triple where fst : encNat, w : encUnary
+
+/-- error: enc_structure: `missingParent` is not a field of `Triple` -/
+#guard_msgs in
+enc_structure eUnknownParent : Triple flattened missingParent : ePair where
+  fst : encNat, snd : encBool, w : encUnary
+
+/-- error: enc_structure: `w` is a field of `Triple`, but not a parent field -/
+#guard_msgs in
+enc_structure eNonParent : Triple flattened w : encUnary where
+  fst : encNat, snd : encBool, w : encUnary
+
+/-- error: enc_structure: parent field `toPair` is not flattened by the listed fields -/
+#guard_msgs in
+enc_structure eUnflattenedParent : Triple flattened toPair : ePair where
+  toPair : ePair, w : encUnary
+
+/-- error: enc_structure: flattened parent `toPair` is listed twice -/
+#guard_msgs in
+enc_structure eDuplicateParent : Triple
+    flattened toPair : ePair flattened toPair : ePair where
+  fst : encNat, snd : encBool, w : encUnary
 
 /-- error: enc_structure: `Nat` is not a structure -/
 #guard_msgs in

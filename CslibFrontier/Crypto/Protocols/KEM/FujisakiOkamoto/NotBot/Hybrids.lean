@@ -28,10 +28,14 @@ Starting from the eager game `Scheme.eagerIndCcaGame` of
    `G`, `Hq : CT → K` and `Hraw : Bool × M × CT → K`; a key-derivation query `H(false, m, c)` reads
    `Hq c` exactly when `c = Enc(pk, m; G(m))` and `Dec(sk, c) = some m`
    (`Scheme.coupledH`), and every decapsulation query `c ≠ c*` reads `Hq c`.
-3. `Scheme.coupledGame`: the lazy-sampling realization of `eagerCoupledGame` on `SimState`.
-4. `Scheme.simGame`: the keyless simulator `Scheme.simHandler`, which drops the decryption test
-   `Dec(sk, c) = some m` from `coupledH`. The two lazy games agree until a sampled coin `G(m)` is a
-   decryption failure for `m`.
+3. `Scheme.coupledGame`: the lazy-sampling realization of `eagerCoupledGame` on `SimState`. Its
+   real and random challenge keys are compared in
+   `CslibFrontier.Crypto.Protocols.KEM.FujisakiOkamoto.NotBot.Challenge`.
+
+The keyless simulator `Scheme.simHandler` drops the decryption test `Dec(sk, c) = some m` from
+`coupledH`; the `FO-notbot` proof uses it only inside the one-wayness experiment
+`Scheme.simFilterOwExperiment`. The filtered games `Scheme.coupledFilterGame` and
+`Scheme.simFilterGame` are the corresponding hybrids of the `FO^⊥` proof.
 
 ## Main definitions
 
@@ -44,8 +48,9 @@ Starting from the eager game `Scheme.eagerIndCcaGame` of
 * `Cslib.Crypto.Protocols.FujisakiOkamoto.Scheme.coupledHashH`,
   `Cslib.Crypto.Protocols.FujisakiOkamoto.Scheme.coupledHandler`,
   `Cslib.Crypto.Protocols.FujisakiOkamoto.Scheme.coupledGame`: lazy coupled game.
-* `Cslib.Crypto.Protocols.FujisakiOkamoto.Scheme.simGame`: lazy keyless simulator game with the
-  challenge coin `G(m*)` programmed.
+* `Cslib.Crypto.Protocols.FujisakiOkamoto.Scheme.coupledFilterGame`,
+  `Cslib.Crypto.Protocols.FujisakiOkamoto.Scheme.simFilterGame`: lazy coupled and keyless simulator
+  games with a decapsulation filter and the challenge coin `G(m*)` programmed.
 
 ## References
 
@@ -90,9 +95,9 @@ table `Hfb : CT → K` instead of `H(true, s, ·)`. -/
 noncomputable def eagerFbGame [Fintype M] [Finite R] [Fintype CT] [Finite K]
     (S : Scheme PK SK M R CT K) (A : ROAdversary PK M R CT K) (b : Bool) : Game := do
   let (pk, dk) ← ProbComp.eval S.keyGenNotBot
-  let G ← pi (α := fun _ : M => R) (fun _ => ProbComp.eval S.pke.sampleCoins)
-  let H ← pi (α := fun _ : Bool × M × CT => K) (fun _ => ProbComp.eval S.sampleKey)
-  let Hfb ← pi (α := fun _ : CT => K) (fun _ => ProbComp.eval S.sampleKey)
+  let G ← S.coinTable
+  let H ← S.keyTable (Bool × M × CT)
+  let Hfb ← S.keyTable CT
   let (cStar, kReal) ← ProbComp.eval (S.encapsNotBot G H pk)
   let kRand ← ProbComp.eval S.sampleKey
   OracleComp.interpret (S.eagerFbHandler G H Hfb dk cStar)
@@ -121,9 +126,9 @@ noncomputable def eagerCoupledHandler (S : Scheme PK SK M R CT K) (G : M → R) 
 noncomputable def eagerCoupledGame [Fintype M] [Finite R] [Fintype CT] [Finite K]
     (S : Scheme PK SK M R CT K) (A : ROAdversary PK M R CT K) (b : Bool) : Game := do
   let (pk, sk) ← ProbComp.eval S.pke.keyGen
-  let G ← pi (α := fun _ : M => R) (fun _ => ProbComp.eval S.pke.sampleCoins)
-  let Hq ← pi (α := fun _ : CT => K) (fun _ => ProbComp.eval S.sampleKey)
-  let Hraw ← pi (α := fun _ : Bool × M × CT => K) (fun _ => ProbComp.eval S.sampleKey)
+  let G ← S.coinTable
+  let Hq ← S.keyTable CT
+  let Hraw ← S.keyTable (Bool × M × CT)
   let mStar ← ProbComp.eval S.sampleMsg
   let cStar := encT S.pke G pk mStar
   let kRand ← ProbComp.eval S.sampleKey
@@ -236,12 +241,6 @@ def simFilterGame (S : Scheme PK SK M R CT K) (d : PK → List (M × R) → CT �
   let (guess, _) ← (OracleComp.interpret (S.simFilterHandler (d pk) pk cStar)
     (A ⟨pk, cStar, if b then kRand else kReal⟩)).run st₀
   return guess
-
-/-- The lazy keyless simulator game: as `coupledGame` with `simHashH` and `simHandler`, which do
-not use the secret key. -/
-def simGame (S : Scheme PK SK M R CT K) (A : ROAdversary PK M R CT K) (b : Bool) :
-    ProbComp Bool :=
-  S.simFilterGame (fun _ _ _ => true) A b
 
 end Scheme
 

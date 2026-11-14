@@ -4,13 +4,13 @@ Part of the [representative algorithm endpoints](algorithm-endpoints.md); the co
 
 ## Shortest paths and priority queues
 
-[abstracts/CslibFrontierAbstracts/DijkstraAbstract.lean](https://github.com/cslib-community/cslib-frontier/blob/13e6a31951bf1c89a1a6258c44f9444aecbbefd8/abstracts/CslibFrontierAbstracts/DijkstraAbstract.lean) (retired; its bridge applied [LogLinear.lean](../../CslibFrontier/Algorithms/WordRAM/Dijkstra/LogLinear.lean) and [Fibonacci.lean](../../CslibFrontier/Algorithms/WordRAM/Dijkstra/Fibonacci.lean)) represents directed weighted multigraphs by adjacency lists with natural weights; parallel edges and self-loops are allowed. Output distance is an extended natural, encoded as zero for infinity and `d+1` for a finite distance. The word condition is `8*(n+m+2)*(W+2) < 2^w`.
+[abstracts/ComplexityAbstracts/DijkstraAbstract.lean](https://github.com/cslib-community/cslib-frontier/blob/13e6a31951bf1c89a1a6258c44f9444aecbbefd8/abstracts/ComplexityAbstracts/DijkstraAbstract.lean) (retired; its bridge applied [LogLinear.lean](../../CslibFrontier/Algorithms/WordRAM/Dijkstra/LogLinear.lean) and [Fibonacci.lean](../../CslibFrontier/Algorithms/WordRAM/Dijkstra/Fibonacci.lean)) represents directed weighted multigraphs by adjacency lists with natural weights; parallel edges and self-loops are allowed. Output distance is an extended natural, encoded as zero for infinity and `d+1` for a finite distance. The word condition is `8*(n+m+2)*(W+2) < 2^w`.
 
 `dijkstra_logLinear` (library `logLinearStatement`) has `O((m+1)*(floorlog₂(n)+1))` instructions; `dijkstra_fibonacci` (library `fibonacciStatement`) has `O(m+n*(floorlog₂(n)+1))`. The graph is already installed in the machine's initial memory. The first bound can omit a standalone scan over isolated vertices because untouched zero memory represents infinity. Treating graph construction or a mandatory full output traversal as charged work would be a different end-to-end contract.
 
 The problem itself is machine-free. `CslibFrontier.Algorithms.Dijkstra.Defs` ([source](../../CslibFrontier/Algorithms/Dijkstra/Defs.lean)) defines the weight-matrix instance `Cslib.Algorithms.Dijkstra.Instance` and its distance `Instance.dist`; `CslibFrontier.Algorithms.Dijkstra.Invariant` proves the loop invariant; `CslibFrontier.Algorithms.Dijkstra.ListInstance` defines the adjacency-list instance `ListInstance` and shows that scanning the edges out of a vertex relaxes it (`relaxEdges_eq_relax`). The interface client `CslibFrontier.Algorithms.Lean.Dijkstra.Client` imports only these. The input words, the distance-word encoding `encodeDist` and the word-RAM statements stay in `CslibFrontier.Algorithms.WordRAM.Dijkstra.HeapStatement` and `ListEncode`.
 
-[abstracts/CslibFrontierAbstracts/FibonacciHeapAbstract.lean](https://github.com/cslib-community/cslib-frontier/blob/f65cf6aabf60f13270367fea7d080141c7a910f5/abstracts/CslibFrontierAbstracts/FibonacciHeapAbstract.lean) (retired; its bridge applied [FibonacciHeap/MinPQ.lean](../../CslibFrontier/DataStructure/PriorityQueue/WordRAM/FibonacciHeap/MinPQ.lean)) specifies bounded-capacity handles, bounded key/value ranges, fresh-handle insertion and arbitrary minimum ties. Initializer/operation code is chosen before capacity/key/value/base/width parameters. The amortized total is constant per ordinary operation plus a sum of logarithms of current size for extract-min; no per-call worst-case bound is stated, even for queries. The operation set has no non-removing find-min: extract-min is the only operation that locates a minimum entry, and it removes that entry. Fresh zeroed memory permits constant-time initialization; the reusable-memory version explicitly clears the region and costs linear time. Both theorems execute demonically admissible adaptive clients (`Client`, whose continuations observe returned handles and extracted entries); external argument preparation, result decoding and pure host continuation choices between `p_op` calls are uncharged.
+[abstracts/ComplexityAbstracts/FibonacciHeapAbstract.lean](https://github.com/cslib-community/cslib-frontier/blob/f65cf6aabf60f13270367fea7d080141c7a910f5/abstracts/ComplexityAbstracts/FibonacciHeapAbstract.lean) (retired; its bridge applied [FibonacciHeap/MinPQ.lean](../../CslibFrontier/DataStructure/PriorityQueue/WordRAM/FibonacciHeap/MinPQ.lean)) specifies bounded-capacity handles, bounded key/value ranges, fresh-handle insertion and arbitrary minimum ties. Initializer/operation code is chosen before capacity/key/value/base/width parameters. The amortized total is constant per ordinary operation plus a sum of logarithms of current size for extract-min; no per-call worst-case bound is stated, even for queries. The operation set has no non-removing find-min: extract-min is the only operation that locates a minimum entry, and it removes that entry. Fresh zeroed memory permits constant-time initialization; the reusable-memory version explicitly clears the region and costs linear time. Both theorems execute demonically admissible adaptive clients (`Client`, whose continuations observe returned handles and extracted entries); external argument preparation, result decoding and pure host continuation choices between `p_op` calls are uncharged.
 
 
 ### Native binary heap and Dijkstra
@@ -43,8 +43,9 @@ Dirty allocation does not itself make memory zero, and local zero for one raw in
 not a reusable global allocator precondition. If fresh-zero premises are unavailable, retain the
 linear dirty-clear allowance instead of applying the fresh theorem.
 
-Standalone calls leave external argument delivery, result decoding and host continuation work
-uncharged. For the fully compiled binary-heap Dijkstra client, import
+Standalone native calls charge conversion to the fixed canonical result bank and halt; external
+argument delivery and host continuation work remain uncharged. Generic inline observations retain
+their stated representation convention. For the fully compiled binary-heap Dijkstra client, import
 `CslibFrontier.Algorithms.Lean.Dijkstra.Native.Binary`. In its
 `Cslib.Algorithms.Lean.Dijkstra.Native.Binary` namespace, `realizes_run` certifies the original
 allocated `Memory.run`; `exists_program_state` exports one program/register layout/factor before
@@ -146,6 +147,27 @@ These are pure Lean functions on adjacency lists, with `TimeM` cost models (as f
 - **Bellman–Ford.** Import `CslibFrontier.Algorithms.Lean.BellmanFord.Basic` ([source](../../CslibFrontier/Algorithms/Lean/BellmanFord/Basic.lean)). Weights may be negative: they lie in a linearly ordered cancellative additive commutative monoid such as `ℤ`. Walks are `Quiver.Path`s, as for Dijkstra's `Instance.dist`. For a list `vs` of all the vertices, `bellmanFord_eq_none_iff` says that the algorithm returns `none` exactly when a negative cycle is reachable from the source. Otherwise `isShortestDist_of_bellmanFord_eq_some` says that each returned value is the least walk weight, or `⊤` with no walk. Together these are [Cormen et al., Theorem 24.4][clrs09] without the predecessor tree. `time_bellmanFordM` gives the exact cost `n + n (n + m)` for `n = |vs|` and `m` adjacency-list entries.
 
 The [DFS examples](../../CslibFrontierTests/DFS.lean) include a triangle and a self-loop, on which topological sort is not a topological order, and the [SCC and 2-SAT examples](../../CslibFrontierTests/SCCAndTwoSAT.lean) check DAGs, cycles, two-component condensation graphs, satisfiable and unsatisfiable 2-CNF instances, and exact tick counts. The [Bellman–Ford examples](../../CslibFrontierTests/BellmanFord.lean) include a negative edge, a reachable negative cycle and an unreachable one, with exact tick counts. Bridges, biconnectivity and Bellman–Ford predecessor trees remain tracked in [#3053](https://github.com/cslib-community/cslib-frontier/issues/3053).
+
+## Expander-walk hitting probabilities
+
+Import `CslibFrontier.Foundations.Combinatorics.Expander.HittingProduct` for
+Goldreich Exercise 8.43. Work with a finite nonempty `Cslib.RotationMap V D`, with both
+vertex and slot types nonempty. For `B : ℕ → Finset V`,
+`dens_filter_forall_walkAt_mem_le_product B t` bounds the probability of visiting
+`B i` at every index by `sqrt (dens (B 0))` times the product of
+`sqrt (dens (B (i + 1)) + spectralExpansion²)` for `i < t`.
+A seed is a uniform vertex and `t` independent uniform incident slots: `t` counts
+edges and the source length is `t + 1` vertices. Parallel edges and loops are allowed.
+
+For a constant set, use `dens_filter_forall_walkAt_mem_le_rpow_of_spectralExpansion_le`:
+supply the source parameters `lambda`, `d` and a proof of
+`spectralExpansion ≤ lambda / d` to obtain the real power with exponent `(t + 1)/2`.
+The [ordinary-import client](../../CslibFrontierTests/ExpanderHittingProduct.lean)
+checks one vertex, empty/full sets, unequal densities and source-parameter transport.
+From the repository root, check it with
+`lake build CslibFrontierTests.ExpanderHittingProduct` after the normal cache bootstrap.
+These are finite probability bounds; they assert no machine uniformity, running time,
+or Exercise 8.44 concentration endpoint.
 
 ## Continuous metric graphs
 
