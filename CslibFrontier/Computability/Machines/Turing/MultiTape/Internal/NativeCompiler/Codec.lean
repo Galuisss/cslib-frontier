@@ -491,41 +491,11 @@ private noncomputable def frameMarkedBitsCompiler :
   (frameMarkedBitsCompiler.comp markBitsCompiler).ofOutputEq fun word => by
     exact (frameMarkedBitsT_run_markBits word).symm
 
-/-- Parser state for removing the three-symbol frame around each encoded Boolean. -/
-inductive UnframeBitsState where
-  | marker
-  | value
-  | terminator
-deriving Fintype
-
-/-- Constructive encoding of the raw Boolean-list parser states. -/
-@[expose] def unframeBitsStateEncoding : UnframeBitsState ↪ ℕ :=
-  ⟨fun state => match state with | .marker => 0 | .value => 1 | .terminator => 2,
-    by intro a b h; cases a <;> cases b <;> simp_all⟩
-
-/-- Remove the marker and terminator surrounding every encoded Boolean. -/
-@[simps q₀ step final]
-def unframeBitsT : Transducer Bool UnframeBitsState where
-  q₀ := .marker
-  step
-    | .marker, _ => (.value, [])
-    | .value, bit => (.terminator, [bit])
-    | .terminator, _ => (.marker, [])
-  final _ := []
-  length_step_le state bit := by cases state <;> cases bit <;> simp
-  length_final_le state := by cases state <;> simp
-
-/-- Removing the frames from a standard encoded Boolean list returns the original raw word. -/
-theorem unframeBitsT_run_encList : ∀ word : List Bool,
-    unframeBitsT.run unframeBitsT.q₀ (encList encBool word) = word
-  | [] => rfl
-  | bit :: word => by
-      simp [encList_cons, encBool_apply, unframeBitsT, unframeBitsT_run_encList word]
-
 /-- Retained conversion from the standard framed Boolean list back to its raw word. -/
 @[expose] noncomputable def unframeBits :
     NativeCompiler id (encList encBool) encBits :=
-  ofTransducer unframeBitsT unframeBitsStateEncoding unframeBitsT_run_encList
+  ofTransducer Encodings.listBitsT Fin.valEmbedding fun word => by
+    simpa only [encList, encBits_apply] using Encodings.listBitsT_run word
 
 private noncomputable def takeBitsInput :
     NativeCompiler (fun input : List Bool × ℕ => (input.1, input.2))
