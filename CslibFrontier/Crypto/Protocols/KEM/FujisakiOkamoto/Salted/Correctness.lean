@@ -1274,17 +1274,13 @@ private theorem realDecaps_apply_eq_prefetchDecaps
           some <$> S.decapsKey ciphertext) z.2) y = 0 := by
         apply (PMF.apply_eq_zero_iff _ _).mpr
         intro hmem
-        split at hmem
-        · change y ∈ (PMF.pure (some z.1.key, z.2)).support at hmem
-          rw [PMF.mem_support_pure_iff] at hmem
-          subst y
-          exact hz hy
-        · change y ∈ (PMF.map (fun x => (some x.1, x.2))
+        change y ∈ (if S.pke.encDet pk message z.1.coins = ciphertext.pke then
+            PMF.pure (some z.1.key, z.2)
+          else
+            PMF.map (fun x => (some x.1, x.2))
               (S.decapsKey ciphertext z.2)).support at hmem
-          rw [PMF.mem_support_map_iff] at hmem
-          obtain ⟨key, hkey, rfl⟩ := hmem
-          exact hz (hy.of_subset fun entry hentry => by
-            rwa [S.decapsKey_jointCache_eq ciphertext hkey])
+        exact hz (hy.of_subset
+          (S.decapsContinuation_jointCache_subset ciphertext z hmem))
       rw [hcont, mul_zero, mul_zero]
 
 private theorem realDecaps_jointCache_subset
