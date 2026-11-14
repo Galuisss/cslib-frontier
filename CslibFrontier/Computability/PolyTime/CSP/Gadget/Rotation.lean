@@ -15,6 +15,7 @@ import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Membership
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Plain
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List
 import CslibFrontier.Computability.PolyTime.CSP.Vars
 import CslibFrontier.Computability.Complexity.FineGrained.CountingCSP
 import Mathlib.Data.List.GetD
@@ -137,8 +138,8 @@ theorem computableInPolyTime_blockAtRecord [Finite Src]
   have hz : ComputableInPolyTime (fun p : CSP Src ℕ × (ℕ × ℕ) => p.1.zipIdx)
       (encBlockRecordInput encSrc)
       (encList (encPair (encConstraint encSrc encNat) encUnary)) :=
-    .of_tidy ((ComputableTidilyInPolyTime.zipIdx _).comp
-      (by unfold encBlockRecordInput encCSP; fun_prop))
+    (ComputableInPolyTime.zipIdx _).comp
+      (by unfold encBlockRecordInput encCSP; fun_prop)
   unfold blockAtRecord
   apply ComputableInPolyTime.flatMapWithInput hz
   apply ComputableInPolyTime.ite_decide
@@ -251,7 +252,7 @@ private theorem auxiliaryCycles_polyTime [Finite Src] (encSrc : Src ↪ List Boo
   have hp := computableInPolyTime_occurrencePrefix encSrc templates
   have hz : ComputableInPolyTime (fun F : CSP Src ℕ => F.zipIdx)
       (encCSP encSrc encNat) (encList (encPair (encConstraint encSrc encNat) encUnary)) :=
-    .of_tidy (ComputableTidilyInPolyTime.zipIdx _)
+    ComputableInPolyTime.zipIdx _
   apply ComputableInPolyTime.flatMapWithInput hz
   refine shiftBlocks_polyTime.comp
     (g := fun p : CSP Src ℕ × (Constraint Src ℕ × ℕ) =>
@@ -294,8 +295,8 @@ private theorem successorPairs_polyTime (encRel : Rel ↪ List Bool) :
       (fun p : CSP Rel ℕ × List (List ℕ) => p.1.occurrences.zipIdx)
       (encTargetCycles encRel)
       (encList (encPair (encOccurrenceRecord encNat) encUnary)) :=
-    .of_tidy ((ComputableTidilyInPolyTime.zipIdx _).comp
-      (ho.tidy.comp (by unfold encTargetCycles; fun_prop)))
+    (ComputableInPolyTime.zipIdx _).comp
+      (ho.comp (by unfold encTargetCycles; fun_prop))
   unfold successorPairs
   apply ComputableInPolyTime.mapWithInput hz
   apply ComputableInPolyTime.prod
