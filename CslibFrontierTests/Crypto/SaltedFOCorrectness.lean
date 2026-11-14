@@ -192,7 +192,8 @@ example (st : HalfState) :
       PMF.pure (none, st) := by
   simp [Scheme.realHandler, Query.dispatch]
 
-def halfRejectionInput : RejectionInput Unit Unit Bool Bool := ⟨(), (), halfCiphertext⟩
+def halfRejectionInput : RejectionInput Unit Unit Bool Bool :=
+  halfErrorScheme.rejectionInput () () halfCiphertext
 
 /-- The post-secret-seed-guessing `J` query is executed by the concrete handler and cannot
 create a local PKE correctness witness. -/
