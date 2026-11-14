@@ -67,8 +67,11 @@ private def sampleInnerDigest : FixedBytes 32 := fun i =>
 #guard input (sha256KeyBlock case1Key case1Text (by decide)) 0x5c sampleInnerDigest.toList ==
   List.replicate 20 0x57 ++ List.replicate 44 0x5c ++ sampleInnerDigest.toList
 
-#guard (hmacSHA256 case1Key case1Text (by decide)).toList == case1SHA256
-#guard (hmacSHA512 case1Key case1Text (by decide)).toList == case1SHA512
+/-- info: true -/
+#guard_msgs in
+#eval decide (
+  (hmacSHA256 case1Key case1Text (by decide)).toList = case1SHA256 ∧
+  (hmacSHA512 case1Key case1Text (by decide)).toList = case1SHA512)
 
 private def case6Key : List Byte := List.replicate 131 0xaa
 
@@ -97,8 +100,17 @@ private def case6SHA512 : List Byte :=
     0x95, 0xe6, 0x4f, 0x73, 0xf6, 0x3f, 0x0a, 0xec,
     0x8b, 0x91, 0x5a, 0x98, 0x5d, 0x78, 0x65, 0x98]
 
-#guard (hmacSHA256 case6Key case6Text (by decide)).toList == case6SHA256
-#guard (hmacSHA512 case6Key case6Text (by decide)).toList == case6SHA512
+private theorem case6Valid :
+    ValidHMACSHA256Input case6Key case6Text ∧ ValidHMACSHA512Input case6Key case6Text := by
+  -- The closed 131-byte key fixture exceeds the default recursion depth only while discharging
+  -- its erased SHA-2 input-domain proofs; digest evaluation below uses compiled code.
+  set_option maxRecDepth 4096 in decide
+
+/-- info: true -/
+#guard_msgs in
+#eval decide (
+  (hmacSHA256 case6Key case6Text case6Valid.1).toList = case6SHA256 ∧
+  (hmacSHA512 case6Key case6Text case6Valid.2).toList = case6SHA512)
 
 private def byteSequence (length : ℕ) : List Byte :=
   (List.range length).map fun value => ⟨value % 256, Nat.mod_lt _ (by decide)⟩
@@ -121,11 +133,22 @@ private def exact128SHA512 : List Byte :=
     0x0c, 0x01, 0x10, 0xfd, 0xe6, 0xec, 0xc7, 0x9c,
     0xd4, 0x5a, 0x3c, 0xe9, 0x50, 0x2f, 0x30, 0xab]
 
+private theorem exactKeyValid :
+    ValidHMACSHA256Input (byteSequence 64) exactKeyText ∧
+      ValidHMACSHA512Input (byteSequence 128) exactKeyText := by
+  -- Reducing the range-generated 128-byte key exceeds the default recursion depth only for these
+  -- erased fixture-validity proofs; the HMAC comparisons below use compiled code.
+  set_option maxRecDepth 4096 in decide
+
 -- Exact-block keys are used unchanged, not passed through the long-key hash branch.
-#guard (sha256KeyBlock (byteSequence 64) exactKeyText (by decide)).toList == byteSequence 64
-#guard (sha512KeyBlock (byteSequence 128) exactKeyText (by decide)).toList == byteSequence 128
-#guard (hmacSHA256 (byteSequence 64) exactKeyText (by decide)).toList == exact64SHA256
-#guard (hmacSHA512 (byteSequence 128) exactKeyText (by decide)).toList == exact128SHA512
+#guard (sha256KeyBlock (byteSequence 64) exactKeyText exactKeyValid.1).toList == byteSequence 64
+#guard (sha512KeyBlock (byteSequence 128) exactKeyText exactKeyValid.2).toList == byteSequence 128
+
+/-- info: true -/
+#guard_msgs in
+#eval decide (
+  (hmacSHA256 (byteSequence 64) exactKeyText exactKeyValid.1).toList = exact64SHA256 ∧
+  (hmacSHA512 (byteSequence 128) exactKeyText exactKeyValid.2).toList = exact128SHA512)
 
 private def mgfSeed : List Byte := byteSequence 10
 
@@ -147,14 +170,17 @@ private def mgfSHA512Length65 : List Byte :=
     0x49, 0x95, 0x8b, 0x62, 0xc3, 0x00, 0xec, 0x54,
     0x4d]
 
-#guard (mgf1SHA256 mgfSeed 0 (by decide)).toList == []
-#guard (mgf1SHA256 mgfSeed 31 (by decide)).toList == mgfSHA256Length33.take 31
-#guard (mgf1SHA256 mgfSeed 32 (by decide)).toList == mgfSHA256Length33.take 32
-#guard (mgf1SHA256 mgfSeed 33 (by decide)).toList == mgfSHA256Length33
-#guard (mgf1SHA512 mgfSeed 0 (by decide)).toList == []
-#guard (mgf1SHA512 mgfSeed 63 (by decide)).toList == mgfSHA512Length65.take 63
-#guard (mgf1SHA512 mgfSeed 64 (by decide)).toList == mgfSHA512Length65.take 64
-#guard (mgf1SHA512 mgfSeed 65 (by decide)).toList == mgfSHA512Length65
+/-- info: true -/
+#guard_msgs in
+#eval decide (
+  (mgf1SHA256 mgfSeed 0 (by decide)).toList = [] ∧
+  (mgf1SHA256 mgfSeed 31 (by decide)).toList = mgfSHA256Length33.take 31 ∧
+  (mgf1SHA256 mgfSeed 32 (by decide)).toList = mgfSHA256Length33.take 32 ∧
+  (mgf1SHA256 mgfSeed 33 (by decide)).toList = mgfSHA256Length33 ∧
+  (mgf1SHA512 mgfSeed 0 (by decide)).toList = [] ∧
+  (mgf1SHA512 mgfSeed 63 (by decide)).toList = mgfSHA512Length65.take 63 ∧
+  (mgf1SHA512 mgfSeed 64 (by decide)).toList = mgfSHA512Length65.take 64 ∧
+  (mgf1SHA512 mgfSeed 65 (by decide)).toList = mgfSHA512Length65)
 
 private def finalCounter : Fin (2 ^ 32) :=
   ⟨2 ^ 32 - 1, Nat.sub_lt (Nat.two_pow_pos 32) Nat.one_pos⟩
@@ -175,8 +201,11 @@ private def finalCounterSHA512 : List Byte :=
     0x83, 0x75, 0xca, 0xaa, 0x8f, 0xbe, 0x4f, 0x30,
     0x77, 0xd2, 0x91, 0x48, 0xf4, 0x1c, 0x41, 0xba]
 
-#guard (sha256CounterDigest mgfSeed finalCounter (by decide)).toList == finalCounterSHA256
-#guard (sha512CounterDigest mgfSeed finalCounter (by decide)).toList == finalCounterSHA512
+/-- info: true -/
+#guard_msgs in
+#eval decide (
+  (sha256CounterDigest mgfSeed finalCounter (by decide)).toList = finalCounterSHA256 ∧
+  (sha512CounterDigest mgfSeed finalCounter (by decide)).toList = finalCounterSHA512)
 
 -- RFC 8017 accepts the inclusive `2^32 * hLen` bound and rejects its successor.
 #guard decide (ValidMGF1SHA256Input mgfSeed (2 ^ 32 * 32))
