@@ -460,8 +460,24 @@ standard values `n = 16, 24, 32`, `WOTS.digits` implements the common first seve
 `wots_sign` and `wots_pkFromSig`: the `2n` base-16 message digits followed by the three complement
 checksum digits, including the specified four-bit left shift and two-byte encoding. The client now
 uses the same `Byte` and `bytesToBitsBE` boundary as SHA-2 rather than a parallel serialization.
-This milestone does not define the WOTS+ hash chain, key generation, signing, public-key
-reconstruction, or any security reduction; those remain obligations under the NIST post-quantum
+The WOTS+ chaining and verification-facing public-key reconstruction layers are in
+[`SLHDSA/WOTS/Chain.lean`](../../CslibFrontier/Crypto/Primitives/SLHDSA/WOTS/Chain.lean) and
+[`SLHDSA/WOTS/PublicKeyFromSignature.lean`](../../CslibFrontier/Crypto/Primitives/SLHDSA/WOTS/PublicKeyFromSignature.lean),
+with ordinary-import clients in
+[`SLHDSAWOTSPublicKey.lean`](../../CslibFrontierTests/Crypto/SLHDSAWOTSPublicKey.lean).
+`WOTS.chain` is Algorithm 5 under its erased `WOTS_HASH` and `i + s < w` source preconditions:
+it writes every hash address and calls the concrete addressed `F` once per step. Algorithm 8's
+`wotsPkFromSig` starts each remaining suffix at the corresponding message/checksum digit, preserves
+the `len` chain ends in canonical block order, clears the payload while changing the address to
+`WOTS_PK`, restores the key-pair word, and makes one concrete `T_len` call. The source ledger
+records exact `F`/`T_len` calls, address writes and byte shapes, including the
+`len * (w - 1)` bound. It deliberately does not invent lower-level permutation/compression or
+machine-program costs that the current hash-call API does not expose.
+
+This milestone still does not define WOTS+ key generation or signing, prove that a generated
+signature reconstructs its generated public key, or establish one-time security. XMSS, FORS,
+hypertree and top-level sign/verify composition; classical or quantum reductions; and exact
+machine, program-size, gate, qubit and query costs remain obligations under the NIST post-quantum
 portfolio roadmap item.
 
 These are implications from hardness assumptions. They do not prove that a concrete OWF, DDH group, LWE family or SIS parameter choice is hard. `DecisionLWE` runs the fixed-instance experiments `LWE.realExperiment` and `LWE.randomExperiment` over `ZMod (2 ^ w)`: a typed distinguisher receives a uniform matrix `A` and either `A t + e`, with independent errors and one shared uniform secret, or an independent uniform vector. For other secret and error laws over any finite commutative ring, `LWE.advantage` is the distance between `LWE.realGame` and `LWE.randomGame`. The distinguisher's machine reads only the row-major binary word of `[b | A]`, and `decisionLWE_iff_encoded` shows that this is the word-level assumption on the serialized public matrix `[B*t+e | B]` (checked in [`CslibFrontierTests/Crypto/DecisionLWE.lean`](../../CslibFrontierTests/Crypto/DecisionLWE.lean)); in [`SIS/Module.lean`](../../CslibFrontier/Crypto/Computational/SIS/Module.lean), `expandModuleMatrix` and `flattenPolyVec` embed negacyclic `ModuleSIS` and `ModuleLWE` instances over `ℤ_q[X]/(X^n+1)` into unstructured `(d * n) × (k * n)` matrices over `ℤ_q` (checked with concrete evaluations and nonvacuity proofs in [`CslibFrontierTests/Crypto/ModuleSIS.lean`](../../CslibFrontierTests/Crypto/ModuleSIS.lean)); [`LWE/Module.lean`](../../CslibFrontier/Crypto/Computational/LWE/Module.lean) states decision Module-LWE as the typed games `ModuleLWE.realGame` and `ModuleLWE.randomGame` for any secret and error laws, whose advantage `ModuleLWE.advantage` is the LWE advantage over the ring `Negacyclic (ZMod q) n` (`ModuleLWE.advantage_eq_lweAdvantage`), and `DecisionModuleLWE` fixes a uniform secret and is the word-level assumption by `decisionModuleLWE_iff_encoded` (checked in [`CslibFrontierTests/Crypto/DecisionModuleLWE.lean`](../../CslibFrontierTests/Crypto/DecisionModuleLWE.lean)); and [`SIS/ModuleEncryption.lean`](../../CslibFrontier/Crypto/Computational/SIS/ModuleEncryption.lean) builds Module-LWE public-key encryption (`moduleLWEKeyGen`, `moduleLWEEncrypt`, `moduleLWEDecrypt`), bounded-noise decryption correctness (`moduleLWEDecrypt_moduleLWEEncrypt_eq`), and two-hop public-key/ciphertext reductions to `ModuleLWE.sampleLaw` (`advantage_realEncryptionView_uniform_le`, `advantage_realEncryptionView_msg_le`, checked in [`CslibFrontierTests/Crypto/ModuleEncryption.lean`](../../CslibFrontierTests/Crypto/ModuleEncryption.lean)); no worst-case lattice reduction is asserted there.
