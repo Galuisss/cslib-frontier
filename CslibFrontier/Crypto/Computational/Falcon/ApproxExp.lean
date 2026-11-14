@@ -35,7 +35,8 @@ The coefficient payload is exactly `13 * 64 = 832` unframed bits. The retained-s
 caller-supplied control-program encoding length. It is not a native program encoder, step count,
 workspace bound, or replacement for the shared attack-resource profile. The deterministic core
 uses no randomness, oracle, or handler. `approxExpRun` structurally records the source-level
-multiply/shift and subtraction ledger; these operation counts are not machine-step costs.
+multiply/shift and subtraction ledger together with exact zero random-bit, oracle-query and
+handler-call coordinates; these operation counts are not machine-step costs.
 
 This module proves neither a numerical approximation-error bound nor a Gaussian sampling or
 security theorem. NIST lists FN-DSA / FIPS 206 as still under development as of 13 November 2026
@@ -62,6 +63,8 @@ security theorem. NIST lists FN-DSA / FIPS 206 as still under development as of 
   most `2^126`.
 * `Cslib.Crypto.Falcon.approxExpRun_ledger`: every complete run records exactly thirteen
   multiply/shifts and twelve subtractions.
+* `Cslib.Crypto.Falcon.approxExpRun_deterministicResources`: every complete run records zero
+  random bits, oracle queries and handler calls.
 * `Cslib.Crypto.Falcon.approxExpFixedPoint_zero_x`,
   `Cslib.Crypto.Falcon.approxExpFixedPoint_zero_ccs`: endpoint behavior.
 
@@ -123,15 +126,22 @@ structure ApproxExpRun where
   mulShiftCount : ℕ
   /-- Number of subtractions. -/
   subtractionCount : ℕ
+  /-- Number of random bits consumed. -/
+  randomBits : ℕ
+  /-- Number of external oracle queries. -/
+  oracleQueries : ℕ
+  /-- Number of external handler calls. -/
+  handlerCalls : ℕ
   deriving DecidableEq
 
 /-- Instrumented Horner evaluation after the initial coefficient has been loaded. -/
 @[expose] def approxExpHornerRun (x63 : ApproxExpExponentInput) : ℕ → List ℕ → ApproxExpRun
-  | y, [] => ⟨y, 0, 0⟩
+  | y, [] => ⟨y, 0, 0, 0, 0, 0⟩
   | y, coefficient :: coefficients =>
       let run := approxExpHornerRun x63
         (coefficient - approxExpMulShift63 x63.val y) coefficients
-      ⟨run.output, run.mulShiftCount + 1, run.subtractionCount + 1⟩
+      ⟨run.output, run.mulShiftCount + 1, run.subtractionCount + 1,
+        run.randomBits, run.oracleQueries, run.handlerCalls⟩
 
 /-- Output projection of the instrumented Horner evaluation. -/
 @[expose] def approxExpHorner
@@ -155,6 +165,18 @@ structure ApproxExpRun where
   | nil => rfl
   | cons coefficient coefficients ih =>
       simp [approxExpHornerRun, ih]
+
+/-- The deterministic Horner core consumes no random bits and makes no external oracle or handler
+calls. -/
+theorem approxExpHornerRun_deterministicResources
+    (x63 : ApproxExpExponentInput) (y : ℕ) (coefficients : List ℕ) :
+    (approxExpHornerRun x63 y coefficients).randomBits = 0 ∧
+      (approxExpHornerRun x63 y coefficients).oracleQueries = 0 ∧
+      (approxExpHornerRun x63 y coefficients).handlerCalls = 0 := by
+  induction coefficients generalizing y with
+  | nil => rfl
+  | cons coefficient coefficients ih =>
+      simpa only [approxExpHornerRun] using ih _
 
 /-- Every state and subtraction in a Horner suffix is within Algorithm 13's integer range. -/
 @[expose] def ApproxExpHornerSafe (x63 : ApproxExpExponentInput) : ℕ → List ℕ → Prop
@@ -260,7 +282,8 @@ multiply/shift and no subtraction beyond the Horner ledger. -/
   let horner := approxExpHornerRun x63
     (approxExpCoefficients.headD 0) approxExpCoefficients.tail
   ⟨approxExpMulShift63 ccs63.val horner.output,
-    horner.mulShiftCount + 1, horner.subtractionCount⟩
+    horner.mulShiftCount + 1, horner.subtractionCount,
+    horner.randomBits, horner.oracleQueries, horner.handlerCalls⟩
 
 /-- Falcon v1.2 Algorithm 13 after both real inputs have been rounded to 63-bit fixed-point
 integers. This follows the published recurrence, including its `ccs63 = 2^63` endpoint. At
@@ -327,6 +350,17 @@ theorem approxExpRun_ledger (x63 : ApproxExpExponentInput) (ccs63 : ApproxExpSca
       (approxExpRun x63 ccs63).subtractionCount = 12 := by
   simpa only [approxExp_mulShiftCount_eq, approxExp_subtractionCount_eq] using
     approxExpRun_counts x63 ccs63
+
+/-- Every complete Algorithm 13 run records zero random bits, external oracle queries and
+external handler calls. These exact source coordinates are separate from a future machine-cost or
+attack-resource profile. -/
+theorem approxExpRun_deterministicResources
+    (x63 : ApproxExpExponentInput) (ccs63 : ApproxExpScalingInput) :
+    (approxExpRun x63 ccs63).randomBits = 0 ∧
+      (approxExpRun x63 ccs63).oracleQueries = 0 ∧
+      (approxExpRun x63 ccs63).handlerCalls = 0 := by
+  simpa only [approxExpRun] using approxExpHornerRun_deterministicResources x63
+    (approxExpCoefficients.headD 0) approxExpCoefficients.tail
 
 /-- Occurrence-aware retained bits for an encoded control program and installed table copies.
 

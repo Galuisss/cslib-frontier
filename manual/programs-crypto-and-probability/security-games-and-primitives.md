@@ -468,9 +468,10 @@ natural-number subtraction is nontruncating; the rounded exponent type is strict
 so every Horner product is below `2^126`. The final scaling product is only bounded by
 `≤ 2^126` and reaches equality at `x = 0`, `ccs = 1`; exact reference-C behavior at that endpoint
 is left open. The associated source account records 13 multiply/shifts, 12 subtractions, no random
-bits or oracle calls, and an exact 832-bit unframed table payload. `Falcon.approxExpRun` computes
-the value together with that structurally linked operation ledger; the counts are not native
-steps or a runtime bound.
+bits, oracle queries or handler calls, and an exact 832-bit unframed table payload.
+`Falcon.approxExpRun` computes the value together with that structurally linked operation ledger
+and explicit zero random-bit,
+oracle-query and handler-call coordinates; the counts are not native steps or a runtime bound.
 `Falcon.approxExpRetainedBits controlBits tableCopies` charges a caller-supplied control-program
 encoding plus every installed table occurrence; it does not invent a native encoding or shared
 attack-resource profile. The wider rounded-input type is only a total bounded extension outside

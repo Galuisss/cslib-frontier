@@ -57,6 +57,9 @@ example : approxExpFixedPoint halfExponent zeroScaling = 0 := by
 #guard (approxExpRun halfExponent halfScaling).output == 2797128963144290736
 #guard (approxExpRun halfExponent halfScaling).mulShiftCount == 13
 #guard (approxExpRun halfExponent halfScaling).subtractionCount == 12
+#guard (approxExpRun halfExponent halfScaling).randomBits == 0
+#guard (approxExpRun halfExponent halfScaling).oracleQueries == 0
+#guard (approxExpRun halfExponent halfScaling).handlerCalls == 0
 
 example : ApproxExpHornerSafe halfExponent (approxExpCoefficients.headD 0)
     approxExpCoefficients.tail :=
@@ -68,6 +71,11 @@ example : approxExpFixedPoint halfExponent halfScaling ≤ approxExpScale :=
 example : (approxExpRun halfExponent halfScaling).mulShiftCount = 13 ∧
     (approxExpRun halfExponent halfScaling).subtractionCount = 12 :=
   approxExpRun_ledger halfExponent halfScaling
+
+example : (approxExpRun halfExponent halfScaling).randomBits = 0 ∧
+    (approxExpRun halfExponent halfScaling).oracleQueries = 0 ∧
+    (approxExpRun halfExponent halfScaling).handlerCalls = 0 :=
+  approxExpRun_deterministicResources halfExponent halfScaling
 
 example : oneScaling.val * approxExpScale ≤ 2 ^ 126 :=
   approxExp_scalingProduct_le_twoPow126 oneScaling le_rfl

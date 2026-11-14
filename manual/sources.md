@@ -614,8 +614,9 @@ same coefficients and implements sub-unit multiplication by doubling the scaled 
 the high 64 product bits. `CslibFrontier.Crypto.Falcon.approxExpFixedPoint` follows the published
 rounded-input recurrence and proves its no-underflow and strict Horner-product bounds. Its
 instrumented run links the evaluator structurally to the source ledger of thirteen
-multiply/shifts and twelve subtractions; these counts are not a native cost model. The module does
-not cover floating-point conversion. Its separate final-scaling bound permits equality at
+multiply/shifts and twelve subtractions, with zero random-bit, oracle-query and handler-call
+coordinates; these counts are not a native cost model. The module does not cover floating-point
+conversion. Its separate final-scaling bound permits equality at
 `2^126` for `x = 0`, `ccs = 1`; the module does not claim the reference implementation's endpoint
 representability or the comment's empirical `2^-50` error observation.
 
