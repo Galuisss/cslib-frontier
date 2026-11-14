@@ -113,6 +113,18 @@ example {m n : ℕ} (X : FixedBytes m) (Y : FixedBytes n) (i : Fin n) :
     FixedBytes.append X Y (Fin.natAdd m i) = Y i :=
   FixedBytes.append_right X Y i
 
+example {m n : ℕ} (X : FixedBytes m) (Y : FixedBytes n) :
+    FixedBytes.take m (Nat.le_add_right m n) (FixedBytes.append X Y) = X :=
+  FixedBytes.take_append X Y
+
+example {m n : ℕ} (X : FixedBytes m) (Y : FixedBytes n) :
+    FixedBytes.suffix (FixedBytes.append X Y) = Y :=
+  FixedBytes.suffix_append X Y
+
+example {m n : ℕ} (X : FixedBytes (m + n)) :
+    FixedBytes.append (FixedBytes.take m (Nat.le_add_right m n) X) (FixedBytes.suffix X) = X :=
+  FixedBytes.append_take_suffix X
+
 -- Typed truncation exposes the leftmost `n` digest bytes required by the FIPS 205 SHA2 variants.
 #guard ((sha512 abc (by simp [abc, ValidSHA512Input])).take 24
   (by decide)).toList == sha512ABC.take 24

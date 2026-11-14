@@ -1546,8 +1546,9 @@ coefficient vector round-trips, and exposes Section 7.2's decode/re-encode canon
 width 12, raw values `3329 ... 4095` reduce modulo 3329 and are therefore noncanonical. The
 [`CiphertextEncoding.lean`](../../CslibFrontier/Crypto/Computational/SIS/MLKEM/CiphertextEncoding.lean)
 boundary applies that codec in Algorithm 14's vector-then-scalar order to the existing compressed
-K-PKE ciphertexts. Exact-length types record the standard 768-, 1088- and 1568-byte boundaries,
-and both directions round-trip for all three standardized parameter records. The
+K-PKE ciphertexts. Exact-length types gated by `Params.IsStandard` record the standard 768-,
+1088- and 1568-byte boundaries, and both directions round-trip for all three standardized
+parameter records. The
 [`SeedExpansion.lean`](../../CslibFrontier/Crypto/Computational/SIS/MLKEM/SeedExpansion.lean)
 boundary fixes Algorithm 13's `rho || j || i` order, the 33-byte SHAKE256 PRF input and its
 128-/192-byte outputs, and Algorithm 7's three-byte nibble parser. Its finite-prefix parser does

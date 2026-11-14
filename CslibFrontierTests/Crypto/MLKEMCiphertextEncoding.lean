@@ -49,12 +49,14 @@ private def orderingCiphertext : Ciphertext mlkem512 :=
 example : decodeCiphertext512 (encodeCiphertext512 orderingCiphertext) = orderingCiphertext :=
   decodeCiphertext512_encodeCiphertext512 orderingCiphertext
 
-example : ciphertextByteLength mlkem512 = 768 ∧
-    ciphertextByteLength mlkem768 = 1088 ∧ ciphertextByteLength mlkem1024 = 1568 := by
+example : ciphertextByteLength mlkem512 (by decide) = 768 ∧
+    ciphertextByteLength mlkem768 (by decide) = 1088 ∧
+    ciphertextByteLength mlkem1024 (by decide) = 1568 := by
   decide
 
-example : ciphertextBitLength mlkem512 = 6144 ∧
-    ciphertextBitLength mlkem768 = 8704 ∧ ciphertextBitLength mlkem1024 = 12544 := by
+example : ciphertextBitLength mlkem512 (by decide) = 6144 ∧
+    ciphertextBitLength mlkem768 (by decide) = 8704 ∧
+    ciphertextBitLength mlkem1024 (by decide) = 12544 := by
   decide
 
 end CslibFrontierTests.Crypto.MLKEMCiphertextEncoding

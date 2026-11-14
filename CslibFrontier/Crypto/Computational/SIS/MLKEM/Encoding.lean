@@ -50,7 +50,7 @@ validation.
   Algorithms 5–6 and Section 7.2, Equation (7.1)][NISTFIPS203].
 -/
 
-@[expose] public section
+public section
 
 namespace Cslib.Crypto.MLKEM
 
@@ -67,21 +67,26 @@ structure CodecWidth where
   deriving DecidableEq
 
 /-- The width 4 used for the scalar part of ML-KEM-512 and ML-KEM-768 ciphertexts. -/
+@[expose]
 def width4 : CodecWidth := ⟨4, by decide, by decide⟩
 
 /-- The width 5 used for the scalar part of ML-KEM-1024 ciphertexts. -/
+@[expose]
 def width5 : CodecWidth := ⟨5, by decide, by decide⟩
 
 /-- The width 10 used for the vector part of ML-KEM-512 and ML-KEM-768 ciphertexts. -/
+@[expose]
 def width10 : CodecWidth := ⟨10, by decide, by decide⟩
 
 /-- The width 11 used for the vector part of ML-KEM-1024 ciphertexts. -/
+@[expose]
 def width11 : CodecWidth := ⟨11, by decide, by decide⟩
 
 /-- The width 12 used for NTT-domain public and secret key coefficients. -/
 def width12 : CodecWidth := ⟨12, by decide, by decide⟩
 
 /-- The coefficient modulus selected by FIPS 203 Algorithms 5 and 6. -/
+@[expose]
 def codecModulus (d : CodecWidth) : ℕ :=
   if d.val = 12 then 3329 else 2 ^ d.val
 
