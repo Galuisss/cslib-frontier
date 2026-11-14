@@ -1204,6 +1204,40 @@ private theorem realJoint_apply_eq_simJoint
         obtain ⟨key, _, rfl⟩ := hmem
         exact hbad_of_entry ⟨key, coins⟩ rfl List.mem_cons_self
 
+/-- Mapping a `decapsKey` result into an optional key preserves every joint-cache entry. -/
+private theorem mapDecapsKey_jointCache_subset
+    [DecidableEq (Ciphertext CT Salt)]
+    (S : Scheme PK SK M R CT JointPrefix Salt RejectPrefix Sigma K)
+    (ciphertext : Ciphertext CT Salt)
+    {st : CacheState JointPrefix M Salt RejectPrefix Sigma CT K R}
+    {y : Option K × CacheState JointPrefix M Salt RejectPrefix Sigma CT K R}
+    (hy : y ∈ (PMF.map (fun x => (some x.1, x.2))
+      (S.decapsKey ciphertext st)).support) :
+    ∀ entry ∈ st.jointCache, entry ∈ y.2.jointCache := by
+  rw [PMF.mem_support_map_iff] at hy
+  obtain ⟨key, hkey, rfl⟩ := hy
+  intro entry hentry
+  rwa [S.decapsKey_jointCache_eq ciphertext hkey]
+
+/-- The continuation after a successful joint lookup preserves every existing joint-cache entry,
+whether re-encryption succeeds or decapsulation falls back to `decapsKey`. -/
+private theorem decapsContinuation_jointCache_subset
+    [DecidableEq (Ciphertext CT Salt)]
+    (S : Scheme PK SK M R CT JointPrefix Salt RejectPrefix Sigma K)
+    (pk : PK) (message : M) (ciphertext : Ciphertext CT Salt)
+    (z : JointReply K R × CacheState JointPrefix M Salt RejectPrefix Sigma CT K R)
+    {y : Option K × CacheState JointPrefix M Salt RejectPrefix Sigma CT K R}
+    (hy : y ∈ (if S.pke.encDet pk message z.1.coins = ciphertext.pke then
+        PMF.pure (some z.1.key, z.2)
+      else
+        PMF.map (fun x => (some x.1, x.2)) (S.decapsKey ciphertext z.2)).support) :
+    ∀ entry ∈ z.2.jointCache, entry ∈ y.2.jointCache := by
+  split at hy
+  · rw [PMF.mem_support_pure_iff] at hy
+    subst y
+    exact fun _ hentry => hentry
+  · exact S.mapDecapsKey_jointCache_subset ciphertext hy
+
 /-- Real decapsulation and proof-only prefetch decapsulation assign the same mass to outcomes
 whose final joint cache is good. -/
 private theorem realDecaps_apply_eq_prefetchDecaps
@@ -1257,10 +1291,7 @@ private theorem realDecaps_jointCache_subset
     simp only [hdec] at hy
     change y ∈ (PMF.map (fun x => (some x.1, x.2))
       (S.decapsKey ciphertext st)).support at hy
-    rw [PMF.mem_support_map_iff] at hy
-    obtain ⟨key, hkey, rfl⟩ := hy
-    intro entry hentry
-    rwa [S.decapsKey_jointCache_eq ciphertext hkey]
+    exact S.mapDecapsKey_jointCache_subset ciphertext hy
   | some message =>
     simp only [hdec] at hy
     change y ∈ ((S.realJoint pk sk (S.jointInput pk message ciphertext.salt) st).bind
@@ -1275,18 +1306,9 @@ private theorem realDecaps_jointCache_subset
     have hsub := S.cacheJoint_jointCache_subset pk
       (fun m coins => S.pke.dec sk (S.pke.encDet pk m coins) = some m)
       (S.jointInput pk message ciphertext.salt) hz
-    split at hy
-    · change y ∈ (PMF.pure (some z.1.key, z.2)).support at hy
-      rw [PMF.mem_support_pure_iff] at hy
-      subst y
-      exact hsub
-    · change y ∈ (PMF.map (fun x => (some x.1, x.2))
-          (S.decapsKey ciphertext z.2)).support at hy
-      rw [PMF.mem_support_map_iff] at hy
-      obtain ⟨key, hkey, rfl⟩ := hy
-      intro entry hentry
-      rw [S.decapsKey_jointCache_eq ciphertext hkey]
-      exact hsub entry hentry
+    exact fun entry hentry =>
+      S.decapsContinuation_jointCache_subset pk message ciphertext z hy entry
+        (hsub entry hentry)
 
 private theorem prefetchDecaps_jointCache_subset
     [DecidableEq (JointInput JointPrefix M Salt)] [DecidableEq (Ciphertext CT Salt)]
@@ -1302,10 +1324,7 @@ private theorem prefetchDecaps_jointCache_subset
     simp only [hdec] at hy
     change y ∈ (PMF.map (fun x => (some x.1, x.2))
       (S.decapsKey ciphertext st)).support at hy
-    rw [PMF.mem_support_map_iff] at hy
-    obtain ⟨key, hkey, rfl⟩ := hy
-    intro entry hentry
-    rwa [S.decapsKey_jointCache_eq ciphertext hkey]
+    exact S.mapDecapsKey_jointCache_subset ciphertext hy
   | some message =>
     simp only [hdec] at hy
     change y ∈ ((S.simJoint pk (S.jointInput pk message ciphertext.salt) st).bind
@@ -1319,18 +1338,9 @@ private theorem prefetchDecaps_jointCache_subset
     obtain ⟨z, hz, hy⟩ := hy
     have hsub := S.cacheJoint_jointCache_subset pk (fun _ _ => True)
       (S.jointInput pk message ciphertext.salt) hz
-    split at hy
-    · change y ∈ (PMF.pure (some z.1.key, z.2)).support at hy
-      rw [PMF.mem_support_pure_iff] at hy
-      subst y
-      exact hsub
-    · change y ∈ (PMF.map (fun x => (some x.1, x.2))
-          (S.decapsKey ciphertext z.2)).support at hy
-      rw [PMF.mem_support_map_iff] at hy
-      obtain ⟨key, hkey, rfl⟩ := hy
-      intro entry hentry
-      rw [S.decapsKey_jointCache_eq ciphertext hkey]
-      exact hsub entry hentry
+    exact fun entry hentry =>
+      S.decapsContinuation_jointCache_subset pk message ciphertext z hy entry
+        (hsub entry hentry)
 
 private theorem realHandler_jointCache_subset
     [DecidableEq (JointInput JointPrefix M Salt)]
@@ -1422,25 +1432,15 @@ private theorem realDecaps_bad_le [Fintype M] [Nonempty M]
     simp only [realDecaps, hdec] at hz
     change z ∈ (PMF.map (fun x => (some x.1, x.2))
       (S.decapsKey ciphertext st)).support at hz
-    rw [PMF.mem_support_map_iff] at hz
-    obtain ⟨key, hkey, rfl⟩ := hz
-    rwa [S.decapsKey_jointCache_eq ciphertext hkey] at hentry
+    exact S.mapDecapsKey_jointCache_subset ciphertext hz entry hentry
   | some message =>
     simp only [realDecaps, hdec]
     refine (Probability.PMF.toOuterMeasure_bind_le_add _ _ {z | ¬S.GoodCache pk sk z.2} _ 0
       (fun z _ hgood => by
         refine le_of_eq (toOuterMeasure_notGood_eq_zero (of_not_not hgood) ?_)
         intro y hy entry hentry
-        split at hy
-        · change y ∈ (PMF.pure (some z.1.key, z.2)).support at hy
-          rw [PMF.mem_support_pure_iff] at hy
-          subst y
-          exact hentry
-        · change y ∈ (PMF.map (fun x => (some x.1, x.2))
-              (S.decapsKey ciphertext z.2)).support at hy
-          rw [PMF.mem_support_map_iff] at hy
-          obtain ⟨key, hkey, rfl⟩ := hy
-          rwa [S.decapsKey_jointCache_eq ciphertext hkey] at hentry)).trans ?_
+        exact S.decapsContinuation_jointCache_subset pk message ciphertext z hy entry
+          hentry).trans ?_
     rw [add_zero]
     exact S.realJoint_bad_le pk sk (S.jointInput pk message ciphertext.salt) hs
 
