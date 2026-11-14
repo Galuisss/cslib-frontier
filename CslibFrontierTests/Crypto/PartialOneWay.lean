@@ -58,4 +58,18 @@ example : ProbComp.eval
 paper's exact uniform loss. -/
 example : Probability.dyadicSize 2 = 4 := by decide
 
+/-- The asymptotic transfer uses one indexed adversary and its single dyadic reduction family;
+the identity query schedule exercises a nonconstant polynomial loss. -/
+example {Index Domain Image Prefix : Type} [DecidableEq Prefix]
+    (sample : Nat → ProbComp (PartialOneWayChallenge Index Domain Image))
+    (part : Domain → Prefix) (fallback : Prefix)
+    (adversary : Nat → PartialGuessingAdversary Index Image Prefix)
+    (hbound : ∀ n, (adversary n).IsQueryBounded n)
+    (hpartialDomain : Negligible fun n =>
+      partialDomainAdvantage (sample n) part
+        (partialGuessingToDomainDyadic fallback n (adversary n))) :
+    Negligible fun n => partialGuessingAdvantage (sample n) part (adversary n) :=
+  negligible_partialGuessingAdvantage_of_partialDomainAdvantage_dyadic sample part fallback
+    (fun n => n) adversary hbound PolynomiallyBounded.id hpartialDomain
+
 end CslibTests.Crypto.PartialOneWay

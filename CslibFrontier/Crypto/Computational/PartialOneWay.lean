@@ -62,6 +62,8 @@ exactly once.
 * `Cslib.Crypto.partialGuessingAdvantage_le_dyadicSize_mul_partialDomainAdvantage`,
   `Cslib.Crypto.partialGuessingAdvantage_le_two_mul_partialDomainAdvantage`: exact and coarse
   strict-fair-coin loss bounds.
+* `Cslib.Crypto.negligible_partialGuessingAdvantage_of_partialDomainAdvantage_dyadic`: transfer
+  negligible PDOW success of the single dyadic reduction family to negligible PGOW success.
 
 ## References
 
@@ -813,6 +815,29 @@ theorem partialGuessingAdvantage_le_dyadicSize_mul_partialDomainAdvantage
     ENNReal.toNNReal_mul, ENNReal.toNNReal_ofNat] using
     ENNReal.toNNReal_mono
       (ENNReal.mul_ne_top ENNReal.ofNat_ne_top (PMF.apply_ne_top _ _)) htotal
+
+/-- **Uniform-family asymptotic advantage transfer.** One polynomial query schedule and one
+indexed PGOW adversary family produce the single indexed dyadic PDOW reduction family below. If
+that exact family has negligible PDOW success, then the original family has negligible PGOW
+success. This is the asymptotic consequence of the concrete bound; establishing that the
+constructed reduction family is uniformly executable remains the separate native-resource
+compiler obligation. -/
+theorem negligible_partialGuessingAdvantage_of_partialDomainAdvantage_dyadic
+    {Index Domain Image Prefix : Type} [DecidableEq Prefix]
+    (sample : Nat → ProbComp (PartialOneWayChallenge Index Domain Image))
+    (part : Domain → Prefix) (fallback : Prefix) (queryBound : Nat → Nat)
+    (adversary : Nat → PartialGuessingAdversary Index Image Prefix)
+    (hbound : ∀ n, (adversary n).IsQueryBounded (queryBound n))
+    (hqueryBound : PolynomiallyBounded queryBound)
+    (hpartialDomain : Negligible fun n =>
+      partialDomainAdvantage (sample n) part
+        (partialGuessingToDomainDyadic fallback (queryBound n) (adversary n))) :
+    Negligible fun n => partialGuessingAdvantage (sample n) part (adversary n) := by
+  apply negligible_of_le (hpartialDomain.polynomiallyBounded_mul
+    (Probability.dyadicSize_polynomiallyBounded.comp hqueryBound))
+  intro n
+  exact partialGuessingAdvantage_le_dyadicSize_mul_partialDomainAdvantage
+    (sample n) part fallback (queryBound n) (adversary n) (hbound n)
 
 /-- The fixed-clock loss is at most twice the paper's exact `queryBound + 1` factor. -/
 theorem partialGuessingAdvantage_le_two_mul_partialDomainAdvantage
