@@ -4407,10 +4407,12 @@ public import CslibFrontier.Crypto.Computational.GeneratorReindex
 public import CslibFrontier.Crypto.Computational.GeneratorXor
 public import CslibFrontier.Crypto.Computational.GoldreichLevin.Decoding
 public import CslibFrontier.Crypto.Computational.GoldreichLevin.HardCore
+public import CslibFrontier.Crypto.Computational.GoldreichLevin.ListDecoding
 public import CslibFrontier.Crypto.Computational.GoldreichLevin.Nonuniform
 public import CslibFrontier.Crypto.Computational.GoldreichLevin.Parameters
 public import CslibFrontier.Crypto.Computational.GoldreichLevin.Reduction
 public import CslibFrontier.Crypto.Computational.GoldreichLevin.WordDecoder
+public import CslibFrontier.Crypto.Computational.GoldreichLevin.WordListDecoder
 public import CslibFrontier.Crypto.Computational.GoldreichLevin.WordReduction
 public import CslibFrontier.Crypto.Computational.GoldwasserMicali
 public import CslibFrontier.Crypto.Computational.HQC.DQCSD
