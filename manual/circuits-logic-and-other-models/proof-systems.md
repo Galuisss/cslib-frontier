@@ -1770,6 +1770,9 @@ SAT/UNSAT rows. It includes repeated copies, used replacement auxiliaries, old m
 auxiliaries, closed/nullary components, unused ports and empty boundaries. The accompanying
 [stored-declaration audit](../../CslibFrontierTests/CSPGadgetExpansionAudit.lean) also checks
 that the low imports do not expose the native compiler API.
+The [restricted-module client](../../CslibFrontierTests/PlanarExpandedModule.lean) uses ordinary
+public imports to compute cap and expansion data, apply the pointwise equation and derive
+SAT/UNSAT rows from both complete original-language endpoints.
 
 This is static finite expansion of supplied checked gadgets. It asserts no preprocessing
 runtime for varying languages or templates and no arbitrary primitive-positive planarity
