@@ -56,6 +56,9 @@ certified efficiency, and security in declaration docstrings.
 For documentation-only changes, check links, claims against source, and Lean examples with the
 imports shown. Record the scope of validation and review accurately.
 
+Prepare the PR using the [writing guidance](AGENTS.md#writing-in-issues-and-prs) and
+[template](.github/pull_request_template.md), adapting the explanation to the reader and change.
+
 ## Library quality standard
 
 The bar is Mathlib's [style guidelines](https://leanprover-community.github.io/contribute/style.html)
@@ -188,6 +191,43 @@ argument can read `CNF V` on one side and `List (List (V × Bool))` on the other
 Improving an interface never weakens the mathematics: keep the models, encodings, independent
 resource bounds and nonvacuity of the results it touches.
 
+**Security premises** ([#5293](https://github.com/cslib-community/cslib-frontier/issues/5293)).
+A security theorem assumes nothing about an object that its proof constructs, from the adversary
+or not ([AGENTS.md](AGENTS.md#security-theorems)). After a build,
+`python3 scripts/check_security_premises.py` reads the elaborated statements of the public Crypto
+theorems from the `.olean` files. It flags each premise that is `Negligible …`, an advantage
+inequality, a class membership (`… ∈ 𝒟` or `Admissible …`), an `IsPPT…` predicate or an
+indistinguishability predicate about a reduction, distinguisher, simulator, extractor, key
+generator or other program defined in the Crypto tree, or about a distribution or game that such
+a definition builds from an adversary or scheme structure, directly or through a predicate applied
+to it. It also flags an advantage bound that holds only for parameters an `∃` chooses for such a
+program, and a *realization*: an equation saying that a variable which another premise makes
+efficient or admissible computes such a program applied to another variable. That is how a
+theorem takes the reduction from the caller, as the Carter–Wegman theorems that #5347 deleted did
+with `hD : IsOraclePPT encBool D` and
+`hreal : eval (prfRealGame family D n) = … nonceFnDistinguisher … (forger n)`. Games,
+experiments, advantages, ideal laws, encodings and the theorem's own variables never count.
+`scripts/security_premises_baseline.json` records the allowed hits, one per line with a
+justification: algebraic helpers whose names and docstrings say so (`…_of_reduction_le`,
+`…_of_isPPTOn`), premises that the rule allows but the checker cannot tell apart (a named
+assumption about a component the scheme uses, the hypothesis of a cited generic theorem), and the
+§1 items of #5293 that are being fixed. CI fails a pull request whose changed modules have an
+unrecorded hit or a baseline entry that no longer matches, and prints such differences in other
+modules as a notice; a change to the checker or its baseline is checked against every module, and
+merge groups only report. To add a deliberately conditional helper, name and document it as such,
+run `python3 scripts/check_security_premises.py --update-baseline` and fill in its `why`; `--list`
+shows every hit.
+
+The check supplements review: a clean run is not evidence that a security theorem is right. It
+does not judge vacuous or misdefined notions, games and assumptions; a wrong or nonstandard
+assumption, such as an MLWE variant without the short secrets that ML-KEM's security needs;
+anything outside `Cslib.Crypto`; or names and docstrings that overclaim. Its rules are syntactic
+over elaborated terms, so it also misses a premise whose definition builds the constructed object
+in its own body, a distribution applied only to numbers or functions (such as a key law at fixed
+parameters), a bound without an advantage-named constant, a caller-supplied object whose existence
+the theorem should prove, and a realization stated other than as an equation (an inequality, a
+predicate of the library or a bundled program).
+
 ### Algorithms are programs
 
 Probabilistic algorithms, such as key generation, signing, provers, verifiers, simulators,
@@ -210,6 +250,13 @@ generates the equation lemma `f.eq_1`, whose statement is the body, and stores i
 file even when `f` is private (Lean v4.36; `unfold f`, `dsimp only [f]` and `rfl` did not in our
 tests, [#4243](https://github.com/cslib-community/cslib-frontier/issues/4243)). `import all` also
 loads private information, so such edits do reach its clients.
+
+Evidence that a public API is usable must include a representative `module` client with ordinary
+imports of that API, exercising intended operations through exposed bodies or public equations.
+[QuantumOracleModule.lean](CslibFrontierTests/QuantumOracleModule.lean) is an example.
+A test without `module`, or using `import all` for that API, has broader access and cannot
+establish usability for ordinary clients. Intentional internal, metaprogramming and axiom tests
+keep their documented access and supplement this representative evidence.
 
 - **What is a helper.** A helper is proof plumbing: a step meaningful only inside one proof, or a
   fact about a module-local construction, encoding or intermediate quantity. Helpers are `private`
@@ -254,8 +301,8 @@ Tidy computability (`ComputableTidily…`, `ComputesTidily…`, `IsTidy…`) may
 proofs, through `.tidy`, `.of_tidy`, a proof-local `attribute [local fun_prop] … in` or a tidy
 `have`. It never appears in a public statement: a theorem's type, or a definition's type, exposed
 body or fields. Only the raw machine constructions in `scripts/tidy_allowlist.txt` are exempt.
-CI enforces this with `scripts/check_tidy_surface.py`. The existing tidy statements, which #456 is
-restating, are counted per module in `scripts/tidy_surface_baseline.json`, and CI fails when a
+CI enforces this with `scripts/check_tidy_surface.py`. The existing tidy statements, which #862 is
+removing, are counted per module in `scripts/tidy_surface_baseline.json`, and CI fails when a
 module's count differs from its entry. When you remove some, lower the baseline in the same PR
 with `python3 scripts/check_tidy_surface.py --update`, so that they cannot come back. Until your
 PR lands, any other merge that removes tidy statements makes your baseline stale: rebase and
@@ -276,6 +323,14 @@ when focused local checks or hosted CI supply the required evidence. `scripts/bu
 elaboration with `scripts/cache/ensure.sh`; retry for missing outputs or changed dependencies,
 not merely a new commit with warm artifacts. See the
 [cache guide](scripts/cache/README.md#automatic-restoration) for actual retries and opt-out.
+
+For ordinary edits, use editor/MCP diagnostics or a targeted
+`scripts/build.sh <modules and representative clients> --wfail --iofail`. At a local checkpoint,
+use `scripts/check.sh --quick --no-full-fallback`. Status 3 means quick mode cannot plan the
+change: run the relevant focused checks and use hosted CI for full validation. Run a full local
+`scripts/check.sh` only when explicitly requested or hosted coverage is unavailable; do not
+repeat it after successful CI covering the final revision. The restored-source audit belongs to
+the validation helpers and recovers missing warning/info logs; ordinary builds still reuse caches.
 
 The test suite audits the axiom dependencies of every declaration stored in imported `CslibFrontier`
 modules. Named `#print axioms` checks are added only for results meant to depend on fewer axioms

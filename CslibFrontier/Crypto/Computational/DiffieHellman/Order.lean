@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Crypto.Computational.DiffieHellman
+import CslibFrontier.Crypto.Game.Order
 import CslibFrontier.Crypto.Negligible.Basic
 import CslibFrontier.Probability.PMF.Bind
 import CslibFrontier.Probability.PMF.Uniform
@@ -29,6 +30,9 @@ DDH clients can use this bound without importing Naor–Reingold.
 
 * `Cslib.Crypto.PrimeOrderGroupFamily.DDH.negligible_expected_inv_order`: `F.DDH setup` implies
   that the expected inverse group order is negligible.
+* `Cslib.Crypto.PrimeOrderGroupFamily.advantage_bind_le_expected_inv_order`: averaging a pointwise
+  `(F.order d)⁻¹` advantage bound over `setup` yields advantage at most the expected inverse group
+  order.
 
 ## References
 
@@ -102,18 +106,18 @@ private theorem expected_inv_order_le_two_mul_advantage_ddh (F : PrimeOrderGroup
         (∑' d, setup n d * (F.order d : ℝ≥0∞)⁻¹) +
         (∑' d, setup n d *
           (((F.order d - 1 : ℕ) : ℝ≥0∞) * ((F.order d : ℝ≥0∞)⁻¹ * (F.order d : ℝ≥0∞)⁻¹))) := by
-    simp only [ddhRealGame, ddhRealExperiment, ddhZeroDistinguisher, ProbComp.eval_bind,
-      ProbComp.eval_uniform, ProbComp.eval_pure, smul_eq_zero, F.generator_ne_zero, or_false,
-      PMF.monad_bind_eq_bind]
+    simp only [ddhRealGame, Game.withSetup, ddhRealExperiment, ddhZeroDistinguisher,
+      ProbComp.eval_bind, ProbComp.eval_uniform, ProbComp.eval_pure, smul_eq_zero,
+      F.generator_ne_zero, or_false]
     rw [PMF.bind_apply, ← tsum_add]
     refine tsum_congr fun d => ?_
     rw [uniform_mul_decide_eq_zero_apply F d, mul_add]
   have hideal :
       (F.ddhRandomGame setup (ddhZeroDistinguisher F) n) true =
         ∑' d, setup n d * (F.order d : ℝ≥0∞)⁻¹ := by
-    simp only [ddhRandomGame, ddhRandomExperiment, ddhZeroDistinguisher, ProbComp.eval_bind,
-      ProbComp.eval_uniform, ProbComp.eval_pure, smul_eq_zero, F.generator_ne_zero, or_false,
-      PMF.bind_const, PMF.monad_bind_eq_bind]
+    simp only [ddhRandomGame, Game.withSetup, ddhRandomExperiment, ddhZeroDistinguisher,
+      ProbComp.eval_bind, ProbComp.eval_uniform, ProbComp.eval_pure, smul_eq_zero,
+      F.generator_ne_zero, or_false, PMF.bind_const]
     rw [PMF.bind_apply]
     refine tsum_congr fun d => congrArg (setup n d * ·) ?_
     simpa only [eq_comm, ZMod.card] using uniformOfFintype_bind_decide_eq_apply_true
@@ -190,5 +194,30 @@ theorem DDH.negligible_expected_inv_order {F : PrimeOrderGroupFamily} {setup : �
   negligible_of_le
     ((hDDH (ddhZeroDistinguisher F) (isPPT_ddhZeroDistinguisher F)).const_mul 2)
     (expected_inv_order_le_two_mul_advantage_ddh F setup)
+
+/-- If `Game.advantage (f d) (g d) ≤ (F.order d)⁻¹` for every group description `d`, then
+averaging over `setup` yields advantage at most `(∑' d, setup d * (F.order d)⁻¹).toNNReal`. -/
+theorem advantage_bind_le_expected_inv_order (F : PrimeOrderGroupFamily)
+    (setup : PMF F.Desc) (f g : F.Desc → Game)
+    (h : ∀ d, Game.advantage (f d) (g d) ≤ (F.order d : ℝ≥0)⁻¹) :
+    Game.advantage (setup.bind f) (setup.bind g) ≤
+      (∑' d, setup d * (F.order d : ℝ≥0∞)⁻¹).toNNReal := by
+  let errPMF : F.Desc → Game := fun d =>
+    (PMF.uniformOfFintype (ZMod (F.order d))).bind fun x => PMF.pure (decide (x = 0))
+  have herr_true (d : F.Desc) : errPMF d true = (F.order d : ℝ≥0∞)⁻¹ := by
+    dsimp only [errPMF]
+    rw [PMF.bind_apply, tsum_fintype]
+    simp [PMF.uniformOfFintype_apply, PMF.pure_apply, ZMod.card, eq_comm (a := true)]
+  have herr_succ :
+      Game.succProbability (setup.bind errPMF) =
+        (∑' d, setup d * (F.order d : ℝ≥0∞)⁻¹).toNNReal := by
+    unfold Game.succProbability
+    rw [PMF.bind_apply]
+    simp_rw [herr_true]
+  rw [← herr_succ]
+  refine Game.advantage_bind_le_succProbability_bind setup f g errPMF fun d => ?_
+  rw [herr_true, ← ENNReal.coe_natCast,
+    ← ENNReal.coe_inv (by exact_mod_cast (F.prime_order d).ne_zero)]
+  exact Game.apply_true_le_of_advantage_le (h d)
 
 end Cslib.Crypto.PrimeOrderGroupFamily

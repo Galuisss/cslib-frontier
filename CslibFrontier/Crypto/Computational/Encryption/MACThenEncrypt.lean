@@ -28,6 +28,7 @@ import CslibFrontier.Probability.PMF.Event
 import CslibFrontier.Probability.PMF
 import CslibFrontier.Tactic.PolyTime
 import CslibFrontier.Tactic.PPT
+import CslibFrontier.Tactic.EncLen
 
 /-!
 # MAC-then-Encrypt Composition and Chosen-Ciphertext Counterexample
@@ -371,9 +372,7 @@ theorem eval_cpaGame_mteToCPAAdversary (E : SymmetricCipher) (M : MACScheme)
       ∀ tag ∈ (ProbComp.eval (M.sign km msg)).support,
         (encPair encBits encBits (msg, tag)).length = ptLen n)
     (ctBound : ℕ → ℕ) (adversary : OracleDistinguisher) (bit : Bool) (n : ℕ)
-    (hctBound : ∀ k ∈ (ProbComp.eval (E.keyGen (ptLen n))).support,
-      ∀ msg, msg.length = ptLen n →
-      ∀ ct ∈ (ProbComp.eval (E.encrypt (ptLen n) k msg)).support, ct.length ≤ ctBound (ptLen n)) :
+    (hctBound : E.CiphertextLengthLE (ptLen n) (ctBound (ptLen n))) :
     ProbComp.eval (E.cpaGame (mteToCPAAdversary M ptLen ctBound adversary) bit (ptLen n)) =
       ProbComp.eval
         ((macThenEncrypt E M ptLen hptLenPoly hmsgLen hpairLen).cpaGame adversary bit n) := by
@@ -591,9 +590,7 @@ theorem isOraclePPT_extendCPAAdversary {ctBound : ℕ → ℕ}
 running `adversary`. -/
 theorem eval_cpaGame_extendCPAAdversary (E : SymmetricCipher) (ctBound : ℕ → ℕ)
     (adversary : OracleDistinguisher) (bit : Bool) (n : ℕ)
-    (hctBound : ∀ k ∈ (ProbComp.eval (E.keyGen n)).support,
-      ∀ msg, msg.length = n →
-      ∀ ct ∈ (ProbComp.eval (E.encrypt n k msg)).support, ct.length ≤ ctBound n) :
+    (hctBound : E.CiphertextLengthLE n (ctBound n)) :
     ProbComp.eval (E.cpaGame (extendCPAAdversary ctBound adversary) bit n) =
       ProbComp.eval (E.extendCipher.cpaGame adversary bit n) := by
   simp only [cpaGame, extendCPAAdversary, ProbComp.eval_bind, ProbComp.eval_pure]
@@ -728,9 +725,7 @@ theorem isOraclePPT_extendOneTimeCPAAdversary {ctBound : ℕ → ℕ}
 `E.extendCipher.cpaOneTimeGame` running `adversary`. -/
 theorem eval_cpaOneTimeGame_extendOneTimeCPAAdversary (E : SymmetricCipher) (ctBound : ℕ → ℕ)
     (adversary : OracleDistinguisher) (bit : Bool) (n : ℕ)
-    (hctBound : ∀ k ∈ (ProbComp.eval (E.keyGen n)).support,
-      ∀ msg, msg.length = n →
-      ∀ ct ∈ (ProbComp.eval (E.encrypt n k msg)).support, ct.length ≤ ctBound n) :
+    (hctBound : E.CiphertextLengthLE n (ctBound n)) :
     ProbComp.eval (E.cpaOneTimeGame (extendOneTimeCPAAdversary ctBound adversary) bit n) =
       ProbComp.eval (E.extendCipher.cpaOneTimeGame adversary bit n) := by
   simp only [cpaOneTimeGame, extendOneTimeCPAAdversary, ProbComp.eval_bind,
@@ -886,11 +881,8 @@ private theorem ci_oracle_for_macThenEncrypt_extendCipher (E : SymmetricCipher) 
       ∀ tag ∈ (ProbComp.eval (M.sign km msg)).support,
         (encPair encBits encBits (msg, tag)).length = ptLen n)
     (ctBound : ℕ → ℕ) (n : ℕ)
-    (hctBound : ∀ k ∈ (ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly
-        hmsgLen hpairLen).keyGen n)).support,
-      ∀ msg, msg.length = n →
-      ∀ ct ∈ (ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly
-          hmsgLen hpairLen).encrypt n k msg)).support, ct.length ≤ ctBound n) :
+    (hctBound : (macThenEncrypt E.extendCipher M ptLen hptLenPoly hmsgLen
+      hpairLen).CiphertextLengthLE n (ctBound n)) :
     ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly hmsgLen
         hpairLen).ciOneTimeGame
       (macThenEncryptExtendCIAdversary ctBound) n) = PMF.pure true := by
@@ -932,11 +924,8 @@ theorem eval_ciOneTimeGame_macThenEncrypt_extendCipher (E : SymmetricCipher) (M 
       ∀ tag ∈ (ProbComp.eval (M.sign km msg)).support,
         (encPair encBits encBits (msg, tag)).length = ptLen n)
     (ctBound : ℕ → ℕ) (n : ℕ)
-    (hctBound : ∀ k ∈ (ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly
-        hmsgLen hpairLen).keyGen n)).support,
-      ∀ msg, msg.length = n →
-      ∀ ct ∈ (ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly
-          hmsgLen hpairLen).encrypt n k msg)).support, ct.length ≤ ctBound n) :
+    (hctBound : (macThenEncrypt E.extendCipher M ptLen hptLenPoly hmsgLen
+      hpairLen).CiphertextLengthLE n (ctBound n)) :
     ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly hmsgLen
         hpairLen).ciOneTimeGame
       (macThenEncryptExtendCIAdversary ctBound) n) = PMF.pure true :=
@@ -1013,11 +1002,8 @@ theorem eval_ccaOneTimeGame_macThenEncrypt_extendCipher (E : SymmetricCipher) (M
       ∀ tag ∈ (ProbComp.eval (M.sign km msg)).support,
         (encPair encBits encBits (msg, tag)).length = ptLen n)
     (ctBound : ℕ → ℕ) (bit : Bool) {n : ℕ} (hn : bit = true ∨ 1 ≤ n)
-    (hctBound : ∀ k ∈ (ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly
-        hmsgLen hpairLen).keyGen n)).support,
-      ∀ msg, msg.length = n →
-      ∀ ct ∈ (ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly
-          hmsgLen hpairLen).encrypt n k msg)).support, ct.length ≤ ctBound n) :
+    (hctBound : (macThenEncrypt E.extendCipher M ptLen hptLenPoly hmsgLen
+      hpairLen).CiphertextLengthLE n (ctBound n)) :
     ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly hmsgLen
         hpairLen).ccaOneTimeGame
       (macThenEncryptExtendCCAAdversary ctBound) bit n) = PMF.pure bit := by
@@ -1072,11 +1058,8 @@ theorem advantage_ccaOneTimeGame_macThenEncrypt_extendCipher_eq_one (E : Symmetr
       ∀ tag ∈ (ProbComp.eval (M.sign km msg)).support,
         (encPair encBits encBits (msg, tag)).length = ptLen n)
     (ctBound : ℕ → ℕ) {n : ℕ} (hn : 1 ≤ n)
-    (hctBound : ∀ k ∈ (ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly
-        hmsgLen hpairLen).keyGen n)).support,
-      ∀ msg, msg.length = n →
-      ∀ ct ∈ (ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly
-          hmsgLen hpairLen).encrypt n k msg)).support, ct.length ≤ ctBound n) :
+    (hctBound : (macThenEncrypt E.extendCipher M ptLen hptLenPoly hmsgLen
+      hpairLen).CiphertextLengthLE n (ctBound n)) :
     Game.advantage
       (ProbComp.eval ((macThenEncrypt E.extendCipher M ptLen hptLenPoly hmsgLen
         hpairLen).ccaOneTimeGame
@@ -1192,8 +1175,7 @@ theorem prfMAC_pair_length
   have htagLen : (prfOracle family km.length km msg).length = n := by
     simp only [prfOracle, hmsg, hkmLen, ↓reduceIte]
     rw [hlen km msg (by rw [hmsg, hkmLen]), hkmLen]
-  simp only [length_encPair, encBits_apply, hmsg, htagLen]
-  omega
+  enc_len [hmsg, htagLen]
 
 /-- Concrete MAC-then-Encrypt counterexample cipher instantiated on
 `(prfCipher family).extendCipher` and `prfMAC family` with plaintext-tag length schedule
