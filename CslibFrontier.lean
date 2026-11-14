@@ -3554,8 +3554,8 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Lin
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.LinearPrimitives
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Codec
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Conditional
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Comparison
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Conditional
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Deterministic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Equality
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatch
@@ -3565,6 +3565,9 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Nat
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.StreamFold
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Sum
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Universal
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeOracleProgram
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeOracleProgram.Forget
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeOracleProgram.Static
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NormalForm
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.OCombinators
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.OCountedIteration
@@ -3697,8 +3700,8 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilisti
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.SingleOracle
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Tidy
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Tidy.Redirect
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Universal.Description
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Universal.Decode
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Universal.Description
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Universal.FirstOrder
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Universal.Native
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.ResourceBounds
