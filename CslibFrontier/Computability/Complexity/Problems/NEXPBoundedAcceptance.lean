@@ -25,17 +25,17 @@ import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.ReplayVerdict
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Run
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.PolyTime
-import CslibFrontier.Tactic.EncLen
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Length
 import Mathlib.Data.Nat.Bits
 
 /-!
 # NEXP-complete bounded nondeterministic acceptance
 
-`Cslib.Complexity.NEXPBoundedAcceptance` [Arora and Barak, draft, Chapter 2 Exercises §9 and
-Chapter 4 Exercises §3][AroraBarak07] is the set of instances `⟨α, x, T⟩`
-(`Cslib.Complexity.NEXPBoundedAcceptanceInstance`), with `T` encoded in **binary** (`encNat`),
-such that some certificate `c : List Bool` of length `|c| ≤ T` makes the machine described by `α`
-accept `⟨x, c⟩ = encPair encBits encBits (x, c)` within `T` steps.
+`Cslib.Complexity.NEXPBoundedAcceptance` [Arora and Barak, draft, Chapter 2 Exercises
+§9][AroraBarak07] is the set of instances `⟨α, x, T⟩`
+(`Cslib.Complexity.NEXPBoundedAcceptanceInstance`), with `T` encoded in **binary** (`encNat`), such
+that some certificate `c : List Bool` of length `|c| ≤ T` makes the machine described by `α` accept
+`⟨x, c⟩ = encPair encBits encBits (x, c)` within `T` steps.
 
 * **Membership in `NE` and `NEXP`** (`Cslib.Complexity.NEXPBoundedAcceptance.mem_NE`,
   `Cslib.Complexity.NEXPBoundedAcceptance.mem_NEXP`): a certificate `c` with `|c| ≤ T` is carried
@@ -96,8 +96,8 @@ public section
 namespace Cslib.Complexity
 
 /-- An instance `⟨α, x, T⟩` of `Cslib.Complexity.NEXPBoundedAcceptance`
-[Arora and Barak, draft, Chapter 2 Exercises §9 and Chapter 4 Exercises §3][AroraBarak07], with the
-step and certificate-length bound `T` encoded in binary. -/
+[Arora and Barak, draft, Chapter 2 Exercises §9][AroraBarak07], with the step and
+certificate-length bound `T` encoded in binary. -/
 structure NEXPBoundedAcceptanceInstance where
   /-- The description `α` of the machine. -/
   machine : Desc
@@ -134,7 +134,7 @@ output `[true]`. -/
   universal (a.machine, (encPair encBits encBits (a.input, c)).map eBit, a.steps) =
     ([eBit true], true)
 
-noncomputable instance (a : NEXPBoundedAcceptanceInstance) (c : List Bool) :
+instance (a : NEXPBoundedAcceptanceInstance) (c : List Bool) :
     Decidable (a.Accepts c) :=
   inferInstanceAs (Decidable
     (universal (a.machine, (encPair encBits encBits (a.input, c)).map eBit, a.steps) =
@@ -163,7 +163,7 @@ theorem accepts_desc_iff {k : ℕ} {State : Type} [Fintype State] (eS : State �
 end NEXPBoundedAcceptanceInstance
 
 /-- **Bounded nondeterministic acceptance with a binary time bound**
-[Arora and Barak, draft, Chapter 2 Exercises §9 and Chapter 4 Exercises §3][AroraBarak07]:
+[Arora and Barak, draft, Chapter 2 Exercises §9][AroraBarak07]:
 the instances `⟨α, x, T⟩` for which some certificate `c : List Bool` of length `|c| ≤ T` makes the
 machine described by `α` accept `⟨x, c⟩` within `T` steps. -/
 def NEXPBoundedAcceptance : Set NEXPBoundedAcceptanceInstance :=
@@ -181,7 +181,7 @@ theorem mem_iff {a : NEXPBoundedAcceptanceInstance} :
 certificate word `w` and simulate `a.machine` on `⟨a.input, unframe w⟩` for `min |w| a.steps`
 steps. When `|w| = 2 * a.steps + 1`, `min |w| a.steps = a.steps` and `unframe` ranges over all
 words `c` of length at most `a.steps`. -/
-noncomputable def verifier (q : NEXPBoundedAcceptanceInstance × List Bool) : Bool :=
+def verifier (q : NEXPBoundedAcceptanceInstance × List Bool) : Bool :=
   decide (universal (q.1.machine, (encPair encBits encBits (q.1.input, unframe q.2)).map eBit,
     min q.2.length q.1.steps) = ([eBit true], true))
 
@@ -190,15 +190,6 @@ theorem verifier_eq_true_iff (q : NEXPBoundedAcceptanceInstance × List Bool) :
       universal (q.1.machine, (encPair encBits encBits (q.1.input, unframe q.2)).map eBit,
         min q.2.length q.1.steps) = ([eBit true], true) := by
   rw [verifier, decide_eq_true_iff]
-
-/-- Doubling the length of `unframe w` never exceeds the length of `w`. -/
-private theorem two_mul_length_unframe_le : ∀ w : List Bool, 2 * (unframe w).length ≤ w.length
-  | [] | [true] => by simp [unframe]
-  | false :: w => by simp [unframe]
-  | true :: b :: w => by
-    have := two_mul_length_unframe_le w
-    simp only [unframe, List.length_cons]
-    omega
 
 /-- An instance `a` belongs to `NEXPBoundedAcceptance` iff some framed certificate `w` of exact
 length `2 * a.steps + 1` satisfies `verifier (a, w) = true`. -/
@@ -220,7 +211,7 @@ theorem mem_iff_exists_verifier (a : NEXPBoundedAcceptanceInstance) :
     rw [verifier_eq_true_iff] at hV
     dsimp only at hV
     rw [hw, Nat.min_eq_right (by omega)] at hV
-    have hlen := two_mul_length_unframe_le w
+    have hlen := length_unframe_add_dropFrame_le w
     exact ⟨unframe w, by omega, hV⟩
 
 /-- `NEXPBoundedAcceptance.verifier` is computable in polynomial time because `min |w| a.steps` is
@@ -453,13 +444,13 @@ theorem polyTimeComplete_NE :
   ⟨mem_NE, polyTimeHard_NE⟩
 
 /-- **`NEXPBoundedAcceptance` is `NEXP`-complete** under polynomial-time many-one reductions
-[Arora and Barak, draft, Chapter 2 Exercises §9 and Chapter 4 Exercises §3][AroraBarak07]. -/
+[Arora and Barak, draft, Chapter 2 Exercises §9][AroraBarak07]. -/
 theorem polyTimeComplete_NEXP :
     PolyTimeComplete @NEXP encNEXPBoundedAcceptanceInstance NEXPBoundedAcceptance :=
   ⟨mem_NEXP, polyTimeHard_NEXP⟩
 
 /-- **If `NEXPBoundedAcceptance` is in `EXP`, then `NEXP = EXP`**
-[Arora and Barak, draft, Chapter 2 Exercises §9 and Chapter 4 Exercises §3][AroraBarak07]. -/
+[Arora and Barak, draft, Chapter 2 Exercises §9][AroraBarak07]. -/
 theorem NEXP_eq_EXP_of_mem_EXP
     (h : NEXPBoundedAcceptance ∈ EXP encNEXPBoundedAcceptanceInstance)
     {α : Type} (enc : α ↪ List Bool) :

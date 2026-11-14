@@ -6,13 +6,12 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 
 module
 
-import CslibFrontier.Computability.Complexity.Classes.Hierarchy.Time
 import CslibFrontier.Computability.Complexity.Problems.NEXPBoundedAcceptance
 
 set_option linter.privateModule false
 
 /-!
-# Smoke tests for `NEXPBoundedAcceptance` (Arora–Barak Exercise 2 §9, 4 §3)
+# Smoke tests for `NEXPBoundedAcceptance` (Arora–Barak Exercise 2 §9)
 
 Exercises:
 1. `NEXPBoundedAcceptanceInstance`, `encNEXPBoundedAcceptanceInstance`, and
