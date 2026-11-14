@@ -458,6 +458,25 @@ FFT/NTT correctness, the adaptive Gaussian trapdoor sampler and rejection law, a
 NTRU-SIS, ROM/QROM reductions, certified efficiency, and reconciliation with the still-developing
 FIPS 206 remain separate obligations.
 
+Import
+[`Falcon/ApproxExp.lean`](../../CslibFrontier/Crypto/Computational/Falcon/ApproxExp.lean) for the
+rounded-input fixed-point core of Falcon v1.2 Algorithm 13. `Falcon.approxExpCoefficients` is the
+single 13-entry table, `Falcon.approxExpFixedPoint` performs the twelve Horner multiply/shift and
+subtraction rounds followed by the final scaling multiply/shift, and
+`Falcon.approxExp_horner_safe` verifies that every intermediate is at most `2^63` and every
+natural-number subtraction is nontruncating; the rounded exponent type is strictly below `2^63`,
+so every Horner product is below `2^126`. The final scaling product is only bounded by
+`≤ 2^126` and reaches equality at `x = 0`, `ccs = 1`; exact reference-C behavior at that endpoint
+is left open. The associated source account records 13 multiply/shifts, 12 subtractions, no random
+bits or oracle calls, and an exact 832-bit unframed table payload. `Falcon.approxExpRun` computes
+the value together with that structurally linked operation ledger; the counts are not native
+steps or a runtime bound.
+`Falcon.approxExpRetainedBits controlBits tableCopies` charges a caller-supplied control-program
+encoding plus every installed table occurrence; it does not invent a native encoding or shared
+attack-resource profile. The wider rounded-input type is only a total bounded extension outside
+`x ∈ [0, ln 2]`. Floating-point conversion and a certified approximation-error bound remain
+unproved.
+
 The source-faithful SLH-DSA WOTS+ digit preprocessing from FIPS 205 is in
 [`SLHDSA/WOTS/Digits.lean`](../../CslibFrontier/Crypto/Primitives/SLHDSA/WOTS/Digits.lean), with
 edge checks in [`SLHDSAWOTSDigits.lean`](../../CslibFrontierTests/Crypto/SLHDSAWOTSDigits.lean)

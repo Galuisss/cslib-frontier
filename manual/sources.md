@@ -606,6 +606,18 @@ Alex Fabrikant, Christos H. Papadimitriou, and Kunal Talwar. *The Complexity of 
 ## falcon2020
 
 Falcon team. *Falcon: Fast-Fourier Lattice-Based Compact Signatures over NTRU*, NIST Post-Quantum Cryptography Standardization Round 3 submission, version 1.2, 2020. [Official archive](https://csrc.nist.gov/CSRC/media/Projects/post-quantum-cryptography/documents/round-3/submissions/Falcon-Round3.zip). Checked on 2026-11-13 against archive SHA-256 `fd58f0454f6bfb4713734e60b2d2d75d96fbae62d5180fceeef1039df5362f44`; the enclosed specification has SHA-256 `fec58c4c7e2f1712413c1e77994886c6f1f40f1cc7ec5fa650f132927ca07cd6`, and `KAT/falcon512-KAT.rsp` has SHA-256 `dd75c946fdedef4ec46a2bee7e10c65c9126f1a839b9ced6921fd45f7354b5cd`. `CslibFrontier.Crypto.Falcon` maps Algorithm 3, Algorithms 16 and 18 and Section 3.11.6 to its verification frontend. In `Reference_Implementation/falcon512/falcon512int/shake.c`, `i_shake256_inject`, `i_shake256_flip` and `i_shake256_extract` confirm the 136-byte rate chunks, least-significant-byte lane convention, `0x1F` domain/padding byte and final `0x80` bit; `common.c`'s `hash_to_point_vartime` consumes successive output bytes as big-endian 16-bit words. The SHAKE256 client checks `count = 0`'s exact 40-byte salt followed by its 33-byte message against the first 20 output bytes; that prefix fixture is not a full key/signature KAT verification or a claim about the still-developing FIPS 206 standard.
+Algorithm 13 supplies `ApproxExp`'s thirteen 64-bit coefficients, twelve Horner rounds and final
+63-bit fixed-point scaling; the specification also states the intermediate `2^63` and 126-bit
+product bounds. The archive's
+`Reference_Implementation/falcon512/falcon512int/fpr.c::fpr_expm_p63`, lines 514--598, uses the
+same coefficients and implements sub-unit multiplication by doubling the scaled input and keeping
+the high 64 product bits. `CslibFrontier.Crypto.Falcon.approxExpFixedPoint` follows the published
+rounded-input recurrence and proves its no-underflow and strict Horner-product bounds. Its
+instrumented run links the evaluator structurally to the source ledger of thirteen
+multiply/shifts and twelve subtractions; these counts are not a native cost model. The module does
+not cover floating-point conversion. Its separate final-scaling bound permits equality at
+`2^126` for `x = 0`, `ccs = 1`; the module does not claim the reference implementation's endpoint
+representability or the comment's empirical `2^-50` error observation.
 
 <a id="feige1998"></a>
 ## feige1998
