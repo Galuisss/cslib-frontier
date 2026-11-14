@@ -1544,15 +1544,21 @@ Algorithms 5–6 their exact 256-coefficient, `32 * d`-byte types. It packs fiel
 significant bit first through the shared `BitString.packWords`/`readPackedField` API, proves every
 coefficient vector round-trips, and exposes Section 7.2's decode/re-encode canonicality check; at
 width 12, raw values `3329 ... 4095` reduce modulo 3329 and are therefore noncanonical. The
+[`CiphertextEncoding.lean`](../../CslibFrontier/Crypto/Computational/SIS/MLKEM/CiphertextEncoding.lean)
+boundary applies that codec in Algorithm 14's vector-then-scalar order to the existing compressed
+K-PKE ciphertexts. Exact-length types record the standard 768-, 1088- and 1568-byte boundaries,
+and both directions round-trip for all three standardized parameter records. The
 [`SeedExpansion.lean`](../../CslibFrontier/Crypto/Computational/SIS/MLKEM/SeedExpansion.lean)
 boundary fixes Algorithm 13's `rho || j || i` order, the 33-byte SHAKE256 PRF input and its
 128-/192-byte outputs, and Algorithm 7's three-byte nibble parser. Its finite-prefix parser does
 not claim that a bounded SHAKE128 prefix always supplies 256 accepted values. The
 [ordinary-import clients](../../CslibFrontierTests/Crypto/MLKEMEncoding.lean) include cross-byte
 round trips, the canonical coefficient 3328, the rejected raw word 3329, nibble-order cases and
-the column-before-row suffix. This layer does not serialize the complete K-PKE/KEM, identify the
-NTT representation with coefficient form, prove seed-derived uniformity or security, or claim
-constant-time execution or FIPS validation.
+the column-before-row suffix. A separate
+[ciphertext client](../../CslibFrontierTests/Crypto/MLKEMCiphertextEncoding.lean) checks nonzero
+values across both vector-polynomial boundaries and the scalar boundary. This layer does not
+serialize keys or the complete KEM, identify the NTT representation with coefficient form, prove
+seed-derived uniformity or security, or claim constant-time execution or FIPS validation.
 
 For multi-block symmetric modes of operation over `BitString n`, import
 [`BlockCipher/Modes.lean`](../../CslibFrontier/Crypto/Primitives/BlockCipher/Modes.lean)

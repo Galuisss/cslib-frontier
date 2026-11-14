@@ -30,11 +30,15 @@ validation.
 * `Cslib.Crypto.MLKEM.codecModulus`: `2 ^ d` below width 12 and 3329 at width 12.
 * `Cslib.Crypto.MLKEM.rawCoefficient`: the unreduced `d`-bit field read from encoded bytes.
 * `Cslib.Crypto.MLKEM.byteEncode`, `Cslib.Crypto.MLKEM.byteDecode`: Algorithms 5 and 6.
+* `Cslib.Crypto.MLKEM.byteEncodeVector`, `Cslib.Crypto.MLKEM.byteDecodeVector`: row-major
+  concatenation of coefficient codecs.
 * `Cslib.Crypto.MLKEM.IsCanonical`: the decode/re-encode check of Section 7.2.
 
 ## Main results
 
 * `Cslib.Crypto.MLKEM.byteDecode_byteEncode`: every coefficient vector round-trips.
+* `Cslib.Crypto.MLKEM.byteDecodeVector_byteEncodeVector`: every row-major vector of coefficient
+  vectors round-trips.
 * `Cslib.Crypto.MLKEM.byteEncode_byteDecode`: every byte string round-trips below width 12.
 * `Cslib.Crypto.MLKEM.isCanonical_width12_iff`: width-12 canonicality is exactly the absence of
   raw fields in `3329 ... 4095`.
@@ -62,7 +66,13 @@ structure CodecWidth where
   le_twelve : val ≤ 12
   deriving DecidableEq
 
-/-- The width 10 used for the vector part of every standardized ML-KEM ciphertext. -/
+/-- The width 4 used for the scalar part of ML-KEM-512 and ML-KEM-768 ciphertexts. -/
+def width4 : CodecWidth := ⟨4, by decide, by decide⟩
+
+/-- The width 5 used for the scalar part of ML-KEM-1024 ciphertexts. -/
+def width5 : CodecWidth := ⟨5, by decide, by decide⟩
+
+/-- The width 10 used for the vector part of ML-KEM-512 and ML-KEM-768 ciphertexts. -/
 def width10 : CodecWidth := ⟨10, by decide, by decide⟩
 
 /-- The width 11 used for the vector part of ML-KEM-1024 ciphertexts. -/
@@ -154,6 +164,25 @@ theorem rawCoefficient_byteEncode (d : CodecWidth) (F : Coefficients d) (i : Fin
   change (rawCoefficient d (byteEncode d F) i : ZMod (codecModulus d)) = F i
   rw [rawCoefficient_byteEncode, ZMod.natCast_zmod_val]
 
+/-- Encode `k` coefficient vectors consecutively in row-major order. Vector position zero occupies
+the first `32 * d` bytes. -/
+def byteEncodeVector (d : CodecWidth) (k : ℕ) (F : Fin k → Coefficients d) :
+    FixedBytes (k * (32 * d.val)) := fun r =>
+  let p := finProdFinEquiv.symm r
+  byteEncode d (F p.1) p.2
+
+/-- Decode `k` consecutive coefficient encodings in row-major order. -/
+def byteDecodeVector (d : CodecWidth) (k : ℕ) (B : FixedBytes (k * (32 * d.val))) :
+    Fin k → Coefficients d := fun i =>
+  byteDecode d fun r => B (finProdFinEquiv (i, r))
+
+/-- Decoding a row-major vector encoding recovers every coefficient vector. -/
+@[simp] theorem byteDecodeVector_byteEncodeVector (d : CodecWidth) (k : ℕ)
+    (F : Fin k → Coefficients d) :
+    byteDecodeVector d k (byteEncodeVector d k F) = F := by
+  funext i
+  simpa [byteDecodeVector, byteEncodeVector] using byteDecode_byteEncode d (F i)
+
 /-- Re-encoding decoded bytes is exact whenever every raw field is below the selected modulus. -/
 theorem byteEncode_byteDecode_of_raw_lt (d : CodecWidth) (B : EncodedBytes d)
     (hraw : ∀ i, rawCoefficient d B i < codecModulus d) :
@@ -203,6 +232,15 @@ theorem byteEncode_byteDecode (d : CodecWidth) (h : d.val ≤ 11) (B : EncodedBy
   intro i
   rw [codecModulus_eq_two_pow h]
   exact rawCoefficient_lt_two_pow d B i
+
+/-- At widths below 12, decoding and re-encoding a row-major vector preserves every input byte. -/
+theorem byteEncodeVector_byteDecodeVector (d : CodecWidth) (h : d.val ≤ 11) (k : ℕ)
+    (B : FixedBytes (k * (32 * d.val))) :
+    byteEncodeVector d k (byteDecodeVector d k B) = B := by
+  funext r
+  simp only [byteEncodeVector, byteDecodeVector]
+  rw [byteEncode_byteDecode d h]
+  simp
 
 /-- A byte string is canonical when decoding and re-encoding does not change it.
 
