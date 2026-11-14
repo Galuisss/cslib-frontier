@@ -527,16 +527,14 @@ theorem unframeBitsT_run_encList : ∀ word : List Bool,
     NativeCompiler id (encList encBool) encBits :=
   ofTransducer unframeBitsT unframeBitsStateEncoding unframeBitsT_run_encList
 
-/-- Retained preparation of the framed Boolean list and unchanged unary prefix count. -/
-@[expose] noncomputable def takeBitsInput :
+private noncomputable def takeBitsInput :
     NativeCompiler (fun input : List Bool × ℕ => (input.1, input.2))
       (encPair encBits encUnary) (encPair (encList encBool) encUnary) := by
   let word := frameBits.comp (NativeCompiler.first encBits encUnary)
   let count := NativeCompiler.second encBits encUnary
   exact word.pair count
 
-/-- Retained encoded-list prefix stage used by canonical raw-bit prefixing. -/
-@[expose] noncomputable def takeBitsFramed :
+private noncomputable def takeBitsFramed :
     NativeCompiler (fun input : List Bool × ℕ => input.1.take input.2)
       (encPair encBits encUnary) (encList encBool) :=
   (takeUnary encBool).comp takeBitsInput
@@ -549,8 +547,11 @@ uses the direct unary encoded-list prefix machine, then removes the frames. -/
   unframeBits.comp takeBitsFramed
 
 /-- Raw prefixing retains the literal frame/take/unframe composition. -/
-theorem machine_takeBits : takeBits.machine =
-    unframeBits.machine.comp takeBitsFramed.machine true :=
+theorem machine_takeBits :
+    let framed := (takeUnary encBool).comp
+      ((frameBits.comp (NativeCompiler.first encBits encUnary)).pair
+        (NativeCompiler.second encBits encUnary))
+    takeBits.machine = unframeBits.machine.comp framed.machine true :=
   rfl
 
 /-- The canonical frame/take/unframe composition has ten work tapes. -/
@@ -559,17 +560,23 @@ theorem tapeCount_takeBits : takeBits.tapeCount = 10 :=
 
 /-- Exact construction-assigned time of canonical raw prefixing. -/
 theorem time_takeBits (input : List Bool × ℕ) :
+    let framed := (takeUnary encBool).comp
+      ((frameBits.comp (NativeCompiler.first encBits encUnary)).pair
+        (NativeCompiler.second encBits encUnary))
     takeBits.time input =
-      takeBitsFramed.time input + unframeBits.time (input.1.take input.2) +
+      framed.time input + unframeBits.time (input.1.take input.2) +
         4 * (encList encBool (input.1.take input.2)).length + 9 :=
   rfl
 
 /-- Exact construction-assigned workspace of canonical raw prefixing. -/
 theorem workspace_takeBits (input : List Bool × ℕ) :
+    let framed := (takeUnary encBool).comp
+      ((frameBits.comp (NativeCompiler.first encBits encUnary)).pair
+        (NativeCompiler.second encBits encUnary))
     takeBits.workspace input =
-      takeBitsFramed.workspace input + unframeBits.workspace (input.1.take input.2) +
+      framed.workspace input + unframeBits.workspace (input.1.take input.2) +
         5 * (encList encBool (input.1.take input.2)).length +
-          (6 * max takeBitsFramed.tapeCount unframeBits.tapeCount + 20) :=
+          (6 * max framed.tapeCount unframeBits.tapeCount + 20) :=
   rfl
 
 /-- Fully expanded exact clock in the raw-word length, unary count and emitted-prefix length. -/
