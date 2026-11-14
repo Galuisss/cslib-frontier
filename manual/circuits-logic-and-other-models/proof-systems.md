@@ -1753,7 +1753,7 @@ Import `CslibFrontier.Logics.Propositional.CSP.PrimitivePositive.Expansion` for 
 semantic `PPGadget.expandList` and `PPGadget.expand` constructors. Each macro occurrence
 gets a separate auxiliary block of its actual size, even when symbols and scopes repeat.
 The macro's original auxiliaries come first, followed by those per-occurrence blocks in
-body order. The existing pointwise `PPGadget.eval_instantiate` equation preserves fixed
+body order. The existing pointwise `Cslib.Logic.PL.CSP.eval_instantiate` equation preserves fixed
 assignments as well as existential satisfiability, including total scope-lookup fallbacks.
 
 Import `CslibFrontier.Logics.Propositional.CSP.Planar.Embedding.Expansion` for
