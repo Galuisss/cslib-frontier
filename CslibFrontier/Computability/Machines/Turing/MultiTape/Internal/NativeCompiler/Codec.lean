@@ -56,11 +56,15 @@ treating encoded tuple access as a semantic callback.
   replace every frame by its unary length in one streaming pass.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.takeUnary`, `.dropUnary`: retain the direct linear
   encoded-list prefix and suffix machines through the existing tidy normal form.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.takeBits`: retain raw-word prefixing by explicitly
+  framing the bits, using `takeUnary`, then removing those frames.
 
 ## Main results
 
 * `Turing.MultiTapeTM.Internal.NativeCompiler.machine_ofTransducer`: the retained machine is
   definitionally the supplied transducer followed by input rewind.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.machine_takeBits`, `.time_takeBits`,
+  `.workspace_takeBits`: expose the exact raw-prefix construction and its resource formulas.
 -/
 
 public section
@@ -417,6 +421,131 @@ clock and workspace expose both the kernel bound and the exact normal-form overh
 /-- Unary take/drop retains the direct kernel inside the direct tidy normal form. -/
 theorem machine_takeDropUnary {Alpha : Type*} (keep : Bool) (enc : Alpha ↪ List Bool) :
     (takeDropUnary keep enc).machine = tidy false true (TakeDropUnary.toTM keep) :=
+  rfl
+
+/-! ### Raw bit-string prefixing -/
+
+/-- Insert one marker before every raw bit. A second transducer adds the frame terminators. -/
+@[expose] def markBits : List Bool → List Bool
+  | [] => []
+  | bit :: word => true :: bit :: markBits word
+
+/-- First pass of raw-bit framing: insert one marker before every bit. -/
+@[simps q₀ step final]
+def markBitsT : Transducer Bool Unit where
+  q₀ := ()
+  step _ bit := ((), [true, bit])
+  final _ := []
+  length_step_le _ _ := by simp
+  length_final_le _ := by simp
+
+theorem markBitsT_run : ∀ word : List Bool,
+    markBitsT.run markBitsT.q₀ word = markBits word
+  | [] => rfl
+  | bit :: word => by simp [markBits, markBitsT, markBitsT_run word]
+
+/-- Second pass of raw-bit framing: preserve each marker/bit pair and append its terminator. -/
+@[simps q₀ step final]
+def frameMarkedBitsT : Transducer Bool Bool where
+  q₀ := false
+  step
+    | false, bit => (true, [bit])
+    | true, bit => (false, [bit, false])
+  final _ := []
+  length_step_le state bit := by cases state <;> cases bit <;> simp
+  length_final_le state := by cases state <;> simp
+
+/-- The two framing passes produce exactly the standard framed-list encoding of the raw bits. -/
+theorem frameMarkedBitsT_run_markBits : ∀ word : List Bool,
+    frameMarkedBitsT.run frameMarkedBitsT.q₀ (markBits word) = encList encBool word
+  | [] => rfl
+  | bit :: word => by
+      simp [markBits, frameMarkedBitsT, encList_cons, encBool_apply,
+        frameMarkedBitsT_run_markBits word]
+
+private noncomputable def markBitsCompiler : NativeCompiler markBits encBits encBits :=
+  ofTransducer markBitsT unitStateEncoding markBitsT_run
+
+private noncomputable def frameMarkedBitsCompiler :
+    NativeCompiler
+      (fun word => frameMarkedBitsT.run frameMarkedBitsT.q₀ word) encBits encBits :=
+  ofTransducer frameMarkedBitsT Universal.eBit fun _ => rfl
+
+/-- Retained conversion from a raw bit word to the standard framed list of its bits. -/
+@[expose] noncomputable def frameBits :
+    NativeCompiler id encBits (encList encBool) :=
+  (frameMarkedBitsCompiler.comp markBitsCompiler).ofOutputEq fun word => by
+    exact (frameMarkedBitsT_run_markBits word).symm
+
+/-- Parser state for removing the three-symbol frame around each encoded Boolean. -/
+inductive UnframeBitsState where
+  | marker
+  | value
+  | terminator
+deriving Fintype
+
+/-- Constructive encoding of the raw Boolean-list parser states. -/
+@[expose] def unframeBitsStateEncoding : UnframeBitsState ↪ ℕ :=
+  ⟨fun state => match state with | .marker => 0 | .value => 1 | .terminator => 2,
+    by intro a b h; cases a <;> cases b <;> simp_all⟩
+
+/-- Remove the marker and terminator surrounding every encoded Boolean. -/
+@[simps q₀ step final]
+def unframeBitsT : Transducer Bool UnframeBitsState where
+  q₀ := .marker
+  step
+    | .marker, _ => (.value, [])
+    | .value, bit => (.terminator, [bit])
+    | .terminator, _ => (.marker, [])
+  final _ := []
+  length_step_le state bit := by cases state <;> cases bit <;> simp
+  length_final_le state := by cases state <;> simp
+
+/-- Removing the frames from a standard encoded Boolean list returns the original raw word. -/
+theorem unframeBitsT_run_encList : ∀ word : List Bool,
+    unframeBitsT.run unframeBitsT.q₀ (encList encBool word) = word
+  | [] => rfl
+  | bit :: word => by
+      simp [encList_cons, encBool_apply, unframeBitsT, unframeBitsT_run_encList word]
+
+/-- Retained conversion from the standard framed Boolean list back to its raw word. -/
+@[expose] noncomputable def unframeBits :
+    NativeCompiler id (encList encBool) encBits :=
+  ofTransducer unframeBitsT unframeBitsStateEncoding unframeBitsT_run_encList
+
+/-- Canonical retained raw-bit prefix compiler. The executed machine first frames every raw bit,
+uses the direct unary encoded-list prefix machine, then removes the frames. -/
+@[expose] noncomputable def takeBits :
+    NativeCompiler (fun input : List Bool × ℕ => input.1.take input.2)
+      (encPair encBits encUnary) encBits := by
+  let word := frameBits.comp (NativeCompiler.first encBits encUnary)
+  let count := NativeCompiler.second encBits encUnary
+  exact unframeBits.comp ((takeUnary encBool).comp (word.pair count))
+
+/-- Raw prefixing retains the literal frame/take/unframe composition. -/
+theorem machine_takeBits : takeBits.machine =
+    unframeBits.machine.comp
+      ((takeUnary encBool).machine.comp
+        (appendTM
+          (((NativeCompiler.encodeFrame (encList encBool)).comp
+            (frameBits.comp (NativeCompiler.first encBits encUnary))).machine)
+          (NativeCompiler.second encBits encUnary).machine) true) true :=
+  rfl
+
+/-- Exact construction-assigned time of canonical raw prefixing. -/
+theorem time_takeBits (input : List Bool × ℕ) :
+    takeBits.time input =
+      let word := frameBits.comp (NativeCompiler.first encBits encUnary)
+      let count := NativeCompiler.second encBits encUnary
+      (unframeBits.comp ((takeUnary encBool).comp (word.pair count))).time input :=
+  rfl
+
+/-- Exact construction-assigned workspace of canonical raw prefixing. -/
+theorem workspace_takeBits (input : List Bool × ℕ) :
+    takeBits.workspace input =
+      let word := frameBits.comp (NativeCompiler.first encBits encUnary)
+      let count := NativeCompiler.second encBits encUnary
+      (unframeBits.comp ((takeUnary encBool).comp (word.pair count))).workspace input :=
   rfl
 
 end Turing.MultiTapeTM.Internal.NativeCompiler

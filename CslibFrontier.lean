@@ -3704,6 +3704,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilisti
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Universal.FirstOrder
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Universal.Interpreter
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Universal.Interpreter.Native
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Universal.Interpreter.NativeHandler
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Universal.Native
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.ResourceBounds
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.ResourceBounds.Degree
