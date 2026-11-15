@@ -11,12 +11,12 @@ public import CslibFrontier.Crypto.Protocols.KEM.FujisakiOkamoto.Salted.Correctn
 /-!
 # Tests for the salted joint-oracle FO correctness hop
 
-The fixtures below keep the direct joint-oracle client and the decapsulation-only client separate.
-Their exact query bounds detect counting the two projections of a joint reply twice or dropping
-the `qD` contribution. The connected explicit-coin PKE has one good and one bad Boolean coin for
-every message, so its global correctness error is exactly `1 / 2` rather than a vacuous endpoint.
-Distinct key and coin types make projection order a type-level regression, and a randomized
-challenge-aware client checks the public averaged theorem.
+The fixtures below keep the direct joint-oracle witness and the decapsulation-only witness
+separate. Their exact query bounds detect counting the two projections of a joint reply twice or
+dropping the `qD` contribution. The connected explicit-coin PKE has one good and one bad Boolean
+coin for every message, so both local bad-event probabilities and its global correctness error are
+exactly `1 / 2` rather than vacuous endpoints. Distinct key and coin types make projection order a
+type-level regression, and a randomized challenge-aware client checks the public averaged theorem.
 -/
 
 public section
@@ -111,6 +111,27 @@ theorem halfDecapsThenJointProgram_bounds : QueryBounds halfDecapsThenJointProgr
       (OracleComp.IsCostBounded.query (Query.joint halfJointInput)).bind fun _ =>
         OracleComp.IsCostBounded.pure _ 0
 
+/-- Local correctness-bad predicate for the connected fixture. -/
+def halfBad (st : HalfState) : Prop := ¬halfErrorScheme.GoodCache () () st
+
+/-- One direct joint query creates the concrete `CORR` witness with probability exactly `1 / 2`.
+This is the nonvacuous `(qRO,qD) = (1,0)` execution. -/
+theorem halfDirect_bad_probability :
+    (halfErrorScheme.realHandler () () halfChallenge (Query.joint halfJointInput)
+      ({} : HalfState)).toOuterMeasure {z | halfBad z.2} = ENNReal.ofReal (1 / 2 : ℝ) := by
+  simpa only [halfBad, halfErrorScheme, halfJointInput, halfErrorPKE_msgFailProb] using
+    (halfErrorScheme.realHandler_joint_bad_eq_msgFailProb () () halfChallenge halfJointInput
+      (st := ({} : HalfState)) (by simp) rfl)
+
+/-- One nonchallenge decapsulation performs the implicit joint lookup and creates the same
+concrete witness with probability exactly `1 / 2`. This is the nonvacuous `(0,1)` execution. -/
+theorem halfDecaps_bad_probability :
+    (halfErrorScheme.realHandler () () halfChallenge (Query.decaps halfCiphertext)
+      ({} : HalfState)).toOuterMeasure {z | halfBad z.2} = ENNReal.ofReal (1 / 2 : ℝ) := by
+  simpa only [halfBad, halfErrorScheme, halfErrorPKE_msgFailProb] using
+    (halfErrorScheme.realHandler_decaps_bad_eq_msgFailProb () () halfChallenge
+      halfCiphertext false (st := ({} : HalfState)) (by decide) (by simp) rfl rfl)
+
 /-- Direct-query execution under the real concrete handler. -/
 noncomputable def halfDirectReal : PMF Bool :=
   ((OracleComp.interpret (halfErrorScheme.realHandler () () halfChallenge)
@@ -163,8 +184,24 @@ example :
     (halfErrorScheme.closeTo_run_realHandler_simHandler () () halfChallenge
       halfDecapsThenJointProgram halfDecapsThenJointProgram_bounds)
 
+/-- Challenge decapsulation is rejected by the dispatcher before either concrete decapsulation
+implementation changes its caches. -/
+example (st : HalfState) :
+    halfErrorScheme.realHandler () () halfChallenge (Query.decaps halfChallenge) st =
+      PMF.pure (none, st) := by
+  exact halfErrorScheme.realHandler_decaps_challenge () () halfChallenge st
+
 noncomputable def halfRejectionInput : RejectionInput Unit Unit Bool Bool :=
   halfErrorScheme.rejectionInput () () halfCiphertext
+
+/-- The post-secret-seed-guessing `J` query is executed by the concrete handler and cannot
+create a local PKE correctness witness. -/
+theorem halfRejection_bad_probability :
+    (halfErrorScheme.realHandler () () halfChallenge (Query.rejection halfRejectionInput)
+      ({} : HalfState)).toOuterMeasure {z | halfBad z.2} = 0 := by
+  simpa only [halfBad] using
+    (halfErrorScheme.realHandler_rejection_bad_eq_zero () () halfChallenge halfRejectionInput
+      (st := ({} : HalfState)) (by simp))
 
 /-- `J` remains a distinct source-shaped query and costs nothing in the correctness accounting. -/
 example : Query.jointCost (Query.rejection halfRejectionInput : HalfQuery) = 0 := rfl
