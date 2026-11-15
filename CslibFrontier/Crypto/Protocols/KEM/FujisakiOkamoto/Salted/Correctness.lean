@@ -70,8 +70,8 @@ resources must be supplied by a later transform and HQC realization.
 * `Scheme.realHandler_joint_bad_eq_msgFailProb` and
   `Scheme.realHandler_decaps_bad_eq_msgFailProb`: exact one-query `CORR` probabilities for fresh
   direct and decapsulation inputs.
-* `Scheme.realHandler_decaps_challenge` and `Scheme.realHandler_rejection_bad_eq_zero`: challenge
-  rejection preserves the state, and the separate `J` channel creates no correctness witness.
+* `Scheme.realHandler_rejection_bad_eq_zero`: the separate `J` channel creates no correctness
+  witness.
 * `Cslib.Crypto.Protocols.FujisakiOkamoto.Salted.Scheme.closeTo_run_realHandler_simHandler`:
   concrete real-to-keyless fixed-key hop.
 * `Scheme.advantage_randomizedRealHandler_simHandler_le`: concrete challenge-aware randomized
