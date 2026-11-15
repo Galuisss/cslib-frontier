@@ -59,6 +59,8 @@ public theorem bitsToList : ComputableInDegree (fun word => word)
 public theorem listToBits : ComputableInDegree (fun word => word)
     (encList encBool) encBits 1 1 :=
   of_transducer Encodings.listBitsT fun word => by
-    simpa only [encList, encBits_apply] using (Encodings.listBitsT_run word).symm
+    change word = Encodings.listBitsT.run Encodings.listBitsT.q₀
+      (word.flatMap (frame ∘ encBool))
+    exact (Encodings.listBitsT_run word).symm
 
 end Turing.MultiTapeTM.ComputableInDegree
