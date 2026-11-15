@@ -1,4 +1,4 @@
-"""Disposable targeted import-minimization evidence for #5533. DO NOT MERGE."""
+"""Disposable targeted import-minimization evidence for #5567. DO NOT MERGE."""
 import hashlib
 import json
 import os
@@ -8,15 +8,20 @@ import subprocess
 import sys
 import time
 
-TARGET = 'dad6003e4d424ec922aefa7e4c021071c2ff0f67'
-BASE = '90e0a1a1f0e6c572c73c21741ef9d0ec9fcbef23'
+TARGET = 'c64cd924b87738609bcf25fce248ae551f4ea7fb'
+BASE = '43199b2ea7edb8b5af0e81815ea18e9c77a8d0b9'
 PREFIX = 'CslibFrontier.Computability.Machines.Turing.MultiTape.'
 MODULES = [PREFIX + name for name in [
-    'Internal.PolyTimeFinitePrimitives', 'Internal.PolyTimePiPrimitives',
-    'Complexity.BigO.Pi', 'Complexity.PolyTime.Pi', 'Complexity.PolyTime.Finite',
-    'Complexity.BigO.FunProp', 'Complexity.BigO.FunPropLists',
-    'Complexity.Degree.Primitives', 'Internal.DegreePrimitives',
-    'Internal.DegreeOptionPrimitives', 'Internal.OPrimitives',
+    'Combinators.Reverse',
+    'Combinators.Transducer',
+    'Complexity.LogSpace',
+    'Complexity.Quantitative',
+    'Complexity.Streaming',
+    'Complexity.WordTransducers',
+    'Internal.DecoderWordMachines',
+    'Internal.KernelReverse',
+    'Internal.KernelTransducer',
+    'Internal.WordMachines',
 ]]
 
 
@@ -42,7 +47,7 @@ def run(args, out, label, timeout):
         command=args, returncode=status, timeout_seconds=timeout, timed_out=timed_out,
         elapsed_seconds=time.monotonic() - start), indent=2))
     if status:
-        raise RuntimeError(f'{label} failed: {status}')
+        raise RuntimeError(f'{label} returned status {status}; inspect the retained raw log')
 
 
 def shake_command():
@@ -75,16 +80,22 @@ def main():
         target=head, harness=harness_head, harness_base=BASE, modules=MODULES,
         source_sha256=manifest, run_id=os.environ.get('GITHUB_RUN_ID'),
         interpretation='Raw tool suggestions, not automatic removal approval. Public imports are '
-        'preserved; no --fix. A successful command is not evidence that suggestions are empty.'
+        'preserved; no --fix. Status 1 can mean suggestions or an error; inspect the raw log. '
+        'A successful command is not evidence that suggestions are empty.'
     ), indent=2))
     # Targeted strict build includes the standard cache bootstrap, only on the hosted runner.
     run(['scripts/build.sh', *MODULES, '--wfail', '--iofail'], out, 'strict-build', 3600)
-    run(shake_command(), out, 'import-minimization', 1800)
-    run(['git', 'diff', '--exit-code'], out, 'source-diff', 30)
-    final = {f: hashlib.sha256(Path(f).read_bytes()).hexdigest() for f in files}
-    assert final == manifest, 'target sources changed'
-    assert not subprocess.check_output(
-        ['git', 'status', '--porcelain', '--untracked-files=no'], text=True).strip()
+    try:
+        run(shake_command(), out, 'import-minimization', 1800)
+    finally:
+        # Suggestions commonly return 1. Retain source identity even on that nonzero result;
+        # the raw status/log, not the job colour, determines suggestions versus a tool error.
+        run(['git', 'diff', '--exit-code'], out, 'source-diff', 30)
+        final = {f: hashlib.sha256(Path(f).read_bytes()).hexdigest() for f in files}
+        assert final == manifest, 'target sources changed'
+        assert not subprocess.check_output(
+            ['git', 'status', '--porcelain', '--untracked-files=no'], text=True).strip()
+        (out / 'source-identity.json').write_text(json.dumps(final, indent=2))
     (out / 'COMPLETED').write_text('Strict targeted build and read-only minimizer completed. '
         'Inspect import-minimization.log for suggestions before disposition.\n')
 
