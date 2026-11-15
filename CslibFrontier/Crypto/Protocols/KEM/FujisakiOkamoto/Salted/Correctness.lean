@@ -164,13 +164,13 @@ oracle, matching HQC's `J` fallback. -/
 
 /-- Cost counting direct joint-oracle queries. One response containing both `key` and `coins`
 costs exactly one. -/
-@[simp] def jointCost : Query JointPrefix M Salt RejectPrefix Sigma CT → ℕ
+@[expose, simp] def jointCost : Query JointPrefix M Salt RejectPrefix Sigma CT → ℕ
   | .joint _ => 1
   | .rejection _ => 0
   | .decaps _ => 0
 
 /-- Cost counting decapsulation queries. -/
-@[simp] def decapsCost : Query JointPrefix M Salt RejectPrefix Sigma CT → ℕ
+@[expose, simp] def decapsCost : Query JointPrefix M Salt RejectPrefix Sigma CT → ℕ
   | .joint _ => 0
   | .rejection _ => 0
   | .decaps _ => 1
@@ -1509,7 +1509,7 @@ end Scheme
 
 /-- Separate source-shaped query bounds: at most `qRO` calls to the joint oracle and at most `qD`
 calls to decapsulation. Rejection-oracle calls do not enter the `CORR` loss. -/
-def QueryBounds {JointPrefix M Salt RejectPrefix Sigma CT K R α : Type}
+@[expose] def QueryBounds {JointPrefix M Salt RejectPrefix Sigma CT K R α : Type}
     (program : OracleComp (Response (JointPrefix := JointPrefix) (M := M) (Salt := Salt)
       (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) α) (qRO qD : ℕ) : Prop :=
   OracleComp.IsCostBounded Query.jointCost program qRO ∧
@@ -1535,7 +1535,7 @@ namespace RandomizedAdversary
 variable {PK JointPrefix M Salt RejectPrefix Sigma CT K R : Type}
 
 /-- Per-random-tape and per-challenge joint-oracle and decapsulation bounds. -/
-def QueryBounded
+@[expose] def QueryBounded
     (A : RandomizedAdversary PK JointPrefix M Salt RejectPrefix Sigma CT K R)
     (qRO qD : ℕ) : Prop :=
   ∀ coins challenge, QueryBounds (A.run coins challenge) qRO qD
