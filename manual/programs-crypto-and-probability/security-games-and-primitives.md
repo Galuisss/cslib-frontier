@@ -278,16 +278,23 @@ the binary-encoded index at the unary bound (`min (length n) i`), `nextBitDistin
 `wordNextBitTwoStage` sample uniform bit positions via `ProbComp.sampleDyadicIndex (length n - 1)`,
 and `wordNextBitPredictor` takes the position already drawn by `nextBitPredictionGame` (the prefix
 length) and samples only a candidate bit (`ProbComp.uniform Bool`) and a uniform suffix
-(`BitString.sampleList`). All four reductions carry unconditional strict-PPT
-certificates (`isPPT_wordNextBitPredictor`, `isPPT_nextBitDistinguisher`,
-`isPPT_wordNextBitTwoStage`, `isPPT_twoStageNextBitDistinguisher`) with explicit concrete advantage
-relations (`guessingAdvantage_nextBitPredictionGame_wordNextBitPredictor` losing factor `length n`,
-`guessingAdvantage_nextBitPredictionGame_le` losing at most `2`,
-`guessingAdvantage_nextBitExperiment_wordNextBitTwoStage` losing `dyadicSize (length n - 1) ≤ 2 * length n`,
-and `guessingAdvantage_nextBitExperiment_eq` achieving exact factor `1`), yielding
-`pseudorandomGenerator_iff_nextBitUnpredictableRandomIndex` (`PseudorandomGenerator.nextBitUnpredictableRandomIndex`,
-`.of_nextBitUnpredictableRandomIndex`) and `pseudorandomGenerator_iff_nextBitUnpredictable`
-(`.nextBitUnpredictable`, `.of_nextBitUnpredictable`). Checked clients in
+(`BitString.sampleList`). Given that `length` is unary polynomial-time computable
+(`ComputableInPolyTime length encUnary encUnary`) and that the adversary being transformed is strict
+PPT, all four reductions carry strict-PPT certificates (`isPPT_wordNextBitPredictor`,
+`isPPT_nextBitDistinguisher`, `isPPT_wordNextBitTwoStage`, `isPPT_twoStageNextBitDistinguisher`).
+The concrete advantage relations are stated at a security parameter with `0 < length n`: for a
+length-regular generator (`∀ word, (generator word).length = length word.length`),
+`guessingAdvantage_nextBitPredictionGame_wordNextBitPredictor` loses factor `length n` and
+`guessingAdvantage_nextBitExperiment_wordNextBitTwoStage` loses
+`dyadicSize (length n - 1) ≤ 2 * length n`; `guessingAdvantage_nextBitPredictionGame_le` loses at
+most `2`. `guessingAdvantage_nextBitExperiment_eq` is an exact identity with no hypothesis. They
+give `pseudorandomGenerator_iff_nextBitUnpredictableRandomIndex`
+(`PseudorandomGenerator.nextBitUnpredictableRandomIndex`, `.of_nextBitUnpredictableRandomIndex`) and
+`pseudorandomGenerator_iff_nextBitUnpredictable` (`.nextBitUnpredictable`,
+`.of_nextBitUnpredictable`): `PseudorandomGenerator generator length` holds if and only if
+`generator` is polynomial-time computable (`ComputableInPolyTime generator encBits encBits`),
+length-regular, strictly stretching (`∀ n, n < length n`) and next-bit unpredictable in the
+respective sense. Checked clients in
 [`CslibFrontierTests/Crypto/PseudorandomGeneratorNextBit.lean`](../../CslibFrontierTests/Crypto/PseudorandomGeneratorNextBit.lean)
 verify client-module PPT composition, full-output-index prediction on `appendFalse` (`seed ++ [false]`),
 the out-of-range stage-1 index guard, non-stretching separation on `id`, and derivation from any

@@ -47,9 +47,10 @@ Two standard uniform next-bit formulations are covered and proved equivalent to
    `length n ≤ i`, the challenger outputs a fair coin so out-of-range guesses yield zero advantage.
 
 Both reductions (`wordNextBitPredictor` / `wordNextBitTwoStage` and `nextBitDistinguisher` /
-`twoStageNextBitDistinguisher`) are unconditionally certified in strict polynomial time, reusing
-`PRG.polyTime_length`, `ProbComp.sampleDyadicIndex` (`isPPTOn_sampleDyadicIndex`) for padded
-uniform index sampling, and the finite hybrid/predictor theorem
+`twoStageNextBitDistinguisher`) are certified strict PPT for a unary polynomial-time `length`,
+which `PRG.polyTime_length` supplies for a polynomial-time length-regular generator. They reuse
+`ProbComp.sampleDyadicIndex` (`isPPTOn_sampleDyadicIndex`) for padded uniform index sampling, and
+the finite hybrid/predictor theorem
 `PRG.Generator.toReal_predictionExperiment_nextBitPredictor` from
 `CslibFrontier/Crypto/Primitives/PRG/NextBit.lean`.
 
@@ -70,7 +71,8 @@ uniform index sampling, and the finite hybrid/predictor theorem
 
 * `Cslib.Crypto.isPPT_wordNextBitPredictor`, `Cslib.Crypto.isPPT_nextBitDistinguisher`,
   `Cslib.Crypto.isPPT_wordNextBitTwoStage`, `Cslib.Crypto.isPPT_twoStageNextBitDistinguisher`:
-  unconditional uniform strict-PPT certificates for all four reductions.
+  uniform strict-PPT certificates for all four reductions, for a unary polynomial-time `length`
+  (which `PRG.polyTime_length` supplies for a polynomial-time length-regular generator).
 * `Cslib.Crypto.guessingAdvantage_nextBitPredictionGame_wordNextBitPredictor`,
   `Cslib.Crypto.advantage_nextBitDistinguisher_eq`,
   `Cslib.Crypto.guessingAdvantage_nextBitExperiment_wordNextBitTwoStage`,
