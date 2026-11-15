@@ -9,6 +9,7 @@ module
 
 import CslibFrontier.DataStructure.AVLTree.PointerMachine
 import CslibFrontier.DataStructure.SearchTree.PointerMachine.Update
+import CslibFrontier.DataStructure.SearchTree.PointerMachine.Context
 
 /-! A linked three-node tree with an unrelated record, metadata and client registers.
 Both outcomes and empty-tree termination are tested, together with the logarithmic theorem. -/
@@ -98,3 +99,24 @@ example (value : ℕ) : keys (updateData tree 0 1 value) = keys tree :=
 -- Writing the key itself is deliberately not covered by the key-preservation theorem.
 example : keys (updateData tree 0 0 8) =
     .node 8 (.node 1 .nil .nil) (.node 3 .nil .nil) := by decide
+
+-- The ghost ancestor context reconstructs the original whole tree.
+private def ancestors : List (Frame model 1) :=
+  [.left (label 0 2) (.node (label 2 3) .nil .nil)]
+
+example (query : ℕ) :
+    Represents (initial query).heap (contextParent ancestors) (.node (label 1 1) .nil .nil) ∧
+      ContextRep (initial query).heap (some 1) ancestors := by
+  apply (represents_plug_iff (initial query).heap ancestors
+    (.node (label 1 1) .nil .nil)).mp
+  simp [ancestors, plug, Represents, initial, root, label]
+
+example (query : ℕ) :
+    ∃ t, Executes [.loadPtr 0 2 0, .halt] ((initial query).setPtr 0 (some 1)) t 2 ∧
+      t.heap = (initial query).heap ∧ t.data = (initial query).data ∧ t.ptr 0 = some 0 ∧
+      (∀ i, i ≠ 0 → t.ptr i = ((initial query).setPtr 0 (some 1)).ptr i) := by
+  apply ascend_correct ((initial query).setPtr 0 (some 1)) ancestors
+    (label 1 1) .nil .nil
+  · simp [State.setPtr, Represents, ancestors, contextParent, initial, label, root]
+  · simp [State.setPtr, label]
+  · rfl

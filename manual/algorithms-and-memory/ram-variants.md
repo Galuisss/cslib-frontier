@@ -190,7 +190,7 @@ stated lower bound and are not bundled into the general machine. The weighted-un
 algorithm, pp. 114–115, combines symbol identities, integer sizes, and parent pointers.
 The current foundation does not prove that algorithm or Tarjan's lower bound.
 
-## Linked BST and AVL search
+## Linked BST and AVL operations
 
 Import [`CslibFrontier.DataStructure.AVLTree.PointerMachine`](../../CslibFrontier/DataStructure/AVLTree/PointerMachine.lean)
 for an instruction-counted search of an already represented AVL tree.
@@ -227,16 +227,101 @@ The [allocation client](../../CslibFrontierTests/PointerMachineAllocation.lean) 
 key/payload initialization, old-tree preservation, and allocation into an empty heap.
 
 The [`Rotation`](../../CslibFrontier/DataStructure/SearchTree/PointerMachine/Rotation.lean)
-module implements a right subtree rotation in ten instructions, including halt.
-`rotateRight_represents` proves the new recursive representation, including the pivot
-and middle-subtree parent links, assuming distinct node addresses.
-`AddressesDistinct.rotateRight` preserves that invariant for subsequent rotations.
-The program leaves cached heights unchanged and does not reconnect the external parent's
-child link; those are separate steps needed by AVL insertion. Left rotation remains open.
+module implements both subtree rotations in ten instructions, including halt.
+`rotateRight_represents` and `rotateLeft_represents` prove the recursive representation,
+including pivot and middle-subtree parent links, assuming distinct node addresses.
+They preserve nonscratch registers and records outside the pivots and middle root;
+address distinctness survives both rotations. These programs leave cached heights and
+the external parent's child link unchanged.
 
-These are components of a BST implementation, not a reverse RAM compiler. Remaining work
-includes building full initial trees, connecting and composing mutations into AVL insertion
-with a mutable value payload, and compiling RAM loads/stores through that dictionary. The eventual RAM simulation must state its scalar-operation assumptions and
+[`Reconnect`](../../CslibFrontier/DataStructure/SearchTree/PointerMachine/Reconnect.lean)
+repairs that external link in seven instructions, or the overall root register in five.
+[`Height`](../../CslibFrontier/DataStructure/SearchTree/PointerMachine/Height.lean) recomputes
+a root's cached height in nine instructions from correct child caches, using explicit scalar
+zero and maximum-plus-one operations. The
+[AVL representation bridge](../../CslibFrontier/DataStructure/AVLTree/PointerMachine/Representation.lean)
+matches keys **and cached heights** to Frontier's existing `AVLTree`; its
+`recomputeHeight_mkNode` theorem proves that height repair implements the existing `mkNode`.
+
+[`Blocks`](../../CslibFrontier/Computability/PointerMachine/Blocks.lean) assembles certified
+routines into a single finite program: `Executes.inBlock` relocates jumps and turns each
+halt into a continuation jump at the same instruction cost. Sequencing adds one final halt;
+branch selection adds a test and final halt. This is verified block composition, not an
+automatic compiler from arbitrary Lean functions.
+The [ghost context](../../CslibFrontier/DataStructure/SearchTree/PointerMachine/Context.lean)
+records ancestors and siblings for whole-tree proofs; it is not a physical machine stack.
+Its parent-navigation theorem charges two instructions, including halt.
+
+[`Frame`](../../CslibFrontier/Computability/PointerMachine/Frame.lean) derives scalar-field
+preservation from program syntax: if no instruction allocates or stores a selected field,
+every run preserves that field at every address, even when pointer links change. The
+`addresses` footprint and `AddressesDistinct.node_iff` support lifting subtree changes
+through ancestor contexts, deriving separation from the original tree's distinct addresses.
+
+The [AVL rotations](../../CslibFrontier/DataStructure/AVLTree/PointerMachine/Rotation.lean)
+compose pointer rewiring with both height repairs: each direction takes 39 instructions
+and matches the corresponding existing `AVLTree.rotateLeft` or `rotateRight` result.
+[`balance_correct`](../../CslibFrontier/DataStructure/AVLTree/PointerMachine/Balance.lean)
+implements all five cases of `AVLTree.balance` in at most 121 instructions, including the
+nested rotations and their internal reconnection. It preserves the subtree's addresses,
+all nonheight payload fields and unrelated heap records; register six retains the former
+root for external reconnection. The
+[balance client](../../CslibFrontierTests/AVLPointerMachineBalance.lean) exercises every case
+with stale root heights and additional payload fields.
+
+[`reconnect_context`](../../CslibFrontier/DataStructure/SearchTree/PointerMachine/ReconnectContext.lean)
+lifts a local replacement to a complete linked tree by running the actual reconnection
+program. Its premises describe the original whole tree, the replacement subtree, and the
+unchanged exterior. Its conclusion establishes the updated whole tree and root register,
+address separation, and preservation of every scalar field. Ghost ancestor contexts bound
+upward traversal by the original tree height without adding a machine stack.
+
+[`seek_correct`](../../CslibFrontier/DataStructure/SearchTree/PointerMachine/Seek.lean)
+retains the missing key's parent and comparison path in at most `7 * searchVisits + 4`
+instructions. [`insertLeaf_correct`](../../CslibFrontier/DataStructure/SearchTree/PointerMachine/InsertLeaf.lean)
+allocates and attaches a complete leaf at that vacant child link, or at the empty root,
+in `extra + 9` instructions. A successful search can keep the existing node and its payload.
+
+Import [`AVLTree.PointerMachine.Insert`](../../CslibFrontier/DataStructure/AVLTree/PointerMachine/Insert.lean)
+for complete insertion. `insert_correct` proves that one finite program searches, allocates
+and attaches a leaf on a miss, and balances every ancestor while following parent pointers.
+Its result matches the existing `AVLTree.insert`, including height caches. The bound is
+`141 * cachedHeight + extra + 31`, hence `282 * Nat.log 2 (card + 1) + extra + 31` for a valid
+input AVL tree. All navigation, scalar operations, allocation, continuation jumps and halt
+are charged. At most one node is allocated; existing addresses and nonheight payloads survive.
+An existing key keeps its payload: this is set insertion, with value updates available through
+the separate scalar-field store primitive. The
+[insertion client](../../CslibFrontierTests/AVLPointerMachineInsert.lean) checks empty input,
+duplicates, single and double rotations, fresh payloads and unrelated records.
+
+For an actual standard word-RAM implementation with natural keys and scalar fields, import
+[`AVLTree.WordRAM`](../../CslibFrontier/DataStructure/AVLTree/WordRAM.lean).
+`AVLTree.WordRAM.insert_correct` composes the concrete insertion program with the pointer
+compiler and the [certified natural scalar basis](../../CslibFrontier/Computability/PointerMachine/WordRAM/Natural.lean).
+The scalar routines use ordinary word-RAM instructions: zero costs one instruction,
+maximum-plus-one and the height-gap test at most five, and order comparisons at most three.
+The gap test uses subtraction and handles a maximal-word second operand without overflowing.
+Operand/destination aliasing is covered by the certificates.
+
+Let `T = 282 * Nat.log 2 (card + 1) + extra + 31`, and let `B` bound all initial scalar
+registers and heap fields. It suffices that both `B + T` and
+`nodeAddr L (initialHeap.length + T)` fit the chosen word width. These conservative bounds
+cover temporary values and addresses throughout the source run; the
+[natural simulation theorem](../../CslibFrontier/Computability/PointerMachine/WordRAM/NaturalSimulation.lean)
+derives the intermediate fit and admissibility conditions. The compiled execution costs at
+most `(4 * extra + 22) * T`, including halt, and represents the same insertion result and
+payloads. The target starts with the canonical encoded input heap; input encoding is not
+charged. The [composed client](../../CslibFrontierTests/AVLWordRAM.lean) discharges every
+hypothesis for an eight-bit execution inserting a key with a separate payload into an empty tree.
+
+The general pointer implementation allows other scalar models satisfying the specified
+operations and comparisons. Its global height-comparison contracts require an infinite
+source scalar domain; the natural instantiation above implements bounded executions of that
+domain using finite words. This does not identify arbitrary scalar models with the word RAM.
+
+The reverse RAM-to-pointer-machine compiler remains open. Its next step is to compose these
+AVL search/insertion routines with mutable value updates into a memory dictionary and compile
+RAM loads/stores through it. The simulation must state its scalar-operation assumptions and
 initialization costs. Arithmetic on simulated RAM addresses is scalar arithmetic; resolving
 an address still requires pointer traversal.
 

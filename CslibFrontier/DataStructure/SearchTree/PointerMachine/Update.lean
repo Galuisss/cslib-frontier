@@ -98,4 +98,53 @@ theorem storeData_correct (x : State M (layout extra regs))
   · intro b hb
     exact List.getElem?_modify_ne _ _ (Ne.symm hb)
 
+/-- A scalar write outside a tree leaves that ghost tree unchanged. -/
+theorem updateData_eq_self (tree : BinaryTree (Label M extra)) (a : ℕ)
+    (field : Fin (extra + 1)) (value : M.Value)
+    (fresh : ∀ p u, tree.get p = some u → u.address ≠ a) :
+    updateData tree a field value = tree := by
+  induction tree with
+  | nil => rfl
+  | node label l r il ir =>
+    have hl := il (fun p u hp => fresh (.bit0 p) u hp)
+    have hr := ir (fun p u hp => fresh (.bit1 p) u hp)
+    have hn := fresh .one label rfl
+    change BinaryTree.node { label with data :=
+      if label.address = a then Function.update label.data field value else label.data }
+      (updateData l a field value) (updateData r a field value) = _
+    rw [hl, hr]
+    simp [hn]
+
+
+/-- Scalar-field writes preserve the complete node-address footprint. -/
+@[simp] theorem addresses_updateData (tree : BinaryTree (Label M extra)) (a : ℕ)
+    (field : Fin (extra + 1)) (value : M.Value) :
+    addresses (updateData tree a field value) = addresses tree := by
+  unfold addresses updateData
+  rw [← BinaryTree.comp_map]
+  rfl
+
+/-- Scalar-field updates preserve the separation of node addresses. -/
+theorem AddressesDistinct.updateData {tree : BinaryTree (Label M extra)}
+    (h : AddressesDistinct tree) (a : ℕ) (field : Fin (extra + 1)) (value : M.Value) :
+    AddressesDistinct (updateData tree a field value) := by
+  have addresses (p : PosNum) :
+      ((PointerMachine.updateData tree a field value).get p).map Label.address =
+        (tree.get p).map Label.address := by
+    clear h
+    induction tree generalizing p with
+    | nil => rfl
+    | node label l r il ir =>
+      cases p <;> simp_all [PointerMachine.updateData, BinaryTree.map, BinaryTree.get]
+  intro p q u v hp hq eq
+  have pu : (tree.get p).map Label.address = some u.address := by
+    rw [← addresses, hp]
+    rfl
+  have qv : (tree.get q).map Label.address = some v.address := by
+    rw [← addresses, hq]
+    rfl
+  obtain ⟨u', hu, eu⟩ := Option.map_eq_some_iff.mp pu
+  obtain ⟨v', hv, ev⟩ := Option.map_eq_some_iff.mp qv
+  exact h p q u' v' hu hv (eu.trans (eq.trans ev.symm))
+
 end Cslib.DataStructure.SearchTree.PointerMachine

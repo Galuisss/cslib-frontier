@@ -9,7 +9,7 @@ module
 
 import CslibFrontier.DataStructure.SearchTree.PointerMachine.Rotation
 
-/-! Right rotation with empty and nonempty middle subtrees, payload preservation,
+/-! Both rotation directions with empty and nonempty middle subtrees, payload preservation,
 and an unrelated external parent record. -/
 
 -- This regression module intentionally exports no declarations.
@@ -53,34 +53,42 @@ example : ((run initial).heap[2]?.map (fun r => r.data 1)) = some 99 := by decid
 -- Reconnecting the external parent's child is intentionally a separate operation.
 example : ((run initial).heap[3]?.map (fun r => r.ptr 0)) = some (some 0) := by decide
 
-example :
+private theorem distinct :
+    AddressesDistinct
+      (.node (label 0 3) (.node (label 1 1) .nil middle) .nil) := by
+  have classify (p : PosNum) (u : Label model 1)
+      (h : (BinaryTree.node (label 0 3) (.node (label 1 1) .nil middle) .nil).get p =
+        some u) :
+      (p = .one ∧ u.address = 0) ∨ (p = .bit0 .one ∧ u.address = 1) ∨
+        (p = .bit0 (.bit1 .one) ∧ u.address = 2) := by
+    cases p with
+    | one => cases Option.some.inj h; exact .inl ⟨rfl, rfl⟩
+    | bit1 p => cases p <;> cases h
+    | bit0 p =>
+      cases p with
+      | one => cases Option.some.inj h; exact .inr (.inl ⟨rfl, rfl⟩)
+      | bit0 p => cases p <;> cases h
+      | bit1 p =>
+        cases p with
+        | one => cases Option.some.inj h; exact .inr (.inr ⟨rfl, rfl⟩)
+        | bit0 p => cases p <;> cases h
+        | bit1 p => cases p <;> cases h
+  intro p q u v hp hq eq
+  rcases classify p u hp with ⟨rfl, hu⟩ | ⟨rfl, hu⟩ | ⟨rfl, hu⟩ <;>
+    rcases classify q v hq with ⟨rfl, hv⟩ | ⟨rfl, hv⟩ | ⟨rfl, hv⟩ <;>
+    simp_all
+
+private theorem rotated :
     ∃ t, Executes rotateRight initial t 10 ∧
       Represents t.heap (some 3)
         (.node (label 1 1) .nil (.node (label 0 3) middle .nil)) ∧
-      t.ptr 0 = some 1 ∧ t.data = initial.data ∧ t.heap.length = initial.heap.length := by
+      t.ptr 0 = some 1 ∧ t.data = initial.data ∧ t.heap.length = initial.heap.length ∧
+      (∀ i, i ≠ 0 → i ≠ 2 → i ≠ 3 → i ≠ 4 → t.ptr i = initial.ptr i) ∧
+      (∀ z, z ≠ 1 → z ≠ 0 → root middle ≠ some z →
+        t.heap[z]? = initial.heap[z]?) := by
   apply rotateRight_represents initial (label 1 1) (label 0 3) .nil middle .nil (some 3)
   · simp [Represents, initial, middle, root, label]
-  · have classify (p : PosNum) (u : Label model 1)
-        (h : (BinaryTree.node (label 0 3) (.node (label 1 1) .nil middle) .nil).get p =
-          some u) :
-        (p = .one ∧ u.address = 0) ∨ (p = .bit0 .one ∧ u.address = 1) ∨
-          (p = .bit0 (.bit1 .one) ∧ u.address = 2) := by
-      cases p with
-      | one => cases Option.some.inj h; exact .inl ⟨rfl, rfl⟩
-      | bit1 p => cases p <;> cases h
-      | bit0 p =>
-        cases p with
-        | one => cases Option.some.inj h; exact .inr (.inl ⟨rfl, rfl⟩)
-        | bit0 p => cases p <;> cases h
-        | bit1 p =>
-          cases p with
-          | one => cases Option.some.inj h; exact .inr (.inr ⟨rfl, rfl⟩)
-          | bit0 p => cases p <;> cases h
-          | bit1 p => cases p <;> cases h
-    intro p q u v hp hq eq
-    rcases classify p u hp with ⟨rfl, hu⟩ | ⟨rfl, hu⟩ | ⟨rfl, hu⟩ <;>
-      rcases classify q v hq with ⟨rfl, hv⟩ | ⟨rfl, hv⟩ | ⟨rfl, hv⟩ <;>
-      simp_all
+  · exact distinct
   · rfl
   · rfl
 
@@ -97,3 +105,36 @@ example : ¬ AddressesDistinct
   intro h
   have bad := h .one (.bit0 .one) (label 0 3) (label 0 1) rfl rfl rfl
   cases bad
+
+
+-- The inverse rotation is a concrete program and restores the represented original subtree.
+example :
+    ∃ s t, Executes rotateRight initial s 10 ∧
+      Executes rotateLeft { s with pc := 0 } t 10 ∧
+      Represents t.heap (some 3)
+        (.node (label 0 3) (.node (label 1 1) .nil middle) .nil) ∧
+      t.ptr 0 = some 0 ∧ t.ptr 1 = initial.ptr 1 ∧ t.ptr 6 = initial.ptr 6 ∧
+      t.heap[3]? = initial.heap[3]? := by
+  obtain ⟨s, first, rep, cursor, _, _, frame, heapFrame⟩ := rotated
+  obtain ⟨t, second, rep', cursor', _, _, frame', heapFrame'⟩ :=
+    rotateLeft_represents { s with pc := 0 } (label 0 3) (label 1 1)
+      .nil middle .nil (some 3) rep distinct.rotateRight cursor rfl
+  exact ⟨s, t, first, second, rep', cursor',
+    (frame' 1 (by decide) (by decide) (by decide) (by decide)).trans
+      (frame 1 (by decide) (by decide) (by decide) (by decide)),
+    (frame' 6 (by decide) (by decide) (by decide) (by decide)).trans
+      (frame 6 (by decide) (by decide) (by decide) (by decide)),
+    (heapFrame' 3 (by decide) (by decide) (by decide)).trans
+      (heapFrame 3 (by decide) (by decide) (by decide))⟩
+
+example : AddressesDistinct
+    (.node (label 0 3) (.node (label 1 1) .nil middle) .nil) :=
+  distinct.rotateRight.rotateLeft
+
+private def runLeft (s : State model (layout 1 1)) : State model (layout 1 1) :=
+  (fun x => (step rotateLeft x).getD x)^[9] s
+
+example : (runLeft { run initial with pc := 0 }).ptr 0 = some 0 := by decide
+example : ((runLeft { run initial with pc := 0 }).heap[2]?.map (fun r => r.ptr 2)) =
+    some (some 1) := by decide
+example : (runLeft { run emptyMiddle with pc := 0 }).ptr 0 = some 0 := by decide
