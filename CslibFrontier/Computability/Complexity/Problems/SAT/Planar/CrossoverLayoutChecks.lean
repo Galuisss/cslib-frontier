@@ -495,8 +495,9 @@ theorem geometry_check : LocalGeometry.Check geometry := by
   · rfl
   · rfl
   · intro e he
-    obtain ⟨e, he, rfl⟩ := List.mem_map.mp he
-    exact (row_checked e he).1
+    change e ∈ incidenceRoutes.map indexed at he
+    obtain ⟨a, ha, rfl⟩ := List.mem_map.mp he
+    exact (row_checked a ha).1
   · decide +kernel
 
 /-- Every route starts at its clause and ends at its variable, with a valid clause index. -/
@@ -506,7 +507,8 @@ theorem incidence_endpoints : ∀ e ∈ incidenceRoutes,
   intro e he
   have h := LocalGeometry.incidence_endpoints geometry_check (indexed_mem e he)
   exact ⟨h.1, h.2.2.1, by
-    simpa only [indexed, LocalIncidence.route, LocalIncidence.variableIndex, position_indexed] using h.2.2.2⟩
+    simpa only [indexed, LocalIncidence.route, LocalIncidence.variableIndex, position_indexed]
+      using h.2.2.2⟩
 
 /-- All incidence routes have proper axis-aligned segments. -/
 theorem incidence_orthogonal :
@@ -539,7 +541,9 @@ theorem routes_contact_check : ∀ e ∈ incidenceRoutes, ∀ f ∈ incidenceRou
   intro e he f hf hne
   have h := (row_checked e he).1.2.1 (indexed f) (indexed_mem f hf)
     (fun h => hne (indexed_injective h))
-  simpa only [commonEndpoints_indexed, indexed, LocalIncidence.route] using h
+  change routeContactCheck (geometry.commonEndpoints (indexed e) (indexed f))
+    e.2.2 f.2.2 = true at h
+  rwa [commonEndpoints_indexed] at h
 
 /-- No route visits a nonincident variable vertex. -/
 theorem variable_avoidance_check : ∀ e ∈ incidenceRoutes, ∀ v,
