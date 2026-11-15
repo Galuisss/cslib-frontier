@@ -102,23 +102,6 @@ instance (g : LocalGeometry) (e : LocalIncidence) : Decidable (RowCheck g e) := 
   repeat' refine @instDecidableAnd _ _ ?_ ?_
   all_goals infer_instance
 
-/-- Boolean traversal of finite row obligations in their original label types.
-The local certificate and all three traversals are reduced independently of indexing. -/
-def finiteRowCheck {α β γ : Type*} (localCheck : Bool)
-    (rows : List α) (vertices : List β) (clauses : List γ)
-    (contact : α → Bool) (avoidVariable : β → Bool) (avoidClause : γ → Bool) : Bool :=
-  localCheck && (rows.all contact &&
-    (vertices.all avoidVariable && clauses.all avoidClause))
-
-/-- Decode a finite Boolean row without recomputing its certificate after relabelling. -/
-theorem finiteRowCheck_iff {α β γ : Type*} (localCheck : Bool)
-    (rows : List α) (vertices : List β) (clauses : List γ)
-    (contact : α → Bool) (avoidVariable : β → Bool) (avoidClause : γ → Bool) :
-    finiteRowCheck localCheck rows vertices clauses contact avoidVariable avoidClause = true ↔
-      localCheck = true ∧ (∀ f ∈ rows, contact f = true) ∧
-      (∀ v ∈ vertices, avoidVariable v = true) ∧ ∀ i ∈ clauses, avoidClause i = true := by
-  simp only [finiteRowCheck, Bool.and_eq_true, List.all_eq_true]
-
 /-- Assemble the unchanged complete check from independently certified incidence rows.
 Access isolation remains a separate obligation, including every nonincident vertex. -/
 theorem check_of_rows {g : LocalGeometry}

@@ -154,11 +154,13 @@ private instance (e : ℕ × Variable × Route) : Decidable (LocalSpec e) :=
   inferInstanceAs (Decidable (_ ∧ _))
 
 private def rowCheck (e : ℕ × Variable × Route) : Bool :=
-  LocalGeometry.finiteRowCheck (decide (LocalSpec e))
-    incidenceRoutes variableList (List.finRange 78)
-    (fun f => e == f || routeContactCheck (commonEndpoints e f) e.2.2 f.2.2)
-    (fun v => v == e.2.1 || routeContactCheck [] e.2.2 [variablePosition v])
-    (fun i => i.val == e.1 || routeContactCheck [] e.2.2 [clausePosition i])
+  decide (LocalSpec e) &&
+    (incidenceRoutes.all (fun f =>
+      e == f || routeContactCheck (commonEndpoints e f) e.2.2 f.2.2) &&
+    (variableList.all (fun v =>
+      v == e.2.1 || routeContactCheck [] e.2.2 [variablePosition v]) &&
+    (List.finRange 78).all (fun i =>
+      i.val == e.1 || routeContactCheck [] e.2.2 [clausePosition i])))
 
 private def rowSpec (e : ℕ × Variable × Route) : Prop :=
   LocalGeometry.RowCheck geometry (indexed e) ∧
@@ -167,7 +169,8 @@ private def rowSpec (e : ℕ × Variable × Route) : Prop :=
 
 private theorem rowSpec_of_check (e : ℕ × Variable × Route)
     (h : rowCheck e = true) : rowSpec e := by
-  obtain ⟨hl, hr, hv, hc⟩ := LocalGeometry.finiteRowCheck_iff _ _ _ _ _ _ _ |>.mp h
+  simp only [rowCheck, Bool.and_eq_true, List.all_eq_true] at h
+  obtain ⟨hl, hr, hv, hc⟩ := h
   have hl : LocalSpec e := of_decide_eq_true hl
   refine ⟨⟨?_, ?_, ?_, ?_⟩, hl.2.2.2.2⟩
   · refine ⟨hl.1.1, index_lt e.2.1, hl.1.2.1, ?_, hl.2.1, hl.2.2.2.1, hl.2.2.1⟩
