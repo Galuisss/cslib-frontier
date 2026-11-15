@@ -190,6 +190,37 @@ stated lower bound and are not bundled into the general machine. The weighted-un
 algorithm, pp. 114–115, combines symbol identities, integer sizes, and parent pointers.
 The current foundation does not prove that algorithm or Tarjan's lower bound.
 
+## Linked BST and AVL search
+
+Import [`CslibFrontier.DataStructure.AVLTree.PointerMachine`](../../CslibFrontier/DataStructure/AVLTree/PointerMachine.lean)
+for an instruction-counted search of an already represented AVL tree.
+`SearchTree.PointerMachine` adapts the left/right/parent layout from `lean-bst-finger-papers`
+to Frontier's `BinaryTree`. Ghost labels describe node addresses and all scalar fields;
+they are proof data, not integer pointers available to the program. The heap may contain
+unrelated records.
+
+`SearchTree.PointerMachine.search_correct` proves that one fixed eleven-instruction program
+agrees with `SearchTree.contains`. It takes at most `6 * searchVisits + 3` executed instructions,
+including null checks, comparisons, branches and halt. Register zero supplies the root pointer
+and query (in the pointer and data banks respectively). The output cursor is null on failure;
+on success the theorem identifies the node in the mathematical tree and preserves its entire
+scalar payload. Only cursor register zero, null pointer register five and scalar temporary
+register one may change. The heap is unchanged.
+
+`AVLTree.search_correct` combines this program with the existing AVL height theorem, giving
+at most `12 * Nat.log 2 (card + 1) + 3` instructions. A model-supplied scalar predicate must
+implement strict comparison. The [checked client](../../CslibFrontierTests/PointerMachineSearchTree.lean)
+covers successful and unsuccessful searches, an empty root, metadata, client registers and
+unrelated heap records. Run it with
+`lake build CslibFrontierTests.PointerMachineSearchTree --wfail --iofail`.
+
+This is the search milestone of a BST implementation, not a reverse RAM compiler. Remaining
+work includes constructing initial representations, porting rotations, implementing allocation
+and AVL insertion with a mutable value payload, and compiling RAM loads/stores through that
+dictionary. The eventual RAM simulation must state its scalar-operation assumptions and
+initialization costs. Arithmetic on simulated RAM addresses is scalar arithmetic; resolving
+an address still requires pointer traversal.
+
 ## Known Limitations
 
 The source survey does not establish a uniform finite encoding of exact real inputs, nor a native certificate for every algebraic interpretation. It does not identify the natural RAM, generic RAM and upstream typed-bank RAM by naming alone. An upstream typed-bank RAM proposal (CSLib #1158) was closed unmerged on 2026-11-02; no local semantic identification with that design was found in the inspected sources.

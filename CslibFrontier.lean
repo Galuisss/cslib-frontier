@@ -5017,6 +5017,7 @@ public import CslibFrontier.Crypto.Protocols.VOLE.World
 public import CslibFrontier.DataStructure.AVLTree.Basic
 public import CslibFrontier.DataStructure.AVLTree.Erase
 public import CslibFrontier.DataStructure.AVLTree.Impl
+public import CslibFrontier.DataStructure.AVLTree.PointerMachine
 public import CslibFrontier.DataStructure.AdjacencyList.Memory
 public import CslibFrontier.DataStructure.AdjacencyList.Spec
 public import CslibFrontier.DataStructure.ApproximateMembership.QuotientFilter.Basic
@@ -5280,6 +5281,8 @@ public import CslibFrontier.DataStructure.SearchTree.Basic
 public import CslibFrontier.DataStructure.SearchTree.Cost
 public import CslibFrontier.DataStructure.SearchTree.Erase
 public import CslibFrontier.DataStructure.SearchTree.Impl
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Representation
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Search
 public import CslibFrontier.DataStructure.SplayTree.AccessLemma
 public import CslibFrontier.DataStructure.SplayTree.Basic
 public import CslibFrontier.DataStructure.SplayTree.Impl
