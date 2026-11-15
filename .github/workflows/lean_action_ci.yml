@@ -15,6 +15,7 @@ on:
         options:
           - hierarchy
           - succinct
+          - geometry
           - degree
           - imports
 
@@ -585,6 +586,48 @@ jobs:
           path: |
             ${{ runner.temp }}/succinct-evidence/
             !${{ runner.temp }}/succinct-evidence/*/lib/**
+          if-no-files-found: error
+          retention-days: 30
+
+  geometry-evidence:
+    if: github.event_name == 'workflow_dispatch' && inputs.evidence == 'geometry'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Reclaim unused hosted-runner SDK space
+        continue-on-error: true
+        run: scripts/ci/prepare-runner.sh
+      # The steps below do what lean-action did, with bounded cache retries: install the toolchain,
+      # restore and save `.lake` under the same Actions cache key, then build, test and lint.
+      - uses: ./.github/actions/install-lean
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 1640f9c0c511b5937af478f0b7876e57ca9d0cda
+          path: source-before
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 295a29b459541469069163083f7987cdb6997239
+          path: source-after
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Compare exact PR5746 geometry clients
+        timeout-minutes: 150
+        run: python3 -u scripts/ci/geometry-evidence.py
+      - name: Retain raw timing evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: geometry-evidence
+          path: |
+            ${{ runner.temp }}/geometry-evidence/
+            !${{ runner.temp }}/geometry-evidence/*/lib/**
           if-no-files-found: error
           retention-days: 30
 
