@@ -75,20 +75,21 @@ theorem table_length_ofMachine (stateEncoding : State ↪ ℕ)
     (machine : MultiTapePTM k Bool State (Fin r)) :
     (ofMachine stateEncoding machine).table.length =
       observationRowCount (Fintype.card State) k r := by
-  simp [ofMachine, observationRowCount, Finset.length_toList, Finset.card_univ,
-    Fintype.card_prod, Fintype.card_option, Fintype.card_bool, Fintype.card_fun,
-    Fintype.card_fin, Nat.mul_assoc]
+  simp [observationRowCount, Finset.length_toList, Finset.card_univ,
+    Fintype.card_prod, Fintype.card_option, Fintype.card_bool, Fintype.card_fin,
+    Nat.mul_assoc]
 
 /-- Encoded length of the generated row at one native observation. -/
 @[expose] def encodedRowBits (stateEncoding : State ↪ ℕ)
     (machine : MultiTapePTM k Bool State (Fin r))
     (entry : State × Option Bool × (Fin k → Option Bool) × (Fin r → Option Bool)) : ℕ :=
+  let (state, input, work, answers) := entry
   (encPair Universal.eKey Universal.eBranches
-    (Universal.key (stateEncoding entry.1)
-      (entry.2.1.map Turing.MultiTapeTM.Universal.eBit)
-      (Option.map Turing.MultiTapeTM.Universal.eBit ∘ entry.2.2.1)
-      (Option.map Turing.MultiTapeTM.Universal.eBit ∘ entry.2.2.2),
-    branches stateEncoding machine entry.1 entry.2.1 entry.2.2.1 entry.2.2.2)).length
+    (Universal.key (stateEncoding state)
+      (input.map Turing.MultiTapeTM.Universal.eBit)
+      (Option.map Turing.MultiTapeTM.Universal.eBit ∘ work)
+      (Option.map Turing.MultiTapeTM.Universal.eBit ∘ answers),
+    branches stateEncoding machine state input work answers)).length
 
 /-- Maximum encoded key-and-branches row produced by the exhaustive construction. -/
 @[expose] noncomputable def maxEncodedRowBits (stateEncoding : State ↪ ℕ)
@@ -127,7 +128,7 @@ theorem descLen_ofMachine_le (stateEncoding : State ↪ ℕ)
       descriptionBitsBound stateEncoding machine := by
   have htable := Turing.MultiTapeTM.length_encList_le
     (encPair Universal.eKey Universal.eBranches) (ofMachine stateEncoding machine).table
-    (encoded_row_le_maxEncodedRowBits stateEncoding machine)
+    (fun _ hrow => encoded_row_le_maxEncodedRowBits stateEncoding machine hrow)
   rw [table_length_ofMachine] at htable
   simp only [Universal.descLen, Universal.eDesc_apply, length_encPair, encUnary_apply,
     List.length_replicate] at htable ⊢
@@ -208,20 +209,22 @@ namespace NativeOracleProgram
 
 open Cslib.Probability
 
-variable {r : ℕ} {Alpha Beta : Type}
+universe u
+
+variable {r : ℕ} {Alpha : Type u} {Beta : Type}
   {program : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
   {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
 
 /-- Cardinality of the retained native control type. -/
 @[expose] noncomputable def stateCard
     (witness : NativeOracleProgram r program encIn encOut) : ℕ := by
-  letI := witness.stateFintype
+  let _ := witness.stateFintype
   exact Fintype.card witness.State
 
 /-- Declared natural-tag control count of the retained first-order description. -/
 @[expose] noncomputable def stateTagCount
     (witness : NativeOracleProgram r program encIn encOut) : ℕ := by
-  letI := witness.stateFintype
+  let _ := witness.stateFintype
   exact Description.stateCount witness.stateEncoding
 
 /-- Number of fixed oracle-operation channels of the retained witness. -/
@@ -256,14 +259,14 @@ the exhaustive row count and maximum encoded row length. -/
 theorem staticBits_le_staticBitsBound
     (witness : NativeOracleProgram r program encIn encOut) :
     witness.staticBits ≤ witness.staticBitsBound := by
-  letI := witness.stateFintype
+  let _ := witness.stateFintype
   exact Description.descLen_ofMachine_le witness.stateEncoding witness.machine
 
 /-- The retained table has exactly the exposed exhaustive row count. -/
 theorem description_table_length
     (witness : NativeOracleProgram r program encIn encOut) :
     witness.description.table.length = witness.observationRowCount := by
-  letI := witness.stateFintype
+  let _ := witness.stateFintype
   exact Description.table_length_ofMachine witness.stateEncoding witness.machine
 
 end NativeOracleProgram

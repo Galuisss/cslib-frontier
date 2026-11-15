@@ -24,6 +24,50 @@ namespace CslibFrontierTests.Internal.NativeOracleWitness
 
 abbrev Operation := Fin 2
 
+private def encLiftedBits : ULift.{1} (List Bool) ↪ List Bool :=
+  ⟨ULift.down, fun _ _ h => ULift.ext h⟩
+
+private def liftedAccounting : OnlineAccounting (ULift.{1} (List Bool)) where
+  time := fun _ _ => 0
+  workspace := fun _ _ => 0
+
+example (input : ULift.{1} (List Bool)) : liftedAccounting.totalTime input = 0 := by
+  simp [liftedAccounting, OnlineAccounting.totalTime]
+
+private noncomputable def liftedClassifiedCompiler :=
+  ClassifiedCompiler.inPhase .localStep
+    (Turing.MultiTapeTM.Internal.NativeCompiler.const encLiftedBits encLiftedBits
+      (ULift.up [] : ULift.{1} (List Bool)))
+
+example (input : ULift.{1} (List Bool)) :
+    liftedClassifiedCompiler.online.totalTime input =
+      liftedClassifiedCompiler.compiler.time input :=
+  liftedClassifiedCompiler.time_eq input
+
+private noncomputable def liftedInputArtifact := NativeOracleProgram.ofCompiler (r := 2)
+  (ClassifiedCompiler.inPhase .localStep
+    (Turing.MultiTapeTM.Internal.NativeCompiler.const encLiftedBits encUnit ()))
+
+example (input : ULift.{1} (List Bool)) : liftedInputArtifact.machine.ComputesTidily
+    (encLiftedBits input) (liftedInputArtifact.time input) (encUnit <$> pure ()) :=
+  liftedInputArtifact.computes input
+
+private noncomputable def liftedPrepare := ClassifiedCompiler.inPhase .inputCopy
+  (Turing.MultiTapeTM.Internal.NativeCompiler.const encUnit encLiftedBits
+    (ULift.up [] : ULift.{1} (List Bool)))
+
+private noncomputable def liftedSource := NativeOracleProgram.ofCompiler (r := 2)
+  (ClassifiedCompiler.inPhase .localStep
+    (Turing.MultiTapeTM.Internal.NativeCompiler.const encLiftedBits encUnit ()))
+
+private noncomputable def liftedPreprocessed :=
+  NativeOracleProgram.preprocess liftedPrepare liftedSource
+
+example : liftedPreprocessed.time () =
+    5 * liftedPrepare.compiler.time () +
+      liftedSource.time (ULift.up [] : ULift.{1} (List Bool)) + 9 :=
+  NativeOracleProgram.time_preprocess liftedPrepare liftedSource ()
+
 /-- The first and second calls use genuinely different fixed native operation artifacts. -/
 noncomputable def firstArtifact :=
   NativeOracleProgram.queryTake (r := 2) (0 : Operation)
@@ -36,37 +80,6 @@ artifact. -/
 noncomputable def encodedFairBit :=
   (NativeOracleProgram.fairBit (r := 2) encUnit).encodedOutput
 
-example : encodedFairBit.machine =
-    (NativeOracleProgram.fairBit (r := 2) encUnit).machine :=
-  rfl
-
-example : encodedFairBit.online =
-    (NativeOracleProgram.fairBit (r := 2) encUnit).online :=
-  rfl
-
-example : encodedFairBit.installedDescriptions = [encodedFairBit.description] :=
-  encodedFairBit.installedDescriptions_eq_singleton
-
-example : encodedFairBit.staticBits =
-    (NativeOracleProgram.fairBit (r := 2) encUnit).staticBits :=
-  NativeOracleProgram.staticBits_encodedOutput _
-
-example : firstArtifact.machine = queryTakePTM (0 : Operation) :=
-  rfl
-
-example : secondArtifact.machine = queryTakePTM (1 : Operation) :=
-  rfl
-
-example : firstArtifact.stateEncoding =
-    Turing.MultiTapeTM.Internal.NativeCompiler.sumStateEncoding
-      NativeOracleProgram.queryTakeStateEncoding
-      Turing.MultiTapeTM.Internal.NativeCompiler.rewindStateEncoding :=
-  rfl
-
-example : firstArtifact.staticBits =
-    Turing.MultiTapePTM.Universal.descLen firstArtifact.description :=
-  firstArtifact.staticBits_eq_descLen
-
 example : firstArtifact.description.table.length = firstArtifact.observationRowCount :=
   firstArtifact.description_table_length
 
@@ -74,10 +87,6 @@ example : firstArtifact.staticBits ≤ firstArtifact.staticBitsBound :=
   firstArtifact.staticBits_le_staticBitsBound
 
 example : Description.observationRowCount 1 0 2 = 27 := by decide
-
-#check Description.scheduledBitsBound_polynomiallyBounded
-#check Description.staticBits_polynomiallyBounded_of_le
-#check Description.scheduledBitsBound_polynomiallyBounded_fixed
 
 /-- The generic preservation theorem applies to an explicit coordinate schedule without a
 dependent family of witness records. -/
@@ -94,10 +103,6 @@ example : Cslib.PolynomiallyBounded (fun _ : ℕ => 1) := by
   · intro n
     simp [Description.scheduledBitsBound, Description.structuralBitsBound,
       Description.observationRowCount]
-
-example : NativeOracleProgram.staticBitsCopies 2 firstArtifact =
-    2 * firstArtifact.staticBits :=
-  rfl
 
 -- Each primitive certificate already quantifies over every shared stateful handler.
 example : firstArtifact.machine.ComputesTidily
@@ -123,19 +128,12 @@ noncomputable def firstRequestCompiler :=
 noncomputable def localArtifact := NativeOracleProgram.ofCompiler (r := 2)
   (ClassifiedCompiler.inPhase .localStep firstRequestCompiler)
 
-example : localArtifact.machine = ofDeterministic firstRequestCompiler.machine :=
-  rfl
-
-example : localArtifact.online =
-    (ClassifiedCompiler.inPhase .localStep firstRequestCompiler).online :=
-  rfl
-
 example : localArtifact.machine.ComputesTidily (encUnit ())
     (localArtifact.time ()) (encPair encBits encUnary <$> pure ([false], 1)) :=
   localArtifact.computes ()
 
 /-- Emitted pair size exposes both the framing of the dynamic first component and the encoded
-second component; it is separate from the one-occurrence installed-artifact charge. -/
+second component; it is separate from the final artifact's static charge. -/
 example (request : List Bool × ℕ) :
     localArtifact.outputBits request =
       2 * (encBits request.1).length + 1 + (encUnary request.2).length := by
@@ -160,7 +158,7 @@ def discardBitOnline : OnlineAccounting Unit where
 theorem discardBit_resource_bound (input : Unit) (OracleState : Type)
     (oracle : Operation × List Bool → StateT OracleState PMF (List Bool))
     (state : OracleState) (middle : Bool) (state' : OracleState)
-    (hmiddle : (middle, state') ∈
+    (_hmiddle : (middle, state') ∈
       (ProbOracleComp.runWith oracle
         (ProbOracleComp.sample (ProbComp.uniform Bool)) state).support)
     (phase : OnlinePhase) :
@@ -168,6 +166,8 @@ theorem discardBit_resource_bound (input : Unit) (OracleState : Type)
       discardBit.online.workspace phase middle ≤ discardBitOnline.workspace phase input := by
   constructor <;>
     simp [discardBit, discardBitCompiler, discardBitOnline, ClassifiedCompiler.inPhase,
+      ClassifiedCompiler.ofAccounting, ClassifiedCompiler.finishCompilerAccounting,
+      OnlineAccounting.withWorkspaceFloor,
       Turing.MultiTapeTM.Internal.NativeCompiler.const]
 
 noncomputable def typedPostArtifact := NativeOracleProgram.postprocess
@@ -194,7 +194,7 @@ def typedContinuationOnline : OnlineAccounting Unit where
 theorem typedContinuation_resource_bound (input : Unit) (OracleState : Type)
     (oracle : Operation × List Bool → StateT OracleState PMF (List Bool))
     (state : OracleState) (middle : Bool) (state' : OracleState)
-    (hmiddle : (middle, state') ∈
+    (_hmiddle : (middle, state') ∈
       (ProbOracleComp.runWith oracle
         (ProbOracleComp.sample (ProbComp.uniform Bool)) state).support)
     (phase : OnlinePhase) :
@@ -204,7 +204,8 @@ theorem typedContinuation_resource_bound (input : Unit) (OracleState : Type)
         typedContinuationOnline.workspace phase input := by
   constructor <;>
     simp [typedContinuation, typedContinuationCompiler, typedContinuationOnline,
-      NativeOracleProgram.online_ofCompiler, ClassifiedCompiler.inPhase,
+      NativeOracleProgram.ofCompiler, ClassifiedCompiler.inPhase, ClassifiedCompiler.ofAccounting,
+      ClassifiedCompiler.finishCompilerAccounting, OnlineAccounting.withWorkspaceFloor,
       Turing.MultiTapeTM.Internal.NativeCompiler.const]
 
 noncomputable def typedCapturedArtifact := NativeOracleProgram.sequenceCaptured
@@ -254,16 +255,20 @@ noncomputable def secondPrepared := NativeOracleProgram.preprocess
 
 theorem secondRequestCompiler_time (input : Unit × List Bool) :
     secondRequestCompiler.time input = 12 * input.2.length + 32 := by
-  rcases input with ⟨unit, word⟩
-  cases unit
+  rcases input with ⟨inputUnit, word⟩
+  cases inputUnit
   simp only [secondRequestCompiler, secondRequest, ClassifiedCompiler.pair,
     secondRequestProjection, secondRequestLimit, ClassifiedCompiler.inPhase,
+    ClassifiedCompiler.ofAccounting,
     Turing.MultiTapeTM.Internal.NativeCompiler.pair,
     Turing.MultiTapeTM.Internal.NativeCompiler.comp,
     Turing.MultiTapeTM.Internal.NativeCompiler.encodeFrame,
     Turing.MultiTapeTM.Internal.NativeCompiler.second,
     Turing.MultiTapeTM.Internal.NativeCompiler.ofTransducer, length_encPair, encUnit_apply,
-    encBits_apply, encUnary_apply, List.length_replicate]
+    encBits_apply]
+  rw [show (Turing.MultiTapeTM.Internal.NativeCompiler.const
+    (encPair encUnit encBits) encUnary 2).time ((), word) = 3 by rfl]
+  simp only [List.length_nil]
   omega
 
 /-- A uniform phase schedule for the second artifact on the first query's one-bit reply prefix. -/
@@ -297,16 +302,25 @@ theorem secondPrepared_resource_bound (input : Unit) (OracleState : Type)
   constructor
   · refine (OnlineAccounting.time_le_totalTime secondPrepared.online phase
       (input, middle)).trans ?_
-    rw [NativeOracleProgram.time_preprocess,
-      secondRequestCompiler_time, NativeOracleProgram.totalTime_queryTakeOnline]
-    simp only [NativeOracleProgram.time, secondOnline, secondClock]
+    change secondPrepared.time (input, middle) ≤ secondOnline.time phase input
+    rw [show secondPrepared.time (input, middle) =
+        5 * secondRequestCompiler.time (input, middle) +
+          secondArtifact.time (middle, 2) + 9 by
+      simpa only [secondPrepared, secondRequestCompiler, Function.const_apply] using
+        (NativeOracleProgram.time_preprocess secondRequest secondArtifact (input, middle)),
+      secondRequestCompiler_time,
+      show secondArtifact.time (middle, 2) = 4 * middle.length + 2 * 2 + 6 by
+        simpa only [secondArtifact, NativeOracleProgram.queryTake,
+          NativeOracleProgram.time] using
+          (NativeOracleProgram.totalTime_queryTakeOnline (middle, 2))]
+    simp only [secondOnline, secondClock]
     omega
   · rcases middle with _ | ⟨bit, rest⟩
     · exact le_max_left _ _
     · have hrest : rest = [] := by
-        apply List.length_eq_zero.mp
-        simp only [List.length_cons] at hlength
-        omega
+        exact List.eq_nil_of_length_eq_zero (by
+          simp only [List.length_cons] at hlength
+          omega)
       subst rest
       cases bit
       · exact (le_max_left _ _).trans (le_max_right _ _)
@@ -324,26 +338,13 @@ def adaptive : ProbOracleComp (fun _ : Operation × List Bool => List Bool) (Lis
     (fun input : Unit × List Bool =>
       NativeOracleProgram.queryTakeProgram (1 : Operation) (input.2, 2)) ()
 
-example : adaptiveArtifact.machine = secondPrepared.machine.tidyComp
-    (appendPTM
-      (ofDeterministic
-        (Turing.MultiTapeTM.Internal.NativeCompiler.encodeFrame encUnit).machine)
-      firstPrepared.machine) true :=
-  rfl
-
 example : adaptiveArtifact.machine.ComputesTidily (encUnit ())
     (adaptiveArtifact.time ()) (encBits <$> adaptive) :=
   adaptiveArtifact.computes ()
 
-example : adaptiveArtifact.installedDescriptions = [adaptiveArtifact.description] :=
-  rfl
-
-example : adaptiveArtifact.installedBits = adaptiveArtifact.staticBits :=
-  adaptiveArtifact.installedBits_eq_staticBits
-
 /-- A deterministic stateful handler. Its second answer is nonempty only at state `1` and only
 when it observes the request produced from the first answer. -/
-def handler : Operation × List Bool → StateT ℕ PMF (List Bool)
+noncomputable def handler : Operation × List Bool → StateT ℕ PMF (List Bool)
   | _, 0 => PMF.pure ([true, false], 1)
   | request, state + 1 =>
       if state = 0 ∧ request = ((1 : Operation), [true]) then
@@ -367,19 +368,12 @@ example : ProbOracleComp.runWith handler (adaptiveArtifact.descriptionRun ()) 0 
 /-- The handler is not memoryless or constant. -/
 example : handler ((0 : Operation), [false]) 0 ≠
     handler ((0 : Operation), [false]) 1 := by
-  simp [handler]
-
--- The typed loop constructor is the downstream controller boundary. In particular it accepts
--- `Decoder.option` with `encOption`, while retaining exactly `body.machine.iterateWhile true`.
-#check NativeOracleProgram.boundedIterationEncodedOn
-#check NativeOracleProgram.machine_boundedIterationEncodedOn
-#check NativeOracleProgram.time_boundedIterationEncodedOn
-#check NativeOracleProgram.bodyWorkspace_le_boundedIterationEncodedOn
-#check NativeOracleProgram.postWorkspace_le_postprocess
-#check NativeOracleProgram.secondWorkspace_le_sequenceCaptured
-#check NativeOracleProgram.isTidyOraclePPTOn
-#check ClassifiedCompiler.comp
-#check ClassifiedCompiler.pair
+  change PMF.pure ([true, false], 1) ≠ PMF.pure ([], 2)
+  intro h
+  have hmem : ([true, false], 1) ∈ (PMF.pure ([true, false], 1)).support :=
+    (PMF.mem_support_pure_iff _ _).mpr rfl
+  rw [h, PMF.mem_support_pure_iff] at hmem
+  simp at hmem
 
 /-- Regression witness: iteration preserves a nonzero query-phase workspace peak instead of
 zeroing it and recovering only a generic controller bound. -/

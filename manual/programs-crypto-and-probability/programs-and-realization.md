@@ -112,9 +112,11 @@ one fixed logging handler and checks adaptive queries, zero clock and malformed-
 The internal
 [`NativeOracleProgram`](../../CslibFrontier/Computability/Machines/Turing/MultiTape/Internal/NativeOracleProgram.lean)
 retains an actual Boolean `MultiTapePTM`, an explicit finite-control encoding and the resulting
-first-order `Desc`; its `staticBits` is exactly that artifact's `descLen`. Its explicit installed
-inventory is the singleton final composed description, so controls inlined by preprocessing,
-dispatch, sequencing or iteration are not charged again as component artifacts.
+first-order `Desc`; its `staticBits` is exactly that final artifact's `descLen`, charged once.
+Controls inlined by preprocessing, dispatch, sequencing or iteration are already part of that
+description. Separately retained compilers, generated programs, interpreters and services are not
+represented by this witness and must be listed and charged in the consuming reduction's resource
+ledger.
 [`NativeOracleProgram/Static`](../../CslibFrontier/Computability/Machines/Turing/MultiTape/Internal/NativeOracleProgram/Static.lean)
 exposes the construction's tape and channel counts, finite-state cardinality and tag count, exact
 exhaustive observation-row count, and maximum encoded row length. The generated table has exactly
@@ -125,9 +127,7 @@ that premise because the table is exponential in `k + r`; the supplied corollary
 and channel counts. Thus asymptotic applications with growing channels need a different succinct
 representation or a separate row-schedule proof, while concrete fixed-parameter instances use the
 exact finite coordinates directly.
-`staticBitsCopies n` is only conditional multiplication for a caller-supplied copy count; it does
-not discover an inventory or prove physical distinctness. A separately installed compiler or
-service needs its own inventory entry. The online clock is the sum of separate input/output-copy,
+The online clock is the sum of separate input/output-copy,
 parsing, codec, word-marshalling, operation-tag, finite-dispatch, table-lookup, local-step,
 query-issue, reply-copy and controller coordinates; ordinary workspace is their peak. The generic
 record certifies only this aggregate sum and peak, while each retained constructor derives its
@@ -139,7 +139,7 @@ pre/postprocessing, fair-bit,
 fixed-operation bounded-prefix query, finite dispatch, captured-input sequencing and bounded
 iteration retain their concrete composed machines and explicit control encodings. `encodedOutput`
 reinterprets an already encoded typed result as a raw word without changing the machine,
-accounting or installed description. `ofCompiler` retains a deterministic phase as an open artifact
+accounting or final description. `ofCompiler` retains a deterministic phase as an open artifact
 without adding a dummy coin or query. Classified deterministic composition and pairing preserve the
 child phase records, charge their exact wrapper clocks to marshalling and add only the composed
 compiler workspace formula and generic clock floor. Postprocessing, dispatch and captured-input

@@ -40,16 +40,16 @@ arbitrary `OnlineAccounting` value is not by itself a per-phase execution certif
 and retained reply copying are distinct coordinates; neither includes the external handler's work
 or words that remain only in communication channels.
 
-`NativeOracleProgram.staticBits` is exactly the `descLen` of the retained artifact, counted once.
-`staticBitsCopies` is only conditional multiplication after a caller supplies a copy count; it
-does not discover or certify an installed-artifact inventory. Static bits, online runtime and
-emitted output size remain separate coordinates. An offline compiler is represented independently
-by `Turing.MultiTapeTM.Internal.NativeCompiler`; its time and workspace are charged only when that
-compiler is run. If its emitted result is later installed as code, the consuming construction must
-record that separate artifact occurrence. The finite table enumeration in `description` constructs
-the stored artifact at the metalevel; it is not a free online whole-code scan. A machine that
-materializes or scans a description at runtime must retain that compiler or interpreter and charge
-its execution.
+`NativeOracleProgram.staticBits` is exactly the `descLen` of the final retained artifact, charged
+once. Controls inlined by the constructors are already part of that description. Separately
+retained compilers, generated programs, interpreters and services are not represented by this
+witness; a consuming reduction must list and charge them in its own resource ledger. Static bits,
+online runtime and emitted output size remain separate coordinates. An offline compiler is
+represented independently by `Turing.MultiTapeTM.Internal.NativeCompiler`; its time and workspace
+are charged only when that compiler is run. The finite table enumeration in `description`
+constructs the stored artifact at the metalevel; it is not a free online whole-code scan. A machine
+that materializes or scans a description at runtime must retain that compiler or interpreter and
+charge its execution.
 
 The semantic function in the type is a specification proved by `computes`; it is not a callback
 available to the machine. This module never extracts a machine from an existential certificate or
@@ -174,6 +174,13 @@ theorem clockedRunsInSpace_mul_time_add_one {k : ℕ} {State Operation : Type}
   intro path _ htime
   exact path.space_le_mul_time_add_one.trans (Nat.mul_le_mul_left k (Nat.add_le_add_right htime 1))
 
+private theorem clockedRunsInSpace_of_mul_time_add_one_le {k : ℕ} {State Operation : Type}
+    [DecidableEq Operation] (machine : MultiTapePTM k Bool State Operation)
+    (input : List Bool) (time workspace : ℕ) (hworkspace : k * (time + 1) ≤ workspace) :
+    ClockedRunsInSpace machine input time workspace := by
+  intro path hhead htime
+  exact (clockedRunsInSpace_mul_time_add_one machine input time path hhead htime).trans hworkspace
+
 /-! ### Explicit finite descriptions -/
 
 namespace Description
@@ -265,11 +272,12 @@ def branches (stateEncoding : State ↪ ℕ) (machine : MultiTapePTM k Bool Stat
 omit [Fintype State] in
 /-- Encoded transition observations determine the native observation. -/
 theorem key_injective (stateEncoding : State ↪ ℕ) : Function.Injective
-    (fun entry : State × Option Bool × (Fin k → Option Bool) × (Fin r → Option Bool) =>
-      Universal.key (stateEncoding entry.1)
-        (entry.2.1.map Turing.MultiTapeTM.Universal.eBit)
-        (Option.map Turing.MultiTapeTM.Universal.eBit ∘ entry.2.2.1)
-        (Option.map Turing.MultiTapeTM.Universal.eBit ∘ entry.2.2.2)) := by
+    (fun ((state, input, work, answers) :
+        State × Option Bool × (Fin k → Option Bool) × (Fin r → Option Bool)) =>
+      Universal.key (stateEncoding state)
+        (input.map Turing.MultiTapeTM.Universal.eBit)
+        (Option.map Turing.MultiTapeTM.Universal.eBit ∘ work)
+        (Option.map Turing.MultiTapeTM.Universal.eBit ∘ answers)) := by
   rintro ⟨state, input, work, answers⟩ ⟨state', input', work', answers'⟩ h
   simp only [Universal.key, Universal.Key.mk.injEq,
     Turing.MultiTapeTM.Universal.Key.mk.injEq] at h
@@ -284,7 +292,7 @@ theorem key_injective (stateEncoding : State ↪ ℕ) : Function.Injective
 
 /-- Explicitly enumerate every finite control, Boolean read symbol, work-head observation and
 finite operation-head observation of a native machine. -/
-@[expose] noncomputable def ofMachine (stateEncoding : State ↪ ℕ)
+noncomputable abbrev ofMachine (stateEncoding : State ↪ ℕ)
     (machine : MultiTapePTM k Bool State (Fin r)) : Universal.Desc :=
   { tapes := k
     states := stateCount stateEncoding
@@ -293,12 +301,12 @@ finite operation-head observation of a native machine. -/
     table :=
       (Finset.univ : Finset
         (State × Option Bool × (Fin k → Option Bool) × (Fin r → Option Bool))).toList.map
-        fun entry =>
-          (Universal.key (stateEncoding entry.1)
-            (entry.2.1.map Turing.MultiTapeTM.Universal.eBit)
-            (Option.map Turing.MultiTapeTM.Universal.eBit ∘ entry.2.2.1)
-            (Option.map Turing.MultiTapeTM.Universal.eBit ∘ entry.2.2.2),
-          branches stateEncoding machine entry.1 entry.2.1 entry.2.2.1 entry.2.2.2) }
+        fun (state, input, work, answers) =>
+          (Universal.key (stateEncoding state)
+            (input.map Turing.MultiTapeTM.Universal.eBit)
+            (Option.map Turing.MultiTapeTM.Universal.eBit ∘ work)
+            (Option.map Turing.MultiTapeTM.Universal.eBit ∘ answers),
+          branches stateEncoding machine state input work answers) }
 
 /-- The explicitly enumerated table selects the native transition at every encoded observation. -/
 theorem find?_ofMachine (stateEncoding : State ↪ ℕ)
@@ -470,8 +478,11 @@ theorem mapConfig_receive (stateEncoding : State ↪ ℕ) {input : List Bool}
   rfl
 
 @[simp] theorem decodeBit_map_eBit (word : List Bool) :
-    (word.map Turing.MultiTapeTM.Universal.eBit).map decodeBit = word := by
-  simp
+    word.map (decodeBit ∘ Turing.MultiTapeTM.Universal.eBit) = word := by
+  induction word with
+  | nil => rfl
+  | cons bit tail ih =>
+      simp only [List.map_cons, Function.comp_apply, decodeBit_eBit, ih]
 
 /-- Query adapter used when executing a natural-symbol description against the original Boolean
 word handler. It decodes the request and re-encodes the reply; this work is semantic simulation,
@@ -503,27 +514,47 @@ theorem runConfigFrom_ofMachine (stateEncoding : State ↪ ℕ)
   | none =>
       have htarget : (mapConfig stateEncoding current).tapes.state = none := by
         simp [mapConfig, hs, Cfg.map]
-      simp [MultiTapeMachine.runConfigFrom, hs, htarget]
+      simp only [MultiTapeMachine.runConfigFrom, hs, htarget]
+      exact (PFunctor.FreeM.map_pure _ _).symm
   | some state =>
       have htarget : (mapConfig stateEncoding current).tapes.state =
           some (controlEmbedding stateEncoding state) := by
         simp [mapConfig, hs, Cfg.map, controlEmbedding]
       simp only [MultiTapeMachine.runConfigFrom, hs, htarget, mapConfig_inputSymbol,
-        mapConfig_workTapeSymbols, mapConfig_answerSymbols, bind_map_left, map_bind]
+        bind_map_left, map_bind]
       congr 1 with coin : 1
+      rw [show (mapConfig stateEncoding current).tapes.workTapeSymbols =
+          Option.map Turing.MultiTapeTM.Universal.eBit ∘ current.tapes.workTapeSymbols by
+        funext tape
+        exact mapConfig_workTapeSymbols stateEncoding current tape]
+      rw [show (mapConfig stateEncoding current).answerSymbols =
+          Option.map Turing.MultiTapeTM.Universal.eBit ∘ current.answerSymbols by
+        funext operation
+        exact mapConfig_answerSymbols stateEncoding current operation]
+      rw [show controlEmbedding stateEncoding state =
+          some (stateEmbedding stateEncoding state) by rfl]
       rw [Turing.MultiTapePTM.Universal.Desc.toMachine_tr,
         ofMachine_action stateEncoding machine state current.tapes.inputSymbol
           current.tapes.workTapeSymbols current.answerSymbols coin]
       cases haction : machine.tr state current.tapes.inputSymbol current.tapes.workTapeSymbols
           current.answerSymbols coin with
       | step ordinary querySymbols answerMoves =>
-          simp only [mapAction, haction, pure_bind, map_pure]
-          exact (mapConfig_step stateEncoding current ordinary querySymbols answerMoves).symm
+          simp only [mapAction, map_pure]
+          rw [mapConfig_step]
       | query operation next =>
-          simp only [mapAction, haction, encodedQuery, ProbOracleComp.query, map_bind]
-          congr 1 with reply : 1
-          simpa only [mapConfig_queryBuffer, decodeBit_map_eBit] using
-            (mapConfig_receive stateEncoding current operation next reply).symm
+          have hquery :
+              ((mapConfig stateEncoding current).channels operation).queryBuffer.map decodeBit =
+                (current.channels operation).queryBuffer := by
+            change ((current.channels operation).queryBuffer.map
+              Turing.MultiTapeTM.Universal.eBit).map decodeBit =
+                (current.channels operation).queryBuffer
+            simpa only [List.map_map] using decodeBit_map_eBit _
+          simp only [mapAction, encodedQuery, ProbOracleComp.query]
+          rw [hquery]
+          simp only [bind_map_left, map_bind, map_pure]
+          apply bind_congr
+          intro reply
+          rw [mapConfig_receive]
 
 /-- The run-level simulation remains exact after interpreting both programs with any shared
 stateful Boolean-word handler. -/
@@ -572,13 +603,28 @@ inductive OnlinePhase where
   | replyCopy
   /-- Run the fixed outer loop or controller around the native primitives. -/
   | controller
-  deriving DecidableEq, Fintype
+  deriving DecidableEq
+
+/-- Explicit enumeration of the twelve disjoint online-accounting phases. -/
+instance : Fintype OnlinePhase where
+  elems := {.inputCopy, .outputCopy, .parsing, .codec, .marshalling, .tags, .dispatch,
+    .lookup, .localStep, .queryIssue, .replyCopy, .controller}
+  complete phase := by cases phase <;> simp
+
+@[simp] theorem OnlinePhase.univ_eq : (Finset.univ : Finset OnlinePhase) =
+    {.inputCopy, .outputCopy, .parsing, .codec, .marshalling, .tags, .dispatch,
+      .lookup, .localStep, .queryIssue, .replyCopy, .controller} :=
+  by
+    ext phase
+    cases phase <;> simp
+
+universe u v w
 
 /-- Construction-assigned time and ordinary-workspace coordinates. The containing named witness
 certifies their aggregate sum and peak; constructor theorems justify the displayed split. Query and
 answer words that remain only in communication channels, and the external handler's private work,
 are outside `workspace`. -/
-structure OnlineAccounting (Alpha : Type) where
+structure OnlineAccounting (Alpha : Type u) where
   /-- Time charged to one phase on one input. -/
   time : OnlinePhase → Alpha → ℕ
   /-- Ordinary work-tape cells charged to one phase on one input. -/
@@ -586,7 +632,7 @@ structure OnlineAccounting (Alpha : Type) where
 
 namespace OnlineAccounting
 
-variable {Alpha Gamma : Type}
+variable {Alpha : Type u} {Gamma : Type v}
 
 /-- The online clock is the sum of the disjoint phase charges. -/
 @[expose] def totalTime (accounting : OnlineAccounting Alpha) (input : Alpha) : ℕ :=
@@ -598,11 +644,15 @@ variable {Alpha Gamma : Type}
 
 theorem time_le_totalTime (accounting : OnlineAccounting Alpha) (phase : OnlinePhase)
     (input : Alpha) : accounting.time phase input ≤ accounting.totalTime input := by
-  exact Finset.single_le_sum (fun _ _ => Nat.zero_le _) (Finset.mem_univ phase)
+  simpa only [totalTime] using
+    (Finset.single_le_sum (f := fun current : OnlinePhase => accounting.time current input)
+      (fun _ _ => Nat.zero_le _) (Finset.mem_univ phase))
 
 theorem workspace_le_totalWorkspace (accounting : OnlineAccounting Alpha) (phase : OnlinePhase)
-    (input : Alpha) : accounting.workspace phase input ≤ accounting.totalWorkspace input :=
-  Finset.le_sup (Finset.mem_univ phase)
+    (input : Alpha) : accounting.workspace phase input ≤ accounting.totalWorkspace input := by
+  simpa only [totalWorkspace] using
+    (Finset.le_sup (f := fun current : OnlinePhase => accounting.workspace current input)
+      (Finset.mem_univ phase))
 
 /-- Sequential componentwise accounting. Each phase's clocks add and its ordinary workspaces take
 the peak. Static artifacts and communication storage are deliberately not part of this operation. -/
@@ -625,15 +675,23 @@ theorem totalWorkspace_seq (first second : OnlineAccounting Alpha) (input : Alph
   · apply Finset.sup_le
     intro phase _
     exact max_le
-      ((Finset.le_sup (Finset.mem_univ phase)).trans (le_max_left _ _))
-      ((Finset.le_sup (Finset.mem_univ phase)).trans (le_max_right _ _))
+      ((Finset.le_sup (f := fun current : OnlinePhase => first.workspace current input)
+        (Finset.mem_univ phase)).trans (le_max_left _ _))
+      ((Finset.le_sup (f := fun current : OnlinePhase => second.workspace current input)
+        (Finset.mem_univ phase)).trans (le_max_right _ _))
   · apply max_le
     · apply Finset.sup_le
       intro phase _
-      exact (le_max_left _ _).trans (Finset.le_sup (Finset.mem_univ phase))
+      exact (le_max_left _ _).trans
+        (Finset.le_sup (f := fun current : OnlinePhase =>
+          max (first.workspace current input) (second.workspace current input))
+          (Finset.mem_univ phase))
     · apply Finset.sup_le
       intro phase _
-      exact (le_max_right _ _).trans (Finset.le_sup (Finset.mem_univ phase))
+      exact (le_max_right _ _).trans
+        (Finset.le_sup (f := fun current : OnlinePhase =>
+          max (first.workspace current input) (second.workspace current input))
+          (Finset.mem_univ phase))
 
 /-- Select one complete accounting record without evaluating the unselected branch. -/
 @[expose] def select (condition : Alpha → Prop) [DecidablePred condition]
@@ -664,7 +722,9 @@ workspace claim. -/
 theorem totalTime_scaleBy (count : Alpha → ℕ) (accounting : OnlineAccounting Alpha)
     (input : Alpha) :
     (accounting.scaleBy count).totalTime input = count input * accounting.totalTime input := by
-  simp [totalTime, scaleBy, Finset.mul_sum]
+  change (∑ phase, count input * accounting.time phase input) =
+    count input * ∑ phase, accounting.time phase input
+  rw [Finset.mul_sum]
 
 /-- Reindex phase resources along a semantic input map. A machine constructor using this helper
 must separately retain a machine that computes that map. -/
@@ -694,7 +754,7 @@ theorem totalTime_addTime (phase : OnlinePhase) (overhead : Alpha → ℕ)
     (accounting : OnlineAccounting Alpha) (input : Alpha) :
     (accounting.addTime phase overhead).totalTime input =
       accounting.totalTime input + overhead input := by
-  simp [totalTime, addTime, Finset.sum_add_distrib]
+  cases phase <;> simp [totalTime, addTime, Finset.sum_add_distrib]
 
 /-- Raise one phase's ordinary-workspace bound to an explicit construction-derived floor. -/
 @[expose] def withWorkspaceFloor (phase : OnlinePhase) (bound : Alpha → ℕ)
@@ -712,8 +772,9 @@ theorem totalTime_withWorkspaceFloor (phase : OnlinePhase) (bound : Alpha → �
 theorem le_totalWorkspace_withWorkspaceFloor (phase : OnlinePhase) (bound : Alpha → ℕ)
     (accounting : OnlineAccounting Alpha) (input : Alpha) :
     bound input ≤ (accounting.withWorkspaceFloor phase bound).totalWorkspace input := by
-  exact (le_max_right _ _).trans
-    (Finset.le_sup (f := fun current =>
+  apply (le_max_right (accounting.workspace phase input) (bound input)).trans
+  simpa [totalWorkspace, withWorkspaceFloor] using
+    (Finset.le_sup (f := fun current : OnlinePhase =>
       if current = phase then max (accounting.workspace current input) (bound input)
       else accounting.workspace current input) (Finset.mem_univ phase))
 
@@ -724,7 +785,7 @@ end OnlineAccounting
 /-- An actual named deterministic compiler together with a componentwise classification of the
 same certified clock and a workspace bound. This adds no semantic callback: `compiler.machine` is
 the executed phase, and the equalities tie every aggregate back to its machine certificate. -/
-structure ClassifiedCompiler {Alpha Beta : Type} (f : Alpha → Beta)
+structure ClassifiedCompiler {Alpha : Type u} {Beta : Type v} (f : Alpha → Beta)
     (encIn : Alpha ↪ List Bool) (encOut : Beta ↪ List Bool) where
   /-- Retained deterministic finite-control machine. -/
   compiler : Turing.MultiTapeTM.Internal.NativeCompiler f encIn encOut
@@ -741,7 +802,7 @@ structure ClassifiedCompiler {Alpha Beta : Type} (f : Alpha → Beta)
 
 namespace ClassifiedCompiler
 
-variable {Alpha Beta : Type} {f : Alpha → Beta}
+variable {Alpha : Type u} {Beta : Type v} {f : Alpha → Beta}
   {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
 
 /-- Raise one construction phase to cover both a named compiler's certified workspace formula and
@@ -764,16 +825,22 @@ theorem workspace_le_finishCompilerAccounting (phase : OnlinePhase)
     (accounting : OnlineAccounting Alpha) (input : Alpha) :
     compiler.workspace input ≤
       (finishCompilerAccounting phase compiler accounting).totalWorkspace input :=
-  (le_max_left _ _).trans
-    (OnlineAccounting.le_totalWorkspace_withWorkspaceFloor phase _ accounting input)
+  (le_max_left _ _).trans <| by
+    simpa only [finishCompilerAccounting] using
+      (OnlineAccounting.le_totalWorkspace_withWorkspaceFloor phase
+        (fun input => max (compiler.workspace input)
+          (compiler.tapeCount * (compiler.time input + 1))) accounting input)
 
 theorem clockWorkspace_le_finishCompilerAccounting (phase : OnlinePhase)
     (compiler : Turing.MultiTapeTM.Internal.NativeCompiler f encIn encOut)
     (accounting : OnlineAccounting Alpha) (input : Alpha) :
     compiler.tapeCount * (compiler.time input + 1) ≤
       (finishCompilerAccounting phase compiler accounting).totalWorkspace input :=
-  (le_max_right _ _).trans
-    (OnlineAccounting.le_totalWorkspace_withWorkspaceFloor phase _ accounting input)
+  (le_max_right _ _).trans <| by
+    simpa only [finishCompilerAccounting] using
+      (OnlineAccounting.le_totalWorkspace_withWorkspaceFloor phase
+        (fun input => max (compiler.workspace input)
+          (compiler.tapeCount * (compiler.time input + 1))) accounting input)
 
 /-- Package an exact phase-time decomposition for a named compiler, adding only the compiler's
 certified workspace formula and generic clock floor to one construction phase. -/
@@ -796,12 +863,13 @@ certified workspace formula and generic clock floor to one construction phase. -
   ofAccounting phase compiler
     { time := fun current input => if current = phase then compiler.time input else 0
       workspace := fun _ _ => 0 }
-    fun input => by simp [OnlineAccounting.totalTime]
+    fun input => by
+      cases phase <;> simp [OnlineAccounting.totalTime]
 
 /-- Phase-preserving composition of classified compilers. Child phase records are sequenced, the
 exact tidy-composition clock overhead is charged to marshalling, and only the composed compiler's
 workspace formula and generic clock floor are added. -/
-@[expose] noncomputable def comp {Gamma : Type} {g : Alpha → Beta} {h : Beta → Gamma}
+@[expose] noncomputable def comp {Gamma : Type w} {g : Alpha → Beta} {h : Beta → Gamma}
     {encMid : Beta ↪ List Bool} {encFinal : Gamma ↪ List Bool}
     (outer : ClassifiedCompiler h encMid encFinal)
     (inner : ClassifiedCompiler g encIn encMid) :
@@ -812,23 +880,15 @@ workspace formula and generic clock floor are added. -/
     (base.addTime .marshalling fun input => 4 * (encMid (g input)).length + 9)
   intro input
   rw [OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_seq,
-    OnlineAccounting.totalTime_reindex]
-  rw [show compiler.time input =
+    OnlineAccounting.totalTime_reindex, show compiler.time input =
       inner.compiler.time input + outer.compiler.time (g input) +
         4 * (encMid (g input)).length + 9 from rfl,
     inner.time_eq, outer.time_eq]
-
-/-- The phase-preserving composition retains the actual named compiler composition. -/
-theorem compiler_comp {Gamma : Type} {g : Alpha → Beta} {h : Beta → Gamma}
-    {encMid : Beta ↪ List Bool} {encFinal : Gamma ↪ List Bool}
-    (outer : ClassifiedCompiler h encMid encFinal)
-    (inner : ClassifiedCompiler g encIn encMid) :
-    (outer.comp inner).compiler = outer.compiler.comp inner.compiler :=
-  rfl
+  omega
 
 /-- Phase-preserving standard-pair construction on a common input. The child records retain their
 phases, while the exact framing/composition clock overhead is charged to marshalling. -/
-@[expose] noncomputable def pair {Gamma : Type} {g : Alpha → Gamma}
+@[expose] noncomputable def pair {Gamma : Type w} {g : Alpha → Gamma}
     {encLeft : Beta ↪ List Bool}
     {encRight : Gamma ↪ List Bool}
     (left : ClassifiedCompiler f encIn encLeft)
@@ -846,15 +906,6 @@ phases, while the exact framing/composition clock overhead is charged to marshal
     left.time_eq, right.time_eq]
   omega
 
-/-- The phase-preserving pair retains the actual named compiler pair construction. -/
-theorem compiler_pair {Gamma : Type} {g : Alpha → Gamma}
-    {encLeft : Beta ↪ List Bool}
-    {encRight : Gamma ↪ List Bool}
-    (left : ClassifiedCompiler f encIn encLeft)
-    (right : ClassifiedCompiler g encIn encRight) :
-    (left.pair right).compiler = left.compiler.pair right.compiler :=
-  rfl
-
 end ClassifiedCompiler
 
 /-! ### Named programs -/
@@ -862,7 +913,7 @@ end ClassifiedCompiler
 /-- A named finite-state native machine for one fixed `Fin r` operation type. The direct tidy
 certificate fixes complete stateful-handler semantics; the path certificate independently records
 ordinary workspace for arbitrary replies and private coins. -/
-structure NativeOracleProgram (r : ℕ) {Alpha Beta : Type}
+structure NativeOracleProgram (r : ℕ) {Alpha : Type u} {Beta : Type}
     (program : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta)
     (encIn : Alpha ↪ List Bool) (encOut : Beta ↪ List Bool) where
   /-- Number of ordinary work tapes. -/
@@ -887,7 +938,7 @@ structure NativeOracleProgram (r : ℕ) {Alpha Beta : Type}
 
 namespace NativeOracleProgram
 
-variable {r : ℕ} {Alpha Beta : Type}
+variable {r : ℕ} {Alpha : Type u} {Beta : Type}
   {program : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
   {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
 
@@ -924,24 +975,17 @@ table are exactly those of `witness`. -/
   stateEncoding := witness.stateEncoding
   online := witness.online
   computes := fun input => by
-    simpa only [encBits_apply, id_map] using witness.computes input
+    rw [show (⇑encBits) = id by
+      funext word
+      exact encBits_apply word]
+    simpa only [id_map] using witness.computes input
   runsInSpace := witness.runsInSpace
-
-/-- Encoding an artifact's output changes neither its retained machine nor its control table. -/
-theorem machine_encodedOutput (witness : NativeOracleProgram r program encIn encOut) :
-    witness.encodedOutput.machine = witness.machine :=
-  rfl
-
-/-- Encoding an artifact's output is a zero-work reinterpretation of its online accounting. -/
-theorem online_encodedOutput (witness : NativeOracleProgram r program encIn encOut) :
-    witness.encodedOutput.online = witness.online :=
-  rfl
 
 /-- Lift a retained deterministic compiler to a named oracle artifact with pure semantics. The
 actual machine is `ofDeterministic classified.compiler.machine`: it ignores private coins and all
 oracle channels, retains the compiler state encoding, and uses exactly the classified online
 record. No dummy query or semantic callback is introduced. -/
-@[expose] noncomputable def ofCompiler {Alpha Beta : Type} {f : Alpha → Beta}
+@[expose] noncomputable def ofCompiler {Alpha : Type u} {Beta : Type} {f : Alpha → Beta}
     {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
     (classified : ClassifiedCompiler f encIn encOut) :
     NativeOracleProgram r (fun input => pure (f input)) encIn encOut := by
@@ -961,24 +1005,10 @@ record. No dummy query or semantic callback is introduced. -/
       rw [classified.time_eq]
       intro path hhead htime
       exact (clockedRunsInSpace_mul_time_add_one
-        (ofDeterministic (Operation := Fin r) classified.compiler.machine)
+        (ofDeterministic (Oracle := Fin r) classified.compiler.machine)
         (encIn input) (classified.compiler.time input) path hhead htime).trans
           (classified.clockWorkspace_le input)
   }
-
-/-- The deterministic lift retains the compiler machine through `ofDeterministic`. -/
-theorem machine_ofCompiler {Alpha Beta : Type} {f : Alpha → Beta}
-    {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
-    (classified : ClassifiedCompiler f encIn encOut) :
-    (ofCompiler (r := r) classified).machine = ofDeterministic classified.compiler.machine :=
-  rfl
-
-/-- The deterministic lift preserves the classified componentwise accounting exactly. -/
-theorem online_ofCompiler {Alpha Beta : Type} {f : Alpha → Beta}
-    {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
-    (classified : ClassifiedCompiler f encIn encOut) :
-    (ofCompiler (r := r) classified).online = classified.online :=
-  rfl
 
 /-! #### State encodings for retained machine combinators -/
 
@@ -998,11 +1028,6 @@ theorem online_ofCompiler {Alpha Beta : Type} {f : Alpha → Beta}
       (Turing.MultiTapeTM.Internal.NativeCompiler.sumStateEncoding
         Turing.MultiTapeTM.Internal.NativeCompiler.unitStateEncoding
         Turing.MultiTapeTM.Internal.NativeCompiler.rewindWorkStateEncoding))
-
-/-- Explicit control tags for output concatenation. -/
-@[expose] def appendStateEncoding {Left Right : Type}
-    (left : Left ↪ ℕ) (right : Right ↪ ℕ) : Left ⊕ Right ↪ ℕ :=
-  Turing.MultiTapeTM.Internal.NativeCompiler.sumStateEncoding left right
 
 /-- Explicit control tags for conditional finite dispatch. -/
 @[expose] def dispatchStateEncoding {Test Yes No : Type}
@@ -1095,7 +1120,10 @@ theorem clockWorkspace_le_finishAccounting (phase : OnlinePhase) (tapes : ℕ)
     (accounting : OnlineAccounting Alpha) (input : Alpha) :
     tapes * (accounting.totalTime input + 1) ≤
       (finishAccounting phase tapes accounting).totalWorkspace input :=
-  OnlineAccounting.le_totalWorkspace_withWorkspaceFloor phase _ accounting input
+  by
+    simpa only [finishAccounting] using
+      (OnlineAccounting.le_totalWorkspace_withWorkspaceFloor phase
+        (fun input => tapes * (accounting.totalTime input + 1)) accounting input)
 
 /-- Adding a construction-wide floor never discards any original phase workspace. -/
 theorem workspace_le_finishAccounting (floorPhase : OnlinePhase) (tapes : ℕ)
@@ -1107,7 +1135,8 @@ theorem workspace_le_finishAccounting (floorPhase : OnlinePhase) (tapes : ℕ)
     by_cases hphase : phase = floorPhase
     · simp only [finishAccounting, OnlineAccounting.withWorkspaceFloor, hphase, ↓reduceIte]
       exact le_max_left _ _
-    · simp only [finishAccounting, OnlineAccounting.withWorkspaceFloor, hphase, ↓reduceIte]).trans
+    · simp only [finishAccounting, OnlineAccounting.withWorkspaceFloor, hphase, ↓reduceIte]
+      exact le_rfl).trans
     (OnlineAccounting.workspace_le_totalWorkspace _ phase input)
 
 /-! #### Primitive artifacts -/
@@ -1149,11 +1178,6 @@ size is still available separately through `inputBits`. -/
         (coinMachine (Operation := Fin r)) (encIn input) 1
   }
 
-/-- The fair-bit artifact retains the one-state native machine definitionally. -/
-theorem machine_fairBit (encIn : Alpha ↪ List Bool) :
-    (fairBit (r := r) encIn).machine = coinMachine :=
-  rfl
-
 /-- Explicit tags for the four native states of the bounded-prefix query primitive. -/
 @[expose] def queryTakeStateEncoding : QueryTakeState ↪ ℕ :=
   ⟨fun
@@ -1183,7 +1207,8 @@ encoded input costs `2 * q.length + limit + 3`. Channel-resident words use no or
 theorem totalTime_queryTakeOnline (input : List Bool × ℕ) :
     queryTakeOnline.totalTime input = 4 * input.1.length + 2 * input.2 + 6 := by
   rcases input with ⟨q, limit⟩
-  simp only [OnlineAccounting.totalTime, queryTakeOnline] <;> omega
+  norm_num [OnlineAccounting.totalTime, queryTakeOnline]
+  all_goals omega
 
 theorem totalWorkspace_queryTakeOnline (input : List Bool × ℕ) :
     queryTakeOnline.totalWorkspace input = 0 := by
@@ -1213,16 +1238,12 @@ machine term; no operation callback is supplied at runtime. -/
         (4 * input.1.length + 2 * input.2 + 6)
   }
 
-/-- The fixed-operation artifact retains the bounded-prefix native machine definitionally. -/
-theorem machine_queryTake (operation : Fin r) :
-    (queryTake operation).machine = queryTakePTM operation :=
-  rfl
-
 /-! #### Retained preprocessing and postprocessing -/
 
 /-- Exact construction-assigned accounting for deterministic preprocessing followed by a named
 oracle program. The deterministic compiler is executed; it is not a semantic callback. -/
-@[expose] def preprocessAccounting {Alpha Middle Output : Type} {f : Alpha → Middle}
+@[expose] def preprocessAccounting {Alpha : Type u} {Middle : Type v} {Output : Type}
+    {f : Alpha → Middle}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
     {encOutput : Output ↪ List Bool}
     (prepare : ClassifiedCompiler f encIn encMiddle)
@@ -1233,7 +1254,8 @@ oracle program. The deterministic compiler is executed; it is not a semantic cal
   finishAccounting .marshalling tapes
     (base.addTime .marshalling fun input => 4 * prepare.online.totalTime input + 9)
 
-theorem totalTime_preprocessAccounting {Alpha Middle Output : Type} {f : Alpha → Middle}
+theorem totalTime_preprocessAccounting {Alpha : Type u} {Middle : Type v} {Output : Type}
+    {f : Alpha → Middle}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
     {encOutput : Output ↪ List Bool}
     (prepare : ClassifiedCompiler f encIn encMiddle)
@@ -1242,13 +1264,59 @@ theorem totalTime_preprocessAccounting {Alpha Middle Output : Type} {f : Alpha �
     (preprocessAccounting prepare source).totalTime input =
       5 * prepare.compiler.time input + source.time (f input) + 9 := by
   simp only [preprocessAccounting, totalTime_finishAccounting,
-    OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_seq]
+    OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_seq,
+    OnlineAccounting.totalTime_reindex, time]
   rw [prepare.time_eq]
   omega
 
+private theorem computes_preprocess {Alpha : Type u} {Middle : Type v} {Output : Type}
+    {f : Alpha → Middle}
+    {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
+    {encOutput : Output ↪ List Bool}
+    (prepare : ClassifiedCompiler f encIn encMiddle)
+    {program : Middle → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Output}
+    (source : NativeOracleProgram r program encMiddle encOutput) (input : Alpha) :
+    (source.machine.tidyComp
+      (ofDeterministic (Oracle := Fin r) prepare.compiler.machine) true).ComputesTidily
+        (encIn input) ((preprocessAccounting prepare source).totalTime input)
+        (encOutput <$> program (f input)) := by
+  rw [totalTime_preprocessAccounting]
+  have hprepare := ComputesTidily.of_deterministic (Operation := Fin r)
+    (prepare.compiler.computes input)
+  have hsource := source.computes (f input)
+  simpa only [pure_bind] using hprepare.comp
+    (prog₂ := fun _ => encOutput <$> program (f input)) true
+    (fun word _ _ _ _ hword => by
+      simp only [ProbOracleComp.runWith_pure, PMF.mem_support_pure_iff] at hword
+      rcases Prod.mk.inj hword with ⟨rfl, rfl⟩
+      exact hsource)
+
+private theorem workspace_preprocess {Alpha : Type u} {Middle : Type v} {Output : Type}
+    {f : Alpha → Middle}
+    {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
+    {encOutput : Output ↪ List Bool}
+    (prepare : ClassifiedCompiler f encIn encMiddle)
+    {program : Middle → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Output}
+    (source : NativeOracleProgram r program encMiddle encOutput) (input : Alpha) :
+    (max prepare.compiler.tapeCount source.tapeCount + 2) *
+        (5 * prepare.compiler.time input + source.time (f input) + 9 + 1) ≤
+      (preprocessAccounting prepare source).totalWorkspace input := by
+  let base := (prepare.online.seq (source.online.reindex f)).addTime .marshalling
+    fun input => 4 * prepare.online.totalTime input + 9
+  have htime : base.totalTime input =
+      5 * prepare.compiler.time input + source.time (f input) + 9 := by
+    simp only [base, OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_seq,
+      OnlineAccounting.totalTime_reindex, time]
+    rw [prepare.time_eq]
+    omega
+  rw [← htime]
+  exact clockWorkspace_le_finishAccounting .marshalling
+    (max prepare.compiler.tapeCount source.tapeCount + 2) base input
+
 /-- Execute a named deterministic word preprocessor and then the named oracle artifact. The
 result retains the literal `tidyComp` term and all of its finite controls. -/
-@[expose] noncomputable def preprocess {Alpha Middle Output : Type} {f : Alpha → Middle}
+noncomputable def preprocess {Alpha : Type u} {Middle : Type v} {Output : Type}
+    {f : Alpha → Middle}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
     {encOutput : Output ↪ List Bool}
     (prepare : ClassifiedCompiler f encIn encMiddle)
@@ -1264,48 +1332,22 @@ result retains the literal `tidyComp` term and all of its finite controls. -/
   let tapes := max prepare.compiler.tapeCount source.tapeCount + 2
   let online := preprocessAccounting prepare source
   let machine := source.machine.tidyComp
-    (ofDeterministic (Operation := Fin r) prepare.compiler.machine) true
+    (ofDeterministic (Oracle := Fin r) prepare.compiler.machine) true
   exact {
     tapeCount := tapes
     State := State
     machine := machine
     stateEncoding := tidyCompStateEncoding prepare.compiler.stateEncoding source.stateEncoding
     online := online
-    computes := fun input => by
-      rw [totalTime_preprocessAccounting]
-      have hprepare := ComputesTidily.of_deterministic (Operation := Fin r)
-        (prepare.compiler.computes input)
-      have hsource := source.computes (f input)
-      simpa only [pure_bind] using hprepare.comp
-        (prog₂ := fun _ => encOutput <$> program (f input)) true
-        (fun word _ _ _ _ hword => by
-          simp only [ProbOracleComp.runWith_pure, PMF.mem_support_pure_iff] at hword
-          rcases Prod.mk.inj hword with ⟨rfl, rfl⟩
-          exact hsource)
+    computes := computes_preprocess prepare source
     runsInSpace := fun input => by
       rw [totalTime_preprocessAccounting]
-      intro path hhead htime
-      have hspace := clockedRunsInSpace_mul_time_add_one machine (encIn input)
-        (5 * prepare.compiler.time input + source.time (f input) + 9) path hhead htime
-      refine hspace.trans ?_
-      simpa only [online, preprocessAccounting, totalTime_preprocessAccounting] using
-        clockWorkspace_le_finishAccounting .marshalling tapes
-          ((prepare.online.seq (source.online.reindex f)).addTime .marshalling
-            fun input => 4 * prepare.online.totalTime input + 9) input
+      apply clockedRunsInSpace_of_mul_time_add_one_le
+      exact workspace_preprocess prepare source input
   }
 
-/-- Preprocessing retains the actual tidy-composition machine definitionally. -/
-theorem machine_preprocess {Alpha Middle Output : Type} {f : Alpha → Middle}
-    {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
-    {encOutput : Output ↪ List Bool}
-    (prepare : ClassifiedCompiler f encIn encMiddle)
-    {program : Middle → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Output}
-    (source : NativeOracleProgram r program encMiddle encOutput) :
-    (preprocess prepare source).machine = source.machine.tidyComp
-      (ofDeterministic prepare.compiler.machine) true :=
-  rfl
-
-theorem time_preprocess {Alpha Middle Output : Type} {f : Alpha → Middle}
+theorem time_preprocess {Alpha : Type u} {Middle : Type v} {Output : Type}
+    {f : Alpha → Middle}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
     {encOutput : Output ↪ List Bool}
     (prepare : ClassifiedCompiler f encIn encMiddle)
@@ -1318,7 +1360,7 @@ theorem time_preprocess {Alpha Middle Output : Type} {f : Alpha → Middle}
 /-- Exact construction-assigned accounting for a named oracle computation followed by a named
 deterministic typed postprocessor. `postOnline` bounds the compiler time and workspace phase by
 phase on the source's supported outputs. -/
-@[expose] def postprocessAccounting {Alpha Middle Beta : Type}
+@[expose] def postprocessAccounting {Alpha : Type u} {Middle Beta : Type}
     {program : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Middle}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
     {encOut : Beta ↪ List Bool}
@@ -1330,7 +1372,7 @@ phase on the source's supported outputs. -/
   finishAccounting .marshalling tapes
     (base.addTime .marshalling fun input => 4 * source.time input + 9)
 
-theorem totalTime_postprocessAccounting {Alpha Middle Beta : Type}
+theorem totalTime_postprocessAccounting {Alpha : Type u} {Middle Beta : Type}
     {program : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Middle}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
     {encOut : Beta ↪ List Bool}
@@ -1340,13 +1382,67 @@ theorem totalTime_postprocessAccounting {Alpha Middle Beta : Type}
     (postprocessAccounting source post postOnline).totalTime input =
       5 * source.time input + postOnline.totalTime input + 9 := by
   simp only [postprocessAccounting, totalTime_finishAccounting,
-    OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_seq]
+    OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_seq, time]
   omega
+
+private theorem computes_postprocess {Alpha : Type u} {Middle Beta : Type}
+    {program : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Middle}
+    {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
+    {encOut : Beta ↪ List Bool}
+    (source : NativeOracleProgram r program encIn encMiddle)
+    {f : Middle → Beta} (post : ClassifiedCompiler f encMiddle encOut)
+    (postOnline : OnlineAccounting Alpha)
+    (hpost : ∀ input (OracleState : Type)
+      (oracle : Fin r × List Bool → StateT OracleState PMF (List Bool))
+      (state : OracleState) (middle : Middle) (state' : OracleState),
+      (middle, state') ∈ (ProbOracleComp.runWith oracle (program input) state).support →
+      ∀ phase,
+        post.online.time phase middle ≤ postOnline.time phase input ∧
+        post.online.workspace phase middle ≤ postOnline.workspace phase input)
+    (input : Alpha) :
+    ((ofDeterministic (Oracle := Fin r) post.compiler.machine).tidyComp
+      source.machine true).ComputesTidily
+      (encIn input) ((postprocessAccounting source post postOnline).totalTime input)
+        (encOut <$> (f <$> program input)) := by
+  rw [totalTime_postprocessAccounting]
+  have hsource := source.computes input
+  have hcomp := hsource.comp_encoded encMiddle
+      (t₂ := postOnline.totalTime input)
+      (prog₂ := fun middle => pure (encOut (f middle))) true
+      fun middle OracleState oracle state state' hmiddle => by
+    have hdet := ComputesTidily.of_deterministic (Operation := Fin r)
+      (post.compiler.computes middle)
+    refine hdet.mono ?_
+    rw [← post.time_eq]
+    exact Finset.sum_le_sum fun phase _ =>
+      (hpost input OracleState oracle state middle state' hmiddle phase).1
+  simpa only [bind_pure_comp, Functor.map_map, Function.comp_apply, time,
+    OnlineAccounting.totalTime] using hcomp
+
+private theorem workspace_postprocess {Alpha : Type u} {Middle Beta : Type}
+    {program : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Middle}
+    {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
+    {encOut : Beta ↪ List Bool}
+    (source : NativeOracleProgram r program encIn encMiddle)
+    {f : Middle → Beta} (post : ClassifiedCompiler f encMiddle encOut)
+    (postOnline : OnlineAccounting Alpha) (input : Alpha) :
+    (max source.tapeCount post.compiler.tapeCount + 2) *
+        (5 * source.time input + postOnline.totalTime input + 9 + 1) ≤
+      (postprocessAccounting source post postOnline).totalWorkspace input := by
+  let base := (source.online.seq postOnline).addTime .marshalling
+    fun input => 4 * source.time input + 9
+  have htime : base.totalTime input =
+      5 * source.time input + postOnline.totalTime input + 9 := by
+    simp only [base, OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_seq, time]
+    omega
+  rw [← htime]
+  exact clockWorkspace_le_finishAccounting .marshalling
+    (max source.tapeCount post.compiler.tapeCount + 2) base input
 
 /-- Execute a named oracle artifact and then a named deterministic typed postprocessor. The caller
 supplies a phasewise bound on the postprocessor for every supported intermediate result. The
 machine passes its encoding directly, avoiding any decoding choice or hidden semantic callback. -/
-@[expose] noncomputable def postprocess {Alpha Middle Beta : Type}
+noncomputable def postprocess {Alpha : Type u} {Middle Beta : Type}
     {program : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Middle}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
     {encOut : Beta ↪ List Bool}
@@ -1369,7 +1465,7 @@ machine passes its encoding directly, avoiding any decoding choice or hidden sem
   letI : Fintype State := inferInstance
   let tapes := max source.tapeCount post.compiler.tapeCount + 2
   let online := postprocessAccounting source post postOnline
-  let machine := (ofDeterministic (Operation := Fin r) post.compiler.machine).tidyComp
+  let machine := (ofDeterministic (Oracle := Fin r) post.compiler.machine).tidyComp
     source.machine true
   exact {
     tapeCount := tapes
@@ -1377,51 +1473,14 @@ machine passes its encoding directly, avoiding any decoding choice or hidden sem
     machine := machine
     stateEncoding := tidyCompStateEncoding source.stateEncoding post.compiler.stateEncoding
     online := online
-    computes := fun input => by
-      rw [totalTime_postprocessAccounting]
-      have hsource := source.computes input
-      have hcomp := hsource.comp_encoded encMiddle
-          (prog₂ := fun middle => pure (encOut (f middle))) true
-          fun middle OracleState oracle state state' hmiddle => by
-        have hdet := ComputesTidily.of_deterministic (Operation := Fin r)
-          (post.compiler.computes middle)
-        apply hdet.mono
-        rw [← post.time_eq]
-        exact Finset.sum_le_sum fun phase _ =>
-          (hpost input OracleState oracle state middle state' hmiddle phase).1
-      simpa only [bind_pure_comp, Functor.map_map, Function.comp_apply] using hcomp
+    computes := computes_postprocess source post postOnline hpost
     runsInSpace := fun input => by
       rw [totalTime_postprocessAccounting]
-      intro path hhead htime
-      have hspace := clockedRunsInSpace_mul_time_add_one machine (encIn input)
-        (5 * source.time input + postOnline.totalTime input + 9) path hhead htime
-      refine hspace.trans ?_
-      simpa only [online, postprocessAccounting, totalTime_postprocessAccounting] using
-        clockWorkspace_le_finishAccounting .marshalling tapes
-          ((source.online.seq postOnline).addTime .marshalling
-            fun input => 4 * source.time input + 9) input
+      apply clockedRunsInSpace_of_mul_time_add_one_le
+      exact workspace_postprocess source post postOnline input
   }
 
-/-- Postprocessing retains the actual tidy-composition machine definitionally. -/
-theorem machine_postprocess {Alpha Middle Beta : Type}
-    {program : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Middle}
-    {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
-    {encOut : Beta ↪ List Bool}
-    (source : NativeOracleProgram r program encIn encMiddle)
-    {f : Middle → Beta} (post : ClassifiedCompiler f encMiddle encOut)
-    (postOnline : OnlineAccounting Alpha)
-    (hpost : ∀ input (OracleState : Type)
-      (oracle : Fin r × List Bool → StateT OracleState PMF (List Bool))
-      (state : OracleState) (middle : Middle) (state' : OracleState),
-      (middle, state') ∈ (ProbOracleComp.runWith oracle (program input) state).support →
-      ∀ phase,
-        post.online.time phase middle ≤ postOnline.time phase input ∧
-        post.online.workspace phase middle ≤ postOnline.workspace phase input) :
-    (postprocess source post postOnline hpost).machine =
-      (ofDeterministic post.compiler.machine).tidyComp source.machine true :=
-  rfl
-
-theorem time_postprocess {Alpha Middle Beta : Type}
+theorem time_postprocess {Alpha : Type u} {Middle Beta : Type}
     {program : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Middle}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
     {encOut : Beta ↪ List Bool}
@@ -1441,7 +1500,7 @@ theorem time_postprocess {Alpha Middle Beta : Type}
   totalTime_postprocessAccounting source post postOnline input
 
 /-- The dynamic postprocessor's claimed phase workspace remains visible in the composed witness. -/
-theorem postWorkspace_le_postprocess {Alpha Middle Beta : Type}
+theorem postWorkspace_le_postprocess {Alpha : Type u} {Middle Beta : Type}
     {program : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Middle}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
     {encOut : Beta ↪ List Bool}
@@ -1479,7 +1538,8 @@ theorem postWorkspace_le_postprocess {Alpha Middle Beta : Type}
 
 /-- Exact accounting for a retained binary dispatch node. The test compiler and selected branch
 are charged phasewise; the fixed `itePTM` scaffolding is charged to dispatch. -/
-@[expose] def dispatchAccounting {Alpha Beta : Type} {test : Alpha → List Bool}
+@[expose] def dispatchAccounting {Alpha : Type u} {Beta : Type}
+    {test : Alpha → List Bool}
     {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
     (condition : ClassifiedCompiler test encIn encBits)
     {yesProgram noProgram : Alpha →
@@ -1492,7 +1552,8 @@ are charged phasewise; the fixed `itePTM` scaffolding is charged to dispatch. -/
   finishAccounting .dispatch tapes
     (base.addTime .dispatch fun input => 4 * (test input).length + 6)
 
-theorem totalTime_dispatchAccounting {Alpha Beta : Type} {test : Alpha → List Bool}
+theorem totalTime_dispatchAccounting {Alpha : Type u} {Beta : Type}
+    {test : Alpha → List Bool}
     {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
     (condition : ClassifiedCompiler test encIn encBits)
     {yesProgram noProgram : Alpha →
@@ -1505,14 +1566,64 @@ theorem totalTime_dispatchAccounting {Alpha Beta : Type} {test : Alpha → List 
         4 * (test input).length + 6 := by
   simp only [dispatchAccounting, totalTime_finishAccounting,
     OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_seq,
-    OnlineAccounting.totalTime_select]
+    OnlineAccounting.totalTime_select, time]
   rw [condition.time_eq]
-  by_cases h : test input = [] <;> simp [h]
+  by_cases h : test input = [] <;> simp [h, Nat.add_assoc]
+
+private theorem computes_dispatch {Alpha : Type u} {Beta : Type}
+    {test : Alpha → List Bool}
+    {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
+    (condition : ClassifiedCompiler test encIn encBits)
+    {yesProgram noProgram : Alpha →
+      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
+    (yes : NativeOracleProgram r yesProgram encIn encOut)
+    (no : NativeOracleProgram r noProgram encIn encOut) (input : Alpha) :
+    (itePTM (ofDeterministic (Oracle := Fin r) condition.compiler.machine)
+      yes.machine no.machine).ComputesTidily
+        (encIn input) ((dispatchAccounting condition yes no).totalTime input)
+        (encOut <$> if test input = [] then noProgram input else yesProgram input) := by
+  rw [totalTime_dispatchAccounting]
+  have hcondition := ComputesTidily.of_deterministic (Operation := Fin r)
+    (condition.compiler.computes input)
+  have hbranch := hcondition.ite
+    (fun _ => yes.computes input) (fun _ => no.computes input)
+  rw [show encOut <$> (if test input = [] then noProgram input else yesProgram input) =
+      if test input = [] then encOut <$> noProgram input else encOut <$> yesProgram input by
+    split <;> rfl]
+  convert hbranch using 1 <;> simp only [time, encBits_apply] <;> rfl
+
+private theorem workspace_dispatch {Alpha : Type u} {Beta : Type}
+    {test : Alpha → List Bool}
+    {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
+    (condition : ClassifiedCompiler test encIn encBits)
+    {yesProgram noProgram : Alpha →
+      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
+    (yes : NativeOracleProgram r yesProgram encIn encOut)
+    (no : NativeOracleProgram r noProgram encIn encOut) (input : Alpha) :
+    (max condition.compiler.tapeCount (max yes.tapeCount no.tapeCount) + 1) *
+        (condition.compiler.time input +
+          (if test input = [] then no.time input else yes.time input) +
+          4 * (test input).length + 6 + 1) ≤
+      (dispatchAccounting condition yes no).totalWorkspace input := by
+  let selected := OnlineAccounting.select (fun input => test input ≠ []) yes.online no.online
+  let base := (condition.online.seq selected).addTime .dispatch
+    fun input => 4 * (test input).length + 6
+  have htime : base.totalTime input = condition.compiler.time input +
+      (if test input = [] then no.time input else yes.time input) +
+      4 * (test input).length + 6 := by
+    simp only [base, selected, OnlineAccounting.totalTime_addTime,
+      OnlineAccounting.totalTime_seq, OnlineAccounting.totalTime_select, time]
+    rw [condition.time_eq]
+    by_cases h : test input = [] <;> simp [h, Nat.add_assoc]
+  rw [← htime]
+  exact clockWorkspace_le_finishAccounting .dispatch
+    (max condition.compiler.tapeCount (max yes.tapeCount no.tapeCount) + 1) base input
 
 /-- Branch on the nonemptiness of a word produced by an actual named compiler. Only the selected
 native branch is executed. This is the binary node used by `finiteDispatch`; it performs no
 runtime whole-description scan. -/
-@[expose] noncomputable def dispatch {Alpha Beta : Type} {test : Alpha → List Bool}
+noncomputable def dispatch {Alpha : Type u} {Beta : Type}
+    {test : Alpha → List Bool}
     {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
     (condition : ClassifiedCompiler test encIn encBits)
     {yesProgram noProgram : Alpha →
@@ -1532,7 +1643,7 @@ runtime whole-description scan. -/
   let tapes := max condition.compiler.tapeCount (max yes.tapeCount no.tapeCount) + 1
   let online := dispatchAccounting condition yes no
   let machine := itePTM
-    (ofDeterministic (Operation := Fin r) condition.compiler.machine) yes.machine no.machine
+    (ofDeterministic (Oracle := Fin r) condition.compiler.machine) yes.machine no.machine
   exact {
     tapeCount := tapes
     State := State
@@ -1540,43 +1651,14 @@ runtime whole-description scan. -/
     stateEncoding := dispatchStateEncoding condition.compiler.stateEncoding
       yes.stateEncoding no.stateEncoding
     online := online
-    computes := fun input => by
-      rw [totalTime_dispatchAccounting]
-      have hcondition := ComputesTidily.of_deterministic (Operation := Fin r)
-        (condition.compiler.computes input)
-      have hbranch := hcondition.ite
-        (fun _ => yes.computes input) (fun _ => no.computes input)
-      by_cases htest : test input = [] <;> simp only [htest, ↓reduceIte] at hbranch ⊢
-      · exact hbranch
-      · exact hbranch
+    computes := computes_dispatch condition yes no
     runsInSpace := fun input => by
       rw [totalTime_dispatchAccounting]
-      intro path hhead htime
-      have hspace := clockedRunsInSpace_mul_time_add_one machine (encIn input)
-        (condition.compiler.time input +
-          (if test input = [] then no.time input else yes.time input) +
-          4 * (test input).length + 6) path hhead htime
-      refine hspace.trans ?_
-      simpa only [online, dispatchAccounting, totalTime_dispatchAccounting] using
-        clockWorkspace_le_finishAccounting .dispatch tapes
-          ((condition.online.seq
-            (OnlineAccounting.select (fun input => test input ≠ []) yes.online no.online)).addTime
-              .dispatch fun input => 4 * (test input).length + 6) input
+      apply clockedRunsInSpace_of_mul_time_add_one_le
+      exact workspace_dispatch condition yes no input
   }
 
-/-- Binary dispatch retains the literal conditional-machine constructor. -/
-theorem machine_dispatch {Alpha Beta : Type} {test : Alpha → List Bool}
-    {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
-    (condition : ClassifiedCompiler test encIn encBits)
-    {yesProgram noProgram : Alpha →
-      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
-    (yes : NativeOracleProgram r yesProgram encIn encOut)
-    (no : NativeOracleProgram r noProgram encIn encOut) :
-    (dispatch condition yes no).machine = itePTM
-      (ofDeterministic condition.compiler.machine) yes.machine no.machine :=
-  rfl
-
-theorem time_dispatch {Alpha Beta : Type} {test : Alpha → List Bool}
+theorem time_dispatch {Alpha : Type u} {Beta : Type} {test : Alpha → List Bool}
     {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
     (condition : ClassifiedCompiler test encIn encBits)
     {yesProgram noProgram : Alpha →
@@ -1590,7 +1672,8 @@ theorem time_dispatch {Alpha Beta : Type} {test : Alpha → List Bool}
   totalTime_dispatchAccounting condition yes no input
 
 /-- One case in a finite retained dispatcher. Both the test and branch are named artifacts. -/
-structure DispatchCase (r : ℕ) (Alpha Beta : Type) (encIn : Alpha ↪ List Bool)
+structure DispatchCase (r : ℕ) (Alpha : Type u) (Beta : Type)
+    (encIn : Alpha ↪ List Bool)
     (encOut : Beta ↪ List Bool) where
   /-- Word test; nonempty selects this case. -/
   test : Alpha → List Bool
@@ -1602,7 +1685,7 @@ structure DispatchCase (r : ℕ) (Alpha Beta : Type) (encIn : Alpha ↪ List Boo
   branch : NativeOracleProgram r program encIn encOut
 
 /-- First-matching-case semantics for a finite list of retained tests and branches. -/
-@[expose] def dispatchProgram {Alpha Beta : Type} {encIn : Alpha ↪ List Bool}
+@[expose] def dispatchProgram {Alpha : Type u} {Beta : Type} {encIn : Alpha ↪ List Bool}
     {encOut : Beta ↪ List Bool} (cases : List (DispatchCase r Alpha Beta encIn encOut))
     (fallback : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta) :
     Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta :=
@@ -1613,7 +1696,8 @@ structure DispatchCase (r : ℕ) (Alpha Beta : Type) (encIn : Alpha ↪ List Boo
 
 /-- Fold finitely many named tests into nested retained conditional machines. The resulting
 artifact contains every test and branch control table; selection does not invoke a callback. -/
-@[expose] noncomputable def finiteDispatch {Alpha Beta : Type} {encIn : Alpha ↪ List Bool}
+@[expose] noncomputable def finiteDispatch {Alpha : Type u} {Beta : Type}
+    {encIn : Alpha ↪ List Bool}
     {encOut : Beta ↪ List Bool} (cases : List (DispatchCase r Alpha Beta encIn encOut))
     {fallbackProgram : Alpha →
       ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
@@ -1622,25 +1706,6 @@ artifact contains every test and branch control table; selection does not invoke
   match cases with
   | [] => fallback
   | head :: tail => dispatch head.condition head.branch (finiteDispatch tail fallback)
-
-@[simp] theorem machine_finiteDispatch_nil {Alpha Beta : Type} {encIn : Alpha ↪ List Bool}
-    {encOut : Beta ↪ List Bool}
-    {fallbackProgram : Alpha →
-      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
-    (fallback : NativeOracleProgram r fallbackProgram encIn encOut) :
-    (finiteDispatch [] fallback).machine = fallback.machine :=
-  rfl
-
-theorem machine_finiteDispatch_cons {Alpha Beta : Type} {encIn : Alpha ↪ List Bool}
-    {encOut : Beta ↪ List Bool} (head : DispatchCase r Alpha Beta encIn encOut)
-    (tail : List (DispatchCase r Alpha Beta encIn encOut))
-    {fallbackProgram : Alpha →
-      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
-    (fallback : NativeOracleProgram r fallbackProgram encIn encOut) :
-    (finiteDispatch (head :: tail) fallback).machine = itePTM
-      (ofDeterministic head.condition.compiler.machine) head.branch.machine
-        (finiteDispatch tail fallback).machine :=
-  rfl
 
 /-! #### Sequencing with captured input -/
 
@@ -1655,7 +1720,7 @@ theorem machine_finiteDispatch_cons {Alpha Beta : Type} {encIn : Alpha ↪ List 
 
 /-- Exact accounting for capturing the input by an actual framing compiler, appending the first
 native result, and running the continuation. -/
-@[expose] def capturedAccounting {Alpha Middle Beta : Type}
+@[expose] noncomputable def capturedAccounting {Alpha Middle Beta : Type}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
     {encOut : Beta ↪ List Bool}
     {firstProgram : Alpha →
@@ -1688,13 +1753,94 @@ theorem totalTime_capturedAccounting {Alpha Middle Beta : Type}
         first.time input) +
         secondOnline.totalTime input + 9 := by
   simp only [capturedAccounting, totalTime_finishAccounting,
-    OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_seq]
+    OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_seq, time]
   omega
+
+private theorem computes_sequenceCaptured {Alpha Middle Beta : Type}
+    {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
+    {encOut : Beta ↪ List Bool}
+    {firstProgram : Alpha →
+      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Middle}
+    (first : NativeOracleProgram r firstProgram encIn encMiddle)
+    {secondProgram : Alpha × Middle →
+      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
+    (second : NativeOracleProgram r secondProgram (encPair encIn encMiddle) encOut)
+    (secondOnline : OnlineAccounting Alpha)
+    (hsecond : ∀ input (OracleState : Type)
+      (oracle : Fin r × List Bool → StateT OracleState PMF (List Bool))
+      (state : OracleState) (middle : Middle) (state' : OracleState),
+      (middle, state') ∈
+        (ProbOracleComp.runWith oracle (firstProgram input) state).support →
+      ∀ phase,
+        second.online.time phase (input, middle) ≤ secondOnline.time phase input ∧
+        second.online.workspace phase (input, middle) ≤ secondOnline.workspace phase input)
+    (input : Alpha) :
+    (second.machine.tidyComp
+      (appendPTM
+        (ofDeterministic (Oracle := Fin r)
+          (Turing.MultiTapeTM.Internal.NativeCompiler.encodeFrame encIn).machine)
+        first.machine) true).ComputesTidily
+      (encIn input) ((capturedAccounting first second secondOnline).totalTime input)
+      (encOut <$> capturedProgram firstProgram secondProgram input) := by
+  rw [totalTime_capturedAccounting]
+  let framing := Turing.MultiTapeTM.Internal.NativeCompiler.encodeFrame encIn
+  let captureMachine := appendPTM
+    (ofDeterministic (Oracle := Fin r) framing.machine) first.machine
+  have hcapture := ComputesTidily.prefix (Operation := Fin r) (framing.computes input)
+    (first.computes input)
+  have hcaptureTyped : captureMachine.ComputesTidily (encIn input)
+      (framing.time input + first.time input)
+      ((encPair encIn encMiddle) <$>
+        ((fun middle => (input, middle)) <$> firstProgram input)) := by
+    simpa only [captureMachine, time, encBits_apply, Functor.map_map,
+      Function.comp_apply, encPair_apply] using hcapture
+  have hcomp := hcaptureTyped.comp_encoded (encPair encIn encMiddle)
+      (prog₂ := fun captured => encOut <$> secondProgram captured) true
+      fun captured OracleState oracle state state' hcaptured => by
+    rw [ProbOracleComp.runWith_map] at hcaptured
+    obtain ⟨⟨middle, middleState⟩, hmiddle, heq⟩ :=
+      (PMF.mem_support_map_iff _ _ _).mp hcaptured
+    rcases Prod.mk.inj heq with ⟨rfl, rfl⟩
+    have hcontinuation := second.computes (input, middle)
+    have hmono : second.time (input, middle) ≤ secondOnline.totalTime input := by
+      change second.online.totalTime (input, middle) ≤ secondOnline.totalTime input
+      exact Finset.sum_le_sum fun phase _ =>
+        (hsecond input OracleState oracle state middle middleState hmiddle phase).1
+    exact hcontinuation.mono hmono
+  simpa only [framing, captureMachine, capturedProgram, map_bind, bind_map_left,
+    Function.comp_apply] using hcomp
+
+private theorem workspace_sequenceCaptured {Alpha Middle Beta : Type}
+    {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
+    {encOut : Beta ↪ List Bool}
+    {firstProgram : Alpha →
+      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Middle}
+    (first : NativeOracleProgram r firstProgram encIn encMiddle)
+    {secondProgram : Alpha × Middle →
+      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
+    (second : NativeOracleProgram r secondProgram (encPair encIn encMiddle) encOut)
+    (secondOnline : OnlineAccounting Alpha) (input : Alpha) :
+    let framing := Turing.MultiTapeTM.Internal.NativeCompiler.encodeFrame encIn
+    (max (max framing.tapeCount first.tapeCount) second.tapeCount + 2) *
+        (5 * (framing.time input + first.time input) +
+          secondOnline.totalTime input + 9 + 1) ≤
+      (capturedAccounting first second secondOnline).totalWorkspace input := by
+  dsimp only
+  let framing := Turing.MultiTapeTM.Internal.NativeCompiler.encodeFrame encIn
+  let base := (first.online.seq secondOnline).addTime .marshalling
+    fun input => 5 * framing.time input + 4 * first.time input + 9
+  have htime : base.totalTime input =
+      5 * (framing.time input + first.time input) + secondOnline.totalTime input + 9 := by
+    simp only [base, OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_seq, time]
+    omega
+  rw [← htime]
+  exact clockWorkspace_le_finishAccounting .marshalling
+    (max (max framing.tapeCount first.tapeCount) second.tapeCount + 2) base input
 
 /-- Sequence two named oracle artifacts while retaining the original input. The actual machine
 frames the input, appends the encoded first result, then feeds the encoded typed pair to the
 continuation. -/
-@[expose] noncomputable def sequenceCaptured {Alpha Middle Beta : Type}
+noncomputable def sequenceCaptured {Alpha Middle Beta : Type}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
     {encOut : Beta ↪ List Bool}
     {firstProgram : Alpha →
@@ -1726,7 +1872,7 @@ continuation. -/
   let captureTapes := max framing.tapeCount first.tapeCount
   let tapes := max captureTapes second.tapeCount + 2
   let captureMachine := appendPTM
-    (ofDeterministic (Operation := Fin r) framing.machine) first.machine
+    (ofDeterministic (Oracle := Fin r) framing.machine) first.machine
   let machine := second.machine.tidyComp captureMachine true
   let online := capturedAccounting first second secondOnline
   exact {
@@ -1734,68 +1880,16 @@ continuation. -/
     State := State
     machine := machine
     stateEncoding := tidyCompStateEncoding
-      (appendStateEncoding framing.stateEncoding first.stateEncoding) second.stateEncoding
+      (Turing.MultiTapeTM.Internal.NativeCompiler.sumStateEncoding
+        framing.stateEncoding first.stateEncoding)
+      second.stateEncoding
     online := online
-    computes := fun input => by
-      rw [totalTime_capturedAccounting]
-      have hcapture := ComputesTidily.prefix (Operation := Fin r) (framing.computes input)
-        (first.computes input)
-      have hcaptureTyped : captureMachine.ComputesTidily (encIn input)
-          (framing.time input + first.time input)
-          ((encPair encIn encMiddle) <$>
-            ((fun middle => (input, middle)) <$> firstProgram input)) := by
-        simpa only [Functor.map_map, Function.comp_apply, encPair_apply] using hcapture
-      have hcomp := hcaptureTyped.comp_encoded (encPair encIn encMiddle)
-          (prog₂ := secondProgram) true
-          fun captured OracleState oracle state state' hcaptured => by
-        rw [ProbOracleComp.runWith_map] at hcaptured
-        obtain ⟨⟨middle, middleState⟩, hmiddle, heq⟩ :=
-          (PMF.mem_support_map_iff _ _ _).mp hcaptured
-        rcases Prod.mk.inj heq with ⟨rfl, rfl⟩
-        have hcontinuation := second.computes (input, middle)
-        have hmono : second.time (input, middle) ≤ secondOnline.totalTime input :=
-          Finset.sum_le_sum fun phase _ =>
-            (hsecond input OracleState oracle state middle middleState hmiddle phase).1
-        exact hcontinuation.mono hmono
-      simpa only [capturedProgram, bind_map_left, Function.comp_apply] using hcomp
+    computes := computes_sequenceCaptured first second secondOnline hsecond
     runsInSpace := fun input => by
       rw [totalTime_capturedAccounting]
-      intro path hhead htime
-      have hspace := clockedRunsInSpace_mul_time_add_one machine (encIn input)
-        (5 * (framing.time input + first.time input) +
-          secondOnline.totalTime input + 9) path hhead htime
-      refine hspace.trans ?_
-      simpa only [online, capturedAccounting, totalTime_capturedAccounting] using
-        clockWorkspace_le_finishAccounting .marshalling tapes
-          ((first.online.seq secondOnline).addTime .marshalling
-            fun input => 5 * framing.time input + 4 * first.time input + 9) input
+      apply clockedRunsInSpace_of_mul_time_add_one_le
+      exact workspace_sequenceCaptured first second secondOnline input
   }
-
-/-- Captured sequencing retains the framing append and outer tidy-composition terms. -/
-theorem machine_sequenceCaptured {Alpha Middle Beta : Type}
-    {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
-    {encOut : Beta ↪ List Bool}
-    {firstProgram : Alpha →
-      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Middle}
-    (first : NativeOracleProgram r firstProgram encIn encMiddle)
-    {secondProgram : Alpha × Middle →
-      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
-    (second : NativeOracleProgram r secondProgram (encPair encIn encMiddle) encOut)
-    (secondOnline : OnlineAccounting Alpha)
-    (hsecond : ∀ input (OracleState : Type)
-      (oracle : Fin r × List Bool → StateT OracleState PMF (List Bool))
-      (state : OracleState) (middle : Middle) (state' : OracleState),
-      (middle, state') ∈
-        (ProbOracleComp.runWith oracle (firstProgram input) state).support →
-      ∀ phase,
-        second.online.time phase (input, middle) ≤ secondOnline.time phase input ∧
-        second.online.workspace phase (input, middle) ≤ secondOnline.workspace phase input) :
-    (sequenceCaptured first second secondOnline hsecond).machine =
-      second.machine.tidyComp
-        (appendPTM (ofDeterministic
-          (Turing.MultiTapeTM.Internal.NativeCompiler.encodeFrame encIn).machine)
-          first.machine) true :=
-  rfl
 
 theorem time_sequenceCaptured {Alpha Middle Beta : Type}
     {encIn : Alpha ↪ List Bool} {encMiddle : Middle ↪ List Bool}
@@ -1890,7 +1984,7 @@ theorem totalTime_boundedIterationAccountingOn
         8 * lengthBound input + 17 := by
   simp only [boundedIterationAccountingOn, totalTime_finishAccounting,
     OnlineAccounting.totalTime_addTime, OnlineAccounting.totalTime_scaleBy]
-  omega
+  simp only [Nat.mul_add, Nat.add_assoc]
 
 /-- Every per-round phase workspace remains visible in the loop accounting. Repetition changes
 time, while workspace is a peak; only controller workspace is additionally raised. -/
@@ -1910,8 +2004,103 @@ theorem workspace_le_boundedIterationAccountingOn
         exact le_max_left _ _
       · simp only [boundedIterationAccountingOn, finishAccounting,
           OnlineAccounting.withWorkspaceFloor, OnlineAccounting.addTime,
-          OnlineAccounting.scaleBy, hphase, ↓reduceIte]).trans
+          OnlineAccounting.scaleBy, hphase, ↓reduceIte]
+        exact le_rfl).trans
     (OnlineAccounting.workspace_le_totalWorkspace _ phase input)
+
+private theorem computes_boundedIterationEncodedOn
+    {Alpha : Type} {enc : Alpha ↪ List Bool} (decoder : Turing.MultiTapeTM.Decoder enc)
+    {step : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Alpha}
+    (body : NativeOracleProgram r step enc enc)
+    (rounds lengthBound : Alpha → ℕ)
+    (roundOnline : OnlineAccounting Alpha)
+    (invariant : Alpha → ℕ → Alpha → Prop)
+    (hbase : ∀ initial, invariant initial 0 initial)
+    (hclock : ∀ initial n, n ≤ rounds initial → ∀ current, invariant initial n current →
+      ∀ phase, body.online.time phase current ≤ roundOnline.time phase initial)
+    (hpreserve : ∀ initial n, n < rounds initial → ∀ current,
+      invariant initial n current →
+      ∀ (OracleState : Type)
+        (oracle : Fin r × List Bool → StateT OracleState PMF (List Bool))
+        (state state' : OracleState) (next : Alpha),
+        (next, state') ∈ (ProbOracleComp.runWith oracle (step current) state).support →
+        invariant initial (n + 1) next ∧ enc next ≠ [])
+    (hlast : ∀ initial current, invariant initial (rounds initial) current →
+      ∀ (OracleState : Type)
+        (oracle : Fin r × List Bool → StateT OracleState PMF (List Bool))
+        (state : OracleState),
+        ProbOracleComp.runWith oracle (enc <$> step current) state =
+          ProbOracleComp.runWith oracle (pure []) state)
+    (hlength : ∀ initial n, n ≤ rounds initial → ∀ current,
+      invariant initial n current → (enc current).length ≤ lengthBound initial)
+    (input : Alpha) :
+    (body.machine.iterateWhile true).ComputesTidily
+      (enc input)
+      ((boundedIterationAccountingOn rounds lengthBound roundOnline
+        (body.tapeCount + 1 + 2)).totalTime input)
+      (enc <$> OracleComp.iterate (rounds input) step input) := by
+  rw [totalTime_boundedIterationAccountingOn]
+  let rawStep : List Bool →
+      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) (List Bool) :=
+    fun word => enc <$> step (decoder.decode word)
+  let rawInvariant (initial : Alpha) (n : ℕ) (word : List Bool) : Prop :=
+    ∃ current, invariant initial n current ∧ word = enc current
+  have hloop := ComputesTidily.iterateWhile true (rawInvariant input)
+    (show rawInvariant input 0 (enc input) from ⟨input, hbase input, rfl⟩)
+    (step := rawStep)
+    (fun n hn word hword => by
+      obtain ⟨current, hcurrent, rfl⟩ := hword
+      have hbody := (body.computes current).mono
+        (Finset.sum_le_sum fun phase _ =>
+          hclock input n hn.le current hcurrent phase)
+      simpa only [rawStep, decoder.decode_enc] using hbody)
+    (fun n hn word hword OracleState oracle state state' word' hword' => by
+      obtain ⟨current, hcurrent, rfl⟩ := hword
+      simp only [rawStep, decoder.decode_enc, ProbOracleComp.runWith_map] at hword'
+      obtain ⟨⟨next, nextState⟩, hnext, heq⟩ :=
+        (PMF.mem_support_map_iff _ _ _).mp hword'
+      rcases Prod.mk.inj heq with ⟨rfl, rfl⟩
+      have hnextInvariant := hpreserve input n hn current hcurrent OracleState oracle state
+        nextState next hnext
+      exact ⟨⟨next, hnextInvariant.1, rfl⟩, hnextInvariant.2⟩)
+    (fun word hword => by
+      obtain ⟨current, hcurrent, rfl⟩ := hword
+      have hbody := (body.computes current).mono
+        (Finset.sum_le_sum fun phase _ =>
+          hclock input (rounds input) le_rfl current hcurrent phase)
+      exact hbody.congr (hlast input current hcurrent))
+    (fun n hn word hword => by
+      obtain ⟨current, hcurrent, rfl⟩ := hword
+      exact hlength input n hn current hcurrent)
+  apply hloop.congr
+  intro OracleState oracle state
+  rw [OracleComp.iterate_map (rounds input) step rawStep enc
+    (fun current => by simp only [rawStep, decoder.decode_enc]) input]
+
+private theorem workspace_boundedIterationEncodedOn
+    {Alpha : Type} {enc : Alpha ↪ List Bool}
+    {step : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Alpha}
+    (body : NativeOracleProgram r step enc enc)
+    (rounds lengthBound : Alpha → ℕ)
+    (roundOnline : OnlineAccounting Alpha) (input : Alpha) :
+    (body.tapeCount + 1 + 2) *
+        ((rounds input + 1) *
+            (roundOnline.totalTime input + 10 * lengthBound input + 23) +
+          8 * lengthBound input + 17 + 1) ≤
+      (boundedIterationAccountingOn rounds lengthBound roundOnline
+        (body.tapeCount + 1 + 2)).totalWorkspace input := by
+  let base := (roundOnline.scaleBy (fun input => rounds input + 1)).addTime .controller
+    fun input => (rounds input + 1) * (10 * lengthBound input + 23) +
+      8 * lengthBound input + 17
+  have htime : base.totalTime input =
+      (rounds input + 1) *
+          (roundOnline.totalTime input + 10 * lengthBound input + 23) +
+        8 * lengthBound input + 17 := by
+    simp only [base, OnlineAccounting.totalTime_addTime,
+      OnlineAccounting.totalTime_scaleBy, Nat.mul_add, Nat.add_assoc]
+  rw [← htime]
+  exact clockWorkspace_le_finishAccounting .controller
+    (body.tapeCount + 1 + 2) base input
 
 /-- Run one fixed named loop machine over typed encoded states under runtime input-indexed round,
 encoded-length and phase bounds. `decoder` is used only as a proof retraction that relates the raw
@@ -1922,7 +2111,7 @@ Changing the encoded fuel changes the certified clock and semantics, not the ins
 its description. Normal rounds produce a nonempty encoded next state. The additional stopping
 round maps the typed body result to the empty word, which `iterateWhile` treats as its
 terminator. -/
-@[expose] noncomputable def boundedIterationEncodedOn
+noncomputable def boundedIterationEncodedOn
     {Alpha : Type} {enc : Alpha ↪ List Bool} (decoder : Turing.MultiTapeTM.Decoder enc)
     {step : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Alpha}
     (body : NativeOracleProgram r step enc enc)
@@ -1932,7 +2121,7 @@ terminator. -/
     (hbase : ∀ initial, invariant initial 0 initial)
     (hclock : ∀ initial n, n ≤ rounds initial → ∀ current, invariant initial n current →
       ∀ phase, body.online.time phase current ≤ roundOnline.time phase initial)
-    (hworkspace : ∀ initial n, n ≤ rounds initial → ∀ current,
+    (_hworkspace : ∀ initial n, n ≤ rounds initial → ∀ current,
       invariant initial n current →
       ∀ phase, body.online.workspace phase current ≤ roundOnline.workspace phase initial)
     (hpreserve : ∀ initial n, n < rounds initial → ∀ current,
@@ -1958,79 +2147,19 @@ terminator. -/
   let tapes := body.tapeCount + 1 + 2
   let online := boundedIterationAccountingOn rounds lengthBound roundOnline tapes
   let machine := body.machine.iterateWhile true
-  let rawStep : List Bool →
-      ProbOracleComp (fun _ : Fin r × List Bool => List Bool) (List Bool) :=
-    fun word => enc <$> step (decoder.decode word)
-  let rawInvariant (initial : Alpha) (n : ℕ) (word : List Bool) : Prop :=
-    ∃ current, invariant initial n current ∧ word = enc current
   exact {
     tapeCount := tapes
     State := State
     machine := machine
     stateEncoding := iterateStateEncoding body.stateEncoding
     online := online
-    computes := fun input => by
-      rw [totalTime_boundedIterationAccountingOn]
-      have hloop := ComputesTidily.iterateWhile true (rawInvariant input)
-        (show rawInvariant input 0 (enc input) from ⟨input, hbase input, rfl⟩)
-        (step := rawStep)
-        (fun n hn word hword => by
-          obtain ⟨current, hcurrent, rfl⟩ := hword
-          have hbody := (body.computes current).mono
-            (Finset.sum_le_sum fun phase _ =>
-              hclock input n hn.le current hcurrent phase)
-          simpa only [rawStep, decoder.decode_enc] using hbody)
-        (fun n hn word hword OracleState oracle state state' word' hword' => by
-          obtain ⟨current, hcurrent, rfl⟩ := hword
-          simp only [rawStep, decoder.decode_enc, ProbOracleComp.runWith_map] at hword'
-          obtain ⟨⟨next, nextState⟩, hnext, heq⟩ :=
-            (PMF.mem_support_map_iff _ _ _).mp hword'
-          rcases Prod.mk.inj heq with ⟨rfl, rfl⟩
-          have hnextInvariant := hpreserve input n hn current hcurrent OracleState oracle state
-            nextState next hnext
-          exact ⟨⟨next, hnextInvariant.1, rfl⟩, hnextInvariant.2⟩)
-        (fun word hword => by
-          obtain ⟨current, hcurrent, rfl⟩ := hword
-          have hbody := (body.computes current).mono
-          (Finset.sum_le_sum fun phase _ =>
-            hclock input (rounds input) le_rfl current hcurrent phase)
-          exact hbody.congr (hlast input current hcurrent))
-        (fun n hn word hword => by
-          obtain ⟨current, hcurrent, rfl⟩ := hword
-          exact hlength input n hn current hcurrent)
-      apply hloop.congr
-      intro OracleState oracle state
-      rw [OracleComp.iterate_map (rounds input) step rawStep enc
-        (fun current => by simp only [rawStep, decoder.decode_enc]) input]
+    computes := computes_boundedIterationEncodedOn decoder body rounds lengthBound roundOnline
+      invariant hbase hclock hpreserve hlast hlength
     runsInSpace := fun input => by
       rw [totalTime_boundedIterationAccountingOn]
-      intro path hhead htime
-      have hspace := clockedRunsInSpace_mul_time_add_one machine (enc input)
-        ((rounds input + 1) *
-            (roundOnline.totalTime input + 10 * lengthBound input + 23) +
-          8 * lengthBound input + 17) path hhead htime
-      refine hspace.trans ?_
-      simpa only [online, boundedIterationAccountingOn,
-        totalTime_boundedIterationAccountingOn] using
-        clockWorkspace_le_finishAccounting .controller tapes
-          ((roundOnline.scaleBy (fun input => rounds input + 1)).addTime .controller fun input =>
-              (rounds input + 1) * (10 * lengthBound input + 23) +
-                8 * lengthBound input + 17) input
+      apply clockedRunsInSpace_of_mul_time_add_one_le
+      exact workspace_boundedIterationEncodedOn body rounds lengthBound roundOnline input
   }
-
-/-- Typed runtime-bounded iteration retains the body loop machine exactly; the proof decoder is
-absent from the installed machine and its one-entry description inventory. -/
-theorem machine_boundedIterationEncodedOn
-    {Alpha : Type} {enc : Alpha ↪ List Bool} (decoder : Turing.MultiTapeTM.Decoder enc)
-    {step : Alpha → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Alpha}
-    (body : NativeOracleProgram r step enc enc)
-    (rounds lengthBound : Alpha → ℕ)
-    (roundOnline : OnlineAccounting Alpha)
-    (invariant : Alpha → ℕ → Alpha → Prop)
-    (hbase hclock hworkspace hpreserve hlast hlength) :
-    (boundedIterationEncodedOn decoder body rounds lengthBound roundOnline invariant hbase hclock
-      hworkspace hpreserve hlast hlength).machine = body.machine.iterateWhile true :=
-  rfl
 
 /-- Exact clock of typed runtime-indexed iteration, including its final stopping round. -/
 theorem time_boundedIterationEncodedOn
@@ -2072,7 +2201,7 @@ theorem bodyWorkspace_le_boundedIterationEncodedOn
       (body.tapeCount + 1 + 2) phase initial)
 
 /-- Raw-word specialization of `boundedIterationEncodedOn`. -/
-@[expose] noncomputable def boundedIterationOn
+noncomputable def boundedIterationOn
     {step : List Bool → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) (List Bool)}
     (body : NativeOracleProgram r step encBits encBits)
     (rounds lengthBound : List Bool → ℕ)
@@ -2107,22 +2236,12 @@ theorem bodyWorkspace_le_boundedIterationEncodedOn
       hpreserve initial n hn word hinvariant OracleState oracle state state' word' hword'
     exact ⟨hnext.1, by simpa only [encBits_apply] using hnext.2⟩
   · intro initial word hinvariant OracleState oracle state
-    simpa only [encBits_apply, id_map] using
-      hlast initial word hinvariant OracleState oracle state
+    rw [show (⇑encBits) = id by
+      funext bits
+      exact encBits_apply bits]
+    simpa only [id_map] using hlast initial word hinvariant OracleState oracle state
   · intro initial n hn word hinvariant
     simpa only [encBits_apply] using hlength initial n hn word hinvariant
-
-/-- Runtime-bounded raw iteration retains one machine independently of its input fuel. -/
-theorem machine_boundedIterationOn
-    {step : List Bool → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) (List Bool)}
-    (body : NativeOracleProgram r step encBits encBits)
-    (rounds lengthBound : List Bool → ℕ)
-    (roundOnline : OnlineAccounting (List Bool))
-    (invariant : List Bool → ℕ → List Bool → Prop)
-    (hbase hclock hworkspace hpreserve hlast hlength) :
-    (boundedIterationOn body rounds lengthBound roundOnline invariant hbase hclock hworkspace
-      hpreserve hlast hlength).machine = body.machine.iterateWhile true :=
-  rfl
 
 /-- Exact clock of raw-word runtime-indexed iteration. -/
 theorem time_boundedIterationOn
@@ -2141,7 +2260,7 @@ theorem time_boundedIterationOn
     (body.tapeCount + 1 + 2) input
 
 /-- Fixed-round specialization of `boundedIterationOn`. -/
-@[expose] noncomputable def boundedIteration
+noncomputable def boundedIteration
     {step : List Bool → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) (List Bool)}
     (body : NativeOracleProgram r step encBits encBits)
     (rounds lengthBound : ℕ) (roundClock roundWorkspace : OnlinePhase → ℕ)
@@ -2172,16 +2291,6 @@ theorem time_boundedIterationOn
       workspace := fun phase _ => roundWorkspace phase }
     invariant hbase hclock hworkspace hpreserve hlast hlength
 
-theorem machine_boundedIteration
-    {step : List Bool → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) (List Bool)}
-    (body : NativeOracleProgram r step encBits encBits)
-    (rounds lengthBound : ℕ) (roundClock roundWorkspace : OnlinePhase → ℕ)
-    (invariant : List Bool → ℕ → List Bool → Prop)
-    (hbase hclock hworkspace hpreserve hlast hlength) :
-    (boundedIteration body rounds lengthBound roundClock roundWorkspace invariant hbase hclock
-      hworkspace hpreserve hlast hlength).machine = body.machine.iterateWhile true :=
-  rfl
-
 /-- Every supported emitted result fits in the charged online clock. This follows from the actual
 machine certificate; `outputBits` is not an uncharged semantic-size annotation. -/
 theorem outputBits_le_time (witness : NativeOracleProgram r program encIn encOut)
@@ -2199,22 +2308,10 @@ theorem outputBits_le_time (witness : NativeOracleProgram r program encIn encOut
   exact (witness.computes input).length_output_le oracle state hencoded
 
 /-- The exact first-order description of the recorded native machine. -/
-@[expose] noncomputable def description (witness : NativeOracleProgram r program encIn encOut) :
+noncomputable abbrev description (witness : NativeOracleProgram r program encIn encOut) :
     Turing.MultiTapePTM.Universal.Desc := by
-  letI := witness.stateFintype
+  let _ := witness.stateFintype
   exact Description.ofMachine witness.stateEncoding witness.machine
-
-/-- The recorded description is the explicit finite enumeration of the packaged open machine. -/
-theorem description_eq_ofMachine (witness : NativeOracleProgram r program encIn encOut) :
-    witness.description =
-      @Description.ofMachine witness.tapeCount r witness.State witness.stateFintype
-        witness.stateEncoding witness.machine :=
-  rfl
-
-/-- Encoding an artifact's typed output preserves its exact first-order description. -/
-theorem description_encodedOutput (witness : NativeOracleProgram r program encIn encOut) :
-    witness.encodedOutput.description = witness.description :=
-  rfl
 
 /-- Execute the generated natural-symbol description through the explicit Boolean-word query
 adapter, retaining its whole clocked output program. -/
@@ -2237,7 +2334,7 @@ theorem runWith_descriptionRun (witness : NativeOracleProgram r program encIn en
     ProbOracleComp.runWith handler (witness.descriptionRun input) state =
       (ProbOracleComp.runWith handler (encOut <$> program input) state).map
         (Prod.map (List.map Turing.MultiTapeTM.Universal.eBit) id) := by
-  letI := witness.stateFintype
+  let _ := witness.stateFintype
   rw [descriptionRun, show witness.description.toMachine.initialConfig
       ((encIn input).map Turing.MultiTapeTM.Universal.eBit) =
         Description.mapConfig witness.stateEncoding
@@ -2246,70 +2343,17 @@ theorem runWith_descriptionRun (witness : NativeOracleProgram r program encIn en
         (encIn input)).symm]
   simp only [MultiTapePTM.runFrom, ProbOracleComp.runWith_map]
   rw [Description.runWith_ofMachine]
-  rw [PMF.map_map]
+  rw [PMF.map_comp]
   have hnative := (witness.computes input).runOracle handler state
-  rw [MultiTapePTM.runOracle_eq_map, ProbOracleComp.runWith_map] at hnative
-  rw [← hnative, PMF.map_map]
+  rw [MultiTapePTM.runOracle_eq_map] at hnative
+  simp only [ProbOracleComp.runWith_map] at hnative
+  rw [← hnative]
+  rw [PMF.map_comp]
   congr 1
-  funext result
-  rcases result with ⟨cfg, finalState⟩
-  rfl
 
 /-- Exact unary-model static length of the named open machine. -/
 @[expose] noncomputable def staticBits (witness : NativeOracleProgram r program encIn encOut) : ℕ :=
   Turing.MultiTapePTM.Universal.descLen witness.description
-
-/-- Static bits are definitionally the length of the recorded first-order description. -/
-theorem staticBits_eq_descLen (witness : NativeOracleProgram r program encIn encOut) :
-    witness.staticBits = Turing.MultiTapePTM.Universal.descLen witness.description :=
-  rfl
-
-/-- Encoding an artifact's typed output adds no installed static bits. -/
-theorem staticBits_encodedOutput (witness : NativeOracleProgram r program encIn encOut) :
-    witness.encodedOutput.staticBits = witness.staticBits :=
-  rfl
-
-/-- The concrete installed-description inventory for one packaged native artifact. A composed
-witness installs its final composed description once: the inlined constructor and component
-controls are not additional installed copies. External services and separately retained compilers
-must appear in their own inventories. -/
-@[expose] noncomputable def installedDescriptions
-    (witness : NativeOracleProgram r program encIn encOut) :
-    List Turing.MultiTapePTM.Universal.Desc :=
-  [witness.description]
-
-/-- Every packaged witness exposes its exact one-occurrence installed inventory. -/
-theorem installedDescriptions_eq_singleton
-    (witness : NativeOracleProgram r program encIn encOut) :
-    witness.installedDescriptions = [witness.description] :=
-  rfl
-
-/-- Encoding an artifact's typed output neither adds nor duplicates an installed occurrence. -/
-theorem installedDescriptions_encodedOutput
-    (witness : NativeOracleProgram r program encIn encOut) :
-    witness.encodedOutput.installedDescriptions = witness.installedDescriptions :=
-  rfl
-
-/-- Exact unary-model size of the explicit installed-description inventory. -/
-@[expose] noncomputable def installedBits
-    (witness : NativeOracleProgram r program encIn encOut) : ℕ :=
-  (witness.installedDescriptions.map Turing.MultiTapePTM.Universal.descLen).sum
-
-/-- A packaged native artifact's one-entry installed inventory is exactly its static charge. -/
-theorem installedBits_eq_staticBits (witness : NativeOracleProgram r program encIn encOut) :
-    witness.installedBits = witness.staticBits := by
-  simp [installedBits, installedDescriptions, staticBits]
-
-/-- Conditional arithmetic charge for a caller-supplied copy count. This helper does not determine
-which artifacts are installed, whether copies are shared, or whether a composed artifact already
-inlines its components; that inventory belongs to the consuming construction. -/
-@[expose] noncomputable def staticBitsCopies (count : ℕ)
-    (witness : NativeOracleProgram r program encIn encOut) : ℕ :=
-  count * witness.staticBits
-
-theorem staticBitsCopies_one (witness : NativeOracleProgram r program encIn encOut) :
-    staticBitsCopies 1 witness = witness.staticBits := by
-  simp [staticBitsCopies]
 
 end NativeOracleProgram
 
