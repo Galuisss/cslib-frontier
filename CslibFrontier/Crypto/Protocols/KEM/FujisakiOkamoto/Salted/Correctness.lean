@@ -741,7 +741,8 @@ private theorem prefetchDecaps_map_completionCache
     simp only [hdec]
     rw [stateT_bind_apply, PMF.monad_bind_eq_bind]
     rw [PMF.map_bind]
-    simp only [completionPrefetchDecapsProgram, hdec, OracleComp.run_interpret_bind]
+    simp only [completionPrefetchDecapsProgram, hdec, OracleComp.run_interpret_bind,
+      PMF.monad_bind_eq_bind]
     rw [← S.simJoint_map_completionCache pk (S.jointInput pk message ciphertext.salt) st hlinked,
       PMF.bind_map]
     apply PMF.bind_congr_on_support
@@ -779,10 +780,11 @@ private theorem Linked.of_prefetchDecaps
     obtain ⟨reply, hreply, hz⟩ := hz
     have hmiddle := hlinked.of_simJoint hreply
     split at hz
-    · simp only [PMF.mem_support_pure_iff] at hz
+    · change z ∈ (PMF.pure (some reply.1.key, reply.2)).support at hz
+      rw [PMF.mem_support_pure_iff] at hz
       subst z
       exact hmiddle
-    · rw [PMF.mem_support_map_iff] at hz
+    · rw [stateT_map_apply, PMF.monad_map_eq_map, PMF.mem_support_map_iff] at hz
       obtain ⟨key, hkey, rfl⟩ := hz
       exact hmiddle.of_decapsKey hkey
 
@@ -1133,6 +1135,7 @@ private theorem realJoint_bad_le [Fintype M] [Nonempty M]
     (hs : S.GoodCache pk sk st) :
     (S.realJoint pk sk input st).toOuterMeasure {z | ¬S.GoodCache pk sk z.2} ≤
       ENNReal.ofReal (S.pke.keyPairMaxFailProb pk sk) := by
+  classical
   cases hlookup : st.jointCache.lookup input with
   | some reply =>
     refine le_of_eq_of_le ?_ zero_le
@@ -1173,7 +1176,8 @@ private theorem realJoint_bad_le [Fintype M] [Nonempty M]
         refine PMF.toOuterMeasure_mono _ ?_
         rintro z ⟨hbad, hz⟩ hdec
         apply hbad
-        apply hs.of_cacheJoint hdec
+        apply hs.of_cacheJoint (valid := fun m coins =>
+          S.pke.dec sk (S.pke.encDet pk m coins) = some m) hdec
         simpa only [realJoint] using hz
       _ = (ProbComp.eval S.pke.sampleCoins).toOuterMeasure
           {coins | S.pke.dec sk (S.pke.encDet pk input.message coins) ≠ some input.message} := by
