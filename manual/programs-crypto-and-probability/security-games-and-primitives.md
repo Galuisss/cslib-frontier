@@ -1066,9 +1066,17 @@ weights `countR`, `countE`, `countR`, giving the HQC encryption-order factor `τ
 extended-nonnegative joint payoff. It is not a generic multiplier for differences or game
 advantages. Nonnegativity is essential: the source's Lemma 6.5 omits it, and a constant payoff of
 `-1` refutes that wording.
+[HQC v5.1's three published parameter rows](../../CslibFrontier/Crypto/Primitives/HQC/Parameters.lean)
+are `hqc1PKEParams`, `hqc3PKEParams` and `hqc5PKEParams`. Each takes the decoder radius `Δ`
+explicitly because the specification does not give it a numerical value; no DFR estimate is
+bundled into the record. The published equality `ωᵣ = ωₑ` makes the exact 32-bit three-draw factor
+`pkeCoinsUpperDensity32` the cube of the corresponding `supportUpperDensity`. These are exact
+products; the rounded decimal values in Table 17 are not used as equalities.
 [Checked examples](../../CslibFrontierTests/Crypto/HQCSupportSampling.lean) include zero/full weight,
 collision replacement, and `n=5`, `count=2`, `width=3`, where `{2,4}` has actual probability
 `1/16` and ideal probability `1/10`. They also distinguish multiply-high from modulo reduction.
+The [parameter checks](../../CslibFrontierTests/Crypto/HQCParameters.lean) verify every recorded
+source field, the message exponents, and all three exact cube identities.
 
 For the finite statistical comparison, import
 [`HQC/SupportProbability.lean`](../../CslibFrontier/Crypto/Primitives/HQC/SupportProbability.lean);
