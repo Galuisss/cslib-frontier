@@ -36,6 +36,8 @@ is not installed or executed.
 * `Turing.MultiTapePTM.Universal.NativeInterpreter.LoopState`: typed runtime loop storage.
 * `Turing.MultiTapePTM.Universal.NativeInterpreter.RetainedCommandInput`: narrow stored-state and
   selected-command boundary for retained query branches.
+* `Turing.MultiTapePTM.Universal.NativeInterpreter.RetainedQueryPayload` and
+  `retainedCommandQueryPayloadCompiler`: shared selected-query view and compiler boundary.
 * `Turing.MultiTapePTM.Universal.NativeInterpreter.bodyWithQueryBranch`: shared retained
   coin/lookup/command/controller construction for a supplied stateful query artifact.
 * `Turing.MultiTapePTM.Universal.NativeInterpreter.body`: retained one-round interpreter.
@@ -98,15 +100,25 @@ enc_structure eLoopState : LoopState where
   desc : eDesc, input : (encList encUnary), fuel : encUnary, replyBits : encUnary,
   remaining : encUnary, cfg : eICfg
 
+/-- Two retained states agree on every field that one interpreter round must preserve. -/
+structure LoopState.SameStatic (first second : LoopState) : Prop where
+  /-- The source description is unchanged. -/
+  desc : second.desc = first.desc
+  /-- The source input is unchanged. -/
+  input : second.input = first.input
+  /-- The source fuel bound is unchanged. -/
+  fuel : second.fuel = first.fuel
+  /-- The raw reply-copy bound is unchanged. -/
+  replyBits : second.replyBits = first.replyBits
+
 /-- Constructive proof decoder used only by the typed bounded-iteration theorem. The retained body
 still executes and charges its concrete parsers. -/
 def loopStateDecoder : Decoder eLoopState :=
   (Decoder.pair descDecoder
     (.pair (.list .unary)
       (.pair .unary (.pair .unary (.pair .unary iCfgDecoder))))).map
-    (fun state =>
-      ⟨state.1, state.2.1, state.2.2.1, state.2.2.2.1, state.2.2.2.2.1,
-        state.2.2.2.2.2⟩)
+    (fun ⟨desc, input, fuel, replyBits, remaining, cfg⟩ =>
+      ⟨desc, input, fuel, replyBits, remaining, cfg⟩)
     (fun state =>
       (state.desc, state.input, state.fuel, state.replyBits, state.remaining, state.cfg))
     (fun _ => rfl) fun _ => rfl
@@ -386,12 +398,27 @@ noncomputable def commandCompiler (r : ℕ) :
       eLookupInput (eCommand r) :=
   storedCommandCompiler r eLoopState id (NativeCompiler.identity eLoopState)
 
-private abbrev QueryPayload (r : ℕ) := Fin r × (List ℕ × (ℕ × ICfg))
-private def eQueryPayload (r : ℕ) : QueryPayload r ↪ List Bool :=
-  encPair (eOperation r) (encPair (encList encUnary) (encPair encUnary eICfg))
-private abbrev CommandSum (r : ℕ) := ICfg ⊕ QueryPayload r
+/-- Operation, source request, continuation tag and suspended configuration selected from a
+retained command. This is the shared typed view used by both the open query executor and locally
+installed handlers. -/
+structure RetainedQueryPayload (r : ℕ) where
+  /-- Selected source operation. -/
+  operation : Fin r
+  /-- Decoded source request symbols. -/
+  request : List ℕ
+  /-- Continuation control tag. -/
+  next : ℕ
+  /-- Suspended source configuration awaiting the reply. -/
+  pending : ICfg
+
+/-- Field-order encoding of the retained-query view: operation, request, continuation tag and
+suspended configuration. Every field except the last is framed. -/
+enc_structure eRetainedQueryPayload (r : ℕ) : RetainedQueryPayload r where
+  operation : (eOperation r), request : (encList encUnary), next : encUnary, pending : eICfg
+
+private abbrev CommandSum (r : ℕ) := ICfg ⊕ RetainedQueryPayload r
 private def eCommandSum (r : ℕ) : CommandSum r ↪ List Bool :=
-  encSum eICfg (eQueryPayload r)
+  encSum eICfg (eRetainedQueryPayload r)
 
 /-- The narrow retained-command boundary: stored controller state and the selected command. -/
 abbrev RetainedCommandInput (r : ℕ) (S : Type) := S × Command r
@@ -405,20 +432,29 @@ private abbrev CommandInput (r : ℕ) := RetainedCommandInput r LoopState
 private def eCommandInput (r : ℕ) : CommandInput r ↪ List Bool :=
   eRetainedCommandInput r eLoopState
 
-private def defaultQueryPayload {r : ℕ} (fallback : Fin r) : QueryPayload r :=
-  (fallback, [], 0, default)
+/-- Total fallback for viewing a local command through the retained-query boundary. The fallback
+is used only on the local branch, before the command tag dispatch excludes that branch. -/
+private def defaultRetainedQueryPayload {r : ℕ} (fallback : Fin r) : RetainedQueryPayload r :=
+  { operation := fallback, request := [], next := 0, pending := default }
 
-private def commandQueryPayload (r : ℕ) (fallback : Fin r)
-    (input : CommandInput r) : QueryPayload r :=
-  Sum.elim (Function.const ICfg (defaultQueryPayload fallback)) id
-    (Command.equivSum r input.2)
+private def commandSumView (r : ℕ) : Command r → CommandSum r
+  | .local cfg => .inl cfg
+  | .query operation request next pending =>
+      .inr { operation, request, next, pending }
+
+/-- Total shared retained-query view of a selected command. -/
+def retainedCommandQueryPayload (r : ℕ) (fallback : Fin r)
+    (input : RetainedCommandInput r S) : RetainedQueryPayload r :=
+  Sum.elim (Function.const ICfg (defaultRetainedQueryPayload fallback)) id
+    (commandSumView r input.2)
 
 private def commandState (input : CommandInput r) : LoopState :=
   input.1
 
 private noncomputable def commandSumCompiler (r : ℕ) :
-    NativeCompiler (Command.equivSum r) (eCommand r) (eCommandSum r) :=
-  (NativeCompiler.identity (eCommandSum r)).ofInputEq (Command.equivSum r) fun _ => rfl
+    NativeCompiler (commandSumView r) (eCommand r) (eCommandSum r) :=
+  (NativeCompiler.identity (eCommandSum r)).ofInputEq (commandSumView r) fun command => by
+    cases command <;> rfl
 
 private noncomputable def retainedCommandValueCompiler (r : ℕ)
     (encState : S ↪ List Bool) :
@@ -428,39 +464,38 @@ private noncomputable def retainedCommandValueCompiler (r : ℕ)
 
 private noncomputable def retainedCommandSumInputCompiler (r : ℕ)
     (encState : S ↪ List Bool) :
-    NativeCompiler (fun input : RetainedCommandInput r S => Command.equivSum r input.2)
+    NativeCompiler (fun input : RetainedCommandInput r S => commandSumView r input.2)
       (eRetainedCommandInput r encState) (eCommandSum r) :=
   (commandSumCompiler r).comp (retainedCommandValueCompiler r encState)
-
-private noncomputable def commandSumInputCompiler (r : ℕ) :
-    NativeCompiler (fun input : CommandInput r => Command.equivSum r input.2)
-      (eCommandInput r) (eCommandSum r) :=
-  retainedCommandSumInputCompiler r eLoopState
 
 private noncomputable def retainedCommandIsQueryCompiler (r : ℕ)
     (encState : S ↪ List Bool) :
     NativeCompiler
-      (fun input : RetainedCommandInput r S => (Command.equivSum r input.2).isRight)
+      (fun input : RetainedCommandInput r S => (commandSumView r input.2).isRight)
       (eRetainedCommandInput r encState) encTest :=
   NativeCompiler.boolToTest.comp
-    ((NativeCompiler.sumTag eICfg (eQueryPayload r)).comp
+    ((NativeCompiler.sumTag eICfg (eRetainedQueryPayload r)).comp
       (retainedCommandSumInputCompiler r encState))
 
 private noncomputable def retainedLocalCfgCompiler (r : ℕ)
     (encState : S ↪ List Bool) :
     NativeCompiler
       (fun input : RetainedCommandInput r S =>
-        Sum.elim id (Function.const (QueryPayload r) default) (Command.equivSum r input.2))
+        Sum.elim id (Function.const (RetainedQueryPayload r) default)
+          (commandSumView r input.2))
       (eRetainedCommandInput r encState) eICfg :=
-  (NativeCompiler.sumLeftD default eICfg (eQueryPayload r)).comp
+  (NativeCompiler.sumLeftD default eICfg (eRetainedQueryPayload r)).comp
     (retainedCommandSumInputCompiler r encState)
 
-private noncomputable def queryPayloadCompiler (r : ℕ) (fallback : Fin r) :
+/-- Compiler for the shared retained-query view. Consumers can project its four fields without
+rebuilding the command-sum decoding chain. -/
+noncomputable def retainedCommandQueryPayloadCompiler (r : ℕ) (fallback : Fin r)
+    (encState : S ↪ List Bool) :
     NativeCompiler
-      (commandQueryPayload r fallback)
-      (eCommandInput r) (eQueryPayload r) :=
-  (NativeCompiler.sumRightD (defaultQueryPayload fallback) eICfg (eQueryPayload r)).comp
-    (commandSumInputCompiler r)
+      (retainedCommandQueryPayload r fallback : RetainedCommandInput r S → _)
+      (eRetainedCommandInput r encState) (eRetainedQueryPayload r) :=
+  (NativeCompiler.sumRightD (defaultRetainedQueryPayload fallback) eICfg
+    (eRetainedQueryPayload r)).comp (retainedCommandSumInputCompiler r encState)
 
 private noncomputable def commandLoopStateCompiler (r : ℕ) :
     NativeCompiler (commandState : CommandInput r → LoopState)
@@ -472,8 +507,8 @@ private noncomputable def retainedLocalAdvanceCompiler (r : ℕ)
     (updateCompiler : NativeCompiler update (encPair encState eICfg) encState) :
     NativeCompiler (fun input : RetainedCommandInput r S =>
       some (update (input.1,
-        Sum.elim id (Function.const (QueryPayload r) default)
-          (Command.equivSum r input.2))))
+        Sum.elim id (Function.const (RetainedQueryPayload r) default)
+          (commandSumView r input.2))))
       (eRetainedCommandInput r encState) (eStoredInput encState) :=
   (NativeCompiler.optionSome encState).comp
     (updateCompiler.comp
@@ -483,58 +518,77 @@ private noncomputable def retainedLocalAdvanceCompiler (r : ℕ)
 private noncomputable def localAdvanceCompiler (r : ℕ) :
     NativeCompiler (fun input : CommandInput r =>
       some (input.1.advance
-        (Sum.elim id (Function.const (QueryPayload r) default)
-          (Command.equivSum r input.2))))
+        (Sum.elim id (Function.const (RetainedQueryPayload r) default)
+          (commandSumView r input.2))))
       (eCommandInput r) eBodyInput :=
   retainedLocalAdvanceCompiler r eLoopState (fun input => input.1.advance input.2)
     advanceCompiler
 
+private noncomputable def queryPayloadFieldsCompiler (r : ℕ) (fallback : Fin r) :
+    NativeCompiler
+      (fun input : CommandInput r =>
+        let payload := retainedCommandQueryPayload r fallback input
+        (payload.operation, payload.request, payload.next, payload.pending))
+      (eCommandInput r)
+      (encPair (eOperation r) (encPair (encList encUnary) (encPair encUnary eICfg))) :=
+  let fields := fun payload : RetainedQueryPayload r =>
+    (payload.operation, payload.request, payload.next, payload.pending)
+  ((NativeCompiler.identity
+      (encPair (eOperation r) (encPair (encList encUnary) (encPair encUnary eICfg))))
+    |>.ofInputEq fields fun _ => rfl).comp
+      (retainedCommandQueryPayloadCompiler r fallback eLoopState)
+
 private noncomputable def queryOperationCompiler (r : ℕ) (fallback : Fin r) :
     NativeCompiler
-      (fun input : CommandInput r => (commandQueryPayload r fallback input).1)
+      (fun input : CommandInput r => (retainedCommandQueryPayload r fallback input).operation)
       (eCommandInput r) (eOperation r) :=
   (NativeCompiler.first (eOperation r)
     (encPair (encList encUnary) (encPair encUnary eICfg))).comp
-      (queryPayloadCompiler r fallback)
+      (queryPayloadFieldsCompiler r fallback)
 
 private noncomputable def queryTailCompiler (r : ℕ) (fallback : Fin r) :
     NativeCompiler
-      (fun input : CommandInput r => (commandQueryPayload r fallback input).2)
+      (fun input : CommandInput r =>
+        ((retainedCommandQueryPayload r fallback input).request,
+          (retainedCommandQueryPayload r fallback input).next,
+          (retainedCommandQueryPayload r fallback input).pending))
       (eCommandInput r) (encPair (encList encUnary) (encPair encUnary eICfg)) :=
   (NativeCompiler.second (eOperation r)
     (encPair (encList encUnary) (encPair encUnary eICfg))).comp
-      (queryPayloadCompiler r fallback)
+      (queryPayloadFieldsCompiler r fallback)
 
 private noncomputable def queryRequestCompiler (r : ℕ) (fallback : Fin r) :
     NativeCompiler
-      (fun input : CommandInput r => (commandQueryPayload r fallback input).2.1)
+      (fun input : CommandInput r => (retainedCommandQueryPayload r fallback input).request)
       (eCommandInput r) (encList encUnary) :=
   (NativeCompiler.first (encList encUnary) (encPair encUnary eICfg)).comp
     (queryTailCompiler r fallback)
 
 private noncomputable def queryNextCfgCompiler (r : ℕ) (fallback : Fin r) :
     NativeCompiler
-      (fun input : CommandInput r => (commandQueryPayload r fallback input).2.2)
+      (fun input : CommandInput r =>
+        ((retainedCommandQueryPayload r fallback input).next,
+          (retainedCommandQueryPayload r fallback input).pending))
       (eCommandInput r) (encPair encUnary eICfg) :=
   (NativeCompiler.second (encList encUnary) (encPair encUnary eICfg)).comp
     (queryTailCompiler r fallback)
 
 private noncomputable def queryNextCompiler (r : ℕ) (fallback : Fin r) :
     NativeCompiler
-      (fun input : CommandInput r => (commandQueryPayload r fallback input).2.2.1)
+      (fun input : CommandInput r => (retainedCommandQueryPayload r fallback input).next)
       (eCommandInput r) encUnary :=
   (NativeCompiler.first encUnary eICfg).comp (queryNextCfgCompiler r fallback)
 
 private noncomputable def queryCfgCompiler (r : ℕ) (fallback : Fin r) :
     NativeCompiler
-      (fun input : CommandInput r => (commandQueryPayload r fallback input).2.2.2)
+      (fun input : CommandInput r => (retainedCommandQueryPayload r fallback input).pending)
       (eCommandInput r) eICfg :=
   (NativeCompiler.second encUnary eICfg).comp (queryNextCfgCompiler r fallback)
 
 private noncomputable def queryRequestWordCompiler (r : ℕ) (fallback : Fin r) :
     NativeCompiler
       (fun input : CommandInput r =>
-        encList encUnary (commandQueryPayload r fallback input).2.1)
+        encList encUnary (retainedCommandQueryPayload r fallback input).request)
       (eCommandInput r) encBits :=
   (queryRequestCompiler r fallback).ofOutputEq fun _ => rfl
 
@@ -546,7 +600,7 @@ private noncomputable def queryReplyBitsCompiler (r : ℕ) :
 
 private def queryInput (r : ℕ) (fallback : Fin r) (input : CommandInput r) :
     List Bool × ℕ :=
-  (encList encUnary (commandQueryPayload r fallback input).2.1,
+  (encList encUnary (retainedCommandQueryPayload r fallback input).request,
     (commandState input).replyBits)
 
 /-- Retained marshalling of a validated query command into the raw request and reply-copy limit
@@ -574,9 +628,9 @@ private def queryPost (r : ℕ) (fallback : Fin r) (input : QueryPostInput r) :
     BodyInput :=
   let command := input.1
   let state := commandState command
-  let payload := commandQueryPayload r fallback command
+  let payload := retainedCommandQueryPayload r fallback command
   let decoded := (frames input.2).map List.length |>.take state.fuel
-  some (state.advance payload.2.2.2.receive payload.1 payload.2.2.1 decoded)
+  some (state.advance payload.pending.receive payload.operation payload.next decoded)
 
 /-- Phase-preserving deterministic reply decoding, source-symbol truncation, checked reply
 installation and loop-state update. -/
@@ -705,11 +759,12 @@ noncomputable def queryBranch (r : ℕ) (fallback operation : Fin r) :
 
 private def operationTest (r : ℕ) (fallback operation : Fin r)
     (input : CommandInput r) : List Bool :=
-  encTest (decide ((commandQueryPayload r fallback input).1 = operation))
+  encTest (decide ((retainedCommandQueryPayload r fallback input).operation = operation))
 
 private noncomputable def operationNatCompiler (r : ℕ) (fallback : Fin r) :
     NativeCompiler
-      (fun input : CommandInput r => (commandQueryPayload r fallback input).1.val)
+      (fun input : CommandInput r =>
+        (retainedCommandQueryPayload r fallback input).operation.val)
       (eCommandInput r) encUnary :=
   (queryOperationCompiler r fallback).ofOutputEq fun _ => rfl
 
@@ -738,8 +793,8 @@ artifact. It advances the original state with the explicit local default rather 
 semantic callback. -/
 private def localAdvance (r : ℕ) (input : CommandInput r) : BodyInput :=
   some ((commandState input).advance
-    (Sum.elim id (Function.const (QueryPayload r) default)
-      (Command.equivSum r input.2)))
+    (Sum.elim id (Function.const (RetainedQueryPayload r) default)
+      (commandSumView r input.2)))
 
 noncomputable def queryFallback (r : ℕ) :=
   NativeOracleProgram.ofCompiler (r := r)
@@ -784,7 +839,7 @@ private noncomputable def commandExecutorWithQueryBranch (r : ℕ)
   cases input.2 <;>
     simp [executeRetainedCommand, NativeOracleProgram.dispatchProgram,
       retainedCommandIsQueryCompiler, retainedCommandSumInputCompiler,
-      retainedCommandValueCompiler, commandSumCompiler, Command.equivSum]
+      retainedCommandValueCompiler, commandSumCompiler, commandSumView]
 
 private noncomputable def commandExecutorZeroWithQueryProgram
     (encState : S ↪ List Bool) (update : S × ICfg → S)
@@ -801,7 +856,7 @@ private noncomputable def commandExecutorZeroWithQueryProgram
 
 private theorem dispatchProgram_operations (r : ℕ) (fallback operation : Fin r)
     (input : CommandInput r)
-    (hoperation : (commandQueryPayload r fallback input).1 = operation) :
+    (hoperation : (retainedCommandQueryPayload r fallback input).operation = operation) :
     NativeOracleProgram.dispatchProgram
         ((operations r).map (operationCase r fallback))
         (fun command => pure (localAdvance r command)) input =
@@ -1216,9 +1271,8 @@ theorem activeProgramWithQueryBranch_apply [Inhabited S] (r : ℕ) (source : S �
       let coin ← ProbOracleComp.sample (ProbComp.uniform Bool)
       let current := source state
       let commandInput := (current.desc, current.input, current.cfg, coin)
-      let lookup := NativeCompiler.firstMatch (commandInput.1.table,
-        commandInput.2.2.1.key commandInput.2.1
-          ((commandInput.2.2.1.control.getD none).getD 0))
+      let lookup := NativeCompiler.firstMatch (current.desc.table,
+        current.cfg.key current.input ((current.cfg.control.getD none).getD 0))
       let command := commandAtFromLookup r (commandInput, lookup)
       match command with
       | .local cfg => pure (some (update (state, cfg)))
@@ -1616,24 +1670,28 @@ noncomputable def body (r : ℕ) :
                 NativeOracleProgram.capturedProgram, storedLookupResult,
                 commandFromStoredLookup, retainedCommandFromLookup, originalQueryProgram,
                 queryBranchProgram, NativeOracleProgram.queryTakeProgram, queryInput, queryPost,
-                commandQueryPayload, defaultQueryPayload,
+                retainedCommandQueryPayload,
+                defaultRetainedQueryPayload,
                 commandAtFromLookup_firstMatch, hremaining, hcontrol]
 
 /-! ### Finite proof reachability and uniform round bounds -/
 
-private def withDynamic (template : LoopState) (remaining : ℕ) (cfg : ICfg) : LoopState :=
+/-- Replace only the dynamic round counter and first-order configuration of retained storage. -/
+def LoopState.withDynamic (template : LoopState) (remaining : ℕ) (cfg : ICfg) : LoopState :=
   { template with remaining := remaining, cfg := cfg }
 
-private theorem iterate_step_withDynamic (r : ℕ) (template : LoopState) (cfg : ICfg) :
+/-- Iterating the optional retained controller from positive dynamic storage is the corresponding
+`wordStep` iteration, with the static fields retained and the round counter exhausted. -/
+theorem iterate_step_withDynamic (r : ℕ) (template : LoopState) (cfg : ICfg) :
     ∀ count,
-      OracleComp.iterate count (step r) (some (withDynamic template count cfg)) =
-        (fun final => some (withDynamic template 0 final)) <$>
+      OracleComp.iterate count (step r) (some (template.withDynamic count cfg)) =
+        (fun final => some (template.withDynamic 0 final)) <$>
           OracleComp.iterate count
             (wordStep r template.desc template.input template.fuel template.replyBits) cfg
-  | 0 => by simp [withDynamic]
+  | 0 => by simp [LoopState.withDynamic]
   | count + 1 => by
       rw [OracleComp.iterate_succ_bind, OracleComp.iterate_succ_bind]
-      simp only [step, withDynamic, Nat.succ_ne_zero, ↓reduceIte, advance]
+      simp only [step, LoopState.withDynamic, Nat.succ_ne_zero, ↓reduceIte, advance]
       apply OracleComp.bind_congr_on_support
       intro next _
       simpa only [Nat.succ_sub_one] using iterate_step_withDynamic r template next count
@@ -1646,16 +1704,22 @@ theorem stagedRun_eq_run (r : ℕ) : stagedRun r = run r := by
     rw [show
       { desc := input.desc, input := input.input, fuel := input.fuel,
           replyBits := input.replyBits, remaining := input.fuel, cfg := ICfg.init input.desc } =
-        withDynamic
+        LoopState.withDynamic
           { desc := input.desc, input := input.input, fuel := input.fuel,
             replyBits := input.replyBits, remaining := input.fuel, cfg := ICfg.init input.desc }
           input.fuel (ICfg.init input.desc) by rfl]
     rw [iterate_step_withDynamic]
-    simp [run, hcount, output, withDynamic]
+    simp [run, hcount, output, LoopState.withDynamic]
   · simp [stagedRun, initialState, hcount, rounds, output, run]
 
-private noncomputable def replyWords (replyBits : ℕ) : List (List Bool) :=
+/-- Finite enumeration of every Boolean reply prefix whose length fits `replyBits`. -/
+noncomputable def boundedReplyWords (replyBits : ℕ) : List (List Bool) :=
   (BitString.shortWords replyBits).toList
+
+/-- The finite reply enumeration contains exactly the words within the copied-prefix budget. -/
+theorem mem_boundedReplyWords_iff (reply : List Bool) (replyBits : ℕ) :
+    reply ∈ boundedReplyWords replyBits ↔ reply.length ≤ replyBits := by
+  rw [boundedReplyWords, Finset.mem_toList, BitString.mem_shortWords]
 
 private def successorForReply (state : LoopState) (operation : Fin r) (next : ℕ)
     (pending : ICfg) (reply : List Bool) : BodyInput :=
@@ -1667,7 +1731,7 @@ private noncomputable def coinSuccessors (r : ℕ) (state : LoopState) (coin : B
   match state.cfg.commandAt r state.desc state.input coin with
   | .local cfg => [some (state.advance cfg)]
   | .query operation _ next pending =>
-      (replyWords state.replyBits).map
+      (boundedReplyWords state.replyBits).map
         (successorForReply state operation next pending)
 
 /-- Finite overapproximation of all one-round results under arbitrary stateful handlers. Duplicate
@@ -1734,9 +1798,9 @@ private theorem support_mem_successors (r : ℕ) (current next : BodyInput)
               simp only [ProbOracleComp.runWith_pure, PMF.mem_support_pure_iff,
                 Prod.mk.injEq] at hfinal
               rcases hfinal with ⟨rfl, rfl⟩
-              have hprefix : reply.take current.replyBits ∈ replyWords current.replyBits := by
-                exact Finset.mem_toList.mpr
-                  (BitString.mem_shortWords.mpr (List.length_take_le _ _))
+              have hprefix : reply.take current.replyBits ∈
+                  boundedReplyWords current.replyBits := by
+                exact (mem_boundedReplyWords_iff _ _).2 (List.length_take_le _ _)
               simp only [successors, hremaining, hcontrol, List.mem_flatMap,
                 List.mem_cons, List.mem_singleton]
               refine ⟨coin, hcoinValue, ?_⟩
@@ -1781,12 +1845,6 @@ private theorem support_mem_reachable (r : ℕ) (initial : BodyInput) (count : �
         support_mem_successors r initial middle OracleState oracle state middleState hmiddle,
         ih middle middleState current htail⟩
 
-private structure SameStatic (first second : LoopState) : Prop where
-  desc : second.desc = first.desc
-  input : second.input = first.input
-  fuel : second.fuel = first.fuel
-  replyBits : second.replyBits = first.replyBits
-
 private def Progress (initial : BodyInput) (count : ℕ) (current : BodyInput) : Prop :=
   match initial with
   | none => current = none
@@ -1800,7 +1858,7 @@ def Invariant (r : ℕ) (initial : BodyInput) (count : ℕ) (current : BodyInput
 private theorem invariant_zero (r : ℕ) (initial : BodyInput) :
     Invariant r initial 0 initial := by
   constructor
-  · cases initial <;> simp [Progress, SameStatic]
+  · cases initial <;> simp [Progress, LoopState.SameStatic]
   · simp [reachable]
 
 private theorem progress_successor {r : ℕ} {initial current next : BodyInput} {count : ℕ}

@@ -124,15 +124,21 @@ one-round artifact instantiates the same coin, table-lookup, command and control
 open interpreter; there is no second controller semantics. Callers provide support-local reply
 installation bounds and an explicit typed-loop certificate consisting of a handler-state decoder,
 reachability invariant, per-phase time and workspace bounds, final stopping-round law and encoded
-state-length bound. The decoder and invariant are proof data, not executed callbacks. The final
-`Fin 0` artifact returns the source output together with the final private handler state, so no
-external validation channel or transcript is manufactured. Input initialization, handler
-marshalling, every later source request, reply truncation/decoding, loop control and final output
-copy remain charged. The final composed description is the only installed occurrence; its inlined
-handler, query branch, body and loop controls are not added again as separate static copies. The
+state-length bound. For a finite private state, `finiteLoopCertificate` and `finiteRunCertificate`
+construct those obligations by enumerating every bounded reply prefix and next handler state. The
+decoder and invariant are proof data, not executed callbacks. The final `Fin 0` artifact returns
+the source output together with the final private handler state, so no external validation channel
+or transcript is manufactured. Its exact semantic theorem is the original fixed-channel
+interpreter executed by `runState` with the local handler. In particular, a runtime operation-count
+mismatch returns the source result `[]` and preserves the caller's initial handler state. Input
+initialization, handler marshalling, every later source request, reply truncation/decoding, loop
+control and final output copy remain charged. The final composed description is the only installed
+occurrence; its inlined handler, query branch, body and loop controls are not added again as
+separate static copies. The
 ordinary [retained-handler client](../../CslibFrontierTests/Machines/Turing/MultiTape/Probabilistic/Universal/NativeHandler.lean)
-uses a nonconstant all-false Boolean-state handler and exercises the public layout, semantic,
-loop-machine and singleton-static boundary. Application-specific agreement with a higher-level
+uses a nonconstant all-false Boolean-state handler, constructs the finite certificates and final
+artifact, and supplies a valid positive-fuel source whose first round calls the handler.
+Application-specific agreement with a higher-level
 reduction still belongs in that reduction's dependent module rather than in this machine layer.
 
 The internal
