@@ -6,7 +6,7 @@ Authors: Samuel Schlesinger
 
 module
 
-public import CslibFrontier.Crypto.Protocols.KEM.FujisakiOkamoto.Salted.Word
+public import CslibFrontier.Crypto.Protocols.KEM.FujisakiOkamoto.Salted.Security
 
 /-!
 # Tests for the word view of the salted FO correctness handler
@@ -242,6 +242,28 @@ theorem boolRandomizedAdversary_bounded : boolRandomizedAdversary.QueryBounded 1
         ⟨challenge.pk, false, challenge.ct.salt⟩)).bind fun _ =>
       OracleComp.IsCostBounded.pure _ 0
 
+theorem boolRandomizedAdversary_securityBounded :
+    boolRandomizedAdversary.SecurityQueryBounded 1 0 0 := by
+  intro coins challenge
+  refine ⟨(boolRandomizedAdversary_bounded coins challenge).1, ?_,
+    (boolRandomizedAdversary_bounded coins challenge).2⟩
+  change OracleComp.IsCostBounded wordRejectionCost (challengeProgram challenge) 0
+  simpa [challengeProgram, wordRejectionCost] using
+    (OracleComp.IsCostBounded.query
+      (spec := fun _ : WordOperation × Word => Word)
+      (cost := wordRejectionCost)
+      (WordOperation.joint, encJointInput encBool encBool encBool
+        ⟨challenge.pk, false, challenge.ct.salt⟩)).bind fun _ =>
+      OracleComp.IsCostBounded.pure true 0
+
+noncomputable def boolTypedAdversary :
+    RandomizedAdversary Bool Bool Bool Bool Bool Bool Bool Bool Bool :=
+  boolRandomizedAdversary.toTyped boolCodec
+
+theorem boolTypedAdversary_securityBounded : boolTypedAdversary.SecurityQueryBounded 1 0 0 :=
+  boolRandomizedAdversary.securityQueryBounded_toTyped boolCodec boolCodec_jointCost
+    boolCodec_rejectionCost boolCodec_decapsCost boolRandomizedAdversary_securityBounded
+
 theorem boolPKE_deltaCorrect_zero : boolPKE.DeltaCorrect 0 := by
   apply ExplicitCoinPKE.deltaCorrect_zero_of_perfect
   intro _ _ _ _ _ _
@@ -258,5 +280,15 @@ example :
   exact boolScheme.advantage_randomizedRealWordHandler_simWordHandler_le boolCodec
     boolChallengeSetup boolRandomizedAdversary boolCodec_jointCost boolCodec_decapsCost
     boolRandomizedAdversary_bounded boolPKE_deltaCorrect_zero
+
+/-- Challenge programming keeps the source `(qG, qJ, qD)` bounds; the challenge-aware hidden-bit
+success hop adds no challenge-query `+1`. -/
+example :
+    (Game.advantage
+      (boolScheme.postGuessRealSuccessGame boolTypedAdversary)
+      (boolScheme.postGuessSimSuccessGame boolTypedAdversary) : ℝ) ≤
+      ((1 + 0 : ℕ) : ℝ) * 0 := by
+  exact boolScheme.advantage_postGuessRealSuccessGame_simSuccessGame_le boolTypedAdversary
+    boolTypedAdversary_securityBounded boolPKE_deltaCorrect_zero
 
 end CslibFrontierTests.SaltedFOWord
