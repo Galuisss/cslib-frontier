@@ -96,9 +96,9 @@ private def case6SHA512 : List Byte :=
 
 -- The source-domain predicates remain separately checkable even though executable HMAC is total.
 set_option maxRecDepth 4096 in
-  #guard decide (ValidHMACSHA256Input case6Key case6Text)
+#guard decide (ValidHMACSHA256Input case6Key case6Text)
 set_option maxRecDepth 4096 in
-  #guard decide (ValidHMACSHA512Input case6Key case6Text)
+#guard decide (ValidHMACSHA512Input case6Key case6Text)
 
 private def byteSequence (length : ℕ) : List Byte :=
   (List.range length).map fun value => ⟨value % 256, Nat.mod_lt _ (by decide)⟩
@@ -123,9 +123,9 @@ private def exact128SHA512 : List Byte :=
 
 -- Reducing the range-generated exact-block fixtures needs a deeper recursion budget.
 set_option maxRecDepth 4096 in
-  #guard decide (ValidHMACSHA256Input (byteSequence 64) exactKeyText)
+#guard decide (ValidHMACSHA256Input (byteSequence 64) exactKeyText)
 set_option maxRecDepth 4096 in
-  #guard decide (ValidHMACSHA512Input (byteSequence 128) exactKeyText)
+#guard decide (ValidHMACSHA512Input (byteSequence 128) exactKeyText)
 
 -- Exact-block keys are used unchanged, not passed through the long-key hash branch.
 #guard (sha256KeyBlock (byteSequence 64)).toList == byteSequence 64
