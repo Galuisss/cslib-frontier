@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Foundations.Geometry.Orthogonal.PairedPorts
 public import CslibFrontier.Computability.Complexity.Problems.SAT.Geometry
 public import CslibFrontier.Logics.Propositional.CNF.ImplicationCycle
+import Mathlib.Data.List.GetD
 import Mathlib.Tactic.FinCases
 import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.NormNum
@@ -233,7 +234,7 @@ theorem geometry_check : LocalGeometry.Check geometry := by
       · exact row_14
       · exact row_15
     have h' := h ⟨i.val, hi⟩
-    rwa [List.getD_eq_get geometry.incidenceRoutes (0, 0, []) i] at h'
+    simpa only [List.getD_eq_getElem _ _ i.isLt, List.get_eq_getElem] using h'
   · decide +kernel
 
 private theorem indexed_mem (e : ℕ × Variable × Route) (he : e ∈ incidenceRoutes) :
@@ -242,6 +243,7 @@ private theorem indexed_mem (e : ℕ × Variable × Route) (he : e ∈ incidence
 
 private theorem index_injective : Function.Injective (fun v : Variable => cyclicOrder.idxOf v) := by
   intro v w h
+  change cyclicOrder.idxOf v = _ at h
   apply variablePosition_injective
   rw [← position_indexed v, ← position_indexed w, h]
 
@@ -261,7 +263,9 @@ theorem incidence_endpoints : ∀ e ∈ incidenceRoutes,
       e.2.2.getLast? = some (variablePosition e.2.1) := by
   intro e he
   have h := LocalGeometry.incidence_endpoints geometry_check (indexed_mem e he)
-  exact ⟨h.1, h.2.2.1, by simpa only [position_indexed] using h.2.2.2⟩
+  exact ⟨h.1, h.2.2.1, by
+    simpa only [LocalIncidence.route, LocalIncidence.variableIndex, position_indexed]
+      using h.2.2.2⟩
 
 /-- All sixteen incidence routes are straight segments. -/
 theorem incidence_pair : ∀ e ∈ incidenceRoutes,
@@ -318,9 +322,9 @@ theorem routes_contact_check : ∀ e ∈ incidenceRoutes, ∀ f ∈ incidenceRou
       (f.1, cyclicOrder.idxOf f.2.1, f.2.2) := by
     intro h
     apply hne
-    exact Prod.ext (congrArg Prod.fst h)
-      (Prod.ext (index_injective (congrArg (fun e => e.2.1) h))
-        (congrArg (fun e => e.2.2) h))
+    exact Prod.ext (congrArg (fun e : LocalIncidence => e.clauseIndex) h)
+      (Prod.ext (index_injective (congrArg (fun e : LocalIncidence => e.variableIndex) h))
+        (congrArg (fun e : LocalIncidence => e.route) h))
   have h := geometry_check.2.2.2.2.2.1 _ (indexed_mem e he) _ (indexed_mem f hf) hne'
   simpa only [commonEndpoints_indexed, LocalIncidence.route] using h
 

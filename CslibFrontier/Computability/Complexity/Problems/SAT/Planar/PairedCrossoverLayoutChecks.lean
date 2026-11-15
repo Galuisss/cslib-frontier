@@ -94,9 +94,12 @@ def geometry : LocalGeometry where
   clausePositions := clausePositions
   incidenceRoutes := incidenceRoutes.map fun (clause, var, route) =>
     (clause, variableList.idxOf var, route)
-  terminalVariables := ((List.finRange 4).flatMap (fun s => (List.finRange 2).map (s, ·))).map fun i => variableList.idxOf (Variable.port i.1 i.2)
-  boundaryPorts := ((List.finRange 4).flatMap (fun s => (List.finRange 2).map (s, ·))).map fun i => boundaryPort i.1 i.2
-  accessRoutes := ((List.finRange 4).flatMap (fun s => (List.finRange 2).map (s, ·))).map fun i => accessRoute i.1 i.2
+  terminalVariables := ((List.finRange 4).flatMap (fun s => (List.finRange 2).map (s, ·))).map fun i =>
+     variableList.idxOf (Variable.port i.1 i.2)
+  boundaryPorts := ((List.finRange 4).flatMap (fun s => (List.finRange 2).map (s, ·))).map fun i =>
+     boundaryPort i.1 i.2
+  accessRoutes := ((List.finRange 4).flatMap (fun s => (List.finRange 2).map (s, ·))).map fun i =>
+     accessRoute i.1 i.2
 
 private def indexed (e : ℕ × Variable × Route) : LocalIncidence :=
   (e.1, variableList.idxOf e.2.1, e.2.2)
@@ -109,14 +112,15 @@ private theorem index_lt : ∀ v : Variable,
 
 private theorem index_injective : Function.Injective (fun v : Variable => variableList.idxOf v) := by
   intro v w h
+  change variableList.idxOf v = _ at h
   apply variablePosition_injective
   rw [← position_indexed v, ← position_indexed w, h]
 
 private theorem indexed_injective : Function.Injective indexed := by
   rintro ⟨i, v, r⟩ ⟨j, w, t⟩ h
-  have hi : i = j := congrArg Prod.fst h
-  have hv : v = w := index_injective (congrArg (fun e => e.2.1) h)
-  have hr : r = t := congrArg (fun e => e.2.2) h
+  have hi : i = j := congrArg (fun e : LocalIncidence => e.clauseIndex) h
+  have hv : v = w := index_injective (congrArg (fun e : LocalIncidence => e.variableIndex) h)
+  have hr : r = t := congrArg (fun e : LocalIncidence => e.route) h
   cases hi; cases hv; cases hr
   rfl
 
@@ -332,407 +336,407 @@ private def blockIndex (q : Fin 27) (r : Fin 6) : Fin 162 :=
 
 private theorem block_0 (r : Fin 6) : rowCheck (routeAt (blockIndex 0 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (0 : Fin 162)
+  · conv => arg 1; arg 1; change (0 : Fin 162)
     exact row_0
-  · conv_lhs => arg 1; arg 1; change (1 : Fin 162)
+  · conv => arg 1; arg 1; change (1 : Fin 162)
     exact row_1
-  · conv_lhs => arg 1; arg 1; change (2 : Fin 162)
+  · conv => arg 1; arg 1; change (2 : Fin 162)
     exact row_2
-  · conv_lhs => arg 1; arg 1; change (3 : Fin 162)
+  · conv => arg 1; arg 1; change (3 : Fin 162)
     exact row_3
-  · conv_lhs => arg 1; arg 1; change (4 : Fin 162)
+  · conv => arg 1; arg 1; change (4 : Fin 162)
     exact row_4
-  · conv_lhs => arg 1; arg 1; change (5 : Fin 162)
+  · conv => arg 1; arg 1; change (5 : Fin 162)
     exact row_5
 
 private theorem block_1 (r : Fin 6) : rowCheck (routeAt (blockIndex 1 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (6 : Fin 162)
+  · conv => arg 1; arg 1; change (6 : Fin 162)
     exact row_6
-  · conv_lhs => arg 1; arg 1; change (7 : Fin 162)
+  · conv => arg 1; arg 1; change (7 : Fin 162)
     exact row_7
-  · conv_lhs => arg 1; arg 1; change (8 : Fin 162)
+  · conv => arg 1; arg 1; change (8 : Fin 162)
     exact row_8
-  · conv_lhs => arg 1; arg 1; change (9 : Fin 162)
+  · conv => arg 1; arg 1; change (9 : Fin 162)
     exact row_9
-  · conv_lhs => arg 1; arg 1; change (10 : Fin 162)
+  · conv => arg 1; arg 1; change (10 : Fin 162)
     exact row_10
-  · conv_lhs => arg 1; arg 1; change (11 : Fin 162)
+  · conv => arg 1; arg 1; change (11 : Fin 162)
     exact row_11
 
 private theorem block_2 (r : Fin 6) : rowCheck (routeAt (blockIndex 2 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (12 : Fin 162)
+  · conv => arg 1; arg 1; change (12 : Fin 162)
     exact row_12
-  · conv_lhs => arg 1; arg 1; change (13 : Fin 162)
+  · conv => arg 1; arg 1; change (13 : Fin 162)
     exact row_13
-  · conv_lhs => arg 1; arg 1; change (14 : Fin 162)
+  · conv => arg 1; arg 1; change (14 : Fin 162)
     exact row_14
-  · conv_lhs => arg 1; arg 1; change (15 : Fin 162)
+  · conv => arg 1; arg 1; change (15 : Fin 162)
     exact row_15
-  · conv_lhs => arg 1; arg 1; change (16 : Fin 162)
+  · conv => arg 1; arg 1; change (16 : Fin 162)
     exact row_16
-  · conv_lhs => arg 1; arg 1; change (17 : Fin 162)
+  · conv => arg 1; arg 1; change (17 : Fin 162)
     exact row_17
 
 private theorem block_3 (r : Fin 6) : rowCheck (routeAt (blockIndex 3 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (18 : Fin 162)
+  · conv => arg 1; arg 1; change (18 : Fin 162)
     exact row_18
-  · conv_lhs => arg 1; arg 1; change (19 : Fin 162)
+  · conv => arg 1; arg 1; change (19 : Fin 162)
     exact row_19
-  · conv_lhs => arg 1; arg 1; change (20 : Fin 162)
+  · conv => arg 1; arg 1; change (20 : Fin 162)
     exact row_20
-  · conv_lhs => arg 1; arg 1; change (21 : Fin 162)
+  · conv => arg 1; arg 1; change (21 : Fin 162)
     exact row_21
-  · conv_lhs => arg 1; arg 1; change (22 : Fin 162)
+  · conv => arg 1; arg 1; change (22 : Fin 162)
     exact row_22
-  · conv_lhs => arg 1; arg 1; change (23 : Fin 162)
+  · conv => arg 1; arg 1; change (23 : Fin 162)
     exact row_23
 
 private theorem block_4 (r : Fin 6) : rowCheck (routeAt (blockIndex 4 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (24 : Fin 162)
+  · conv => arg 1; arg 1; change (24 : Fin 162)
     exact row_24
-  · conv_lhs => arg 1; arg 1; change (25 : Fin 162)
+  · conv => arg 1; arg 1; change (25 : Fin 162)
     exact row_25
-  · conv_lhs => arg 1; arg 1; change (26 : Fin 162)
+  · conv => arg 1; arg 1; change (26 : Fin 162)
     exact row_26
-  · conv_lhs => arg 1; arg 1; change (27 : Fin 162)
+  · conv => arg 1; arg 1; change (27 : Fin 162)
     exact row_27
-  · conv_lhs => arg 1; arg 1; change (28 : Fin 162)
+  · conv => arg 1; arg 1; change (28 : Fin 162)
     exact row_28
-  · conv_lhs => arg 1; arg 1; change (29 : Fin 162)
+  · conv => arg 1; arg 1; change (29 : Fin 162)
     exact row_29
 
 private theorem block_5 (r : Fin 6) : rowCheck (routeAt (blockIndex 5 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (30 : Fin 162)
+  · conv => arg 1; arg 1; change (30 : Fin 162)
     exact row_30
-  · conv_lhs => arg 1; arg 1; change (31 : Fin 162)
+  · conv => arg 1; arg 1; change (31 : Fin 162)
     exact row_31
-  · conv_lhs => arg 1; arg 1; change (32 : Fin 162)
+  · conv => arg 1; arg 1; change (32 : Fin 162)
     exact row_32
-  · conv_lhs => arg 1; arg 1; change (33 : Fin 162)
+  · conv => arg 1; arg 1; change (33 : Fin 162)
     exact row_33
-  · conv_lhs => arg 1; arg 1; change (34 : Fin 162)
+  · conv => arg 1; arg 1; change (34 : Fin 162)
     exact row_34
-  · conv_lhs => arg 1; arg 1; change (35 : Fin 162)
+  · conv => arg 1; arg 1; change (35 : Fin 162)
     exact row_35
 
 private theorem block_6 (r : Fin 6) : rowCheck (routeAt (blockIndex 6 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (36 : Fin 162)
+  · conv => arg 1; arg 1; change (36 : Fin 162)
     exact row_36
-  · conv_lhs => arg 1; arg 1; change (37 : Fin 162)
+  · conv => arg 1; arg 1; change (37 : Fin 162)
     exact row_37
-  · conv_lhs => arg 1; arg 1; change (38 : Fin 162)
+  · conv => arg 1; arg 1; change (38 : Fin 162)
     exact row_38
-  · conv_lhs => arg 1; arg 1; change (39 : Fin 162)
+  · conv => arg 1; arg 1; change (39 : Fin 162)
     exact row_39
-  · conv_lhs => arg 1; arg 1; change (40 : Fin 162)
+  · conv => arg 1; arg 1; change (40 : Fin 162)
     exact row_40
-  · conv_lhs => arg 1; arg 1; change (41 : Fin 162)
+  · conv => arg 1; arg 1; change (41 : Fin 162)
     exact row_41
 
 private theorem block_7 (r : Fin 6) : rowCheck (routeAt (blockIndex 7 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (42 : Fin 162)
+  · conv => arg 1; arg 1; change (42 : Fin 162)
     exact row_42
-  · conv_lhs => arg 1; arg 1; change (43 : Fin 162)
+  · conv => arg 1; arg 1; change (43 : Fin 162)
     exact row_43
-  · conv_lhs => arg 1; arg 1; change (44 : Fin 162)
+  · conv => arg 1; arg 1; change (44 : Fin 162)
     exact row_44
-  · conv_lhs => arg 1; arg 1; change (45 : Fin 162)
+  · conv => arg 1; arg 1; change (45 : Fin 162)
     exact row_45
-  · conv_lhs => arg 1; arg 1; change (46 : Fin 162)
+  · conv => arg 1; arg 1; change (46 : Fin 162)
     exact row_46
-  · conv_lhs => arg 1; arg 1; change (47 : Fin 162)
+  · conv => arg 1; arg 1; change (47 : Fin 162)
     exact row_47
 
 private theorem block_8 (r : Fin 6) : rowCheck (routeAt (blockIndex 8 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (48 : Fin 162)
+  · conv => arg 1; arg 1; change (48 : Fin 162)
     exact row_48
-  · conv_lhs => arg 1; arg 1; change (49 : Fin 162)
+  · conv => arg 1; arg 1; change (49 : Fin 162)
     exact row_49
-  · conv_lhs => arg 1; arg 1; change (50 : Fin 162)
+  · conv => arg 1; arg 1; change (50 : Fin 162)
     exact row_50
-  · conv_lhs => arg 1; arg 1; change (51 : Fin 162)
+  · conv => arg 1; arg 1; change (51 : Fin 162)
     exact row_51
-  · conv_lhs => arg 1; arg 1; change (52 : Fin 162)
+  · conv => arg 1; arg 1; change (52 : Fin 162)
     exact row_52
-  · conv_lhs => arg 1; arg 1; change (53 : Fin 162)
+  · conv => arg 1; arg 1; change (53 : Fin 162)
     exact row_53
 
 private theorem block_9 (r : Fin 6) : rowCheck (routeAt (blockIndex 9 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (54 : Fin 162)
+  · conv => arg 1; arg 1; change (54 : Fin 162)
     exact row_54
-  · conv_lhs => arg 1; arg 1; change (55 : Fin 162)
+  · conv => arg 1; arg 1; change (55 : Fin 162)
     exact row_55
-  · conv_lhs => arg 1; arg 1; change (56 : Fin 162)
+  · conv => arg 1; arg 1; change (56 : Fin 162)
     exact row_56
-  · conv_lhs => arg 1; arg 1; change (57 : Fin 162)
+  · conv => arg 1; arg 1; change (57 : Fin 162)
     exact row_57
-  · conv_lhs => arg 1; arg 1; change (58 : Fin 162)
+  · conv => arg 1; arg 1; change (58 : Fin 162)
     exact row_58
-  · conv_lhs => arg 1; arg 1; change (59 : Fin 162)
+  · conv => arg 1; arg 1; change (59 : Fin 162)
     exact row_59
 
 private theorem block_10 (r : Fin 6) : rowCheck (routeAt (blockIndex 10 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (60 : Fin 162)
+  · conv => arg 1; arg 1; change (60 : Fin 162)
     exact row_60
-  · conv_lhs => arg 1; arg 1; change (61 : Fin 162)
+  · conv => arg 1; arg 1; change (61 : Fin 162)
     exact row_61
-  · conv_lhs => arg 1; arg 1; change (62 : Fin 162)
+  · conv => arg 1; arg 1; change (62 : Fin 162)
     exact row_62
-  · conv_lhs => arg 1; arg 1; change (63 : Fin 162)
+  · conv => arg 1; arg 1; change (63 : Fin 162)
     exact row_63
-  · conv_lhs => arg 1; arg 1; change (64 : Fin 162)
+  · conv => arg 1; arg 1; change (64 : Fin 162)
     exact row_64
-  · conv_lhs => arg 1; arg 1; change (65 : Fin 162)
+  · conv => arg 1; arg 1; change (65 : Fin 162)
     exact row_65
 
 private theorem block_11 (r : Fin 6) : rowCheck (routeAt (blockIndex 11 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (66 : Fin 162)
+  · conv => arg 1; arg 1; change (66 : Fin 162)
     exact row_66
-  · conv_lhs => arg 1; arg 1; change (67 : Fin 162)
+  · conv => arg 1; arg 1; change (67 : Fin 162)
     exact row_67
-  · conv_lhs => arg 1; arg 1; change (68 : Fin 162)
+  · conv => arg 1; arg 1; change (68 : Fin 162)
     exact row_68
-  · conv_lhs => arg 1; arg 1; change (69 : Fin 162)
+  · conv => arg 1; arg 1; change (69 : Fin 162)
     exact row_69
-  · conv_lhs => arg 1; arg 1; change (70 : Fin 162)
+  · conv => arg 1; arg 1; change (70 : Fin 162)
     exact row_70
-  · conv_lhs => arg 1; arg 1; change (71 : Fin 162)
+  · conv => arg 1; arg 1; change (71 : Fin 162)
     exact row_71
 
 private theorem block_12 (r : Fin 6) : rowCheck (routeAt (blockIndex 12 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (72 : Fin 162)
+  · conv => arg 1; arg 1; change (72 : Fin 162)
     exact row_72
-  · conv_lhs => arg 1; arg 1; change (73 : Fin 162)
+  · conv => arg 1; arg 1; change (73 : Fin 162)
     exact row_73
-  · conv_lhs => arg 1; arg 1; change (74 : Fin 162)
+  · conv => arg 1; arg 1; change (74 : Fin 162)
     exact row_74
-  · conv_lhs => arg 1; arg 1; change (75 : Fin 162)
+  · conv => arg 1; arg 1; change (75 : Fin 162)
     exact row_75
-  · conv_lhs => arg 1; arg 1; change (76 : Fin 162)
+  · conv => arg 1; arg 1; change (76 : Fin 162)
     exact row_76
-  · conv_lhs => arg 1; arg 1; change (77 : Fin 162)
+  · conv => arg 1; arg 1; change (77 : Fin 162)
     exact row_77
 
 private theorem block_13 (r : Fin 6) : rowCheck (routeAt (blockIndex 13 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (78 : Fin 162)
+  · conv => arg 1; arg 1; change (78 : Fin 162)
     exact row_78
-  · conv_lhs => arg 1; arg 1; change (79 : Fin 162)
+  · conv => arg 1; arg 1; change (79 : Fin 162)
     exact row_79
-  · conv_lhs => arg 1; arg 1; change (80 : Fin 162)
+  · conv => arg 1; arg 1; change (80 : Fin 162)
     exact row_80
-  · conv_lhs => arg 1; arg 1; change (81 : Fin 162)
+  · conv => arg 1; arg 1; change (81 : Fin 162)
     exact row_81
-  · conv_lhs => arg 1; arg 1; change (82 : Fin 162)
+  · conv => arg 1; arg 1; change (82 : Fin 162)
     exact row_82
-  · conv_lhs => arg 1; arg 1; change (83 : Fin 162)
+  · conv => arg 1; arg 1; change (83 : Fin 162)
     exact row_83
 
 private theorem block_14 (r : Fin 6) : rowCheck (routeAt (blockIndex 14 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (84 : Fin 162)
+  · conv => arg 1; arg 1; change (84 : Fin 162)
     exact row_84
-  · conv_lhs => arg 1; arg 1; change (85 : Fin 162)
+  · conv => arg 1; arg 1; change (85 : Fin 162)
     exact row_85
-  · conv_lhs => arg 1; arg 1; change (86 : Fin 162)
+  · conv => arg 1; arg 1; change (86 : Fin 162)
     exact row_86
-  · conv_lhs => arg 1; arg 1; change (87 : Fin 162)
+  · conv => arg 1; arg 1; change (87 : Fin 162)
     exact row_87
-  · conv_lhs => arg 1; arg 1; change (88 : Fin 162)
+  · conv => arg 1; arg 1; change (88 : Fin 162)
     exact row_88
-  · conv_lhs => arg 1; arg 1; change (89 : Fin 162)
+  · conv => arg 1; arg 1; change (89 : Fin 162)
     exact row_89
 
 private theorem block_15 (r : Fin 6) : rowCheck (routeAt (blockIndex 15 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (90 : Fin 162)
+  · conv => arg 1; arg 1; change (90 : Fin 162)
     exact row_90
-  · conv_lhs => arg 1; arg 1; change (91 : Fin 162)
+  · conv => arg 1; arg 1; change (91 : Fin 162)
     exact row_91
-  · conv_lhs => arg 1; arg 1; change (92 : Fin 162)
+  · conv => arg 1; arg 1; change (92 : Fin 162)
     exact row_92
-  · conv_lhs => arg 1; arg 1; change (93 : Fin 162)
+  · conv => arg 1; arg 1; change (93 : Fin 162)
     exact row_93
-  · conv_lhs => arg 1; arg 1; change (94 : Fin 162)
+  · conv => arg 1; arg 1; change (94 : Fin 162)
     exact row_94
-  · conv_lhs => arg 1; arg 1; change (95 : Fin 162)
+  · conv => arg 1; arg 1; change (95 : Fin 162)
     exact row_95
 
 private theorem block_16 (r : Fin 6) : rowCheck (routeAt (blockIndex 16 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (96 : Fin 162)
+  · conv => arg 1; arg 1; change (96 : Fin 162)
     exact row_96
-  · conv_lhs => arg 1; arg 1; change (97 : Fin 162)
+  · conv => arg 1; arg 1; change (97 : Fin 162)
     exact row_97
-  · conv_lhs => arg 1; arg 1; change (98 : Fin 162)
+  · conv => arg 1; arg 1; change (98 : Fin 162)
     exact row_98
-  · conv_lhs => arg 1; arg 1; change (99 : Fin 162)
+  · conv => arg 1; arg 1; change (99 : Fin 162)
     exact row_99
-  · conv_lhs => arg 1; arg 1; change (100 : Fin 162)
+  · conv => arg 1; arg 1; change (100 : Fin 162)
     exact row_100
-  · conv_lhs => arg 1; arg 1; change (101 : Fin 162)
+  · conv => arg 1; arg 1; change (101 : Fin 162)
     exact row_101
 
 private theorem block_17 (r : Fin 6) : rowCheck (routeAt (blockIndex 17 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (102 : Fin 162)
+  · conv => arg 1; arg 1; change (102 : Fin 162)
     exact row_102
-  · conv_lhs => arg 1; arg 1; change (103 : Fin 162)
+  · conv => arg 1; arg 1; change (103 : Fin 162)
     exact row_103
-  · conv_lhs => arg 1; arg 1; change (104 : Fin 162)
+  · conv => arg 1; arg 1; change (104 : Fin 162)
     exact row_104
-  · conv_lhs => arg 1; arg 1; change (105 : Fin 162)
+  · conv => arg 1; arg 1; change (105 : Fin 162)
     exact row_105
-  · conv_lhs => arg 1; arg 1; change (106 : Fin 162)
+  · conv => arg 1; arg 1; change (106 : Fin 162)
     exact row_106
-  · conv_lhs => arg 1; arg 1; change (107 : Fin 162)
+  · conv => arg 1; arg 1; change (107 : Fin 162)
     exact row_107
 
 private theorem block_18 (r : Fin 6) : rowCheck (routeAt (blockIndex 18 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (108 : Fin 162)
+  · conv => arg 1; arg 1; change (108 : Fin 162)
     exact row_108
-  · conv_lhs => arg 1; arg 1; change (109 : Fin 162)
+  · conv => arg 1; arg 1; change (109 : Fin 162)
     exact row_109
-  · conv_lhs => arg 1; arg 1; change (110 : Fin 162)
+  · conv => arg 1; arg 1; change (110 : Fin 162)
     exact row_110
-  · conv_lhs => arg 1; arg 1; change (111 : Fin 162)
+  · conv => arg 1; arg 1; change (111 : Fin 162)
     exact row_111
-  · conv_lhs => arg 1; arg 1; change (112 : Fin 162)
+  · conv => arg 1; arg 1; change (112 : Fin 162)
     exact row_112
-  · conv_lhs => arg 1; arg 1; change (113 : Fin 162)
+  · conv => arg 1; arg 1; change (113 : Fin 162)
     exact row_113
 
 private theorem block_19 (r : Fin 6) : rowCheck (routeAt (blockIndex 19 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (114 : Fin 162)
+  · conv => arg 1; arg 1; change (114 : Fin 162)
     exact row_114
-  · conv_lhs => arg 1; arg 1; change (115 : Fin 162)
+  · conv => arg 1; arg 1; change (115 : Fin 162)
     exact row_115
-  · conv_lhs => arg 1; arg 1; change (116 : Fin 162)
+  · conv => arg 1; arg 1; change (116 : Fin 162)
     exact row_116
-  · conv_lhs => arg 1; arg 1; change (117 : Fin 162)
+  · conv => arg 1; arg 1; change (117 : Fin 162)
     exact row_117
-  · conv_lhs => arg 1; arg 1; change (118 : Fin 162)
+  · conv => arg 1; arg 1; change (118 : Fin 162)
     exact row_118
-  · conv_lhs => arg 1; arg 1; change (119 : Fin 162)
+  · conv => arg 1; arg 1; change (119 : Fin 162)
     exact row_119
 
 private theorem block_20 (r : Fin 6) : rowCheck (routeAt (blockIndex 20 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (120 : Fin 162)
+  · conv => arg 1; arg 1; change (120 : Fin 162)
     exact row_120
-  · conv_lhs => arg 1; arg 1; change (121 : Fin 162)
+  · conv => arg 1; arg 1; change (121 : Fin 162)
     exact row_121
-  · conv_lhs => arg 1; arg 1; change (122 : Fin 162)
+  · conv => arg 1; arg 1; change (122 : Fin 162)
     exact row_122
-  · conv_lhs => arg 1; arg 1; change (123 : Fin 162)
+  · conv => arg 1; arg 1; change (123 : Fin 162)
     exact row_123
-  · conv_lhs => arg 1; arg 1; change (124 : Fin 162)
+  · conv => arg 1; arg 1; change (124 : Fin 162)
     exact row_124
-  · conv_lhs => arg 1; arg 1; change (125 : Fin 162)
+  · conv => arg 1; arg 1; change (125 : Fin 162)
     exact row_125
 
 private theorem block_21 (r : Fin 6) : rowCheck (routeAt (blockIndex 21 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (126 : Fin 162)
+  · conv => arg 1; arg 1; change (126 : Fin 162)
     exact row_126
-  · conv_lhs => arg 1; arg 1; change (127 : Fin 162)
+  · conv => arg 1; arg 1; change (127 : Fin 162)
     exact row_127
-  · conv_lhs => arg 1; arg 1; change (128 : Fin 162)
+  · conv => arg 1; arg 1; change (128 : Fin 162)
     exact row_128
-  · conv_lhs => arg 1; arg 1; change (129 : Fin 162)
+  · conv => arg 1; arg 1; change (129 : Fin 162)
     exact row_129
-  · conv_lhs => arg 1; arg 1; change (130 : Fin 162)
+  · conv => arg 1; arg 1; change (130 : Fin 162)
     exact row_130
-  · conv_lhs => arg 1; arg 1; change (131 : Fin 162)
+  · conv => arg 1; arg 1; change (131 : Fin 162)
     exact row_131
 
 private theorem block_22 (r : Fin 6) : rowCheck (routeAt (blockIndex 22 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (132 : Fin 162)
+  · conv => arg 1; arg 1; change (132 : Fin 162)
     exact row_132
-  · conv_lhs => arg 1; arg 1; change (133 : Fin 162)
+  · conv => arg 1; arg 1; change (133 : Fin 162)
     exact row_133
-  · conv_lhs => arg 1; arg 1; change (134 : Fin 162)
+  · conv => arg 1; arg 1; change (134 : Fin 162)
     exact row_134
-  · conv_lhs => arg 1; arg 1; change (135 : Fin 162)
+  · conv => arg 1; arg 1; change (135 : Fin 162)
     exact row_135
-  · conv_lhs => arg 1; arg 1; change (136 : Fin 162)
+  · conv => arg 1; arg 1; change (136 : Fin 162)
     exact row_136
-  · conv_lhs => arg 1; arg 1; change (137 : Fin 162)
+  · conv => arg 1; arg 1; change (137 : Fin 162)
     exact row_137
 
 private theorem block_23 (r : Fin 6) : rowCheck (routeAt (blockIndex 23 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (138 : Fin 162)
+  · conv => arg 1; arg 1; change (138 : Fin 162)
     exact row_138
-  · conv_lhs => arg 1; arg 1; change (139 : Fin 162)
+  · conv => arg 1; arg 1; change (139 : Fin 162)
     exact row_139
-  · conv_lhs => arg 1; arg 1; change (140 : Fin 162)
+  · conv => arg 1; arg 1; change (140 : Fin 162)
     exact row_140
-  · conv_lhs => arg 1; arg 1; change (141 : Fin 162)
+  · conv => arg 1; arg 1; change (141 : Fin 162)
     exact row_141
-  · conv_lhs => arg 1; arg 1; change (142 : Fin 162)
+  · conv => arg 1; arg 1; change (142 : Fin 162)
     exact row_142
-  · conv_lhs => arg 1; arg 1; change (143 : Fin 162)
+  · conv => arg 1; arg 1; change (143 : Fin 162)
     exact row_143
 
 private theorem block_24 (r : Fin 6) : rowCheck (routeAt (blockIndex 24 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (144 : Fin 162)
+  · conv => arg 1; arg 1; change (144 : Fin 162)
     exact row_144
-  · conv_lhs => arg 1; arg 1; change (145 : Fin 162)
+  · conv => arg 1; arg 1; change (145 : Fin 162)
     exact row_145
-  · conv_lhs => arg 1; arg 1; change (146 : Fin 162)
+  · conv => arg 1; arg 1; change (146 : Fin 162)
     exact row_146
-  · conv_lhs => arg 1; arg 1; change (147 : Fin 162)
+  · conv => arg 1; arg 1; change (147 : Fin 162)
     exact row_147
-  · conv_lhs => arg 1; arg 1; change (148 : Fin 162)
+  · conv => arg 1; arg 1; change (148 : Fin 162)
     exact row_148
-  · conv_lhs => arg 1; arg 1; change (149 : Fin 162)
+  · conv => arg 1; arg 1; change (149 : Fin 162)
     exact row_149
 
 private theorem block_25 (r : Fin 6) : rowCheck (routeAt (blockIndex 25 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (150 : Fin 162)
+  · conv => arg 1; arg 1; change (150 : Fin 162)
     exact row_150
-  · conv_lhs => arg 1; arg 1; change (151 : Fin 162)
+  · conv => arg 1; arg 1; change (151 : Fin 162)
     exact row_151
-  · conv_lhs => arg 1; arg 1; change (152 : Fin 162)
+  · conv => arg 1; arg 1; change (152 : Fin 162)
     exact row_152
-  · conv_lhs => arg 1; arg 1; change (153 : Fin 162)
+  · conv => arg 1; arg 1; change (153 : Fin 162)
     exact row_153
-  · conv_lhs => arg 1; arg 1; change (154 : Fin 162)
+  · conv => arg 1; arg 1; change (154 : Fin 162)
     exact row_154
-  · conv_lhs => arg 1; arg 1; change (155 : Fin 162)
+  · conv => arg 1; arg 1; change (155 : Fin 162)
     exact row_155
 
 private theorem block_26 (r : Fin 6) : rowCheck (routeAt (blockIndex 26 r)) := by
   fin_cases r
-  · conv_lhs => arg 1; arg 1; change (156 : Fin 162)
+  · conv => arg 1; arg 1; change (156 : Fin 162)
     exact row_156
-  · conv_lhs => arg 1; arg 1; change (157 : Fin 162)
+  · conv => arg 1; arg 1; change (157 : Fin 162)
     exact row_157
-  · conv_lhs => arg 1; arg 1; change (158 : Fin 162)
+  · conv => arg 1; arg 1; change (158 : Fin 162)
     exact row_158
-  · conv_lhs => arg 1; arg 1; change (159 : Fin 162)
+  · conv => arg 1; arg 1; change (159 : Fin 162)
     exact row_159
-  · conv_lhs => arg 1; arg 1; change (160 : Fin 162)
+  · conv => arg 1; arg 1; change (160 : Fin 162)
     exact row_160
-  · conv_lhs => arg 1; arg 1; change (161 : Fin 162)
+  · conv => arg 1; arg 1; change (161 : Fin 162)
     exact row_161
 
 private theorem blocks_checked (q : Fin 27) (r : Fin 6) :
@@ -782,7 +786,7 @@ private theorem row_checked (e : ℕ × Variable × Route) (he : e ∈ incidence
   have hi : i.val < 162 := by simpa only [drawing_sizes.2] using i.isLt
   have h := rows_checked ⟨i.val, hi⟩
   have heq : routeAt ⟨i.val, hi⟩ = incidenceRoutes.get i :=
-    List.getD_eq_get incidenceRoutes (0, .center, []) i
+    List.getD_eq_getElem incidenceRoutes (0, .center, []) i.isLt
   rwa [heq] at h
 
 /-- Complete local certificate, assembled without a whole-table kernel computation. -/
@@ -804,7 +808,7 @@ theorem incidence_endpoints : ∀ e ∈ incidenceRoutes,
   intro e he
   have h := LocalGeometry.incidence_endpoints geometry_check (indexed_mem e he)
   exact ⟨h.1, h.2.2.1, by
-    simpa only [indexed, LocalIncidence.variableIndex, position_indexed] using h.2.2.2⟩
+    simpa only [indexed, LocalIncidence.route, LocalIncidence.variableIndex, position_indexed] using h.2.2.2⟩
 
 /-- All incidence routes have proper axis-aligned segments. -/
 theorem incidence_orthogonal :

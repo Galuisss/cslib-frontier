@@ -113,14 +113,15 @@ private theorem index_lt : ∀ v : SplitVariable,
 
 private theorem index_injective : Function.Injective (fun v : SplitVariable => splitVariables.idxOf v) := by
   intro v w h
+  change splitVariables.idxOf v = _ at h
   apply variablePosition_injective
   rw [← position_indexed v, ← position_indexed w, h]
 
 private theorem indexed_injective : Function.Injective indexed := by
   rintro ⟨i, v, r⟩ ⟨j, w, t⟩ h
-  have hi : i = j := congrArg Prod.fst h
-  have hv : v = w := index_injective (congrArg (fun e => e.2.1) h)
-  have hr : r = t := congrArg (fun e => e.2.2) h
+  have hi : i = j := congrArg (fun e : LocalIncidence => e.clauseIndex) h
+  have hv : v = w := index_injective (congrArg (fun e : LocalIncidence => e.variableIndex) h)
+  have hr : r = t := congrArg (fun e : LocalIncidence => e.route) h
   cases hi; cases hv; cases hr
   rfl
 
@@ -483,7 +484,7 @@ private theorem row_checked (e : ℕ × SplitVariable × Route) (he : e ∈ inci
   have hi : i.val < 154 := by simpa only [drawing_sizes.2] using i.isLt
   have h := rows_checked ⟨i.val, hi⟩
   have heq : routeAt ⟨i.val, hi⟩ = incidenceRoutes.get i :=
-    List.getD_eq_get incidenceRoutes (0, .center, []) i
+    List.getD_eq_getElem incidenceRoutes (0, .center, []) i.isLt
   rwa [heq] at h
 
 /-- Complete local certificate, assembled without a whole-table kernel computation. -/
@@ -505,7 +506,7 @@ theorem incidence_endpoints : ∀ e ∈ incidenceRoutes,
   intro e he
   have h := LocalGeometry.incidence_endpoints geometry_check (indexed_mem e he)
   exact ⟨h.1, h.2.2.1, by
-    simpa only [indexed, LocalIncidence.variableIndex, position_indexed] using h.2.2.2⟩
+    simpa only [indexed, LocalIncidence.route, LocalIncidence.variableIndex, position_indexed] using h.2.2.2⟩
 
 /-- All incidence routes have proper axis-aligned segments. -/
 theorem incidence_orthogonal :
