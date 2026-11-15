@@ -20,27 +20,29 @@ reads word replies, and once for an adversary over typed queries and replies. An
 records how typed queries travel on the word channels: `encodeQuery` writes a query as a request,
 `decodeQuery` reads the requests that carry a query, and `encodeReply` writes each reply.
 
-`OracleCodec.adapt` runs a word program against a typed oracle: a request that carries a query is
-forwarded and its reply encoded, and any other request is answered `[]` without a call. Dually,
-`OracleCodec.wordOracle` is the word oracle that a typed oracle presents. `run_adapt` and
-`runWith_adapt` say that the two views agree: the typed run of `c.adapt P` is the word run of `P`
-against `c.wordOracle`. A word game therefore equals the typed game of the adapted adversary
-exactly when its oracle is `c.wordOracle` of the typed one, that is, when it answers requests
-carrying no query with `[]` and leaves its state unchanged on them, and answers the others
+`OracleCodec.adaptOracle` and `OracleCodec.adapt` run deterministic and probabilistic word
+programs against a typed oracle: a request that carries a query is forwarded and its reply encoded,
+and any other request is answered `[]` without a call. Dually, `OracleCodec.wordOracle` is the word
+oracle that a typed oracle presents. Their interpretation and run laws say that the typed view is
+the word run against `c.wordOracle`. A word game therefore equals the typed game of the adapted
+adversary exactly when its oracle is `c.wordOracle` of the typed one, that is, when it answers
+requests carrying no query with `[]` and leaves its state unchanged on them, and answers the others
 through the typed oracle.
 
 ## Main definitions
 
 * `Cslib.OracleCodec`: typed queries and replies on named word channels.
-* `Cslib.OracleCodec.wordOracle`, `Cslib.OracleCodec.adapt`: the word oracle of a typed oracle,
-  and a word program run against a typed oracle.
+* `Cslib.OracleCodec.wordOracle`, `Cslib.OracleCodec.adaptOracle`,
+  `Cslib.OracleCodec.adapt`: the word oracle of a typed oracle, and deterministic or probabilistic
+  word programs run against a typed oracle.
 * `Cslib.OracleCodec.id`, `Cslib.OracleCodec.bitString`, `Cslib.OracleCodec.comap`,
   `Cslib.OracleCodec.withOp`: word requests themselves, fixed-width strings, transport along an
   equivalence of queries, and one copy of a codec per channel.
 
 ## Main results
 
-* `Cslib.OracleCodec.interpret_adapt`, `Cslib.OracleCodec.run_adapt`,
+* `Cslib.OracleCodec.interpret_adaptOracle`, `Cslib.OracleCodec.interpret_adapt`,
+  `Cslib.OracleCodec.run_adapt`,
   `Cslib.OracleCodec.runWith_adapt`: the typed run of an adapted program is the word run against
   the word oracle.
 * `Cslib.OracleCodec.isCostBounded_adapt`, `Cslib.OracleCodec.isQueryBounded_adapt`: adapting
@@ -87,6 +89,13 @@ the oracle and its reply encoded; any other request is answered `[]` without a c
   match c.decodeQuery request with
   | some q => c.encodeReply q <$> oracle q
   | none => pure []
+
+/-- Run a deterministic word-oracle program against a typed oracle. A word request carrying a
+typed query is forwarded once and its reply is encoded; every other request is answered with
+`[]` without a typed call. -/
+@[expose] def adaptOracle
+    (program : OracleComp (fun _ : Op × List Bool => List Bool) α) : OracleComp spec α :=
+  OracleComp.interpret (c.wordOracle (OracleComp.query (spec := spec))) program
 
 /-- Run a word program against a typed oracle. Private samples are kept, and each request is
 answered as by `c.wordOracle`, with the typed oracle as an external call. -/
@@ -143,6 +152,19 @@ theorem interpret_wordOracle {m : Type → Type v} [Monad m] [LawfulMonad m]
   unfold wordOracle
   split <;> simp
 
+/-- **Deterministic typed and word interpretations agree.** Interpreting the adapted program with
+a typed oracle is interpreting the original word program with the typed oracle's word view. -/
+theorem interpret_adaptOracle {m : Type → Type v} [Monad m] [LawfulMonad m]
+    (oracle : (q : Q) → m (spec q))
+    (program : OracleComp (fun _ : Op × List Bool => List Bool) α) :
+    OracleComp.interpret oracle (c.adaptOracle program) =
+      OracleComp.interpret (c.wordOracle oracle) program := by
+  rw [adaptOracle, OracleComp.interpret_interpret]
+  congr 1
+  funext request
+  unfold wordOracle
+  split <;> simp
+
 /-- **Typed and word runs agree**: interpreting an adapted program with a typed oracle
 interprets the word program with the word oracle, under the same interpretation of private
 samples. -/
@@ -183,6 +205,29 @@ theorem isCostBounded_adapt {wordCost : Op × List Bool → ℕ} {cost : Q → �
     exact (OracleComp.isCostBounded_map_iff _ _ _).mpr
       ((ProbOracleComp.isCostBounded_query cost q).mono (hcost q))
   · exact .pure [] _
+
+/-- Deterministic adaptation keeps a cost budget when each typed query costs at most its carrying
+word request. -/
+theorem isCostBounded_adaptOracle {wordCost : Op × List Bool → ℕ} {cost : Q → ℕ}
+    (hcost : ∀ q, cost q ≤ wordCost (c.encodeQuery q))
+    {program : OracleComp (fun _ : Op × List Bool => List Bool) α} {n : ℕ}
+    (h : OracleComp.IsCostBounded wordCost program n) :
+    OracleComp.IsCostBounded cost (c.adaptOracle program) n := by
+  apply h.interpret
+  intro request
+  unfold wordOracle
+  split
+  · next q hq =>
+    rw [← (c.decodeQuery_eq_some_iff _ _).mp hq]
+    exact (OracleComp.isCostBounded_map_iff _ _ _).mpr
+      ((OracleComp.IsCostBounded.query q).mono (hcost q))
+  · exact .pure [] _
+
+/-- Deterministic adaptation keeps a query budget. -/
+theorem isQueryBounded_adaptOracle
+    {program : OracleComp (fun _ : Op × List Bool => List Bool) α} {n : ℕ}
+    (h : program.IsQueryBounded n) : (c.adaptOracle program).IsQueryBounded n :=
+  c.isCostBounded_adaptOracle (fun _ => le_rfl) h
 
 /-- Adapting keeps a query budget. -/
 theorem isQueryBounded_adapt {program : ProbOracleComp (fun _ : Op × List Bool => List Bool) α}

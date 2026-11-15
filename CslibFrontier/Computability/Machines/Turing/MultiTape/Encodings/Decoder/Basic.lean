@@ -24,6 +24,7 @@ output degrees. The basic constructors preserve totality and the round-trip law.
 
 * `Turing.MultiTapeTM.Decoder`: total decoding with independent cost and output degrees.
 * `Turing.MultiTapeTM.Decoder.computableInPolyTime`: the ordinary polynomial-time certificate.
+* `Turing.MultiTapeTM.Decoder.decodeCanonical`: partial decoding that rejects noncanonical words.
 * `Turing.MultiTapeTM.Decoder.bits`, `.unary`, `.bool`, `.option`, `.pair`, `.map`: basic decoders.
 
 ## Main results
@@ -52,6 +53,26 @@ variable {α β : Type} {enc : α ↪ List Bool} {enc' : β ↪ List Bool}
 theorem computableInPolyTime (D : Decoder enc) : ComputableInPolyTime D.decode encBits enc := by
   obtain ⟨_, _, h⟩ := D.computable
   exact h.computableInPolyTime
+
+/-- Decode a word only when re-encoding the total decoder's result reproduces the original word.
+This turns a total `Decoder` into the canonical partial decoder of its embedding. -/
+def decodeCanonical (D : Decoder enc) (word : List Bool) : Option α :=
+  let decoded := D.decode word
+  if enc decoded = word then some decoded else none
+
+/-- Canonical partial decoding returns `a` exactly on its encoded word. -/
+theorem decodeCanonical_eq_some_iff (D : Decoder enc) (word : List Bool) (a : α) :
+    D.decodeCanonical word = some a ↔ enc a = word := by
+  constructor
+  · intro hdecode
+    by_cases hcanonical : enc (D.decode word) = word
+    · simp only [decodeCanonical, hcanonical, ↓reduceIte, Option.some.injEq] at hdecode
+      rw [← hdecode]
+      exact hcanonical
+    · simp only [decodeCanonical, hcanonical, ↓reduceIte, reduceCtorEq] at hdecode
+  · intro hencode
+    rw [← hencode]
+    simp [decodeCanonical, D.decode_enc]
 
 /-- Bit strings are their own encoding. -/
 def bits : Decoder encBits where

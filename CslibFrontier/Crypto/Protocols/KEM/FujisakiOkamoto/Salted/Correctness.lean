@@ -33,7 +33,7 @@ independent here, rather than a model of the original pre-guessing HQC fallback 
 inserts a private prefetch handler: real and prefetch are identical until one cached encryption coin
 fails to decrypt, while prefetch and keyless have exactly the same output law after completing their
 joined coin, `LD` and `J` tables. The concrete fixed-key theorem therefore loses exactly
-`(qRO + qD) * ε`; the randomized theorem averages a challenge-aware public adversary over a common
+`(qG + qD) * ε`; the randomized theorem averages a challenge-aware public adversary over a common
 challenge law and key generation using `ExplicitCoinPKE.DeltaCorrect δ`.
 
 This is the single-user, single-challenge specialization of the `CORR` step in Theorem 11 and
@@ -66,7 +66,12 @@ static-description-size or other resource bound for either handler.
 * `Cslib.Crypto.Protocols.FujisakiOkamoto.Salted.Scheme.realHandler` and
   `Cslib.Crypto.Protocols.FujisakiOkamoto.Salted.Scheme.simHandler`: the decrypt/re-encrypt and
   keyless cached handlers.
-* `Cslib.Crypto.Protocols.FujisakiOkamoto.Salted.QueryBounds`: separate `qRO` and `qD` bounds.
+* `Cslib.Crypto.Protocols.FujisakiOkamoto.Salted.QueryBounds`: joint-`G` and decapsulation bounds
+  used by the `CORR` hop.
+* `Cslib.Crypto.Protocols.FujisakiOkamoto.Salted.ROQueryBounds`: one combined tagged random-oracle
+  budget for `G` and `J`, plus a separate decapsulation budget.
+* `Cslib.Crypto.Protocols.FujisakiOkamoto.Salted.SecurityQueryBounds`: separate joint-`G`,
+  rejection-`J` and decapsulation bounds retained for the complete security theorem.
 * `Cslib.Crypto.Protocols.FujisakiOkamoto.Salted.RandomizedAdversary`: randomized programs whose
   external query bounds hold for each fixed coin value and public challenge.
 
@@ -177,6 +182,19 @@ costs exactly one. -/
 @[expose, simp] def jointCost : Query JointPrefix M Salt RejectPrefix Sigma CT → ℕ
   | .joint _ => 1
   | .rejection _ => 0
+  | .decaps _ => 0
+
+/-- Cost counting both adversary-visible random-oracle channels. The fused `G` channel and the
+separate implicit-rejection `J` channel each cost one; decapsulation has its own coordinate. -/
+@[expose, simp] def roCost : Query JointPrefix M Salt RejectPrefix Sigma CT → ℕ
+  | .joint _ => 1
+  | .rejection _ => 1
+  | .decaps _ => 0
+
+/-- Cost counting only calls to the separate implicit-rejection oracle `J`. -/
+@[expose, simp] def rejectionCost : Query JointPrefix M Salt RejectPrefix Sigma CT → ℕ
+  | .joint _ => 0
+  | .rejection _ => 1
   | .decaps _ => 0
 
 /-- Cost counting decapsulation queries. -/
@@ -1172,7 +1190,7 @@ private theorem toOuterMeasure_notGood_eq_zero
 
 /-- From a good cache with a fresh input, one real joint query creates a bad cache with exactly
 the underlying message's decryption-failure probability. This is the direct-query execution
-property behind the `qRO` term. -/
+property behind the `qG` term. -/
 private theorem realJoint_bad_eq_msgFailProb
     [DecidableEq (JointInput JointPrefix M Salt)] [DecidableEq (Ciphertext CT Salt)]
     (S : Scheme PK SK M R CT JointPrefix Salt RejectPrefix Sigma K)
@@ -1785,13 +1803,78 @@ private theorem realHandler_bad_le [Fintype M] [Nonempty M]
 
 end Scheme
 
-/-- Separate source-shaped query bounds: at most `qRO` calls to the joint oracle and at most `qD`
+/-- Separate source-shaped query bounds: at most `qG` calls to the joint oracle and at most `qD`
 calls to decapsulation. Rejection-oracle calls do not enter the `CORR` loss. -/
 @[expose] def QueryBounds {JointPrefix M Salt RejectPrefix Sigma CT K R α : Type}
     (program : OracleComp (Response (JointPrefix := JointPrefix) (M := M) (Salt := Salt)
-      (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) α) (qRO qD : ℕ) : Prop :=
-  OracleComp.IsCostBounded Query.jointCost program qRO ∧
+      (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) α) (qG qD : ℕ) : Prop :=
+  OracleComp.IsCostBounded Query.jointCost program qG ∧
     OracleComp.IsCostBounded Query.decapsCost program qD
+
+/-- Security-level query bounds with separate joint-`G`, rejection-`J` and decapsulation
+coordinates. Keeping `qG` and `qJ` separate preserves the passive theorem's
+`(2 * qG + qJ) / |M|` loss before specializing both to HQC's published `qRO`. -/
+@[expose] def SecurityQueryBounds {JointPrefix M Salt RejectPrefix Sigma CT K R α : Type}
+    (program : OracleComp (Response (JointPrefix := JointPrefix) (M := M) (Salt := Salt)
+      (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) α)
+    (qG qJ qD : ℕ) : Prop :=
+  OracleComp.IsCostBounded Query.jointCost program qG ∧
+    OracleComp.IsCostBounded Query.rejectionCost program qJ ∧
+    OracleComp.IsCostBounded Query.decapsCost program qD
+
+/-- One combined budget for the tagged `G` and `J` random-oracle interface, with a separate
+decapsulation budget. This is an explicit strengthened completion of the source model: HQC v5.1
+defines `qRO` only as the number of queries to `G` and does not state a budget for `J`. Here `qRO`
+counts total calls across both tags, rather than allowing `qRO` calls to each tag independently. -/
+@[expose] def ROQueryBounds {JointPrefix M Salt RejectPrefix Sigma CT K R α : Type}
+    (program : OracleComp (Response (JointPrefix := JointPrefix) (M := M) (Salt := Salt)
+      (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) α)
+    (qRO qD : ℕ) : Prop :=
+  OracleComp.IsCostBounded Query.roCost program qRO ∧
+    OracleComp.IsCostBounded Query.decapsCost program qD
+
+namespace SecurityQueryBounds
+
+/-- For the `CORR` hop only, discard the `J` coordinate and retain the joint-`G`/decapsulation
+budgets; this is not a global relaxation of the security adversary's bounds. -/
+theorem toQueryBounds {JointPrefix M Salt RejectPrefix Sigma CT K R α : Type}
+    {program : OracleComp (Response (JointPrefix := JointPrefix) (M := M) (Salt := Salt)
+      (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) α} {qG qJ qD : ℕ}
+    (h : SecurityQueryBounds program qG qJ qD) : QueryBounds program qG qD :=
+  ⟨h.1, h.2.2⟩
+
+/-- The separate `G` and `J` bounds give a combined random-oracle budget `qG + qJ`. -/
+theorem roCostBounded {JointPrefix M Salt RejectPrefix Sigma CT K R α : Type}
+    {program : OracleComp (Response (JointPrefix := JointPrefix) (M := M) (Salt := Salt)
+      (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) α} {qG qJ qD : ℕ}
+    (h : SecurityQueryBounds program qG qJ qD) :
+    OracleComp.IsCostBounded Query.roCost program (qG + qJ) := by
+  convert h.1.add h.2.1 using 1
+  funext query
+  cases query <;> rfl
+
+end SecurityQueryBounds
+
+namespace ROQueryBounds
+
+/-- A combined `qRO` budget implies separate `qRO` upper bounds for `G` and `J`. This deliberately
+forgets that their total is at most `qRO`; it is the weakening used to state HQC's published
+`3 * qRO` random-oracle term from the sharper split loss `2 * qG + qJ`. -/
+theorem toSecurityQueryBounds {JointPrefix M Salt RejectPrefix Sigma CT K R α : Type}
+    {program : OracleComp (Response (JointPrefix := JointPrefix) (M := M) (Salt := Salt)
+      (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) α} {qRO qD : ℕ}
+    (h : ROQueryBounds program qRO qD) : SecurityQueryBounds program qRO qRO qD :=
+  ⟨h.1.of_le fun query => by cases query <;> simp,
+    h.1.of_le fun query => by cases query <;> simp, h.2⟩
+
+/-- A combined random-oracle budget implies the joint-only budget consumed by `CORR`. -/
+theorem toQueryBounds {JointPrefix M Salt RejectPrefix Sigma CT K R α : Type}
+    {program : OracleComp (Response (JointPrefix := JointPrefix) (M := M) (Salt := Salt)
+      (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) α} {qRO qD : ℕ}
+    (h : ROQueryBounds program qRO qD) : QueryBounds program qRO qD :=
+  h.toSecurityQueryBounds.toQueryBounds
+
+end ROQueryBounds
 
 /-- A randomized single-user, single-challenge adversary for the correctness hop. Its oracle
 program is selected by private coins and the full public KEM challenge; in particular, the program
@@ -1815,8 +1898,39 @@ variable {PK JointPrefix M Salt RejectPrefix Sigma CT K R : Type}
 /-- Per-random-tape and per-challenge joint-oracle and decapsulation bounds. -/
 @[expose] def QueryBounded
     (A : RandomizedAdversary PK JointPrefix M Salt RejectPrefix Sigma CT K R)
+    (qG qD : ℕ) : Prop :=
+  ∀ coins challenge, QueryBounds (A.run coins challenge) qG qD
+
+/-- Per-random-tape and per-challenge security bounds for `G`, `J` and decapsulation. -/
+@[expose] def SecurityQueryBounded
+    (A : RandomizedAdversary PK JointPrefix M Salt RejectPrefix Sigma CT K R)
+    (qG qJ qD : ℕ) : Prop :=
+  ∀ coins challenge, SecurityQueryBounds (A.run coins challenge) qG qJ qD
+
+/-- Per-random-tape and per-challenge combined tagged-random-oracle and decapsulation bounds. -/
+@[expose] def ROQueryBounded
+    (A : RandomizedAdversary PK JointPrefix M Salt RejectPrefix Sigma CT K R)
     (qRO qD : ℕ) : Prop :=
-  ∀ coins challenge, QueryBounds (A.run coins challenge) qRO qD
+  ∀ coins challenge, ROQueryBounds (A.run coins challenge) qRO qD
+
+/-- Security-level bounds imply the joint-only bounds required by the correctness simulation. -/
+theorem SecurityQueryBounded.toQueryBounded
+    {A : RandomizedAdversary PK JointPrefix M Salt RejectPrefix Sigma CT K R}
+    {qG qJ qD : ℕ} (h : A.SecurityQueryBounded qG qJ qD) : A.QueryBounded qG qD :=
+  fun coins challenge => (h coins challenge).toQueryBounds
+
+/-- A combined tagged-random-oracle bound gives the separate bounds used by the split security
+theorem. -/
+theorem ROQueryBounded.toSecurityQueryBounded
+    {A : RandomizedAdversary PK JointPrefix M Salt RejectPrefix Sigma CT K R}
+    {qRO qD : ℕ} (h : A.ROQueryBounded qRO qD) : A.SecurityQueryBounded qRO qRO qD :=
+  fun coins challenge => (h coins challenge).toSecurityQueryBounds
+
+/-- A combined tagged-random-oracle bound gives the joint-only bound required by `CORR`. -/
+theorem ROQueryBounded.toQueryBounded
+    {A : RandomizedAdversary PK JointPrefix M Salt RejectPrefix Sigma CT K R}
+    {qRO qD : ℕ} (h : A.ROQueryBounded qRO qD) : A.QueryBounded qRO qD :=
+  fun coins challenge => (h coins challenge).toQueryBounds
 
 end RandomizedAdversary
 
@@ -1824,8 +1938,8 @@ variable {PK SK M R CT JointPrefix Salt RejectPrefix Sigma K : Type}
 
 /-- **Fixed-key salted-FO `CORR` hop.** Suppose the real and simulated handlers agree until
 `bad`, and from any good state each joint-oracle or decapsulation query creates `bad` with
-probability at most `ε`. A program bounded by `qRO` joint queries and `qD` decapsulation queries
-then has output laws within `(qRO + qD) * ε`, after any shared randomized postprocessing.
+probability at most `ε`. A program bounded by `qG` joint queries and `qD` decapsulation queries
+then has output laws within `(qG + qD) * ε`, after any shared randomized postprocessing.
 
 The cost of `Query.rejection` is zero in both channels, so a shared `J` fallback contributes no
 correctness term. `Query.joint` has cost one even though its reply has two projections. -/
@@ -1837,15 +1951,15 @@ private theorem closeTo_run_corr {JointPrefix M Salt RejectPrefix Sigma CT K R S
       (first q s).toOuterMeasure {x | bad x.2} ≤
         (Query.jointCost q : ℝ≥0∞) * ε + (Query.decapsCost q : ℝ≥0∞) * ε)
     (program : OracleComp (Response (JointPrefix := JointPrefix) (M := M) (Salt := Salt)
-      (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) α) {qRO qD : ℕ}
-    (hbounds : QueryBounds program qRO qD) {initial : State} (hinitial : ¬bad initial)
+      (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) α) {qG qD : ℕ}
+    (hbounds : QueryBounds program qG qD) {initial : State} (hinitial : ¬bad initial)
     (next : α × State → PMF β) :
     CloseTo (((OracleComp.interpret first program).run initial).bind next)
       (((OracleComp.interpret second program).run initial).bind next)
-      (((qRO + qD : ℕ) : ℝ≥0∞) * ε) := by
+      (((qG + qD : ℕ) : ℝ≥0∞) * ε) := by
   have hreach :
       ((OracleComp.interpret first program).run initial).toOuterMeasure {x | bad x.2} ≤
-        (qRO : ℝ≥0∞) * ε + (qD : ℝ≥0∞) * ε := by
+        (qG : ℝ≥0∞) * ε + (qD : ℝ≥0∞) * ε := by
     simpa only [mul_zero, add_zero] using
       (OracleComp.toOuterMeasure_bad_le_two Query.jointCost Query.decapsCost (fun _ => ε)
         0 0 ε hstep (fun _ _ _ _ _ _ => by simp) hbounds.1 hbounds.2 hinitial)
@@ -1861,11 +1975,11 @@ private theorem Scheme.closeTo_run_realHandler_prefetchHandler
     (pk : PK) (sk : SK) (challenge : Ciphertext CT Salt) {A : Type}
     (program : OracleComp (Response (JointPrefix := JointPrefix) (M := M) (Salt := Salt)
       (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) A)
-    {qRO qD : ℕ} (hbounds : QueryBounds program qRO qD) :
+    {qG qD : ℕ} (hbounds : QueryBounds program qG qD) :
     CloseTo
       (((OracleComp.interpret (S.realHandler pk sk challenge) program).run {}).map Prod.fst)
       (((OracleComp.interpret (S.prefetchHandler pk sk challenge) program).run {}).map Prod.fst)
-      (((qRO + qD : ℕ) : ℝ≥0∞) *
+      (((qG + qD : ℕ) : ℝ≥0∞) *
         ENNReal.ofReal (S.pke.keyPairMaxFailProb pk sk)) := by
   simpa only [PMF.bind_pure_comp] using
     (closeTo_run_corr (S.identicalUntilBad_realHandler_prefetchHandler pk sk challenge)
@@ -1874,7 +1988,7 @@ private theorem Scheme.closeTo_run_realHandler_prefetchHandler
         ExplicitCoinPKE.GoodCache]) (PMF.pure ∘ Prod.fst))
 
 /-- **Concrete fixed-key salted-FO `CORR` hop.** The decrypt/re-encrypt real handler and the
-secret-key-free keyless handler have output laws within `(qRO + qD)` times the fixed key pair's
+secret-key-free keyless handler have output laws within `(qG + qD)` times the fixed key pair's
 worst-message decryption-failure probability. Private final caches are not observable. -/
 theorem Scheme.closeTo_run_realHandler_simHandler
     [Finite JointPrefix] [Fintype M] [Nonempty M] [Finite Salt] [Finite RejectPrefix]
@@ -1886,20 +2000,20 @@ theorem Scheme.closeTo_run_realHandler_simHandler
     (pk : PK) (sk : SK) (challenge : Ciphertext CT Salt) {A : Type}
     (program : OracleComp (Response (JointPrefix := JointPrefix) (M := M) (Salt := Salt)
       (RejectPrefix := RejectPrefix) (Sigma := Sigma) (CT := CT) K R) A)
-    {qRO qD : ℕ} (hbounds : QueryBounds program qRO qD) :
+    {qG qD : ℕ} (hbounds : QueryBounds program qG qD) :
     CloseTo
       (((OracleComp.interpret (S.realHandler pk sk challenge) program).run
         ({} : CacheState JointPrefix M Salt RejectPrefix Sigma CT K R)).map Prod.fst)
       (((OracleComp.interpret (S.simHandler pk challenge) program).run
         ({} : CacheState JointPrefix M Salt RejectPrefix Sigma CT K R)).map Prod.fst)
-      (((qRO + qD : ℕ) : ℝ≥0∞) *
+      (((qG + qD : ℕ) : ℝ≥0∞) *
         ENNReal.ofReal (S.pke.keyPairMaxFailProb pk sk)) := by
   rw [← S.run_prefetchHandler_eq_simHandler pk sk challenge program]
   exact S.closeTo_run_realHandler_prefetchHandler pk sk challenge program hbounds
 
 /-- Run a challenge-aware randomized adversary against the post-secret-seed-guessing real
 handler. The adversary's coins are sampled before the common public challenge. -/
-noncomputable def Scheme.randomizedRealHandlerGame
+@[expose] noncomputable def Scheme.randomizedRealHandlerGame
     [DecidableEq (JointInput JointPrefix M Salt)]
     [DecidableEq (RejectionInput RejectPrefix Sigma CT Salt)]
     [DecidableEq (Ciphertext CT Salt)]
@@ -1914,7 +2028,7 @@ noncomputable def Scheme.randomizedRealHandlerGame
 
 /-- Run the same challenge-aware randomized adversary against the post-secret-seed-guessing
 keyless handler, using the identical key, coin and challenge setup laws. -/
-noncomputable def Scheme.randomizedSimHandlerGame
+@[expose] noncomputable def Scheme.randomizedSimHandlerGame
     [DecidableEq (JointInput JointPrefix M Salt)]
     [DecidableEq (RejectionInput RejectPrefix Sigma CT Salt)]
     [DecidableEq (Ciphertext CT Salt)]
@@ -1928,8 +2042,8 @@ noncomputable def Scheme.randomizedSimHandlerGame
           (A.run coins ⟨keys.1, challenge.1, challenge.2⟩)).run {}).map Prod.fst
 
 /-- **Concrete randomized-adversary salted-FO `CORR` hop.** For a randomized adversary that
-receives the full public KEM challenge and has `qRO`/`qD` bounds for every tape and challenge, the
-concrete real and keyless-handler games differ by at most `(qRO + qD) * δ` under
+receives the full public KEM challenge and has `qG`/`qD` bounds for every tape and challenge, the
+concrete real and keyless-handler games differ by at most `(qG + qD) * δ` under
 `ExplicitCoinPKE.DeltaCorrect δ`. Both games sample the same challenge law after key generation;
 challenge construction is outside the counted handler queries and therefore adds no `+1`. -/
 theorem Scheme.advantage_randomizedRealHandler_simHandler_le
@@ -1941,12 +2055,12 @@ theorem Scheme.advantage_randomizedRealHandler_simHandler_le
     (S : Scheme PK SK M R CT JointPrefix Salt RejectPrefix Sigma K)
     (challengeSetup : PK → ProbComp (Ciphertext CT Salt × K))
     (A : RandomizedAdversary PK JointPrefix M Salt RejectPrefix Sigma CT K R)
-    {qRO qD : ℕ} (hbounds : A.QueryBounded qRO qD)
+    {qG qD : ℕ} (hbounds : A.QueryBounded qG qD)
     {δ : ℝ} (hδ : S.pke.DeltaCorrect δ) :
     (Game.advantage
       (S.randomizedRealHandlerGame challengeSetup A)
       (S.randomizedSimHandlerGame challengeSetup A) : ℝ) ≤
-      ((qRO + qD : ℕ) : ℝ) * δ := by
+      ((qG + qD : ℕ) : ℝ) * δ := by
   change (Game.advantage
       ((ProbComp.eval S.pke.keyGen).bind fun keys =>
         (ProbComp.eval A.coins).bind fun coins =>
@@ -1967,13 +2081,13 @@ theorem Scheme.advantage_randomizedRealHandler_simHandler_le
       (ProbComp.eval (challengeSetup pk)).bind fun challenge =>
         ((OracleComp.interpret (S.simHandler pk challenge.1)
           (A.run coins ⟨pk, challenge.1, challenge.2⟩)).run {}).map Prod.fst)
-    (qRO + qD) ?_ hδ
+    (qG + qD) ?_ hδ
   intro pk sk
   refine (CloseTo.bind_right_tsum (ProbComp.eval A.coins)
-    (err := fun _ => (((qRO + qD : ℕ) : ℝ≥0∞) *
+    (err := fun _ => (((qG + qD : ℕ) : ℝ≥0∞) *
       ENNReal.ofReal (S.pke.keyPairMaxFailProb pk sk))) fun coins _ => ?_).mono ?_
   · refine (CloseTo.bind_right_tsum (ProbComp.eval (challengeSetup pk))
-      (err := fun _ => (((qRO + qD : ℕ) : ℝ≥0∞) *
+      (err := fun _ => (((qG + qD : ℕ) : ℝ≥0∞) *
         ENNReal.ofReal (S.pke.keyPairMaxFailProb pk sk))) fun challenge _ => ?_).mono ?_
     · exact S.closeTo_run_realHandler_simHandler pk sk challenge.1
         (A.run coins ⟨pk, challenge.1, challenge.2⟩)

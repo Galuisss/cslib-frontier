@@ -117,6 +117,10 @@ structure PKEPublicKey (P : PKEParams) where
   s : RingWord P
   deriving DecidableEq
 
+instance (P : PKEParams) : Finite (PKEPublicKey P) :=
+  Finite.of_injective (fun key => (key.h, key.s)) fun _ _ h => by
+    exact congrArg (fun ⟨h, s⟩ => (⟨h, s⟩ : PKEPublicKey P)) h
+
 /-- The expanded HQC-PKE secret key is the fixed-weight word `y`. The key-generation witness `x`
 is intentionally not part of the decryption key. -/
 abbrev PKESecretKey (P : PKEParams) := RingWord P
@@ -131,6 +135,10 @@ structure PKECoins (P : PKEParams) where
   r1 : RingWord P
   deriving DecidableEq
 
+instance (P : PKEParams) : Finite (PKECoins P) :=
+  Finite.of_injective (fun coins => (coins.r2, coins.e, coins.r1)) fun _ _ h => by
+    exact congrArg (fun ⟨r2, e, r1⟩ => (⟨r2, e, r1⟩ : PKECoins P)) h
+
 /-- An expanded HQC-PKE ciphertext `(u, v)`. -/
 structure PKECiphertext (P : PKEParams) where
   /-- Complete quasi-cyclic component `u`. -/
@@ -138,6 +146,10 @@ structure PKECiphertext (P : PKEParams) where
   /-- Truncated codeword component `v`. -/
   v : Codeword P
   deriving DecidableEq
+
+instance (P : PKEParams) : Finite (PKECiphertext P) :=
+  Finite.of_injective (fun ciphertext => (ciphertext.u, ciphertext.v)) fun _ _ h => by
+    exact congrArg (fun ⟨u, v⟩ => (⟨u, v⟩ : PKECiphertext P)) h
 
 /-- Remove the last `ℓ` coordinates of a ring word, retaining the prefix of length `n - ℓ`. -/
 @[expose] def truncate (P : PKEParams) (x : RingWord P) : Codeword P :=
