@@ -13,7 +13,7 @@ import time
 import tomllib
 
 VARIANTS = {'before': '1640f9c0c511b5937af478f0b7876e57ca9d0cda',
-            'after': '295a29b459541469069163083f7987cdb6997239'}
+            'after': '150937e27ccf29aef7c1c872e175a669daf156d2'}
 MAIN = 'd83c776472ed326ae2201ee4a61828bedc676093'
 ROOT = 'CslibFrontier/Computability/Complexity/Problems/SAT/Planar/'
 CLIENTS = {'CrossoverLayoutChecks': 154, 'PairedCrossoverLayoutChecks': 162,
