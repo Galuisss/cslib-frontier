@@ -740,7 +740,7 @@ private theorem prefetchDecaps_map_completionCache
   | some message =>
     unfold prefetchDecaps
     simp only [hdec]
-    rw [StateT.run_bind, PMF.monad_bind_eq_bind]
+    erw [StateT.run_bind, PMF.monad_bind_eq_bind]
     rw [PMF.map_bind]
     simp only [completionPrefetchDecapsProgram, hdec, OracleComp.run_interpret_bind,
       PMF.monad_bind_eq_bind]
@@ -782,7 +782,7 @@ private theorem Linked.of_prefetchDecaps
   | some message =>
     unfold prefetchDecaps at hz
     simp only [hdec] at hz
-    rw [StateT.run_bind, PMF.monad_bind_eq_bind] at hz
+    erw [StateT.run_bind, PMF.monad_bind_eq_bind] at hz
     rw [PMF.mem_support_bind_iff] at hz
     obtain ⟨reply, hreply, hz⟩ := hz
     have hmiddle := hlinked.of_simJoint hreply
@@ -1321,7 +1321,7 @@ private theorem decapsContinuation_jointCache_eq
     rw [PMF.mem_support_pure_iff] at hy
     subst y
     rfl
-  · rw [StateT.run_map, PMF.monad_map_eq_map] at hy
+  · erw [StateT.run_map, PMF.monad_map_eq_map] at hy
     exact S.mapDecapsKey_jointCache_eq ciphertext hy
 
 /-- Real decapsulation and proof-only prefetch decapsulation assign the same mass to outcomes
@@ -1367,13 +1367,14 @@ private theorem realDecaps_jointCache_subset
   | none =>
     unfold realDecaps at hy
     simp only [hdec] at hy
-    rw [StateT.run_map, PMF.monad_map_eq_map] at hy
+    erw [StateT.run_map, PMF.monad_map_eq_map] at hy
     intro entry hentry
     rwa [S.mapDecapsKey_jointCache_eq ciphertext hy]
   | some message =>
     unfold realDecaps at hy
     simp only [hdec] at hy
-    rw [StateT.run_bind, PMF.monad_bind_eq_bind, PMF.mem_support_bind_iff] at hy
+    erw [StateT.run_bind, PMF.monad_bind_eq_bind] at hy
+    rw [PMF.mem_support_bind_iff] at hy
     obtain ⟨z, hz, hy⟩ := hy
     have hsub := S.cacheJoint_jointCache_subset pk
       (fun m coins => S.pke.dec sk (S.pke.encDet pk m coins) = some m)
@@ -1395,13 +1396,14 @@ private theorem prefetchDecaps_jointCache_subset
   | none =>
     unfold prefetchDecaps at hy
     simp only [hdec] at hy
-    rw [StateT.run_map, PMF.monad_map_eq_map] at hy
+    erw [StateT.run_map, PMF.monad_map_eq_map] at hy
     intro entry hentry
     rwa [S.mapDecapsKey_jointCache_eq ciphertext hy]
   | some message =>
     unfold prefetchDecaps at hy
     simp only [hdec] at hy
-    rw [StateT.run_bind, PMF.monad_bind_eq_bind, PMF.mem_support_bind_iff] at hy
+    erw [StateT.run_bind, PMF.monad_bind_eq_bind] at hy
+    rw [PMF.mem_support_bind_iff] at hy
     obtain ⟨z, hz, hy⟩ := hy
     have hsub := S.cacheJoint_jointCache_subset pk (fun _ _ => True)
       (S.jointInput pk message ciphertext.salt) hz
@@ -1496,8 +1498,8 @@ private theorem realDecaps_bad_eq_realJoint_bad
         {z | ¬S.GoodCache pk sk z.2} := by
   classical
   unfold realDecaps
-  simp only [hdec, StateT.run_bind, PMF.monad_bind_eq_bind,
-    PMF.toOuterMeasure_bind_apply, PMF.toOuterMeasure_apply]
+  simp only [hdec, PMF.toOuterMeasure_bind_apply]
+  rw [PMF.toOuterMeasure_apply]
   refine tsum_congr fun z => ?_
   by_cases hbad : ¬S.GoodCache pk sk z.2
   · have hone :
@@ -1586,6 +1588,8 @@ theorem realHandler_decaps_bad_eq_msgFailProb
     (st : CacheState JointPrefix M Salt RejectPrefix Sigma CT K R) :
     S.realHandler pk sk challenge (.decaps challenge) st = PMF.pure (none, st) := by
   simp only [realHandler, Query.dispatch, ↓reduceIte]
+  change PMF.pure (none, st) = PMF.pure (none, st)
+  rfl
 
 /-- A rejection-oracle query through the real handler cannot create a PKE correctness witness. -/
 theorem realHandler_rejection_bad_eq_zero
@@ -1626,7 +1630,7 @@ private theorem realDecaps_bad_le [Fintype M] [Nonempty M]
   | some message =>
     unfold realDecaps
     simp only [hdec]
-    rw [StateT.run_bind, PMF.monad_bind_eq_bind]
+    erw [StateT.run_bind, PMF.monad_bind_eq_bind]
     refine (Probability.PMF.toOuterMeasure_bind_le_add _ _ {z | ¬S.GoodCache pk sk z.2} _ 0
       fun z _ hgood => by
         refine le_of_eq (toOuterMeasure_notGood_eq_zero (of_not_not hgood) ?_)
