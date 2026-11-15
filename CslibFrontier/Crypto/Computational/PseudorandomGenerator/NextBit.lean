@@ -103,7 +103,9 @@ private theorem getD_eq_headD_drop (l : List Bool) (i : ℕ) (d : Bool) :
     l.getD i d = (l.drop i).headD d := by
   rw [List.getD_eq_getElem?_getD, List.headD_eq_head?_getD, List.head?_drop]
 
-private theorem uniformList_bind_take_getD {α : Type*} (m i : ℕ) (hi : i < m)
+/-- For `i < m`, reading the prefix `word.take i` and the bit `word.getD i false` of a uniform
+`m`-bit word is the same as sampling a uniform `i`-bit prefix and an independent fair bit. -/
+theorem uniformList_bind_take_getD {α : Type*} (m i : ℕ) (hi : i < m)
     (k : List Bool → Bool → PMF α) :
     (BitString.uniformList m).bind (fun word => k (word.take i) (word.getD i false)) =
       (BitString.uniformList i).bind fun front =>
@@ -119,7 +121,9 @@ private theorem uniformList_bind_take_getD {α : Type*} (m i : ℕ) (hi : i < m)
       rw [PMF.bind_map]
       simp only [Function.comp_def, List.headD_cons, PMF.bind_const])
 
-private theorem uniformList_bind_take_getD_eq_uniform_bool {m i : ℕ} (hi : i < m)
+/-- For any predictor `f` that sees only the first `i < m` bits of a uniform `m`-bit word, the
+indicator that its guess equals bit `i` is a fair coin. -/
+theorem uniformList_bind_take_getD_eq_uniform_bool {m i : ℕ} (hi : i < m)
     (f : List Bool → PMF Bool) :
     (BitString.uniformList m).bind
         (fun word => (f (word.take i)).map fun guess => decide (guess = word.getD i false)) =
@@ -265,20 +269,6 @@ private theorem computableInPolyTime_suffixLen {length : ℕ → ℕ}
       (encPair (encPair encUnary encBits) encBool) encUnary :=
     ComputableInPolyTime.unary_succ.comp hpref
   exact ComputableInPolyTime.unary_sub' hl1 hplus1
-
-private theorem computableInPolyTime_two_mul_length_poly {length : ℕ → ℕ}
-    (hl : ComputableInPolyTime length encUnary encUnary) :
-    PolynomiallyBounded (fun n => dyadicSize (length n - 1)) := by
-  refine polynomiallyBounded_iff_le.mpr ?_
-  obtain ⟨c, d, hc⟩ := polynomiallyBounded_iff_le.mp hl.polynomiallyBounded
-  refine ⟨2 * c + 2, d, fun n => ?_⟩
-  have h1 := Probability.dyadicSize_le (length n - 1)
-  have h2 : length n - 1 + 1 ≤ c * (n + 1) ^ d + 1 :=
-    Nat.add_le_add_right ((Nat.sub_le _ 1).trans (hc n)) 1
-  have h3 : c * (n + 1) ^ d + 1 ≤ (c + 1) * (n + 1) ^ d := by
-    have hpow : 1 ≤ (n + 1) ^ d := Nat.one_le_pow d _ (Nat.succ_pos n)
-    nlinarith
-  nlinarith
 
 private theorem computableInPolyTime_decide_eq_getD {γ : Type} {encγ : γ ↪ List Bool}
     {wordOf : γ → List Bool} {idxOf : γ → ℕ}
@@ -995,7 +985,8 @@ theorem PseudorandomGenerator.of_nextBitUnpredictable
       (ProbComp.eval
         (nextBitExperiment generator length (wordNextBitTwoStage length adversary n) n))) :=
     hunpred encUnit _ hA
-  have hpoly := computableInPolyTime_two_mul_length_poly hl
+  have hpoly : PolynomiallyBounded (fun n => dyadicSize (length n - 1)) :=
+    dyadicSize_polynomiallyBounded.comp (hl.polynomiallyBounded.tsub _)
   refine (hadv.polynomiallyBounded_mul hpoly).congr fun n => ?_
   have hpos : 0 < length n := lt_of_le_of_lt (Nat.zero_le n) (hstretch n)
   have hDne : (dyadicSize (length n - 1) : ℝ≥0) ≠ 0 :=
