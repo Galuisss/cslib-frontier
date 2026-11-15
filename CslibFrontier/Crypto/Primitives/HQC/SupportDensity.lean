@@ -25,6 +25,8 @@ import CslibFrontier.Probability.PMF.Event
 * `Cslib.Crypto.HQC.sampleSupport2_density_bounds`: the actual finite-bit product bounds.
 * `Cslib.Crypto.HQC.sampleSupport2_expect_bounds`, `Cslib.Crypto.HQC.sampleSupport2_payoff_bounds`:
   extended nonnegative and finite real-valued nonnegative payoff bounds.
+* `Cslib.Crypto.HQC.sampleSupport2_three_expect_le`: the upper factor for three independent
+  support samples with weights `countR`, `countE`, `countR` is `τR² * τE`.
 * `Cslib.Crypto.HQC.sampleSupport2_event_bounds`: the same factors bound every event.
 * `Cslib.Crypto.HQC.supportLowerDensity_toReal`, `Cslib.Crypto.HQC.supportUpperDensity_toReal`:
   equality with the source's remainder expressions.
@@ -152,6 +154,59 @@ theorem sampleSupport2_expect_bounds {width n count : ℕ} (h : count ≤ n)
     exact tsum_le_tsum fun S => by
       simpa only [sampleSupport2, mul_assoc, mul_comm, mul_left_comm] using
         mul_le_mul_right (hb S).2 (V S)
+
+/-- Three independent finite-width support samples with respective weights `countR`, `countE`,
+and `countR` increase every nonnegative joint payoff by at most `τR² * τE` relative to ideal
+uniform fixed-weight sampling. This is the sampling order `r₂`, `e`, `r₁` used by HQC encryption.
+It does not bound a difference of payoffs or a game advantage. -/
+theorem sampleSupport2_three_expect_le {width n countR countE : ℕ}
+    (hR : countR ≤ n) (hE : countE ≤ n)
+    (V : Finset ℕ → Finset ℕ → Finset ℕ → ℝ≥0∞) :
+    (ProbComp.expect (sampleSupport2 width n countR) fun r₂ =>
+        ProbComp.expect (sampleSupport2 width n countE) fun e =>
+          ProbComp.expect (sampleSupport2 width n countR) fun r₁ => V r₂ e r₁) ≤
+      supportUpperDensity width n 0 countR ^ 2 * supportUpperDensity width n 0 countE *
+        ProbComp.expect (sampleSupportFrom (idealCandidate n) 0 countR) fun r₂ =>
+          ProbComp.expect (sampleSupportFrom (idealCandidate n) 0 countE) fun e =>
+            ProbComp.expect (sampleSupportFrom (idealCandidate n) 0 countR) fun r₁ =>
+              V r₂ e r₁ := by
+  calc
+    _ ≤ supportUpperDensity width n 0 countR *
+        ProbComp.expect (sampleSupportFrom (idealCandidate n) 0 countR) (fun r₂ =>
+          ProbComp.expect (sampleSupport2 width n countE) fun e =>
+            ProbComp.expect (sampleSupport2 width n countR) fun r₁ => V r₂ e r₁) :=
+      (sampleSupport2_expect_bounds (width := width) hR _).2
+    _ ≤ supportUpperDensity width n 0 countR *
+        ProbComp.expect (sampleSupportFrom (idealCandidate n) 0 countR) (fun r₂ =>
+          supportUpperDensity width n 0 countE *
+            ProbComp.expect (sampleSupportFrom (idealCandidate n) 0 countE) (fun e =>
+              ProbComp.expect (sampleSupport2 width n countR) fun r₁ => V r₂ e r₁)) := by
+      apply mul_le_mul_of_nonneg_left
+      · apply ProbComp.expect_mono
+        intro r₂
+        exact (sampleSupport2_expect_bounds (width := width) hE _).2
+      · exact bot_le
+    _ = supportUpperDensity width n 0 countR * supportUpperDensity width n 0 countE *
+        ProbComp.expect (sampleSupportFrom (idealCandidate n) 0 countR) (fun r₂ =>
+          ProbComp.expect (sampleSupportFrom (idealCandidate n) 0 countE) fun e =>
+            ProbComp.expect (sampleSupport2 width n countR) fun r₁ => V r₂ e r₁) := by
+      simp only [ProbComp.expect_mul_left, mul_assoc]
+    _ ≤ supportUpperDensity width n 0 countR * supportUpperDensity width n 0 countE *
+        ProbComp.expect (sampleSupportFrom (idealCandidate n) 0 countR) (fun r₂ =>
+          ProbComp.expect (sampleSupportFrom (idealCandidate n) 0 countE) fun e =>
+            supportUpperDensity width n 0 countR *
+              ProbComp.expect (sampleSupportFrom (idealCandidate n) 0 countR) fun r₁ =>
+                V r₂ e r₁) := by
+      apply mul_le_mul_of_nonneg_left
+      · apply ProbComp.expect_mono
+        intro r₂
+        apply ProbComp.expect_mono
+        intro e
+        exact (sampleSupport2_expect_bounds (width := width) hR _).2
+      · exact bot_le
+    _ = _ := by
+      simp only [ProbComp.expect_mul_left, pow_two]
+      ac_rfl
 
 /-- Every event probability obeys the same bounds, stated with the program-level probability
 notation. No event-specific sampling or cryptographic hypothesis is required. -/

@@ -76,6 +76,20 @@ example : ProbComp.expect (sampleSupport2 3 5 2) (fun S => if 4 ∈ S then 3 els
         (fun S => if 4 ∈ S then 3 else 0) :=
   (sampleSupport2_expect_bounds (by decide) _).2
 
+-- The encryption-order bound keeps the two `r` factors distinct from the middle `e` factor,
+-- and the payoff observes all three independently sampled supports.
+example :
+    ProbComp.expect (sampleSupport2 3 5 2) (fun r₂ =>
+      ProbComp.expect (sampleSupport2 3 5 1) (fun e =>
+        ProbComp.expect (sampleSupport2 3 5 2) fun r₁ =>
+          if 4 ∈ r₂ ∧ 3 ∈ e ∧ 2 ∈ r₁ then 7 else 0)) ≤
+      supportUpperDensity 3 5 0 2 ^ 2 * supportUpperDensity 3 5 0 1 *
+        ProbComp.expect (sampleSupportFrom (idealCandidate 5) 0 2) (fun r₂ =>
+          ProbComp.expect (sampleSupportFrom (idealCandidate 5) 0 1) (fun e =>
+            ProbComp.expect (sampleSupportFrom (idealCandidate 5) 0 2) fun r₁ =>
+              if 4 ∈ r₂ ∧ 3 ∈ e ∧ 2 ∈ r₁ then 7 else 0)) :=
+  sampleSupport2_three_expect_le (by decide) (by decide) _
+
 example : Pr[(fun S => decide (4 ∈ S)) <$> sampleSupport2 3 5 2] ≤
     (supportUpperDensity 3 5 0 2).toReal *
       Pr[(fun S => decide (4 ∈ S)) <$> sampleSupportFrom (idealCandidate 5) 0 2] :=

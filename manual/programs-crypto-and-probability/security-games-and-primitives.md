@@ -1060,8 +1060,12 @@ uniformity when each shrinking interval is sampled uniformly instead.
 Proposition 6.2.1's two product bounds for the actual multiply-high choices. The remainder
 formulas in Equation (16) are identified by `supportLowerDensity_toReal` and
 `supportUpperDensity_toReal`. Use `sampleSupport2_event_bounds` for a Boolean event and
-`sampleSupport2_payoff_bounds` for a real payoff nonnegative on valid supports. Nonnegativity
-is essential: the source's Lemma 6.5 omits it, and a constant payoff of `-1` refutes that wording.
+`sampleSupport2_payoff_bounds` for a real payoff nonnegative on valid supports.
+`sampleSupport2_three_expect_le` composes the upper bound for independent support samples with
+weights `countR`, `countE`, `countR`, giving the HQC encryption-order factor `τR² * τE` for an
+extended-nonnegative joint payoff. It is not a generic multiplier for differences or game
+advantages. Nonnegativity is essential: the source's Lemma 6.5 omits it, and a constant payoff of
+`-1` refutes that wording.
 [Checked examples](../../CslibFrontierTests/Crypto/HQCSupportSampling.lean) include zero/full weight,
 collision replacement, and `n=5`, `count=2`, `width=3`, where `{2,4}` has actual probability
 `1/16` and ideal probability `1/10`. They also distinguish multiply-high from modulo reduction.
