@@ -510,8 +510,21 @@ records exact `F`/`T_len` calls, address writes and byte shapes, including the
 `len * (w - 1)` bound. It deliberately does not invent lower-level permutation/compression or
 machine-program costs that the current hash-call API does not expose.
 
-This milestone still does not define WOTS+ key generation or signing, prove that a generated
-signature reconstructs its generated public key, or establish one-time security. XMSS, FORS,
+The verification-facing XMSS composition is in
+[`SLHDSA/XMSS/PublicKeyFromSignature.lean`](../../CslibFrontier/Crypto/Primitives/SLHDSA/XMSS/PublicKeyFromSignature.lean),
+with ordinary-import clients in
+[`SLHDSAXMSSPublicKey.lean`](../../CslibFrontierTests/Crypto/SLHDSAXMSSPublicKey.lean).
+`XMSS.xmssPkFromSig` implements FIPS 205 Algorithm 11: it clears and initializes the WOTS hash
+address, invokes Algorithm 8, clears and initializes the tree address, then makes exactly `h'`
+ordered `H` calls while updating tree height and index in leaf-to-root order. The named signature
+shape contains exactly `len` WOTS+ blocks and `h'` authentication blocks. The structurally
+accumulated operation ledger retains the nested WOTS+ counts and the branch/address operations;
+the separate query ledger records zero external oracle queries or handlers because all hashes are
+concrete. The static ledger records signature and hash-input shapes and explicitly leaves compiled
+description size unmeasured.
+
+This milestone still does not define WOTS+ key generation or signing, XMSS tree generation or
+signing, or prove that a generated signature reconstructs its generated public key. FORS,
 hypertree and top-level sign/verify composition; classical or quantum reductions; and exact
 machine, program-size, gate, qubit and query costs remain obligations under the NIST post-quantum
 portfolio roadmap item.

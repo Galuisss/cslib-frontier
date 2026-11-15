@@ -4774,6 +4774,7 @@ public import CslibFrontier.Crypto.Primitives.SLHDSA.Parameters
 public import CslibFrontier.Crypto.Primitives.SLHDSA.WOTS.Chain
 public import CslibFrontier.Crypto.Primitives.SLHDSA.WOTS.Digits
 public import CslibFrontier.Crypto.Primitives.SLHDSA.WOTS.PublicKeyFromSignature
+public import CslibFrontier.Crypto.Primitives.SLHDSA.XMSS.PublicKeyFromSignature
 public import CslibFrontier.Crypto.Protocols.BCS.Basic
 public import CslibFrontier.Crypto.Protocols.BCS.ROM
 public import CslibFrontier.Crypto.Protocols.Cipher.EvenMansour

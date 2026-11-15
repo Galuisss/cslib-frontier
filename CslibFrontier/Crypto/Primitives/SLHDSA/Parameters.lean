@@ -32,6 +32,8 @@ from any later asymptotic security family indexed by a growing parameter.
 * `Cslib.Crypto.SLHDSA.SecurityBytes.count_pos`: every standardized length is positive.
 * `Cslib.Crypto.SLHDSA.SecurityBytes.count_le_32`: every standardized length is at most 32.
 * `Cslib.Crypto.SLHDSA.ParameterShape.digestBytes_eq`: the Section 9 digest-length formula.
+* `Cslib.Crypto.SLHDSA.ParameterShape.xmssHeight_pos`, `xmssHeight_le_nine`: the standardized
+  XMSS trees have heights between one and nine.
 
 ## References
 
@@ -101,6 +103,16 @@ def xmssHeight : SecurityBytes → ParameterShape → ℕ
   | .bytes24, .fast => 3
   | .bytes32, .small => 8
   | .bytes32, .fast => 4
+
+/-- Every standardized XMSS tree has positive height. -/
+theorem xmssHeight_pos (p : SecurityBytes) (shape : ParameterShape) :
+    0 < xmssHeight p shape := by
+  cases p <;> cases shape <;> decide
+
+/-- Every standardized XMSS tree has height at most nine. -/
+theorem xmssHeight_le_nine (p : SecurityBytes) (shape : ParameterShape) :
+    xmssHeight p shape ≤ 9 := by
+  cases p <;> cases shape <;> decide
 
 /-- The FORS tree height `a` from FIPS 205, Table 2. -/
 def forsHeight : SecurityBytes → ParameterShape → ℕ
