@@ -583,7 +583,7 @@ private theorem simJoint_map_completionCache
     | none =>
       rw [RandomOracle.answer_sum_inl, RandomOracle.answer_sum_inr, PMF.map_comp]
       simp [RandomOracle.answer, RandomOracle.ofList, hdec,
-        RandomOracle.ofList_cons, PMF.map, PMF.map_comp, Function.comp_def]
+        RandomOracle.ofList_cons, PMF.map, Function.comp_def]
 
 private theorem rejection_map_completionCache
     [DecidableEq (JointInput JointPrefix M Salt)]
@@ -740,8 +740,6 @@ private theorem prefetchDecaps_map_completionCache
     unfold prefetchDecaps
     simp only [hdec]
     rw [stateT_bind_apply, PMF.monad_bind_eq_bind]
-    dsimp only [StateT.pure, StateT.map, PMF.monad_pure_eq_pure,
-      PMF.monad_map_eq_map]
     rw [PMF.map_bind]
     simp only [completionPrefetchDecapsProgram, hdec, OracleComp.run_interpret_bind]
     rw [← S.simJoint_map_completionCache pk (S.jointInput pk message ciphertext.salt) st hlinked,
@@ -777,8 +775,6 @@ private theorem Linked.of_prefetchDecaps
     unfold prefetchDecaps at hz
     simp only [hdec] at hz
     rw [stateT_bind_apply, PMF.monad_bind_eq_bind] at hz
-    dsimp only [StateT.pure, StateT.map, PMF.monad_pure_eq_pure,
-      PMF.monad_map_eq_map] at hz
     rw [PMF.mem_support_bind_iff] at hz
     obtain ⟨reply, hreply, hz⟩ := hz
     have hmiddle := hlinked.of_simJoint hreply
@@ -1152,6 +1148,14 @@ private theorem realJoint_bad_le [Fintype M] [Nonempty M]
       conv_rhs => rw [← PMF.bind_pure (ProbComp.eval S.pke.sampleCoins)]
       apply PMF.bind_congr_on_support
       intro coins _
+      have hmapConst : PMF.map (fun _ : K => coins) (ProbComp.eval S.sampleKey) =
+          PMF.pure coins := by
+        calc
+          _ = PMF.map (Function.const K coins) (ProbComp.eval S.sampleKey) :=
+            congrArg (fun f => PMF.map f (ProbComp.eval S.sampleKey)) (by
+              funext _
+              rfl)
+          _ = _ := PMF.map_const (ProbComp.eval S.sampleKey) coins
       by_cases hcoins :
           S.pke.dec sk (S.pke.encDet pk input.message coins) = some input.message
       · simp only [hcoins, ↓reduceIte]
@@ -1159,10 +1163,9 @@ private theorem realJoint_bad_le [Fintype M] [Nonempty M]
             ⟨S.pke.encDet pk input.message coins, input.salt⟩ with
         | some key => simp only [PMF.pure_map]
         | none =>
-          simpa only [PMF.map_comp, Function.comp_def] using
-            PMF.map_const (ProbComp.eval S.sampleKey) coins
+          simpa only [PMF.map_comp, Function.comp_def] using hmapConst
       · simpa only [hcoins, ↓reduceIte, PMF.map_comp, Function.comp_def] using
-          PMF.map_const (ProbComp.eval S.sampleKey) coins
+          hmapConst
     calc
       _ ≤ (S.realJoint pk sk input st).toOuterMeasure
           ((fun z => z.1.coins) ⁻¹' {coins |
