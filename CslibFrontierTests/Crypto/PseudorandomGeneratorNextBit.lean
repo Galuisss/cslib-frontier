@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Samuel Schlesinger
 -/
 
+module
+
 import CslibFrontier.Crypto.Computational.PseudorandomGenerator.NextBit
 import CslibFrontier.Crypto.Computational.OneWayToPRG
 import CslibFrontier.Crypto.Negligible.Basic
@@ -34,6 +36,8 @@ Exercises `CslibFrontier.Crypto.Computational.PseudorandomGenerator.NextBit` as 
 5. **Positive client:** any uniform `OneWay` function yields a one-bit-stretching generator
    satisfying both `NextBitUnpredictable` and `NextBitUnpredictableRandomIndex`.
 -/
+
+set_option linter.privateModule false
 
 namespace CslibFrontierTests.Crypto.PseudorandomGeneratorNextBit
 
