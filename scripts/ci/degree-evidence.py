@@ -170,7 +170,9 @@ def main():
             tmp = SOURCE.with_suffix('.degree-tmp')
             tmp.write_text(modified)
             tmp.replace(SOURCE)
-            args = [*common]
+            # Development-only wrappers/profile options are absent from the strict source pass.
+            args = [*common, '-Dlinter.style.setOption=false',
+                    '-Dlinter.style.whitespace=false']
             if diagnostic:
                 args += ['-Dtrace.Meta.Tactic.fun_prop=true']
             rows = intervals(run([*args, str(SOURCE)], out, label))
