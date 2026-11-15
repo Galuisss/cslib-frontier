@@ -1805,7 +1805,10 @@ and the 20-unit core margin are preserved. Use the shared continuous consequence
 consecutive-bend certificates also remain available for segment-level reasoning.
 For larger fixed tables, `LocalGeometry.check_of_rows` assembles the complete certificate
 from separate `RowCheck` proofs. Each crossover still has one kernel certificate per incidence
-row; accesses and vertex distinctness are separate obligations. This is a certificate refactor,
+row; accesses and vertex distinctness are separate obligations. The crossovers compute
+Boolean rows on their original variable labels using `LocalGeometry.finiteRowCheck` and
+decode them with `finiteRowCheck_iff` before transporting to the indexed `RowCheck`.
+The indexed drawing is used for shared soundness, rather than for each closed row reduction. This is a certificate refactor,
 not a new planar reduction or a change to its variable or wire-length counts.
 
 ## Finite crossover gadget semantics
