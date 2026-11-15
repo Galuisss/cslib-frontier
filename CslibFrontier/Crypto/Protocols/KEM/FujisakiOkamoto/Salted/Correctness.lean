@@ -748,8 +748,12 @@ private theorem prefetchDecaps_map_completionCache
     apply PMF.bind_congr_on_support
     intro z _
     split <;> rename_i henc
-    · simp only [Function.comp_def, henc, ↓reduceIte, StateT.run_pure,
-        OracleComp.run_interpret_pure, PMF.monad_pure_eq_pure, PMF.pure_map]
+    · simp only [Function.comp_def, henc, ↓reduceIte, OracleComp.run_interpret_pure,
+        PMF.monad_pure_eq_pure]
+      change PMF.map (fun y => (y.1, completionCache y.2))
+        (PMF.pure (some z.1.key, z.2)) =
+          PMF.pure (some z.1.key, completionCache z.2)
+      exact PMF.pure_map _ _
     · simpa only [henc, ↓reduceIte, stateT_map_apply, OracleComp.run_interpret_map,
         OracleComp.run_interpret_query, PMF.map_comp, Function.comp_def, Prod.map_apply, id_eq,
         PMF.monad_map_eq_map] using
