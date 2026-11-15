@@ -95,6 +95,7 @@ example (family : HashFamily) :
         (FixedBytes.pairBlocks (oneBytes .bytes16) (twoBytes .bytes16)) := by
   rw [authenticationRootWithCalls_succ_output]
   rw [authenticationRootWithCalls_zero]
+  rw [authenticationInput_of_left indexZero levelZero (oneBytes .bytes16) (twoBytes .bytes16) rfl]
   rfl
 
 example (family : HashFamily) :
@@ -105,6 +106,7 @@ example (family : HashFamily) :
         (FixedBytes.pairBlocks (twoBytes .bytes16) (oneBytes .bytes16)) := by
   rw [authenticationRootWithCalls_succ_output]
   rw [authenticationRootWithCalls_zero]
+  rw [authenticationInput_of_right indexOne levelZero (oneBytes .bytes16) (twoBytes .bytes16) rfl]
   rfl
 
 example (family : HashFamily) :
