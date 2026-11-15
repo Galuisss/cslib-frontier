@@ -18,7 +18,7 @@ import CslibFrontier.Probability.PMF.Bind
 import CslibFrontier.Probability.PMF.BindFailure
 
 /-!
-# Correctness hop for salted joint-oracle FO transforms
+# Concrete-only correctness hop for salted joint-oracle FO transforms
 
 This module isolates the `CORR` hop in the classical-ROM decapsulation simulation for an
 implicit-rejection salted Fujisaki--Okamoto transform. A direct query receives the session key and
@@ -42,9 +42,14 @@ coin and key oracles are fused as `G(H(ekKEM) || m || salt) = (K, θ)`, so their
 contribution is counted once. The full passive salted-FO lift, its message-guessing and collision
 terms, and the HQC instantiation are outside this module.
 
-This is a probability-level game hop. It does not claim a native implementation, running-time,
-gate-count, static-description-size or other concrete resource bound for either handler; those
-resources must be supplied by a later transform and HQC realization.
+This module is deliberately **concrete-only**: it proves a finite typed probability-level game hop
+and introduces no encoding, parameter family or efficiency predicate. The word-family simulator
+witness and HQC-specific executable reduction remain owned by
+[cslib-frontier#5279](https://github.com/cslib-community/cslib-frontier/issues/5279). That later
+theorem must reuse the existing `WordPKE`/`WordReduction` and `AttackResources`/OracleTM layers,
+rather than adding a parallel efficiency bundle to this finite leaf. Accordingly, this module does
+not claim a native implementation, strict-PPT closure, running-time, gate-count,
+static-description-size or other resource bound for either handler.
 
 ## Main definitions
 
