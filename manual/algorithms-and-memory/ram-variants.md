@@ -319,11 +319,41 @@ operations and comparisons. Its global height-comparison contracts require an in
 source scalar domain; the natural instantiation above implements bounded executions of that
 domain using finite words. This does not identify arbitrary scalar models with the word RAM.
 
-The reverse RAM-to-pointer-machine compiler remains open. Its next step is to compose these
-AVL search/insertion routines with mutable value updates into a memory dictionary and compile
-RAM loads/stores through it. The simulation must state its scalar-operation assumptions and
-initialization costs. Arithmetic on simulated RAM addresses is scalar arithmetic; resolving
-an address still requires pointer traversal.
+### Compiling the standard word RAM to pointer machines
+
+Import
+[`WordRAM.PointerMachine.Simulation`](../../CslibFrontier/Computability/WordRAM/PointerMachine/Simulation.lean)
+and use `Cslib.WordRAM.PointerMachine.executes_input`. Given a successful deterministic
+`WordRAM.Executes w p ⟨0, Data.init input⟩ v n`, it constructs a halting execution of the finite
+program `compile w p`, returning `v` in scalar register three. If the input has `N` words,
+the execution uses at most `N + n` records and
+`n * (294 * Nat.log 2 (N + n + 1) + 56)` pointer-machine instructions, including halt.
+The general `executes_compile` theorem preserves the complete represented source state and
+bounds time by `n * (294 * Nat.log 2 (M + 1) + 56)`, where `M` is the final dictionary size.
+
+The target has seven pointer registers, `r + 4` scalar registers for a source with `r`
+registers, and records with three links (left, right, parent) and three scalar fields
+(key, height, value). The verified
+[AVL dictionary](../../CslibFrontier/DataStructure/AVLTree/PointerMachine/Dictionary.lean)
+reads an absent address as zero and inserts or overwrites on a store. It retains entries
+written back to zero, so `M` counts retained addresses, rather than just nonzero memory cells.
+A source step allocates at most one record. Memory reads, writes, rotations, allocation,
+control flow and scalar instructions are all charged.
+
+The explicit `inputState` encoding builds a valid AVL dictionary for the length cell and
+input cells, using exactly `N + 1` records. Input encoding is outside the execution charge,
+as in the source `Data.init` convention. It is constructed and proved correct, rather than
+supplied as an assumed dictionary implementation. The
+[compiler client](../../CslibFrontierTests/WordRAMPointerMachine.lean) checks memory updates,
+missing addresses, register aliasing, backward loops, and the general simulation theorem.
+
+The scalar model `model w` supplies the standard word-RAM arithmetic, constants and width
+operation, together with the AVL height operations and comparisons. Simulated addresses are
+natural-number scalars on which source arithmetic is allowed. Resolving an address requires
+traversing physical heap pointers; the scalar operations cannot inspect or construct those
+pointers. This result does not claim simulation by an atom-only model, nor fault equivalence
+or randomized execution. Source `rand` instructions fault in the deterministic semantics and
+cannot occur on the successful runs covered by the theorem.
 
 ## Known Limitations
 
