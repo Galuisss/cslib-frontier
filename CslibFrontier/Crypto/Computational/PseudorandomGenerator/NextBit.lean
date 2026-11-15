@@ -296,8 +296,11 @@ accept when the guess matches bit `i` of `word`. If `length n = 0`, output a fai
   else
     PMF.uniformOfFintype Bool
 
-/-- Uniform strict-PPT next-bit unpredictability at a random bit position: every uniform strict PPT
-predictor `Distinguisher` has negligible guessing advantage in `nextBitPredictionGame`. -/
+/-- Uniform strict-PPT next-bit unpredictability at a random bit position. This is the
+random-position form of [BonehShoup2023], Attack Game 3.2 and Definition 3.3 (printed p. 64), not
+Definition 3.3 as printed: the challenger draws the position uniformly, and the single-stage
+predictor does not choose it. Every uniform strict PPT predictor `Distinguisher` has negligible
+guessing advantage in `nextBitPredictionGame`. -/
 @[expose] def NextBitUnpredictableRandomIndex (generator : List Bool → List Bool)
     (length : ℕ → ℕ) : Prop :=
   ∀ predictor : Distinguisher, IsPPT encBool predictor →
@@ -735,9 +738,9 @@ fair coin so they yield zero advantage. -/
   else
     ProbComp.uniform Bool
 
-/-- Uniform strict-PPT next-bit unpredictability (Boneh–Shoup Definition 3.3 / Attack Game 3.2):
-every uniform strict PPT two-stage predictor choosing a position `i : ℕ` (binary encoded) has
-negligible guessing advantage in `nextBitExperiment`. -/
+/-- Uniform strict-PPT next-bit unpredictability ([BonehShoup2023], Attack Game 3.2 and
+Definition 3.3, printed p. 64): every uniform strict PPT two-stage predictor choosing a position
+`i : ℕ` (binary encoded) has negligible guessing advantage in `nextBitExperiment`. -/
 @[expose] def NextBitUnpredictable (generator : List Bool → List Bool) (length : ℕ → ℕ) : Prop :=
   ∀ {σ : Type} (encσ : σ ↪ List Bool) (adversary : ℕ → TwoStage Unit ℕ (List Bool) Bool σ),
     TwoStage.IsPPT encUnit encNat encBits encBool encσ adversary →
