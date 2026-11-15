@@ -46,7 +46,9 @@ def run(args, out, label, timeout):
 
 
 def shake_command():
-    args = ['lake', 'shake', '--explain', '--keep-public']
+    # The preceding strict targeted build validates these roots and their dependency closure.
+    # --force skips Lake's unrelated workspace-default-target no-build preflight only.
+    args = ['lake', 'shake', '--force', '--explain', '--keep-public']
     for module in MODULES:
         args += ['--only', module]
     return args + MODULES
