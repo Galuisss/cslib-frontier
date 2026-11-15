@@ -10,11 +10,13 @@ module
 public import CslibFrontier.Crypto.Computational.DiffieHellman.MultiDDH
 public import CslibFrontier.Crypto.Game.Hybrid
 public import CslibFrontier.Foundations.Data.BitString.Basic
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.BitString
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat.Binary
 import CslibFrontier.Probability.PMF.Uniform
 import CslibFrontier.Probability.Product
 import CslibFrontier.Tactic.PolyTime
+import CslibFrontier.Tactic.EncLen
 
 /-!
 # The Naor–Reingold pseudorandom function from Decisional Diffie–Hellman
@@ -58,7 +60,8 @@ Following Boneh–Shoup Exercises 10.4, 10.8, 10.11, and 4.18, we formalize:
    - The distributional single-level DDH distinguisher `naorReingoldLevelDDHDistinguisher`
      (which samples the $2^k$-entry prefix table `BitString k`) and adjacent-hop bound
      `advantage_naorReingoldHybridGame_succ_le`, the $n$-hybrid sum bound
-     `advantage_naorReingold_le_sum`, and the common-bound corollary `advantage_naorReingold_le_mul`
+     `advantage_naorReingold_le_sum`, and the common-bound algebraic helper
+     `advantage_naorReingold_le_mul_of_reduction_le`
      ($\le n \cdot (\varepsilon + 1 / q)$). The efficient lazy-sampling `IsOraclePPT` reduction and
      `PseudorandomFunction` bridge are proved in `NaorReingold.Security` and `NaorReingold.PRF`.
 
@@ -99,7 +102,7 @@ Following Boneh–Shoup Exercises 10.4, 10.8, 10.11, and 4.18, we formalize:
   (Boneh–Shoup Exercise 10.11).
 * `Cslib.Crypto.PrimeOrderGroupFamily.advantage_naorReingoldHybridGame_succ_le`,
   `Cslib.Crypto.PrimeOrderGroupFamily.advantage_naorReingold_le_sum`,
-  `Cslib.Crypto.PrimeOrderGroupFamily.advantage_naorReingold_le_mul`:
+  `Cslib.Crypto.PrimeOrderGroupFamily.advantage_naorReingold_le_mul_of_reduction_le`:
   distributional prefix-hybrid security bounds for the Naor–Reingold PRF against the explicit
   $2^k$-pair PMF distinguisher `naorReingoldLevelDDHDistinguisher` (Boneh–Shoup Exercise 10.4(b);
   Naor–Reingold Theorem 4.1); see `NaorReingold.Security` and `NaorReingold.PRF` for the
@@ -310,8 +313,7 @@ theorem computableInPolyTime_naorReingoldProdNat :
   have hval : value.1.size ≤ (encList (encPair encNat encBool) input.2).length := by
     rw [← Nat.size_eq_bits_len, ← encNat_apply]
     have h1 : (encNat value.1).length ≤ (encPair encNat encBool value).length := by
-      simp only [length_encPair]
-      omega
+      enc_len
     exact h1.trans (length_le_encList_of_mem (encPair encNat encBool) hmem)
   rcases value with ⟨v, _ | _⟩
   · simp
@@ -332,27 +334,27 @@ theorem computableInPolyTime_naorReingoldWordSuffix :
       (fun input : F.Desc × List Bool × List ℕ × List Bool => input.2.1)
       (encPair F.encDesc (encPair encBits (encPair (encList encNat) encBits))) encBits := by
     fun_prop
-  have hαs : ComputableTidilyInPolyTime
+  have hαs : ComputableInPolyTime
       (fun input : F.Desc × List Bool × List ℕ × List Bool => input.2.2.1)
       (encPair F.encDesc (encPair encBits (encPair (encList encNat) encBits)))
       (encList encNat) := by
     fun_prop
-  have hxs : ComputableTidilyInPolyTime
+  have hxs : ComputableInPolyTime
       (fun input : F.Desc × List Bool × List ℕ × List Bool => input.2.2.2)
       (encPair F.encDesc (encPair encBits (encPair (encList encNat) encBits)))
       (encList encBool) :=
-    ComputableTidilyInPolyTime.bitsToList.comp (by fun_prop)
-  have hzip : ComputableTidilyInPolyTime
+    ComputableInPolyTime.bitsToList.comp (by fun_prop)
+  have hzip : ComputableInPolyTime
       (fun input : F.Desc × List Bool × List ℕ × List Bool => input.2.2.1.zip input.2.2.2)
       (encPair F.encDesc (encPair encBits (encPair (encList encNat) encBits)))
       (encList (encPair encNat encBool)) :=
-    (ComputableTidilyInPolyTime.zip encNat encBool).comp (hαs.prod hxs)
+    (ComputableInPolyTime.zip encNat encBool).comp (hαs.prod hxs)
   have hprod : ComputableInPolyTime
       (fun input : F.Desc × List Bool × List ℕ × List Bool =>
         naorReingoldProdNat 1 (input.2.2.1.zip input.2.2.2))
       (encPair F.encDesc (encPair encBits (encPair (encList encNat) encBits))) encNat :=
     computableInPolyTime_naorReingoldProdNat.comp
-      ((ComputableInPolyTime.const 1).prod hzip.computableInPolyTime)
+      ((ComputableInPolyTime.const 1).prod hzip)
   exact F.computableInPolyTime_smul.comp (hd.prod (hprod.prod hu))
 
 /-- `naorReingoldWordEval` is computable in polynomial time. -/
@@ -369,25 +371,25 @@ theorem computableInPolyTime_naorReingoldWordEval :
       (fun input : F.Desc × ℕ × List ℕ × List Bool => input.2.1)
       (encPair F.encDesc (encPair encNat (encPair (encList encNat) encBits))) encNat := by
     fun_prop
-  have hαs : ComputableTidilyInPolyTime
+  have hαs : ComputableInPolyTime
       (fun input : F.Desc × ℕ × List ℕ × List Bool => input.2.2.1)
       (encPair F.encDesc (encPair encNat (encPair (encList encNat) encBits))) (encList encNat) := by
     fun_prop
-  have hxs : ComputableTidilyInPolyTime
+  have hxs : ComputableInPolyTime
       (fun input : F.Desc × ℕ × List ℕ × List Bool => input.2.2.2)
       (encPair F.encDesc (encPair encNat (encPair (encList encNat) encBits)))
       (encList encBool) :=
-    ComputableTidilyInPolyTime.bitsToList.comp (by fun_prop)
-  have hzip : ComputableTidilyInPolyTime
+    ComputableInPolyTime.bitsToList.comp (by fun_prop)
+  have hzip : ComputableInPolyTime
       (fun input : F.Desc × ℕ × List ℕ × List Bool => input.2.2.1.zip input.2.2.2)
       (encPair F.encDesc (encPair encNat (encPair (encList encNat) encBits)))
       (encList (encPair encNat encBool)) :=
-    (ComputableTidilyInPolyTime.zip encNat encBool).comp (hαs.prod hxs)
+    (ComputableInPolyTime.zip encNat encBool).comp (hαs.prod hxs)
   have hprod : ComputableInPolyTime
       (fun input : F.Desc × ℕ × List ℕ × List Bool =>
         naorReingoldProdNat input.2.1 (input.2.2.1.zip input.2.2.2))
       (encPair F.encDesc (encPair encNat (encPair (encList encNat) encBits))) encNat :=
-    computableInPolyTime_naorReingoldProdNat.comp (hα₀.prod hzip.computableInPolyTime)
+    computableInPolyTime_naorReingoldProdNat.comp (hα₀.prod hzip)
   have hgen : ComputableInPolyTime
       (fun input : F.Desc × ℕ × List ℕ × List Bool => F.encode input.1 (F.generator input.1))
       (encPair F.encDesc (encPair encNat (encPair (encList encNat) encBits))) encBits :=
@@ -687,8 +689,11 @@ theorem advantage_naorReingold_le_sum (d : F.Desc) (n : ℕ)
 /-- **Common-bound Naor–Reingold PRF distributional prefix-hybrid bound**
 ([BonehShoup2023], Exercise 10.4; [NaorReingold2004], Theorem 4.1): if for every `k < n` the
 explicit `2^k`-pair PMF distinguisher `naorReingoldHopDDHDistinguisher d n k adv` has DDH advantage
-at most `ε`, then the Naor–Reingold PRF advantage is at most `n * (ε + (F.order d)⁻¹)`. -/
-theorem advantage_naorReingold_le_mul (d : F.Desc) (n : ℕ)
+at most `ε`, then the Naor–Reingold PRF advantage is at most `n * (ε + (F.order d)⁻¹)`.
+
+This is an algebraic helper: it assumes the bound on the hop distinguishers that the proof builds.
+The asymptotic theorem uses the certified lazy-sampling reduction of `NaorReingold.Security`. -/
+theorem advantage_naorReingold_le_mul_of_reduction_le (d : F.Desc) (n : ℕ)
     (adv : OracleComp (fun _ : BitString n => F.Carrier d) Bool) (ε : ℝ≥0)
     (hε : ∀ k < n,
       Game.advantage
