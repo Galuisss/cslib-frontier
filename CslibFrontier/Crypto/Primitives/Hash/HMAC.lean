@@ -86,7 +86,7 @@ def sha512KeyBlock (key text : List Byte) (hinput : ValidHMACSHA512Input key tex
     keyBlock 128 key
 
 /-- XOR an exact key block with one repeated HMAC pad byte. -/
-def xorPad {blockBytes : ℕ} (key : FixedBytes blockBytes) (pad : Byte) :
+private def xorPad {blockBytes : ℕ} (key : FixedBytes blockBytes) (pad : Byte) :
     FixedBytes blockBytes := fun i =>
   ⟨(key i).val ^^^ pad.val, Nat.xor_lt_two_pow (key i).isLt pad.isLt⟩
 

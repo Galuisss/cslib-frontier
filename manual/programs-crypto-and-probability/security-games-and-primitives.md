@@ -515,9 +515,11 @@ padding. MGF1 hashes `seed || I2OSP(counter, 4)` in increasing counter order, co
 typed digest blocks with `BitString.blocksEquiv.symm`, and uses `FixedBytes.take` for the requested
 leading bytes. Its source domain admits the inclusive `2^32 * hLen` output bound and avoids a
 spurious seed-length restriction for an empty mask. The
-[ordinary-import client](../../CslibFrontierTests/Crypto/HMACMGF1.lean) checks RFC 4231 short- and
-long-key vectors, exact-block keys, empty and digest-boundary masks, and the final four-byte
-counter [rfc4231][rfc4231]. These executable functions are not constant-time implementations,
+[ordinary-import client](../../CslibFrontierTests/Crypto/HMACMGF1.lean) checks direct HMAC
+packaging, exact-block keys and the inclusive MGF1 bound. The
+[native test driver](../../CslibFrontierTestDriver.lean) checks RFC 4231 short- and long-key
+vectors, exact-block HMAC outputs, empty and digest-boundary masks, and the final four-byte counter
+[rfc4231][rfc4231]. These executable functions are not constant-time implementations,
 FIPS validations, security proofs, or machine/resource bounds; the FIPS 205 `PRF_msg` and `H_msg`
 wrappers remain separate.
 

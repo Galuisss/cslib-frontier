@@ -9,8 +9,6 @@ module
 
 public import CslibFrontier.Crypto.Primitives.Hash.HMAC
 public import CslibFrontier.Crypto.Primitives.Hash.MGF1
-public meta import CslibFrontier.Crypto.Primitives.Hash.HMAC
-public meta import CslibFrontier.Crypto.Primitives.Hash.MGF1
 
 /-!
 # HMAC and MGF1 boundary clients
@@ -24,7 +22,7 @@ output, both sides of each digest boundary, the inclusive output-length bound, a
 four-byte counter `0xffffffff`.
 -/
 
--- This module checks the exported HMAC and MGF1 APIs and exports no test fixtures.
+-- This module exports only the named native-check harness below; its fixtures remain private.
 set_option linter.privateModule false
 
 public section
@@ -177,26 +175,38 @@ private def finalCounterSHA512 : List Byte :=
 #guard decide (ValidMGF1SHA512Input mgfSeed (2 ^ 32 * 64))
 #guard !decide (ValidMGF1SHA512Input mgfSeed (2 ^ 32 * 64 + 1))
 
--- Keep every digest fixture in one compiled evaluation so SHA-2 code generation is shared across
--- the RFC vectors, exact-block branches, MGF1 boundaries, and final-counter checks.
-/-- info: true -/
-#guard_msgs in
-#eval decide (
-  (hmacSHA256 case1Key case1Text (by decide)).toList = case1SHA256 ∧
-  (hmacSHA512 case1Key case1Text (by decide)).toList = case1SHA512 ∧
-  (hmacSHA256 case6Key case6Text case6Valid.1).toList = case6SHA256 ∧
-  (hmacSHA512 case6Key case6Text case6Valid.2).toList = case6SHA512 ∧
-  (hmacSHA256 (byteSequence 64) exactKeyText exactKeyValid.1).toList = exact64SHA256 ∧
-  (hmacSHA512 (byteSequence 128) exactKeyText exactKeyValid.2).toList = exact128SHA512 ∧
-  (mgf1SHA256 mgfSeed 0 (by decide)).toList = [] ∧
-  (mgf1SHA256 mgfSeed 31 (by decide)).toList = mgfSHA256Length33.take 31 ∧
-  (mgf1SHA256 mgfSeed 32 (by decide)).toList = mgfSHA256Length33.take 32 ∧
-  (mgf1SHA256 mgfSeed 33 (by decide)).toList = mgfSHA256Length33 ∧
-  (mgf1SHA512 mgfSeed 0 (by decide)).toList = [] ∧
-  (mgf1SHA512 mgfSeed 63 (by decide)).toList = mgfSHA512Length65.take 63 ∧
-  (mgf1SHA512 mgfSeed 64 (by decide)).toList = mgfSHA512Length65.take 64 ∧
-  (mgf1SHA512 mgfSeed 65 (by decide)).toList = mgfSHA512Length65 ∧
-  (sha256CounterDigest mgfSeed finalCounter (by decide)).toList = finalCounterSHA256 ∧
-  (sha512CounterDigest mgfSeed finalCounter (by decide)).toList = finalCounterSHA512)
+/-- The named known-answer conditions executed by the native project test driver. -/
+def hmacMGF1Checks : List (String × Bool) :=
+  [ ("RFC 4231 case 1 SHA-256",
+      decide ((hmacSHA256 case1Key case1Text (by decide)).toList = case1SHA256))
+  , ("RFC 4231 case 1 SHA-512",
+      decide ((hmacSHA512 case1Key case1Text (by decide)).toList = case1SHA512))
+  , ("RFC 4231 case 6 SHA-256",
+      decide ((hmacSHA256 case6Key case6Text case6Valid.1).toList = case6SHA256))
+  , ("RFC 4231 case 6 SHA-512",
+      decide ((hmacSHA512 case6Key case6Text case6Valid.2).toList = case6SHA512))
+  , ("exact-block key SHA-256",
+      decide ((hmacSHA256 (byteSequence 64) exactKeyText exactKeyValid.1).toList = exact64SHA256))
+  , ("exact-block key SHA-512",
+      decide ((hmacSHA512 (byteSequence 128) exactKeyText exactKeyValid.2).toList = exact128SHA512))
+  , ("empty MGF1 SHA-256 mask", decide ((mgf1SHA256 mgfSeed 0 (by decide)).toList = []))
+  , ("31-byte MGF1 SHA-256 mask",
+      decide ((mgf1SHA256 mgfSeed 31 (by decide)).toList = mgfSHA256Length33.take 31))
+  , ("32-byte MGF1 SHA-256 mask",
+      decide ((mgf1SHA256 mgfSeed 32 (by decide)).toList = mgfSHA256Length33.take 32))
+  , ("33-byte MGF1 SHA-256 mask",
+      decide ((mgf1SHA256 mgfSeed 33 (by decide)).toList = mgfSHA256Length33))
+  , ("empty MGF1 SHA-512 mask", decide ((mgf1SHA512 mgfSeed 0 (by decide)).toList = []))
+  , ("63-byte MGF1 SHA-512 mask",
+      decide ((mgf1SHA512 mgfSeed 63 (by decide)).toList = mgfSHA512Length65.take 63))
+  , ("64-byte MGF1 SHA-512 mask",
+      decide ((mgf1SHA512 mgfSeed 64 (by decide)).toList = mgfSHA512Length65.take 64))
+  , ("65-byte MGF1 SHA-512 mask",
+      decide ((mgf1SHA512 mgfSeed 65 (by decide)).toList = mgfSHA512Length65))
+  , ("final MGF1 SHA-256 counter",
+      decide ((sha256CounterDigest mgfSeed finalCounter (by decide)).toList = finalCounterSHA256))
+  , ("final MGF1 SHA-512 counter",
+      decide ((sha512CounterDigest mgfSeed finalCounter (by decide)).toList = finalCounterSHA512))
+  ]
 
 end HMACMGF1Tests
