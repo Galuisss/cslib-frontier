@@ -767,7 +767,12 @@ private theorem prefetchDecaps_map_completionCache
         (PMF.pure (some z.1.key, z.2)) =
           PMF.pure (some z.1.key, completionCache z.2)
       exact PMF.pure_map _ _
-    · simpa only [henc, ↓reduceIte, StateT.run_map, OracleComp.run_interpret_map,
+    · have hmap :
+          ((some <$> S.decapsKey ciphertext) z.2) =
+            (fun p => (some p.1, p.2)) <$> S.decapsKey ciphertext z.2 :=
+        StateT.run_map (fun key : K => some key) (S.decapsKey ciphertext) z.2
+      rw [hmap, PMF.monad_map_eq_map]
+      simpa only [henc, ↓reduceIte, OracleComp.run_interpret_map,
         OracleComp.run_interpret_query, PMF.map_comp, Function.comp_def, Prod.map_apply, id_eq,
         PMF.monad_map_eq_map] using
         congrArg (PMF.map (Prod.map some id))
@@ -815,7 +820,11 @@ private theorem Linked.of_prefetchDecaps
       rw [PMF.mem_support_pure_iff] at hz
       subst z
       exact hmiddle
-    · rw [StateT.run_map, PMF.monad_map_eq_map, PMF.mem_support_map_iff] at hz
+    · have hmap :
+          ((some <$> S.decapsKey ciphertext) reply.2) =
+            (fun p => (some p.1, p.2)) <$> S.decapsKey ciphertext reply.2 :=
+        StateT.run_map (fun key : K => some key) (S.decapsKey ciphertext) reply.2
+      rw [hmap, PMF.monad_map_eq_map, PMF.mem_support_map_iff] at hz
       obtain ⟨key, hkey, rfl⟩ := hz
       exact hmiddle.of_decapsKey hkey
 
