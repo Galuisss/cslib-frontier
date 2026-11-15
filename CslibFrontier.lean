@@ -2721,6 +2721,8 @@ public import CslibFrontier.Computability.Complexity.Problems.SAT.ExactOne.Geome
 public import CslibFrontier.Computability.Complexity.Problems.SAT.ExactOne.GeometryProfilesData
 public import CslibFrontier.Computability.Complexity.Problems.SAT.ExactOne.GeometryProfilesPrefix
 public import CslibFrontier.Computability.Complexity.Problems.SAT.ExactOne.GeometryProfilesPrefixData
+public import CslibFrontier.Computability.Complexity.Problems.SAT.Geometry
+public import CslibFrontier.Computability.Complexity.Problems.SAT.GeometryData
 public import CslibFrontier.Computability.Complexity.Problems.SAT.Incidence
 public import CslibFrontier.Computability.Complexity.Problems.SAT.Incidence.Compact
 public import CslibFrontier.Computability.Complexity.Problems.SAT.Incidence.Degree

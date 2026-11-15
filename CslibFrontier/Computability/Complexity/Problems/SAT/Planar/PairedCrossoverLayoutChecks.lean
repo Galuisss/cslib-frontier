@@ -8,7 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Complexity.Problems.SAT.Planar.PairedCrossoverLayoutData
-public import CslibFrontier.Foundations.Geometry.Orthogonal.Separation
+public import CslibFrontier.Computability.Complexity.Problems.SAT.Geometry
 import Mathlib.Data.List.GetD
 import Mathlib.Data.List.Nodup
 import Mathlib.Data.List.Zip
@@ -45,7 +45,7 @@ The paired modification and its finite orthogonal certificates are original.
 
 namespace Cslib.Logic.PL.CNF.PairedCrossover
 
-open Orthogonal
+open Orthogonal Cslib.Complexity.SAT
 
 /-- The clause position at an index. All indices in `incidenceRoutes` are certified in range. -/
 def clausePosition (i : ℕ) : Point := clausePositions.getD i (0, 0)
@@ -86,218 +86,250 @@ def commonEndpoints (e f : ℕ × Variable × Route) : List Point :=
   (if e.1 = f.1 then [clausePosition e.1] else []) ++
     (if e.2.1 = f.2.1 then [variablePosition e.2.1] else [])
 
-private def LocalSpec (e : ℕ × Variable × Route) : Prop :=
-  (e.1 < 78 ∧ e.2.2.head? = some (clausePosition e.1) ∧
-    e.2.2.getLast? = some (variablePosition e.2.1)) ∧
-  IsOrthogonal e.2.2 ∧
-  (∀ p ∈ e.2.2, 20 ≤ p.1 ∧ p.1 ≤ 220 ∧ 20 ≤ p.2 ∧ p.2 ≤ 220) ∧
-  e.2.2.Nodup ∧
+/-- The same drawing indexed by the explicit variable list. Only vertex labels change;
+routes, clause order and the 20-unit margin are unchanged. -/
+def geometry : LocalGeometry where
+  size := 240
+  variablePositions := variableList.map variablePosition
+  clausePositions := clausePositions
+  incidenceRoutes := incidenceRoutes.map fun e => (e.1, variableList.idxOf e.2.1, e.2.2)
+  terminalVariables := ((List.finRange 4).flatMap (fun s => (List.finRange 2).map (s, ·))).map fun i => variableList.idxOf (Variable.port i.1 i.2)
+  boundaryPorts := ((List.finRange 4).flatMap (fun s => (List.finRange 2).map (s, ·))).map fun i => boundaryPort i.1 i.2
+  accessRoutes := ((List.finRange 4).flatMap (fun s => (List.finRange 2).map (s, ·))).map fun i => accessRoute i.1 i.2
+
+private def indexed (e : ℕ × Variable × Route) : LocalIncidence :=
+  (e.1, variableList.idxOf e.2.1, e.2.2)
+
+private theorem position_indexed : ∀ v : Variable,
+    geometry.variablePosition (variableList.idxOf v) = variablePosition v := by decide +kernel
+
+private theorem index_lt : ∀ v : Variable,
+    variableList.idxOf v < geometry.variablePositions.length := by decide +kernel
+
+private theorem index_injective : Function.Injective (fun v : Variable => variableList.idxOf v) := by
+  intro v w h
+  apply variablePosition_injective
+  rw [← position_indexed v, ← position_indexed w, h]
+
+private theorem indexed_injective : Function.Injective indexed := by
+  rintro ⟨i, v, r⟩ ⟨j, w, t⟩ h
+  have hi : i = j := congrArg Prod.fst h
+  have hv : v = w := index_injective (congrArg (fun e => e.2.1) h)
+  have hr : r = t := congrArg (fun e => e.2.2) h
+  cases hi; cases hv; cases hr
+  rfl
+
+private theorem indexed_mem (e : ℕ × Variable × Route) (he : e ∈ incidenceRoutes) :
+    indexed e ∈ geometry.incidenceRoutes :=
+  List.mem_map_of_mem (f := indexed) he
+
+private theorem commonEndpoints_indexed (e f : ℕ × Variable × Route) :
+    geometry.commonEndpoints (indexed e) (indexed f) = commonEndpoints e f := by
+  simp only [LocalGeometry.commonEndpoints, LocalIncidence.clauseIndex,
+    LocalIncidence.variableIndex, indexed, commonEndpoints,
+    index_injective.eq_iff, position_indexed]
+  rfl
+
+-- Keep the stronger consecutive-bend certificate used by the planar segment clients.
+private def rowCheck (e : ℕ × Variable × Route) : Prop :=
+  LocalGeometry.RowCheck geometry (indexed e) ∧
   ∀ a ∈ e.2.2.consecutivePairs, ∀ b ∈ e.2.2.consecutivePairs, a ≠ b →
     segmentContactCheck (consecutiveContact a b) a.1 a.2 b.1 b.2 = true
 
-private instance (e : ℕ × Variable × Route) : Decidable (LocalSpec e) :=
+private instance (e : ℕ × Variable × Route) : Decidable (rowCheck e) :=
   inferInstanceAs (Decidable (_ ∧ _))
-
-private def rowCheck (e : ℕ × Variable × Route) : Bool :=
-  decide (LocalSpec e) &&
-  ((incidenceRoutes.all fun f => e == f ||
-      routeContactCheck (commonEndpoints e f) e.2.2 f.2.2) &&
-   ((variableList.all fun v => v == e.2.1 ||
-      routeContactCheck [] e.2.2 [variablePosition v]) &&
-    ((List.finRange 78).all fun i => i.val == e.1 ||
-      routeContactCheck [] e.2.2 [clausePosition i])))
 
 private def routeAt (i : Fin 162) : ℕ × Variable × Route :=
   incidenceRoutes.getD i (0, .center, [])
 
 -- Separate closed certificates keep kernel reduction memory bounded per incidence row.
 
-private theorem row_0 : rowCheck (routeAt 0) = true := by decide +kernel
+private theorem row_0 : rowCheck (routeAt 0) := by decide +kernel
 
-private theorem row_1 : rowCheck (routeAt 1) = true := by decide +kernel
-private theorem row_2 : rowCheck (routeAt 2) = true := by decide +kernel
-private theorem row_3 : rowCheck (routeAt 3) = true := by decide +kernel
-private theorem row_4 : rowCheck (routeAt 4) = true := by decide +kernel
-private theorem row_5 : rowCheck (routeAt 5) = true := by decide +kernel
-private theorem row_6 : rowCheck (routeAt 6) = true := by decide +kernel
-private theorem row_7 : rowCheck (routeAt 7) = true := by decide +kernel
-private theorem row_8 : rowCheck (routeAt 8) = true := by decide +kernel
-private theorem row_9 : rowCheck (routeAt 9) = true := by decide +kernel
-private theorem row_10 : rowCheck (routeAt 10) = true := by decide +kernel
+private theorem row_1 : rowCheck (routeAt 1) := by decide +kernel
+private theorem row_2 : rowCheck (routeAt 2) := by decide +kernel
+private theorem row_3 : rowCheck (routeAt 3) := by decide +kernel
+private theorem row_4 : rowCheck (routeAt 4) := by decide +kernel
+private theorem row_5 : rowCheck (routeAt 5) := by decide +kernel
+private theorem row_6 : rowCheck (routeAt 6) := by decide +kernel
+private theorem row_7 : rowCheck (routeAt 7) := by decide +kernel
+private theorem row_8 : rowCheck (routeAt 8) := by decide +kernel
+private theorem row_9 : rowCheck (routeAt 9) := by decide +kernel
+private theorem row_10 : rowCheck (routeAt 10) := by decide +kernel
 
-private theorem row_11 : rowCheck (routeAt 11) = true := by decide +kernel
-private theorem row_12 : rowCheck (routeAt 12) = true := by decide +kernel
-private theorem row_13 : rowCheck (routeAt 13) = true := by decide +kernel
-private theorem row_14 : rowCheck (routeAt 14) = true := by decide +kernel
-private theorem row_15 : rowCheck (routeAt 15) = true := by decide +kernel
-private theorem row_16 : rowCheck (routeAt 16) = true := by decide +kernel
-private theorem row_17 : rowCheck (routeAt 17) = true := by decide +kernel
-private theorem row_18 : rowCheck (routeAt 18) = true := by decide +kernel
-private theorem row_19 : rowCheck (routeAt 19) = true := by decide +kernel
-private theorem row_20 : rowCheck (routeAt 20) = true := by decide +kernel
+private theorem row_11 : rowCheck (routeAt 11) := by decide +kernel
+private theorem row_12 : rowCheck (routeAt 12) := by decide +kernel
+private theorem row_13 : rowCheck (routeAt 13) := by decide +kernel
+private theorem row_14 : rowCheck (routeAt 14) := by decide +kernel
+private theorem row_15 : rowCheck (routeAt 15) := by decide +kernel
+private theorem row_16 : rowCheck (routeAt 16) := by decide +kernel
+private theorem row_17 : rowCheck (routeAt 17) := by decide +kernel
+private theorem row_18 : rowCheck (routeAt 18) := by decide +kernel
+private theorem row_19 : rowCheck (routeAt 19) := by decide +kernel
+private theorem row_20 : rowCheck (routeAt 20) := by decide +kernel
 
-private theorem row_21 : rowCheck (routeAt 21) = true := by decide +kernel
-private theorem row_22 : rowCheck (routeAt 22) = true := by decide +kernel
-private theorem row_23 : rowCheck (routeAt 23) = true := by decide +kernel
-private theorem row_24 : rowCheck (routeAt 24) = true := by decide +kernel
-private theorem row_25 : rowCheck (routeAt 25) = true := by decide +kernel
-private theorem row_26 : rowCheck (routeAt 26) = true := by decide +kernel
-private theorem row_27 : rowCheck (routeAt 27) = true := by decide +kernel
-private theorem row_28 : rowCheck (routeAt 28) = true := by decide +kernel
-private theorem row_29 : rowCheck (routeAt 29) = true := by decide +kernel
-private theorem row_30 : rowCheck (routeAt 30) = true := by decide +kernel
+private theorem row_21 : rowCheck (routeAt 21) := by decide +kernel
+private theorem row_22 : rowCheck (routeAt 22) := by decide +kernel
+private theorem row_23 : rowCheck (routeAt 23) := by decide +kernel
+private theorem row_24 : rowCheck (routeAt 24) := by decide +kernel
+private theorem row_25 : rowCheck (routeAt 25) := by decide +kernel
+private theorem row_26 : rowCheck (routeAt 26) := by decide +kernel
+private theorem row_27 : rowCheck (routeAt 27) := by decide +kernel
+private theorem row_28 : rowCheck (routeAt 28) := by decide +kernel
+private theorem row_29 : rowCheck (routeAt 29) := by decide +kernel
+private theorem row_30 : rowCheck (routeAt 30) := by decide +kernel
 
-private theorem row_31 : rowCheck (routeAt 31) = true := by decide +kernel
-private theorem row_32 : rowCheck (routeAt 32) = true := by decide +kernel
-private theorem row_33 : rowCheck (routeAt 33) = true := by decide +kernel
-private theorem row_34 : rowCheck (routeAt 34) = true := by decide +kernel
-private theorem row_35 : rowCheck (routeAt 35) = true := by decide +kernel
-private theorem row_36 : rowCheck (routeAt 36) = true := by decide +kernel
-private theorem row_37 : rowCheck (routeAt 37) = true := by decide +kernel
-private theorem row_38 : rowCheck (routeAt 38) = true := by decide +kernel
-private theorem row_39 : rowCheck (routeAt 39) = true := by decide +kernel
-private theorem row_40 : rowCheck (routeAt 40) = true := by decide +kernel
+private theorem row_31 : rowCheck (routeAt 31) := by decide +kernel
+private theorem row_32 : rowCheck (routeAt 32) := by decide +kernel
+private theorem row_33 : rowCheck (routeAt 33) := by decide +kernel
+private theorem row_34 : rowCheck (routeAt 34) := by decide +kernel
+private theorem row_35 : rowCheck (routeAt 35) := by decide +kernel
+private theorem row_36 : rowCheck (routeAt 36) := by decide +kernel
+private theorem row_37 : rowCheck (routeAt 37) := by decide +kernel
+private theorem row_38 : rowCheck (routeAt 38) := by decide +kernel
+private theorem row_39 : rowCheck (routeAt 39) := by decide +kernel
+private theorem row_40 : rowCheck (routeAt 40) := by decide +kernel
 
-private theorem row_41 : rowCheck (routeAt 41) = true := by decide +kernel
-private theorem row_42 : rowCheck (routeAt 42) = true := by decide +kernel
-private theorem row_43 : rowCheck (routeAt 43) = true := by decide +kernel
-private theorem row_44 : rowCheck (routeAt 44) = true := by decide +kernel
-private theorem row_45 : rowCheck (routeAt 45) = true := by decide +kernel
-private theorem row_46 : rowCheck (routeAt 46) = true := by decide +kernel
-private theorem row_47 : rowCheck (routeAt 47) = true := by decide +kernel
-private theorem row_48 : rowCheck (routeAt 48) = true := by decide +kernel
-private theorem row_49 : rowCheck (routeAt 49) = true := by decide +kernel
-private theorem row_50 : rowCheck (routeAt 50) = true := by decide +kernel
+private theorem row_41 : rowCheck (routeAt 41) := by decide +kernel
+private theorem row_42 : rowCheck (routeAt 42) := by decide +kernel
+private theorem row_43 : rowCheck (routeAt 43) := by decide +kernel
+private theorem row_44 : rowCheck (routeAt 44) := by decide +kernel
+private theorem row_45 : rowCheck (routeAt 45) := by decide +kernel
+private theorem row_46 : rowCheck (routeAt 46) := by decide +kernel
+private theorem row_47 : rowCheck (routeAt 47) := by decide +kernel
+private theorem row_48 : rowCheck (routeAt 48) := by decide +kernel
+private theorem row_49 : rowCheck (routeAt 49) := by decide +kernel
+private theorem row_50 : rowCheck (routeAt 50) := by decide +kernel
 
-private theorem row_51 : rowCheck (routeAt 51) = true := by decide +kernel
-private theorem row_52 : rowCheck (routeAt 52) = true := by decide +kernel
-private theorem row_53 : rowCheck (routeAt 53) = true := by decide +kernel
-private theorem row_54 : rowCheck (routeAt 54) = true := by decide +kernel
-private theorem row_55 : rowCheck (routeAt 55) = true := by decide +kernel
-private theorem row_56 : rowCheck (routeAt 56) = true := by decide +kernel
-private theorem row_57 : rowCheck (routeAt 57) = true := by decide +kernel
-private theorem row_58 : rowCheck (routeAt 58) = true := by decide +kernel
-private theorem row_59 : rowCheck (routeAt 59) = true := by decide +kernel
-private theorem row_60 : rowCheck (routeAt 60) = true := by decide +kernel
+private theorem row_51 : rowCheck (routeAt 51) := by decide +kernel
+private theorem row_52 : rowCheck (routeAt 52) := by decide +kernel
+private theorem row_53 : rowCheck (routeAt 53) := by decide +kernel
+private theorem row_54 : rowCheck (routeAt 54) := by decide +kernel
+private theorem row_55 : rowCheck (routeAt 55) := by decide +kernel
+private theorem row_56 : rowCheck (routeAt 56) := by decide +kernel
+private theorem row_57 : rowCheck (routeAt 57) := by decide +kernel
+private theorem row_58 : rowCheck (routeAt 58) := by decide +kernel
+private theorem row_59 : rowCheck (routeAt 59) := by decide +kernel
+private theorem row_60 : rowCheck (routeAt 60) := by decide +kernel
 
-private theorem row_61 : rowCheck (routeAt 61) = true := by decide +kernel
-private theorem row_62 : rowCheck (routeAt 62) = true := by decide +kernel
-private theorem row_63 : rowCheck (routeAt 63) = true := by decide +kernel
-private theorem row_64 : rowCheck (routeAt 64) = true := by decide +kernel
-private theorem row_65 : rowCheck (routeAt 65) = true := by decide +kernel
-private theorem row_66 : rowCheck (routeAt 66) = true := by decide +kernel
-private theorem row_67 : rowCheck (routeAt 67) = true := by decide +kernel
-private theorem row_68 : rowCheck (routeAt 68) = true := by decide +kernel
-private theorem row_69 : rowCheck (routeAt 69) = true := by decide +kernel
-private theorem row_70 : rowCheck (routeAt 70) = true := by decide +kernel
+private theorem row_61 : rowCheck (routeAt 61) := by decide +kernel
+private theorem row_62 : rowCheck (routeAt 62) := by decide +kernel
+private theorem row_63 : rowCheck (routeAt 63) := by decide +kernel
+private theorem row_64 : rowCheck (routeAt 64) := by decide +kernel
+private theorem row_65 : rowCheck (routeAt 65) := by decide +kernel
+private theorem row_66 : rowCheck (routeAt 66) := by decide +kernel
+private theorem row_67 : rowCheck (routeAt 67) := by decide +kernel
+private theorem row_68 : rowCheck (routeAt 68) := by decide +kernel
+private theorem row_69 : rowCheck (routeAt 69) := by decide +kernel
+private theorem row_70 : rowCheck (routeAt 70) := by decide +kernel
 
-private theorem row_71 : rowCheck (routeAt 71) = true := by decide +kernel
-private theorem row_72 : rowCheck (routeAt 72) = true := by decide +kernel
-private theorem row_73 : rowCheck (routeAt 73) = true := by decide +kernel
-private theorem row_74 : rowCheck (routeAt 74) = true := by decide +kernel
-private theorem row_75 : rowCheck (routeAt 75) = true := by decide +kernel
-private theorem row_76 : rowCheck (routeAt 76) = true := by decide +kernel
-private theorem row_77 : rowCheck (routeAt 77) = true := by decide +kernel
-private theorem row_78 : rowCheck (routeAt 78) = true := by decide +kernel
-private theorem row_79 : rowCheck (routeAt 79) = true := by decide +kernel
-private theorem row_80 : rowCheck (routeAt 80) = true := by decide +kernel
+private theorem row_71 : rowCheck (routeAt 71) := by decide +kernel
+private theorem row_72 : rowCheck (routeAt 72) := by decide +kernel
+private theorem row_73 : rowCheck (routeAt 73) := by decide +kernel
+private theorem row_74 : rowCheck (routeAt 74) := by decide +kernel
+private theorem row_75 : rowCheck (routeAt 75) := by decide +kernel
+private theorem row_76 : rowCheck (routeAt 76) := by decide +kernel
+private theorem row_77 : rowCheck (routeAt 77) := by decide +kernel
+private theorem row_78 : rowCheck (routeAt 78) := by decide +kernel
+private theorem row_79 : rowCheck (routeAt 79) := by decide +kernel
+private theorem row_80 : rowCheck (routeAt 80) := by decide +kernel
 
-private theorem row_81 : rowCheck (routeAt 81) = true := by decide +kernel
-private theorem row_82 : rowCheck (routeAt 82) = true := by decide +kernel
-private theorem row_83 : rowCheck (routeAt 83) = true := by decide +kernel
-private theorem row_84 : rowCheck (routeAt 84) = true := by decide +kernel
-private theorem row_85 : rowCheck (routeAt 85) = true := by decide +kernel
-private theorem row_86 : rowCheck (routeAt 86) = true := by decide +kernel
-private theorem row_87 : rowCheck (routeAt 87) = true := by decide +kernel
-private theorem row_88 : rowCheck (routeAt 88) = true := by decide +kernel
-private theorem row_89 : rowCheck (routeAt 89) = true := by decide +kernel
-private theorem row_90 : rowCheck (routeAt 90) = true := by decide +kernel
+private theorem row_81 : rowCheck (routeAt 81) := by decide +kernel
+private theorem row_82 : rowCheck (routeAt 82) := by decide +kernel
+private theorem row_83 : rowCheck (routeAt 83) := by decide +kernel
+private theorem row_84 : rowCheck (routeAt 84) := by decide +kernel
+private theorem row_85 : rowCheck (routeAt 85) := by decide +kernel
+private theorem row_86 : rowCheck (routeAt 86) := by decide +kernel
+private theorem row_87 : rowCheck (routeAt 87) := by decide +kernel
+private theorem row_88 : rowCheck (routeAt 88) := by decide +kernel
+private theorem row_89 : rowCheck (routeAt 89) := by decide +kernel
+private theorem row_90 : rowCheck (routeAt 90) := by decide +kernel
 
-private theorem row_91 : rowCheck (routeAt 91) = true := by decide +kernel
-private theorem row_92 : rowCheck (routeAt 92) = true := by decide +kernel
-private theorem row_93 : rowCheck (routeAt 93) = true := by decide +kernel
-private theorem row_94 : rowCheck (routeAt 94) = true := by decide +kernel
-private theorem row_95 : rowCheck (routeAt 95) = true := by decide +kernel
-private theorem row_96 : rowCheck (routeAt 96) = true := by decide +kernel
-private theorem row_97 : rowCheck (routeAt 97) = true := by decide +kernel
-private theorem row_98 : rowCheck (routeAt 98) = true := by decide +kernel
-private theorem row_99 : rowCheck (routeAt 99) = true := by decide +kernel
-private theorem row_100 : rowCheck (routeAt 100) = true := by decide +kernel
+private theorem row_91 : rowCheck (routeAt 91) := by decide +kernel
+private theorem row_92 : rowCheck (routeAt 92) := by decide +kernel
+private theorem row_93 : rowCheck (routeAt 93) := by decide +kernel
+private theorem row_94 : rowCheck (routeAt 94) := by decide +kernel
+private theorem row_95 : rowCheck (routeAt 95) := by decide +kernel
+private theorem row_96 : rowCheck (routeAt 96) := by decide +kernel
+private theorem row_97 : rowCheck (routeAt 97) := by decide +kernel
+private theorem row_98 : rowCheck (routeAt 98) := by decide +kernel
+private theorem row_99 : rowCheck (routeAt 99) := by decide +kernel
+private theorem row_100 : rowCheck (routeAt 100) := by decide +kernel
 
-private theorem row_101 : rowCheck (routeAt 101) = true := by decide +kernel
-private theorem row_102 : rowCheck (routeAt 102) = true := by decide +kernel
-private theorem row_103 : rowCheck (routeAt 103) = true := by decide +kernel
-private theorem row_104 : rowCheck (routeAt 104) = true := by decide +kernel
-private theorem row_105 : rowCheck (routeAt 105) = true := by decide +kernel
-private theorem row_106 : rowCheck (routeAt 106) = true := by decide +kernel
-private theorem row_107 : rowCheck (routeAt 107) = true := by decide +kernel
-private theorem row_108 : rowCheck (routeAt 108) = true := by decide +kernel
-private theorem row_109 : rowCheck (routeAt 109) = true := by decide +kernel
-private theorem row_110 : rowCheck (routeAt 110) = true := by decide +kernel
+private theorem row_101 : rowCheck (routeAt 101) := by decide +kernel
+private theorem row_102 : rowCheck (routeAt 102) := by decide +kernel
+private theorem row_103 : rowCheck (routeAt 103) := by decide +kernel
+private theorem row_104 : rowCheck (routeAt 104) := by decide +kernel
+private theorem row_105 : rowCheck (routeAt 105) := by decide +kernel
+private theorem row_106 : rowCheck (routeAt 106) := by decide +kernel
+private theorem row_107 : rowCheck (routeAt 107) := by decide +kernel
+private theorem row_108 : rowCheck (routeAt 108) := by decide +kernel
+private theorem row_109 : rowCheck (routeAt 109) := by decide +kernel
+private theorem row_110 : rowCheck (routeAt 110) := by decide +kernel
 
-private theorem row_111 : rowCheck (routeAt 111) = true := by decide +kernel
-private theorem row_112 : rowCheck (routeAt 112) = true := by decide +kernel
-private theorem row_113 : rowCheck (routeAt 113) = true := by decide +kernel
-private theorem row_114 : rowCheck (routeAt 114) = true := by decide +kernel
-private theorem row_115 : rowCheck (routeAt 115) = true := by decide +kernel
-private theorem row_116 : rowCheck (routeAt 116) = true := by decide +kernel
-private theorem row_117 : rowCheck (routeAt 117) = true := by decide +kernel
-private theorem row_118 : rowCheck (routeAt 118) = true := by decide +kernel
-private theorem row_119 : rowCheck (routeAt 119) = true := by decide +kernel
-private theorem row_120 : rowCheck (routeAt 120) = true := by decide +kernel
+private theorem row_111 : rowCheck (routeAt 111) := by decide +kernel
+private theorem row_112 : rowCheck (routeAt 112) := by decide +kernel
+private theorem row_113 : rowCheck (routeAt 113) := by decide +kernel
+private theorem row_114 : rowCheck (routeAt 114) := by decide +kernel
+private theorem row_115 : rowCheck (routeAt 115) := by decide +kernel
+private theorem row_116 : rowCheck (routeAt 116) := by decide +kernel
+private theorem row_117 : rowCheck (routeAt 117) := by decide +kernel
+private theorem row_118 : rowCheck (routeAt 118) := by decide +kernel
+private theorem row_119 : rowCheck (routeAt 119) := by decide +kernel
+private theorem row_120 : rowCheck (routeAt 120) := by decide +kernel
 
-private theorem row_121 : rowCheck (routeAt 121) = true := by decide +kernel
-private theorem row_122 : rowCheck (routeAt 122) = true := by decide +kernel
-private theorem row_123 : rowCheck (routeAt 123) = true := by decide +kernel
-private theorem row_124 : rowCheck (routeAt 124) = true := by decide +kernel
-private theorem row_125 : rowCheck (routeAt 125) = true := by decide +kernel
-private theorem row_126 : rowCheck (routeAt 126) = true := by decide +kernel
-private theorem row_127 : rowCheck (routeAt 127) = true := by decide +kernel
-private theorem row_128 : rowCheck (routeAt 128) = true := by decide +kernel
-private theorem row_129 : rowCheck (routeAt 129) = true := by decide +kernel
-private theorem row_130 : rowCheck (routeAt 130) = true := by decide +kernel
+private theorem row_121 : rowCheck (routeAt 121) := by decide +kernel
+private theorem row_122 : rowCheck (routeAt 122) := by decide +kernel
+private theorem row_123 : rowCheck (routeAt 123) := by decide +kernel
+private theorem row_124 : rowCheck (routeAt 124) := by decide +kernel
+private theorem row_125 : rowCheck (routeAt 125) := by decide +kernel
+private theorem row_126 : rowCheck (routeAt 126) := by decide +kernel
+private theorem row_127 : rowCheck (routeAt 127) := by decide +kernel
+private theorem row_128 : rowCheck (routeAt 128) := by decide +kernel
+private theorem row_129 : rowCheck (routeAt 129) := by decide +kernel
+private theorem row_130 : rowCheck (routeAt 130) := by decide +kernel
 
-private theorem row_131 : rowCheck (routeAt 131) = true := by decide +kernel
-private theorem row_132 : rowCheck (routeAt 132) = true := by decide +kernel
-private theorem row_133 : rowCheck (routeAt 133) = true := by decide +kernel
-private theorem row_134 : rowCheck (routeAt 134) = true := by decide +kernel
-private theorem row_135 : rowCheck (routeAt 135) = true := by decide +kernel
-private theorem row_136 : rowCheck (routeAt 136) = true := by decide +kernel
-private theorem row_137 : rowCheck (routeAt 137) = true := by decide +kernel
-private theorem row_138 : rowCheck (routeAt 138) = true := by decide +kernel
-private theorem row_139 : rowCheck (routeAt 139) = true := by decide +kernel
-private theorem row_140 : rowCheck (routeAt 140) = true := by decide +kernel
+private theorem row_131 : rowCheck (routeAt 131) := by decide +kernel
+private theorem row_132 : rowCheck (routeAt 132) := by decide +kernel
+private theorem row_133 : rowCheck (routeAt 133) := by decide +kernel
+private theorem row_134 : rowCheck (routeAt 134) := by decide +kernel
+private theorem row_135 : rowCheck (routeAt 135) := by decide +kernel
+private theorem row_136 : rowCheck (routeAt 136) := by decide +kernel
+private theorem row_137 : rowCheck (routeAt 137) := by decide +kernel
+private theorem row_138 : rowCheck (routeAt 138) := by decide +kernel
+private theorem row_139 : rowCheck (routeAt 139) := by decide +kernel
+private theorem row_140 : rowCheck (routeAt 140) := by decide +kernel
 
-private theorem row_141 : rowCheck (routeAt 141) = true := by decide +kernel
-private theorem row_142 : rowCheck (routeAt 142) = true := by decide +kernel
-private theorem row_143 : rowCheck (routeAt 143) = true := by decide +kernel
-private theorem row_144 : rowCheck (routeAt 144) = true := by decide +kernel
-private theorem row_145 : rowCheck (routeAt 145) = true := by decide +kernel
-private theorem row_146 : rowCheck (routeAt 146) = true := by decide +kernel
-private theorem row_147 : rowCheck (routeAt 147) = true := by decide +kernel
-private theorem row_148 : rowCheck (routeAt 148) = true := by decide +kernel
-private theorem row_149 : rowCheck (routeAt 149) = true := by decide +kernel
-private theorem row_150 : rowCheck (routeAt 150) = true := by decide +kernel
+private theorem row_141 : rowCheck (routeAt 141) := by decide +kernel
+private theorem row_142 : rowCheck (routeAt 142) := by decide +kernel
+private theorem row_143 : rowCheck (routeAt 143) := by decide +kernel
+private theorem row_144 : rowCheck (routeAt 144) := by decide +kernel
+private theorem row_145 : rowCheck (routeAt 145) := by decide +kernel
+private theorem row_146 : rowCheck (routeAt 146) := by decide +kernel
+private theorem row_147 : rowCheck (routeAt 147) := by decide +kernel
+private theorem row_148 : rowCheck (routeAt 148) := by decide +kernel
+private theorem row_149 : rowCheck (routeAt 149) := by decide +kernel
+private theorem row_150 : rowCheck (routeAt 150) := by decide +kernel
 
-private theorem row_151 : rowCheck (routeAt 151) = true := by decide +kernel
-private theorem row_152 : rowCheck (routeAt 152) = true := by decide +kernel
-private theorem row_153 : rowCheck (routeAt 153) = true := by decide +kernel
+private theorem row_151 : rowCheck (routeAt 151) := by decide +kernel
+private theorem row_152 : rowCheck (routeAt 152) := by decide +kernel
+private theorem row_153 : rowCheck (routeAt 153) := by decide +kernel
 
-private theorem row_154 : rowCheck (routeAt 154) = true := by decide +kernel
-private theorem row_155 : rowCheck (routeAt 155) = true := by decide +kernel
-private theorem row_156 : rowCheck (routeAt 156) = true := by decide +kernel
-private theorem row_157 : rowCheck (routeAt 157) = true := by decide +kernel
-private theorem row_158 : rowCheck (routeAt 158) = true := by decide +kernel
-private theorem row_159 : rowCheck (routeAt 159) = true := by decide +kernel
-private theorem row_160 : rowCheck (routeAt 160) = true := by decide +kernel
-private theorem row_161 : rowCheck (routeAt 161) = true := by decide +kernel
+private theorem row_154 : rowCheck (routeAt 154) := by decide +kernel
+private theorem row_155 : rowCheck (routeAt 155) := by decide +kernel
+private theorem row_156 : rowCheck (routeAt 156) := by decide +kernel
+private theorem row_157 : rowCheck (routeAt 157) := by decide +kernel
+private theorem row_158 : rowCheck (routeAt 158) := by decide +kernel
+private theorem row_159 : rowCheck (routeAt 159) := by decide +kernel
+private theorem row_160 : rowCheck (routeAt 160) := by decide +kernel
+private theorem row_161 : rowCheck (routeAt 161) := by decide +kernel
 
 -- Keep dispatch proofs small as well as the individual kernel certificates. In particular,
 -- no theorem elaborates the full 162-case split: six rows form a block, then 27 blocks cover all.
 private def blockIndex (q : Fin 27) (r : Fin 6) : Fin 162 :=
   ⟨q.val * 6 + r.val, by omega⟩
 
-private theorem block_0 (r : Fin 6) : rowCheck (routeAt (blockIndex 0 r)) = true := by
+private theorem block_0 (r : Fin 6) : rowCheck (routeAt (blockIndex 0 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (0 : Fin 162)
     exact row_0
@@ -312,7 +344,7 @@ private theorem block_0 (r : Fin 6) : rowCheck (routeAt (blockIndex 0 r)) = true
   · conv_lhs => arg 1; arg 1; change (5 : Fin 162)
     exact row_5
 
-private theorem block_1 (r : Fin 6) : rowCheck (routeAt (blockIndex 1 r)) = true := by
+private theorem block_1 (r : Fin 6) : rowCheck (routeAt (blockIndex 1 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (6 : Fin 162)
     exact row_6
@@ -327,7 +359,7 @@ private theorem block_1 (r : Fin 6) : rowCheck (routeAt (blockIndex 1 r)) = true
   · conv_lhs => arg 1; arg 1; change (11 : Fin 162)
     exact row_11
 
-private theorem block_2 (r : Fin 6) : rowCheck (routeAt (blockIndex 2 r)) = true := by
+private theorem block_2 (r : Fin 6) : rowCheck (routeAt (blockIndex 2 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (12 : Fin 162)
     exact row_12
@@ -342,7 +374,7 @@ private theorem block_2 (r : Fin 6) : rowCheck (routeAt (blockIndex 2 r)) = true
   · conv_lhs => arg 1; arg 1; change (17 : Fin 162)
     exact row_17
 
-private theorem block_3 (r : Fin 6) : rowCheck (routeAt (blockIndex 3 r)) = true := by
+private theorem block_3 (r : Fin 6) : rowCheck (routeAt (blockIndex 3 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (18 : Fin 162)
     exact row_18
@@ -357,7 +389,7 @@ private theorem block_3 (r : Fin 6) : rowCheck (routeAt (blockIndex 3 r)) = true
   · conv_lhs => arg 1; arg 1; change (23 : Fin 162)
     exact row_23
 
-private theorem block_4 (r : Fin 6) : rowCheck (routeAt (blockIndex 4 r)) = true := by
+private theorem block_4 (r : Fin 6) : rowCheck (routeAt (blockIndex 4 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (24 : Fin 162)
     exact row_24
@@ -372,7 +404,7 @@ private theorem block_4 (r : Fin 6) : rowCheck (routeAt (blockIndex 4 r)) = true
   · conv_lhs => arg 1; arg 1; change (29 : Fin 162)
     exact row_29
 
-private theorem block_5 (r : Fin 6) : rowCheck (routeAt (blockIndex 5 r)) = true := by
+private theorem block_5 (r : Fin 6) : rowCheck (routeAt (blockIndex 5 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (30 : Fin 162)
     exact row_30
@@ -387,7 +419,7 @@ private theorem block_5 (r : Fin 6) : rowCheck (routeAt (blockIndex 5 r)) = true
   · conv_lhs => arg 1; arg 1; change (35 : Fin 162)
     exact row_35
 
-private theorem block_6 (r : Fin 6) : rowCheck (routeAt (blockIndex 6 r)) = true := by
+private theorem block_6 (r : Fin 6) : rowCheck (routeAt (blockIndex 6 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (36 : Fin 162)
     exact row_36
@@ -402,7 +434,7 @@ private theorem block_6 (r : Fin 6) : rowCheck (routeAt (blockIndex 6 r)) = true
   · conv_lhs => arg 1; arg 1; change (41 : Fin 162)
     exact row_41
 
-private theorem block_7 (r : Fin 6) : rowCheck (routeAt (blockIndex 7 r)) = true := by
+private theorem block_7 (r : Fin 6) : rowCheck (routeAt (blockIndex 7 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (42 : Fin 162)
     exact row_42
@@ -417,7 +449,7 @@ private theorem block_7 (r : Fin 6) : rowCheck (routeAt (blockIndex 7 r)) = true
   · conv_lhs => arg 1; arg 1; change (47 : Fin 162)
     exact row_47
 
-private theorem block_8 (r : Fin 6) : rowCheck (routeAt (blockIndex 8 r)) = true := by
+private theorem block_8 (r : Fin 6) : rowCheck (routeAt (blockIndex 8 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (48 : Fin 162)
     exact row_48
@@ -432,7 +464,7 @@ private theorem block_8 (r : Fin 6) : rowCheck (routeAt (blockIndex 8 r)) = true
   · conv_lhs => arg 1; arg 1; change (53 : Fin 162)
     exact row_53
 
-private theorem block_9 (r : Fin 6) : rowCheck (routeAt (blockIndex 9 r)) = true := by
+private theorem block_9 (r : Fin 6) : rowCheck (routeAt (blockIndex 9 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (54 : Fin 162)
     exact row_54
@@ -447,7 +479,7 @@ private theorem block_9 (r : Fin 6) : rowCheck (routeAt (blockIndex 9 r)) = true
   · conv_lhs => arg 1; arg 1; change (59 : Fin 162)
     exact row_59
 
-private theorem block_10 (r : Fin 6) : rowCheck (routeAt (blockIndex 10 r)) = true := by
+private theorem block_10 (r : Fin 6) : rowCheck (routeAt (blockIndex 10 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (60 : Fin 162)
     exact row_60
@@ -462,7 +494,7 @@ private theorem block_10 (r : Fin 6) : rowCheck (routeAt (blockIndex 10 r)) = tr
   · conv_lhs => arg 1; arg 1; change (65 : Fin 162)
     exact row_65
 
-private theorem block_11 (r : Fin 6) : rowCheck (routeAt (blockIndex 11 r)) = true := by
+private theorem block_11 (r : Fin 6) : rowCheck (routeAt (blockIndex 11 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (66 : Fin 162)
     exact row_66
@@ -477,7 +509,7 @@ private theorem block_11 (r : Fin 6) : rowCheck (routeAt (blockIndex 11 r)) = tr
   · conv_lhs => arg 1; arg 1; change (71 : Fin 162)
     exact row_71
 
-private theorem block_12 (r : Fin 6) : rowCheck (routeAt (blockIndex 12 r)) = true := by
+private theorem block_12 (r : Fin 6) : rowCheck (routeAt (blockIndex 12 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (72 : Fin 162)
     exact row_72
@@ -492,7 +524,7 @@ private theorem block_12 (r : Fin 6) : rowCheck (routeAt (blockIndex 12 r)) = tr
   · conv_lhs => arg 1; arg 1; change (77 : Fin 162)
     exact row_77
 
-private theorem block_13 (r : Fin 6) : rowCheck (routeAt (blockIndex 13 r)) = true := by
+private theorem block_13 (r : Fin 6) : rowCheck (routeAt (blockIndex 13 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (78 : Fin 162)
     exact row_78
@@ -507,7 +539,7 @@ private theorem block_13 (r : Fin 6) : rowCheck (routeAt (blockIndex 13 r)) = tr
   · conv_lhs => arg 1; arg 1; change (83 : Fin 162)
     exact row_83
 
-private theorem block_14 (r : Fin 6) : rowCheck (routeAt (blockIndex 14 r)) = true := by
+private theorem block_14 (r : Fin 6) : rowCheck (routeAt (blockIndex 14 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (84 : Fin 162)
     exact row_84
@@ -522,7 +554,7 @@ private theorem block_14 (r : Fin 6) : rowCheck (routeAt (blockIndex 14 r)) = tr
   · conv_lhs => arg 1; arg 1; change (89 : Fin 162)
     exact row_89
 
-private theorem block_15 (r : Fin 6) : rowCheck (routeAt (blockIndex 15 r)) = true := by
+private theorem block_15 (r : Fin 6) : rowCheck (routeAt (blockIndex 15 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (90 : Fin 162)
     exact row_90
@@ -537,7 +569,7 @@ private theorem block_15 (r : Fin 6) : rowCheck (routeAt (blockIndex 15 r)) = tr
   · conv_lhs => arg 1; arg 1; change (95 : Fin 162)
     exact row_95
 
-private theorem block_16 (r : Fin 6) : rowCheck (routeAt (blockIndex 16 r)) = true := by
+private theorem block_16 (r : Fin 6) : rowCheck (routeAt (blockIndex 16 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (96 : Fin 162)
     exact row_96
@@ -552,7 +584,7 @@ private theorem block_16 (r : Fin 6) : rowCheck (routeAt (blockIndex 16 r)) = tr
   · conv_lhs => arg 1; arg 1; change (101 : Fin 162)
     exact row_101
 
-private theorem block_17 (r : Fin 6) : rowCheck (routeAt (blockIndex 17 r)) = true := by
+private theorem block_17 (r : Fin 6) : rowCheck (routeAt (blockIndex 17 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (102 : Fin 162)
     exact row_102
@@ -567,7 +599,7 @@ private theorem block_17 (r : Fin 6) : rowCheck (routeAt (blockIndex 17 r)) = tr
   · conv_lhs => arg 1; arg 1; change (107 : Fin 162)
     exact row_107
 
-private theorem block_18 (r : Fin 6) : rowCheck (routeAt (blockIndex 18 r)) = true := by
+private theorem block_18 (r : Fin 6) : rowCheck (routeAt (blockIndex 18 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (108 : Fin 162)
     exact row_108
@@ -582,7 +614,7 @@ private theorem block_18 (r : Fin 6) : rowCheck (routeAt (blockIndex 18 r)) = tr
   · conv_lhs => arg 1; arg 1; change (113 : Fin 162)
     exact row_113
 
-private theorem block_19 (r : Fin 6) : rowCheck (routeAt (blockIndex 19 r)) = true := by
+private theorem block_19 (r : Fin 6) : rowCheck (routeAt (blockIndex 19 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (114 : Fin 162)
     exact row_114
@@ -597,7 +629,7 @@ private theorem block_19 (r : Fin 6) : rowCheck (routeAt (blockIndex 19 r)) = tr
   · conv_lhs => arg 1; arg 1; change (119 : Fin 162)
     exact row_119
 
-private theorem block_20 (r : Fin 6) : rowCheck (routeAt (blockIndex 20 r)) = true := by
+private theorem block_20 (r : Fin 6) : rowCheck (routeAt (blockIndex 20 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (120 : Fin 162)
     exact row_120
@@ -612,7 +644,7 @@ private theorem block_20 (r : Fin 6) : rowCheck (routeAt (blockIndex 20 r)) = tr
   · conv_lhs => arg 1; arg 1; change (125 : Fin 162)
     exact row_125
 
-private theorem block_21 (r : Fin 6) : rowCheck (routeAt (blockIndex 21 r)) = true := by
+private theorem block_21 (r : Fin 6) : rowCheck (routeAt (blockIndex 21 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (126 : Fin 162)
     exact row_126
@@ -627,7 +659,7 @@ private theorem block_21 (r : Fin 6) : rowCheck (routeAt (blockIndex 21 r)) = tr
   · conv_lhs => arg 1; arg 1; change (131 : Fin 162)
     exact row_131
 
-private theorem block_22 (r : Fin 6) : rowCheck (routeAt (blockIndex 22 r)) = true := by
+private theorem block_22 (r : Fin 6) : rowCheck (routeAt (blockIndex 22 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (132 : Fin 162)
     exact row_132
@@ -642,7 +674,7 @@ private theorem block_22 (r : Fin 6) : rowCheck (routeAt (blockIndex 22 r)) = tr
   · conv_lhs => arg 1; arg 1; change (137 : Fin 162)
     exact row_137
 
-private theorem block_23 (r : Fin 6) : rowCheck (routeAt (blockIndex 23 r)) = true := by
+private theorem block_23 (r : Fin 6) : rowCheck (routeAt (blockIndex 23 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (138 : Fin 162)
     exact row_138
@@ -657,7 +689,7 @@ private theorem block_23 (r : Fin 6) : rowCheck (routeAt (blockIndex 23 r)) = tr
   · conv_lhs => arg 1; arg 1; change (143 : Fin 162)
     exact row_143
 
-private theorem block_24 (r : Fin 6) : rowCheck (routeAt (blockIndex 24 r)) = true := by
+private theorem block_24 (r : Fin 6) : rowCheck (routeAt (blockIndex 24 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (144 : Fin 162)
     exact row_144
@@ -672,7 +704,7 @@ private theorem block_24 (r : Fin 6) : rowCheck (routeAt (blockIndex 24 r)) = tr
   · conv_lhs => arg 1; arg 1; change (149 : Fin 162)
     exact row_149
 
-private theorem block_25 (r : Fin 6) : rowCheck (routeAt (blockIndex 25 r)) = true := by
+private theorem block_25 (r : Fin 6) : rowCheck (routeAt (blockIndex 25 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (150 : Fin 162)
     exact row_150
@@ -687,7 +719,7 @@ private theorem block_25 (r : Fin 6) : rowCheck (routeAt (blockIndex 25 r)) = tr
   · conv_lhs => arg 1; arg 1; change (155 : Fin 162)
     exact row_155
 
-private theorem block_26 (r : Fin 6) : rowCheck (routeAt (blockIndex 26 r)) = true := by
+private theorem block_26 (r : Fin 6) : rowCheck (routeAt (blockIndex 26 r)) := by
   fin_cases r
   · conv_lhs => arg 1; arg 1; change (156 : Fin 162)
     exact row_156
@@ -703,7 +735,7 @@ private theorem block_26 (r : Fin 6) : rowCheck (routeAt (blockIndex 26 r)) = tr
     exact row_161
 
 private theorem blocks_checked (q : Fin 27) (r : Fin 6) :
-    rowCheck (routeAt (blockIndex q r)) = true := by
+    rowCheck (routeAt (blockIndex q r)) := by
   fin_cases q
   · exact block_0 r
   · exact block_1 r
@@ -733,7 +765,7 @@ private theorem blocks_checked (q : Fin 27) (r : Fin 6) :
   · exact block_25 r
   · exact block_26 r
 
-private theorem rows_checked (i : Fin 162) : rowCheck (routeAt i) = true := by
+private theorem rows_checked (i : Fin 162) : rowCheck (routeAt i) := by
   let q : Fin 27 := ⟨i.val / 6, by omega⟩
   let r : Fin 6 := ⟨i.val % 6, by omega⟩
   have heq : blockIndex q r = i := by
@@ -744,7 +776,7 @@ private theorem rows_checked (i : Fin 162) : rowCheck (routeAt i) = true := by
   rwa [heq] at h
 
 private theorem row_checked (e : ℕ × Variable × Route) (he : e ∈ incidenceRoutes) :
-    rowCheck e = true := by
+    rowCheck e := by
   obtain ⟨i, rfl⟩ := List.mem_iff_get.mp he
   have hi : i.val < 162 := by simpa only [drawing_sizes.2] using i.isLt
   have h := rows_checked ⟨i.val, hi⟩
@@ -752,27 +784,36 @@ private theorem row_checked (e : ℕ × Variable × Route) (he : e ∈ incidence
     List.getD_eq_get incidenceRoutes (0, .center, []) i
   rwa [heq] at h
 
-private theorem local_checked (e : ℕ × Variable × Route) (he : e ∈ incidenceRoutes) :
-    LocalSpec e := by
-  have h := row_checked e he
-  simp only [rowCheck, Bool.and_eq_true, decide_eq_true_eq] at h
-  exact h.1
+/-- Complete local certificate, assembled without a whole-table kernel computation. -/
+theorem geometry_check : LocalGeometry.Check geometry := by
+  apply LocalGeometry.check_of_rows
+  · decide +kernel
+  · decide +kernel
+  · rfl
+  · rfl
+  · intro e he
+    obtain ⟨e, he, rfl⟩ := List.mem_map.mp he
+    exact (row_checked e he).1
+  · decide +kernel
 
 /-- Every route starts at its clause and ends at its variable, with a valid clause index. -/
 theorem incidence_endpoints : ∀ e ∈ incidenceRoutes,
     e.1 < 78 ∧ e.2.2.head? = some (clausePosition e.1) ∧
-      e.2.2.getLast? = some (variablePosition e.2.1) :=
-  fun e he => (local_checked e he).1
+      e.2.2.getLast? = some (variablePosition e.2.1) := by
+  intro e he
+  have h := LocalGeometry.incidence_endpoints geometry_check (indexed_mem e he)
+  exact ⟨h.1, h.2.2.1, by
+    simpa only [indexed, LocalIncidence.variableIndex, position_indexed] using h.2.2.2⟩
 
 /-- All incidence routes have proper axis-aligned segments. -/
 theorem incidence_orthogonal :
     ∀ e ∈ incidenceRoutes, IsOrthogonal e.2.2 :=
-  fun e he => (local_checked e he).2.1
+  fun e he => LocalGeometry.incidence_orthogonal geometry_check (indexed_mem e he)
 
 /-- All listed core points are inside the smaller rectangle `[20,220]²`. -/
 theorem core_bounds : ∀ e ∈ incidenceRoutes, ∀ p ∈ e.2.2,
     20 ≤ p.1 ∧ p.1 ≤ 220 ∧ 20 ≤ p.2 ∧ p.2 ≤ 220 :=
-  fun e he => (local_checked e he).2.2.1
+  fun e he => (row_checked e he).1.1.2.2.2.2.2.2
 
 /-- Exactly 407 proper segments and 2192 units of total Manhattan wire length. -/
 theorem route_sizes :
@@ -781,40 +822,36 @@ theorem route_sizes :
 
 /-- Every incidence route lists each bend only once. -/
 theorem incidence_points_nodup : ∀ e ∈ incidenceRoutes, e.2.2.Nodup :=
-  fun e he => (local_checked e he).2.2.2.1
+  fun e he => (row_checked e he).1.1.2.2.2.2.2.1.1
 
 /-- Finite simplicity certificate: distinct segments are disjoint except at a shared next bend. -/
 theorem incidence_simple_check : ∀ e ∈ incidenceRoutes,
     ∀ a ∈ e.2.2.consecutivePairs, ∀ b ∈ e.2.2.consecutivePairs, a ≠ b →
       segmentContactCheck (consecutiveContact a b) a.1 a.2 b.1 b.2 = true :=
-  fun e he => (local_checked e he).2.2.2.2
+  fun e he => (row_checked e he).2
 
 /-- Exhaustive finite contact certificate for the fixed route table. -/
 theorem routes_contact_check : ∀ e ∈ incidenceRoutes, ∀ f ∈ incidenceRoutes,
     e ≠ f → routeContactCheck (commonEndpoints e f) e.2.2 f.2.2 = true := by
   intro e he f hf hne
-  have h := row_checked e he
-  simp only [rowCheck, Bool.and_eq_true] at h
-  have hf' := List.all_eq_true.mp h.2.1 f hf
-  simpa only [Bool.or_eq_true, beq_iff_eq, hne, false_or] using hf'
+  have h := (row_checked e he).1.2.1 (indexed f) (indexed_mem f hf)
+    (fun h => hne (indexed_injective h))
+  simpa only [commonEndpoints_indexed, indexed, LocalIncidence.route] using h
 
 /-- No route visits a nonincident variable vertex. -/
 theorem variable_avoidance_check : ∀ e ∈ incidenceRoutes, ∀ v,
     v ≠ e.2.1 → routeContactCheck [] e.2.2 [variablePosition v] = true := by
   intro e he v hv
-  have h := row_checked e he
-  simp only [rowCheck, Bool.and_eq_true] at h
-  have hv' := List.all_eq_true.mp h.2.2.1 v (mem_variableList v)
-  simpa only [Bool.or_eq_true, beq_iff_eq, hv, false_or] using hv'
+  have hi := index_lt v
+  have h := (row_checked e he).1.2.2.1 ⟨variableList.idxOf v, hi⟩
+    (fun h => hv (index_injective h))
+  simpa only [indexed, LocalIncidence.route, position_indexed] using h
 
 /-- No route visits a nonincident clause vertex. -/
 theorem clause_avoidance_check : ∀ e ∈ incidenceRoutes, ∀ i : Fin 78,
     i.val ≠ e.1 → routeContactCheck [] e.2.2 [clausePosition i] = true := by
   intro e he i hi
-  have h := row_checked e he
-  simp only [rowCheck, Bool.and_eq_true] at h
-  have hi' := List.all_eq_true.mp h.2.2.2 i (List.mem_finRange i)
-  simpa only [Bool.or_eq_true, beq_iff_eq, hi, false_or] using hi'
+  exact (row_checked e he).1.2.2.2 i hi
 
 /-- All eight access routes have their prescribed endpoints and proper orthogonal segments. -/
 theorem access_endpoints : ∀ s l, IsOrthogonal (accessRoute s l) ∧
