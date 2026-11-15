@@ -83,10 +83,10 @@ actually composed into the executed machine.
 
 * `Turing.MultiTapePTM.Internal.OpenRunPath.space_le_mul_time_add_one`: the generic clocked
   workspace bound.
-* `Turing.MultiTapePTM.Internal.NativeOracleProgram.description_eq_ofMachine`: the exact retained
-  description.
 * `Turing.MultiTapePTM.Internal.Description.runConfigFrom_ofMachine`: clocked execution of the
   description simulates the retained Boolean machine.
+* `Turing.MultiTapePTM.Internal.NativeOracleProgram.runWith_descriptionRun`: the generated
+  description preserves the retained machine's exact law under every stateful oracle handler.
 * `Turing.MultiTapePTM.Internal.NativeOracleProgram.postWorkspace_le_postprocess`,
   `.secondWorkspace_le_sequenceCaptured`, `.bodyWorkspace_le_boundedIterationEncodedOn`:
   dynamic subartifact phase workspace remains visible in composed witnesses.
