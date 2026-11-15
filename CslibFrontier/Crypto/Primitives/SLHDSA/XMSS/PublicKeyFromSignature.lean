@@ -42,6 +42,9 @@ gate, qubit, timing or constant-time bound.
 
 * `Cslib.Crypto.SLHDSA.XMSS.authenticationInput_of_left`,
   `authenticationInput_of_right`: the two source-prescribed block orders.
+* `Cslib.Crypto.SLHDSA.XMSS.authenticationRootWithCalls_succ_output`,
+  `authenticationRootWithCalls_addressAtLevel`: the actual fold's semantic step and exact mutable
+  address state.
 * `Cslib.Crypto.SLHDSA.XMSS.authenticationRootWithCalls_calls`: the recursive run has the exact
   authentication-path ledger.
 * `Cslib.Crypto.SLHDSA.XMSS.xmssPkFromSigWithLedger_ledger`: the complete run agrees with the
@@ -155,6 +158,18 @@ private def nextTreeIndexAddressWord (current : AddressWord) (left : Bool) : Add
       ((Nat.div_le_self (current.val - 1) 2).trans (Nat.sub_le current.val 1)).trans_lt
         current.isLt⟩
 
+private theorem nextTreeIndexAddressWord_eq_half (current : AddressWord) (left : Bool)
+    (hleft : left = true ↔ current.val % 2 = 0) :
+    (nextTreeIndexAddressWord current left).val = current.val / 2 := by
+  by_cases h : left = true
+  · simp only [nextTreeIndexAddressWord, h, if_true]
+  · have hodd : current.val % 2 = 1 := by
+      rcases Nat.mod_two_eq_zero_or_one current.val with heven | hodd
+      · exact (h (hleft.mpr heven)).elim
+      · exact hodd
+    simp only [nextTreeIndexAddressWord, h, if_false]
+    omega
+
 /-- Algorithm 11 lines 9 and 11/14: update the mutable tree address for one `H` call. -/
 def authenticationStepAddress {p : SecurityBytes} {shape : ParameterShape}
     (current : Address) (level : Fin (ParameterShape.xmssHeight p shape))
@@ -177,6 +192,49 @@ def authenticationStepAddress {p : SecurityBytes} {shape : ParameterShape}
       (authenticationStepAddress current level left).layerAddress = current.layerAddress ∧
       (authenticationStepAddress current level left).treeAddress = current.treeAddress :=
   ⟨rfl, rfl, rfl⟩
+
+/-- When the current index is `floor(idx / 2^levels)`, the source's even/odd update produces
+`floor(idx / 2^(levels + 1))`. -/
+theorem authenticationStepAddress_index {p : SecurityBytes} {shape : ParameterShape}
+    (current : Address) (idx : LeafIndex p shape) (levels : ℕ)
+    (level : Fin (ParameterShape.xmssHeight p shape)) (_hlevel : level.val = levels)
+    (hindex : current.word7.val = idx.val / 2 ^ levels) :
+    (authenticationStepAddress current level (nodeIsLeft idx.val levels)).word7.val =
+      idx.val / 2 ^ (levels + 1) := by
+  have hleft : nodeIsLeft idx.val levels = true ↔ current.word7.val % 2 = 0 := by
+    rw [hindex]
+    exact nodeIsLeft_eq_true_iff idx.val levels
+  change (nextTreeIndexAddressWord current.word7 (nodeIsLeft idx.val levels)).val = _
+  rw [nextTreeIndexAddressWord_eq_half current.word7 (nodeIsLeft idx.val levels) hleft, hindex,
+    Nat.div_div_eq_div_mul, ← pow_succ]
+
+/-- Exact mutable-address state after `levels` authentication steps. -/
+@[expose] def AddressAtLevel {p : SecurityBytes} {shape : ParameterShape}
+    (initial : Address) (idx : LeafIndex p shape) (levels : ℕ) (current : Address) : Prop :=
+  current.addressType = .tree ∧
+    current.word5 = 0 ∧
+    current.word6.val = levels ∧
+    current.word7.val = idx.val / 2 ^ levels ∧
+    current.layerAddress = initial.layerAddress ∧
+    current.treeAddress = initial.treeAddress
+
+/-- Lines 6--7 establish the level-zero tree-address invariant. -/
+theorem addressAtLevel_initial {p : SecurityBytes} {shape : ParameterShape}
+    (initial : Address) (idx : LeafIndex p shape) :
+    AddressAtLevel initial idx 0 (initialTreeAddress initial idx) := by
+  simp [AddressAtLevel, initialTreeAddress]
+
+/-- Lines 9 and 11/14 advance the exact mutable-address invariant by one level. -/
+theorem AddressAtLevel.step {p : SecurityBytes} {shape : ParameterShape}
+    {initial current : Address} {idx : LeafIndex p shape} {levels : ℕ}
+    (hcurrent : AddressAtLevel initial idx levels current)
+    (level : Fin (ParameterShape.xmssHeight p shape)) (hlevel : level.val = levels) :
+    AddressAtLevel initial idx (levels + 1)
+      (authenticationStepAddress current level (nodeIsLeft idx.val levels)) := by
+  rcases hcurrent with ⟨htype, hword5, _hheight, hindex, hlayer, htree⟩
+  refine ⟨htype, hword5, ?_, ?_, hlayer, htree⟩
+  · exact hlevel ▸ rfl
+  · exact authenticationStepAddress_index current idx levels level hlevel hindex
 
 /-- The exact ordered two-block input to `H` at one authentication level. -/
 def authenticationInput {p : SecurityBytes} {shape : ParameterShape}
@@ -288,6 +346,25 @@ def authenticationRootWithCalls (family : HashFamily) {p : SecurityBytes}
         address := nextAddress
         calls := previous.calls.addStep left }
 
+/-- Direct semantic successor equation for the actual recursive evaluator. The next output is one
+addressed `H` call over the source-ordered current/authentication pair. -/
+theorem authenticationRootWithCalls_succ_output (family : HashFamily) {p : SecurityBytes}
+    {shape : ParameterShape} (idx : LeafIndex p shape)
+    (authentication : Fin (ParameterShape.xmssHeight p shape) → NBytes p)
+    (publicSeed : NBytes p) (address : Address) (leaf : NBytes p) (levels : ℕ)
+    (hlevels : levels + 1 ≤ ParameterShape.xmssHeight p shape) :
+    (authenticationRootWithCalls family idx authentication publicSeed address leaf (levels + 1)
+      hlevels).output =
+      let previous := authenticationRootWithCalls family idx authentication publicSeed address leaf
+        levels (Nat.le_trans (Nat.le_succ levels) hlevels)
+      let level : Fin (ParameterShape.xmssHeight p shape) :=
+        ⟨levels, Nat.lt_of_lt_of_le (Nat.lt_succ_self levels) hlevels⟩
+      let left := nodeIsLeft idx.val levels
+      let nextAddress := authenticationStepAddress previous.address level left
+      h family publicSeed nextAddress
+        (authenticationInput idx level previous.output (authentication level)) :=
+  rfl
+
 /-- The instrumented authentication fold has exactly its closed recursive source ledger. -/
 @[simp] theorem authenticationRootWithCalls_calls (family : HashFamily) {p : SecurityBytes}
     {shape : ParameterShape} (idx : LeafIndex p shape)
@@ -300,6 +377,26 @@ def authenticationRootWithCalls (family : HashFamily) {p : SecurityBytes}
   | zero => rfl
   | succ levels ih =>
       simp only [authenticationRootWithCalls, ih]
+
+/-- The address carried by the actual recursive run has the exact Algorithm 11 state after every
+processed prefix. -/
+theorem authenticationRootWithCalls_addressAtLevel (family : HashFamily) {p : SecurityBytes}
+    {shape : ParameterShape} (idx : LeafIndex p shape)
+    (authentication : Fin (ParameterShape.xmssHeight p shape) → NBytes p)
+    (publicSeed : NBytes p) (address : Address) (leaf : NBytes p) (levels : ℕ)
+    (hlevels : levels ≤ ParameterShape.xmssHeight p shape) :
+    AddressAtLevel address idx levels
+      (authenticationRootWithCalls family idx authentication publicSeed address leaf levels
+        hlevels).address := by
+  induction levels generalizing hlevels with
+  | zero => exact addressAtLevel_initial address idx
+  | succ levels ih =>
+      change AddressAtLevel address idx (levels + 1)
+        (authenticationStepAddress
+          (authenticationRootWithCalls family idx authentication publicSeed address leaf levels
+            (by omega)).address
+          ⟨levels, by omega⟩ (nodeIsLeft idx.val levels))
+      exact AddressAtLevel.step (ih (by omega)) ⟨levels, by omega⟩ rfl
 
 /-- Algorithm 11 lines 8--18 for the complete `h'`-node authentication path. -/
 def authenticationRoot (family : HashFamily) {p : SecurityBytes} {shape : ParameterShape}
@@ -365,8 +462,11 @@ structure StaticDescriptionLedger where
 
 /-- The three source-ledger views kept distinct from compiled resource claims. -/
 structure SourceLedger where
+  /-- Exact source operations. -/
   operations : OperationLedger
+  /-- External-query boundary, separated from concrete hash calls. -/
   queries : QueryLedger
+  /-- Static source shapes and the absence of a compiled-description measurement. -/
   staticDescription : StaticDescriptionLedger
   deriving DecidableEq, Repr
 
@@ -418,7 +518,9 @@ structure SourceLedger where
 
 /-- Reconstructed root and ledgers actually accumulated by Algorithm 11. -/
 structure PublicKeyFromSigRun (p : SecurityBytes) where
+  /-- The reconstructed `n`-byte XMSS root. -/
   output : NBytes p
+  /-- Source operations, query boundary and static shapes accumulated by the run. -/
   ledger : SourceLedger
 
 /-- Instrumented FIPS 205 Algorithm 11. -/

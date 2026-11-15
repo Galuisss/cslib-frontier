@@ -25,6 +25,8 @@ namespace SLHDSAXMSSPublicKeyTests
 open Cslib.Crypto Cslib.Crypto.SLHDSA Cslib.Crypto.SLHDSA.XMSS
 
 private def zeroBytes (p : SecurityBytes) : NBytes p := fun _ => 0
+private def oneBytes (p : SecurityBytes) : NBytes p := fun _ => 1
+private def twoBytes (p : SecurityBytes) : NBytes p := fun _ => 2
 private def zeroMessage (p : SecurityBytes) : WOTS.Message p := fun _ => 0
 private def zeroWOTSSignature (p : SecurityBytes) : WOTS.Signature p := fun _ _ => 0
 
@@ -82,6 +84,33 @@ private def afterLevelOne : Address :=
 example : initialFive.word7.val = 5 := rfl
 example : afterLevelZero.word6.val = 1 ∧ afterLevelZero.word7.val = 2 := ⟨rfl, rfl⟩
 example : afterLevelOne.word6.val = 2 ∧ afterLevelOne.word7.val = 1 := ⟨rfl, rfl⟩
+
+-- Exercise the two block-order branches through the actual recursive evaluator, rather than only
+-- through the detached input helper.
+example (family : HashFamily) :
+    (authenticationRootWithCalls family indexZero (fun _ => twoBytes .bytes16)
+      (zeroBytes .bytes16) baseAddress (oneBytes .bytes16) 1 (by decide)).output =
+      h family (zeroBytes .bytes16)
+        (authenticationStepAddress (initialTreeAddress baseAddress indexZero) levelZero true)
+        (FixedBytes.pairBlocks (oneBytes .bytes16) (twoBytes .bytes16)) := by
+  rw [authenticationRootWithCalls_succ_output]
+  rfl
+
+example (family : HashFamily) :
+    (authenticationRootWithCalls family indexOne (fun _ => twoBytes .bytes16)
+      (zeroBytes .bytes16) baseAddress (oneBytes .bytes16) 1 (by decide)).output =
+      h family (zeroBytes .bytes16)
+        (authenticationStepAddress (initialTreeAddress baseAddress indexOne) levelZero false)
+        (FixedBytes.pairBlocks (twoBytes .bytes16) (oneBytes .bytes16)) := by
+  rw [authenticationRootWithCalls_succ_output]
+  rfl
+
+example (family : HashFamily) :
+    AddressAtLevel baseAddress indexFive 2
+      (authenticationRootWithCalls family indexFive (fun _ => zeroBytes .bytes16)
+        (zeroBytes .bytes16) baseAddress (zeroBytes .bytes16) 2 (by decide)).address :=
+  authenticationRootWithCalls_addressAtLevel family indexFive (fun _ => zeroBytes .bytes16)
+    (zeroBytes .bytes16) baseAddress (zeroBytes .bytes16) 2 (by decide)
 
 /-! ### Complete executable clients -/
 
