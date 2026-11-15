@@ -42,9 +42,9 @@ gate, qubit, timing or constant-time bound.
 
 * `Cslib.Crypto.SLHDSA.XMSS.authenticationInput_of_left`,
   `authenticationInput_of_right`: the two source-prescribed block orders.
-* `Cslib.Crypto.SLHDSA.XMSS.authenticationRootWithCalls_succ_output`,
-  `authenticationRootWithCalls_addressAtLevel`: the actual fold's semantic step and exact mutable
-  address state.
+* `Cslib.Crypto.SLHDSA.XMSS.authenticationRootWithCalls_zero`,
+  `authenticationRootWithCalls_succ_output`, `authenticationRootWithCalls_addressAtLevel`: the
+  actual fold's base state, semantic step and exact mutable address state.
 * `Cslib.Crypto.SLHDSA.XMSS.authenticationRootWithCalls_calls`: the recursive run has the exact
   authentication-path ledger.
 * `Cslib.Crypto.SLHDSA.XMSS.xmssPkFromSigWithLedger_ledger`: the complete run agrees with the
@@ -345,6 +345,19 @@ def authenticationRootWithCalls (family : HashFamily) {p : SecurityBytes}
           (authenticationInput idx level previous.output (authentication level))
         address := nextAddress
         calls := previous.calls.addStep left }
+
+/-- Direct semantic base equation for the actual recursive evaluator. Before the first `H` call,
+the output is the WOTS+ leaf and lines 6--7 have initialized the mutable tree address. -/
+theorem authenticationRootWithCalls_zero (family : HashFamily) {p : SecurityBytes}
+    {shape : ParameterShape} (idx : LeafIndex p shape)
+    (authentication : Fin (ParameterShape.xmssHeight p shape) → NBytes p)
+    (publicSeed : NBytes p) (address : Address) (leaf : NBytes p)
+    (hzero : 0 ≤ ParameterShape.xmssHeight p shape) :
+    authenticationRootWithCalls family idx authentication publicSeed address leaf 0 hzero =
+      { output := leaf
+        address := initialTreeAddress address idx
+        calls := authenticationCalls idx.val 0 } :=
+  rfl
 
 /-- Direct semantic successor equation for the actual recursive evaluator. The next output is one
 addressed `H` call over the source-ordered current/authentication pair. -/

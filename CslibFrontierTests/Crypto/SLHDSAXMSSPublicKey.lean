@@ -94,6 +94,7 @@ example (family : HashFamily) :
         (authenticationStepAddress (initialTreeAddress baseAddress indexZero) levelZero true)
         (FixedBytes.pairBlocks (oneBytes .bytes16) (twoBytes .bytes16)) := by
   rw [authenticationRootWithCalls_succ_output]
+  rw [authenticationRootWithCalls_zero]
   rfl
 
 example (family : HashFamily) :
@@ -103,6 +104,7 @@ example (family : HashFamily) :
         (authenticationStepAddress (initialTreeAddress baseAddress indexOne) levelZero false)
         (FixedBytes.pairBlocks (twoBytes .bytes16) (oneBytes .bytes16)) := by
   rw [authenticationRootWithCalls_succ_output]
+  rw [authenticationRootWithCalls_zero]
   rfl
 
 example (family : HashFamily) :
