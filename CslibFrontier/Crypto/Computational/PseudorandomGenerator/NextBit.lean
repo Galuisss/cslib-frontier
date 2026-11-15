@@ -87,9 +87,7 @@ uniform index sampling, and the finite hybrid/predictor theorem
 
 * [D. Boneh, V. Shoup, *A Graduate Course in Applied Cryptography*,
   Version 0.6][BonehShoup2023], Section 3.5 (Attack Game 3.2, Theorems 3.4 and 3.6).
-* [J. Katz, Y. Lindell, *Introduction to Modern Cryptography*, 3rd ed.][KatzLindell2020],
-  Section 8.1.3 (Theorem 8.10).
-* [S. Arora, B. Barak, *Computational Complexity: A Modern Approach*][AroraBarak09], Section 9.2.3.
+* [S. Arora, B. Barak, *Computational Complexity: A Modern Approach*][AroraBarak09], Chapter 9.
 -/
 
 public section

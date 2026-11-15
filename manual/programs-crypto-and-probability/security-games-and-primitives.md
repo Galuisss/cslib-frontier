@@ -269,14 +269,16 @@ Yao's uniform next-bit characterization lives in
 It formalizes both the single-stage random-index game `nextBitPredictionGame`
 (`NextBitUnpredictableRandomIndex`, sampling a uniform `i : Fin (length n)` and returning a fair
 coin when `length n = 0`) and Boneh–Shoup Attack Game 3.2's stateful two-stage experiment
-`nextBitExperiment` (`NextBitUnpredictable`, [bs23][bs23], Definition 3.6 and Theorems 3.3 / 3.12,
+`nextBitExperiment` (`NextBitUnpredictable`, [bs23][bs23], Section 3.5, Definition 3.3 and Theorems 3.4 / 3.6,
 over `TwoStage Unit ℕ (List Bool) Bool σ` with arbitrary `σ ↪ List Bool` state and fair-coin
 fallback when stage 1 outputs `i ≥ length n`). Neither equivalence takes any caller-supplied
 closure or admissibility hypothesis: unary length computability (`ComputableInPolyTime length encUnary encUnary`)
 is extracted from `PseudorandomGenerator.polyTime_length`, `twoStageNextBitDistinguisher` clips
-the binary-encoded index at the unary bound (`min (length n) i`), and `wordNextBitPredictor`,
-`nextBitDistinguisher` and `wordNextBitTwoStage` sample uniform bit positions via
-`ProbComp.sampleDyadicIndex (length n - 1)`. All four reductions carry unconditional strict-PPT
+the binary-encoded index at the unary bound (`min (length n) i`), `nextBitDistinguisher` and
+`wordNextBitTwoStage` sample uniform bit positions via `ProbComp.sampleDyadicIndex (length n - 1)`,
+and `wordNextBitPredictor` takes the position already drawn by `nextBitPredictionGame` (the prefix
+length) and samples only a candidate bit (`ProbComp.uniform Bool`) and a uniform suffix
+(`BitString.sampleList`). All four reductions carry unconditional strict-PPT
 certificates (`isPPT_wordNextBitPredictor`, `isPPT_nextBitDistinguisher`,
 `isPPT_wordNextBitTwoStage`, `isPPT_twoStageNextBitDistinguisher`) with explicit concrete advantage
 relations (`guessingAdvantage_nextBitPredictionGame_wordNextBitPredictor` losing factor `length n`,
