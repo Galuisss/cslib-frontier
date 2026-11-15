@@ -17,10 +17,7 @@ HMAC and MGF1 known-answer tests as native code. Keeping these checks out of mod
 prevents SHA-2 evaluation from holding the ordinary test-build critical path open.
 -/
 
--- This executable is a local test entry point and intentionally exports no library declarations.
-set_option linter.privateModule false
-
-def main : IO UInt32 := do
+public def main : IO UInt32 := do
   let checks := HMACMGF1Tests.hmacMGF1Checks
   let failures := checks.filter fun check => !check.2
   if failures.isEmpty then
