@@ -102,7 +102,7 @@ def PrefixCheck (g : LocalGeometry) : Prop :=
   (∀ e ∈ g.incidenceRoutes, ∀ i : Fin g.clausePositions.length, i.val ≠ e.clauseIndex →
     routeContactCheck [] e.route [g.clausePosition i] = true) ∧
   ∀ e ∈ g.incidenceRoutes,
-    segmentRouteContactCheck [g.variablePosition e.variableIndex] e.route g.boundaryRoute = true
+    segmentRouteContactCheck [g.variablePosition e.variableIndex] e.route (boundaryRoute g) = true
 
 instance (g : LocalGeometry) : Decidable (PrefixCheck g) := by
   unfold PrefixCheck
@@ -164,7 +164,7 @@ theorem prefix_clause_not_mem_support {g : LocalGeometry} (h : PrefixCheck g)
 /-- The variable endpoint is the only permitted contact with the full cell boundary. -/
 theorem prefix_boundary_contact {g : LocalGeometry} (h : PrefixCheck g)
     {e : LocalIncidence} (he : e ∈ g.incidenceRoutes)
-    {p : ℝ × ℝ} (hp : p ∈ support e.route) (hq : p ∈ support g.boundaryRoute) :
+    {p : ℝ × ℝ} (hp : p ∈ support e.route) (hq : p ∈ support (boundaryRoute g)) :
     p = realPoint (g.variablePosition e.variableIndex) := by
   obtain ⟨q, hq, hpq⟩ := segmentRouteContactCheck_sound (prefix_incidence_length h he)
     (by simp [boundaryRoute]) (h.2.2.2.2.2.2 e he) hp hq

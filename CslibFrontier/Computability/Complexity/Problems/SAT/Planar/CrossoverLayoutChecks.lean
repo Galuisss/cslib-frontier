@@ -96,8 +96,8 @@ def geometry : LocalGeometry where
   size := 240
   variablePositions := splitVariables.map variablePosition
   clausePositions := clausePositions
-  incidenceRoutes := incidenceRoutes.map fun (clause, variable, route) =>
-    (clause, splitVariables.idxOf variable, route)
+  incidenceRoutes := incidenceRoutes.map fun (clause, var, route) =>
+    (clause, splitVariables.idxOf var, route)
   terminalVariables := (List.finRange 4).map fun i => splitVariables.idxOf (splitTerminal i)
   boundaryPorts := (List.finRange 4).map fun i => boundaryPort i
   accessRoutes := (List.finRange 4).map fun i => accessRoute i

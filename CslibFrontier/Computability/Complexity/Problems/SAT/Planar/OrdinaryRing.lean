@@ -144,8 +144,8 @@ def geometry : LocalGeometry where
   size := 240
   variablePositions := cyclicOrder.map variablePosition
   clausePositions := clausePositions
-  incidenceRoutes := incidenceRoutes.map fun (clause, variable, route) =>
-    (clause, cyclicOrder.idxOf variable, route)
+  incidenceRoutes := incidenceRoutes.map fun (clause, var, route) =>
+    (clause, cyclicOrder.idxOf var, route)
   terminalVariables := cyclicOrder.map cyclicOrder.idxOf
   boundaryPorts := cyclicOrder.map fun v => PairedPorts.boundaryPort v.1 v.2
   accessRoutes := cyclicOrder.map fun v => PairedPorts.accessRoute v.1 v.2
