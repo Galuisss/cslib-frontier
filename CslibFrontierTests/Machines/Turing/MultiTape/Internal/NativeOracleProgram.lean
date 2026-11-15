@@ -75,11 +75,6 @@ noncomputable def firstArtifact :=
 noncomputable def secondArtifact :=
   NativeOracleProgram.queryTake (r := 2) (1 : Operation)
 
-/-- Encoding a typed result as its raw word is a zero-work reinterpretation of the same native
-artifact. -/
-noncomputable def encodedFairBit :=
-  (NativeOracleProgram.fairBit (r := 2) encUnit).encodedOutput
-
 example : firstArtifact.description.table.length = firstArtifact.observationRowCount :=
   firstArtifact.description_table_length
 
@@ -247,17 +242,14 @@ noncomputable def secondRequestLimit := ClassifiedCompiler.inPhase .marshalling
 noncomputable def secondRequest :=
   ClassifiedCompiler.pair secondRequestProjection secondRequestLimit
 
-noncomputable def secondRequestCompiler :=
-  secondRequest.compiler
-
 noncomputable def secondPrepared := NativeOracleProgram.preprocess
   secondRequest secondArtifact
 
 theorem secondRequestCompiler_time (input : Unit × List Bool) :
-    secondRequestCompiler.time input = 12 * input.2.length + 32 := by
+    secondRequest.compiler.time input = 12 * input.2.length + 32 := by
   rcases input with ⟨inputUnit, word⟩
   cases inputUnit
-  simp only [secondRequestCompiler, secondRequest, ClassifiedCompiler.pair,
+  simp only [secondRequest, ClassifiedCompiler.pair,
     secondRequestProjection, secondRequestLimit, ClassifiedCompiler.inPhase,
     ClassifiedCompiler.ofAccounting,
     Turing.MultiTapeTM.Internal.NativeCompiler.pair,
@@ -304,9 +296,9 @@ theorem secondPrepared_resource_bound (input : Unit) (OracleState : Type)
       (input, middle)).trans ?_
     change secondPrepared.time (input, middle) ≤ secondOnline.time phase input
     rw [show secondPrepared.time (input, middle) =
-        5 * secondRequestCompiler.time (input, middle) +
+        5 * secondRequest.compiler.time (input, middle) +
           secondArtifact.time (middle, 2) + 9 by
-      simpa only [secondPrepared, secondRequestCompiler, Function.const_apply] using
+      simpa only [secondPrepared, Function.const_apply] using
         (NativeOracleProgram.time_preprocess secondRequest secondArtifact (input, middle)),
       secondRequestCompiler_time,
       show secondArtifact.time (middle, 2) = 4 * middle.length + 2 * 2 + 6 by
