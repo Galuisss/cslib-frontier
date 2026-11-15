@@ -8,7 +8,6 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Crypto.Primitives.Hash.SHA2
-import Mathlib.Tactic
 
 /-!
 # HMAC with SHA-256 and SHA-512
@@ -18,9 +17,10 @@ the hash block are padded on the right with zero bytes, block-sized keys are use
 longer keys are first hashed and then padded. The inner and outer pad bytes are respectively
 `0x36` and `0x5c`, repeated to the SHA-2 block size.
 
-The public validity predicates retain the input domains of the underlying SHA-256 and SHA-512
-functions as erased proof preconditions. The functions return the full 32-byte or 64-byte HMAC;
-applications that prescribe truncation, such as FIPS 205 `PRF_msg`, apply it at their own boundary.
+The public validity predicates record the input domains prescribed by the underlying SHA-256 and
+SHA-512 standards separately from the total executable functions. HMAC returns the full 32-byte or
+64-byte digest; applications that prescribe truncation, such as FIPS 205 `PRF_msg`, apply it at
+their own boundary.
 
 This is an executable specification. It is not a constant-time implementation, a machine-costed
 program, a validation claim, or a proof that HMAC is a pseudorandom function or a secure MAC.
@@ -70,18 +70,16 @@ private def keyBlock (blockBytes : ℕ) (keyMaterial : List Byte) : FixedBytes b
   fun i => keyMaterial.getD i.val 0
 
 /-- The FIPS 198-1 SHA-256 key preprocessing branches, producing a 64-byte `K0`. -/
-def sha256KeyBlock (key text : List Byte) (hinput : ValidHMACSHA256Input key text) :
-    FixedBytes 64 :=
-  if hlong : 64 < key.length then
-    keyBlock 64 (SHA2.sha256 key (hinput.1 hlong)).toList
+def sha256KeyBlock (key : List Byte) : FixedBytes 64 :=
+  if 64 < key.length then
+    keyBlock 64 (SHA2.sha256 key).toList
   else
     keyBlock 64 key
 
 /-- The FIPS 198-1 SHA-512 key preprocessing branches, producing a 128-byte `K0`. -/
-def sha512KeyBlock (key text : List Byte) (hinput : ValidHMACSHA512Input key text) :
-    FixedBytes 128 :=
-  if hlong : 128 < key.length then
-    keyBlock 128 (SHA2.sha512 key (hinput.1 hlong)).toList
+def sha512KeyBlock (key : List Byte) : FixedBytes 128 :=
+  if 128 < key.length then
+    keyBlock 128 (SHA2.sha512 key).toList
   else
     keyBlock 128 key
 
@@ -100,36 +98,16 @@ def input {blockBytes : ℕ} (key : FixedBytes blockBytes) (pad : Byte)
     (text : List Byte) : (input key pad text).length = blockBytes + text.length := by
   simp [input]
 
-private theorem validSHA256Inner (key : FixedBytes 64) (text : List Byte)
-    (htext : 64 + text.length < 2 ^ 61) : SHA2.ValidSHA256Input (input key 0x36 text) := by
-  simpa only [SHA2.ValidSHA256Input, length_input] using htext
-
-private theorem validSHA512Inner (key : FixedBytes 128) (text : List Byte)
-    (htext : 128 + text.length < 2 ^ 125) : SHA2.ValidSHA512Input (input key 0x36 text) := by
-  simpa only [SHA2.ValidSHA512Input, length_input] using htext
-
-private theorem validSHA256Outer (key : FixedBytes 64) (digest : FixedBytes 32) :
-    SHA2.ValidSHA256Input (input key 0x5c digest.toList) := by
-  norm_num [SHA2.ValidSHA256Input]
-
-private theorem validSHA512Outer (key : FixedBytes 128) (digest : FixedBytes 64) :
-    SHA2.ValidSHA512Input (input key 0x5c digest.toList) := by
-  norm_num [SHA2.ValidSHA512Input]
-
 /-- FIPS 198-1 HMAC instantiated with SHA-256, returning all 32 digest bytes. -/
-def hmacSHA256 (key text : List Byte) (hinput : ValidHMACSHA256Input key text) :
-    FixedBytes 32 :=
-  let keyBlock := sha256KeyBlock key text hinput
+def hmacSHA256 (key text : List Byte) : FixedBytes 32 :=
+  let keyBlock := sha256KeyBlock key
   let innerDigest := SHA2.sha256 (input keyBlock 0x36 text)
-    (validSHA256Inner keyBlock text hinput.2)
-  SHA2.sha256 (input keyBlock 0x5c innerDigest.toList) (validSHA256Outer keyBlock innerDigest)
+  SHA2.sha256 (input keyBlock 0x5c innerDigest.toList)
 
 /-- FIPS 198-1 HMAC instantiated with SHA-512, returning all 64 digest bytes. -/
-def hmacSHA512 (key text : List Byte) (hinput : ValidHMACSHA512Input key text) :
-    FixedBytes 64 :=
-  let keyBlock := sha512KeyBlock key text hinput
+def hmacSHA512 (key text : List Byte) : FixedBytes 64 :=
+  let keyBlock := sha512KeyBlock key
   let innerDigest := SHA2.sha512 (input keyBlock 0x36 text)
-    (validSHA512Inner keyBlock text hinput.2)
-  SHA2.sha512 (input keyBlock 0x5c innerDigest.toList) (validSHA512Outer keyBlock innerDigest)
+  SHA2.sha512 (input keyBlock 0x5c innerDigest.toList)
 
 end Cslib.Crypto.HMAC

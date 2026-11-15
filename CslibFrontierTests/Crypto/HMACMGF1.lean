@@ -62,9 +62,9 @@ private def sampleInnerDigest : FixedBytes 32 := fun i =>
 -- The padded key block precedes the payload on both HMAC passes, with the selected pad XORed
 -- bytewise before concatenation. For case 1, `0x0b xor 0x36 = 0x3d` and
 -- `0x0b xor 0x5c = 0x57`; the zero-padded tail therefore remains the pad byte itself.
-#guard input (sha256KeyBlock case1Key case1Text (by decide)) 0x36 case1Text ==
+#guard input (sha256KeyBlock case1Key) 0x36 case1Text ==
   List.replicate 20 0x3d ++ List.replicate 44 0x36 ++ case1Text
-#guard input (sha256KeyBlock case1Key case1Text (by decide)) 0x5c sampleInnerDigest.toList ==
+#guard input (sha256KeyBlock case1Key) 0x5c sampleInnerDigest.toList ==
   List.replicate 20 0x57 ++ List.replicate 44 0x5c ++ sampleInnerDigest.toList
 
 private def case6Key : List Byte := List.replicate 131 0xaa
@@ -94,11 +94,11 @@ private def case6SHA512 : List Byte :=
     0x95, 0xe6, 0x4f, 0x73, 0xf6, 0x3f, 0x0a, 0xec,
     0x8b, 0x91, 0x5a, 0x98, 0x5d, 0x78, 0x65, 0x98]
 
-private theorem case6Valid :
-    ValidHMACSHA256Input case6Key case6Text ∧ ValidHMACSHA512Input case6Key case6Text := by
-  -- The closed 131-byte key fixture exceeds the default recursion depth only while discharging
-  -- its erased SHA-2 input-domain proofs; digest evaluation below uses compiled code.
-  set_option maxRecDepth 4096 in decide
+-- The source-domain predicates remain separately checkable even though executable HMAC is total.
+set_option maxRecDepth 4096 in
+  #guard decide (ValidHMACSHA256Input case6Key case6Text)
+set_option maxRecDepth 4096 in
+  #guard decide (ValidHMACSHA512Input case6Key case6Text)
 
 private def byteSequence (length : ℕ) : List Byte :=
   (List.range length).map fun value => ⟨value % 256, Nat.mod_lt _ (by decide)⟩
@@ -121,16 +121,15 @@ private def exact128SHA512 : List Byte :=
     0x0c, 0x01, 0x10, 0xfd, 0xe6, 0xec, 0xc7, 0x9c,
     0xd4, 0x5a, 0x3c, 0xe9, 0x50, 0x2f, 0x30, 0xab]
 
-private theorem exactKeyValid :
-    ValidHMACSHA256Input (byteSequence 64) exactKeyText ∧
-      ValidHMACSHA512Input (byteSequence 128) exactKeyText := by
-  -- Reducing the range-generated 128-byte key exceeds the default recursion depth only for these
-  -- erased fixture-validity proofs; the HMAC comparisons below use compiled code.
-  set_option maxRecDepth 4096 in decide
+-- Reducing the range-generated exact-block fixtures needs a deeper recursion budget.
+set_option maxRecDepth 4096 in
+  #guard decide (ValidHMACSHA256Input (byteSequence 64) exactKeyText)
+set_option maxRecDepth 4096 in
+  #guard decide (ValidHMACSHA512Input (byteSequence 128) exactKeyText)
 
 -- Exact-block keys are used unchanged, not passed through the long-key hash branch.
-#guard (sha256KeyBlock (byteSequence 64) exactKeyText exactKeyValid.1).toList == byteSequence 64
-#guard (sha512KeyBlock (byteSequence 128) exactKeyText exactKeyValid.2).toList == byteSequence 128
+#guard (sha256KeyBlock (byteSequence 64)).toList == byteSequence 64
+#guard (sha512KeyBlock (byteSequence 128)).toList == byteSequence 128
 
 private def mgfSeed : List Byte := byteSequence 10
 
@@ -172,25 +171,25 @@ private def finalCounterSHA512 : List Byte :=
     0x77, 0xd2, 0x91, 0x48, 0xf4, 0x1c, 0x41, 0xba]
 
 -- RFC 8017 accepts the inclusive `2^32 * hLen` bound and rejects its successor.
-#guard decide (ValidMGF1SHA256Input mgfSeed (2 ^ 32 * 32))
-#guard !decide (ValidMGF1SHA256Input mgfSeed (2 ^ 32 * 32 + 1))
-#guard decide (ValidMGF1SHA512Input mgfSeed (2 ^ 32 * 64))
-#guard !decide (ValidMGF1SHA512Input mgfSeed (2 ^ 32 * 64 + 1))
+#guard decide (ValidMGF1SHA256Input (2 ^ 32 * 32))
+#guard !decide (ValidMGF1SHA256Input (2 ^ 32 * 32 + 1))
+#guard decide (ValidMGF1SHA512Input (2 ^ 32 * 64))
+#guard !decide (ValidMGF1SHA512Input (2 ^ 32 * 64 + 1))
 
 /-- The named known-answer conditions executed by the native project test driver. -/
 def hmacMGF1Checks : List (String × Bool) :=
   [ ("RFC 4231 case 1 SHA-256",
-      decide ((hmacSHA256 case1Key case1Text (by decide)).toList = case1SHA256))
+      decide ((hmacSHA256 case1Key case1Text).toList = case1SHA256))
   , ("RFC 4231 case 1 SHA-512",
-      decide ((hmacSHA512 case1Key case1Text (by decide)).toList = case1SHA512))
+      decide ((hmacSHA512 case1Key case1Text).toList = case1SHA512))
   , ("RFC 4231 case 6 SHA-256",
-      decide ((hmacSHA256 case6Key case6Text case6Valid.1).toList = case6SHA256))
+      decide ((hmacSHA256 case6Key case6Text).toList = case6SHA256))
   , ("RFC 4231 case 6 SHA-512",
-      decide ((hmacSHA512 case6Key case6Text case6Valid.2).toList = case6SHA512))
+      decide ((hmacSHA512 case6Key case6Text).toList = case6SHA512))
   , ("exact-block key SHA-256",
-      decide ((hmacSHA256 (byteSequence 64) exactKeyText exactKeyValid.1).toList = exact64SHA256))
+      decide ((hmacSHA256 (byteSequence 64) exactKeyText).toList = exact64SHA256))
   , ("exact-block key SHA-512",
-      decide ((hmacSHA512 (byteSequence 128) exactKeyText exactKeyValid.2).toList = exact128SHA512))
+      decide ((hmacSHA512 (byteSequence 128) exactKeyText).toList = exact128SHA512))
   , ("empty MGF1 SHA-256 mask", decide ((mgf1SHA256 mgfSeed 0 (by decide)).toList = []))
   , ("31-byte MGF1 SHA-256 mask",
       decide ((mgf1SHA256 mgfSeed 31 (by decide)).toList = mgfSHA256Length33.take 31))
@@ -206,9 +205,9 @@ def hmacMGF1Checks : List (String × Bool) :=
   , ("65-byte MGF1 SHA-512 mask",
       decide ((mgf1SHA512 mgfSeed 65 (by decide)).toList = mgfSHA512Length65))
   , ("final MGF1 SHA-256 counter",
-      decide ((sha256CounterDigest mgfSeed finalCounter (by decide)).toList = finalCounterSHA256))
+      decide ((sha256CounterDigest mgfSeed finalCounter).toList = finalCounterSHA256))
   , ("final MGF1 SHA-512 counter",
-      decide ((sha512CounterDigest mgfSeed finalCounter (by decide)).toList = finalCounterSHA512))
+      decide ((sha512CounterDigest mgfSeed finalCounter).toList = finalCounterSHA512))
   ]
 
 end HMACMGF1Tests

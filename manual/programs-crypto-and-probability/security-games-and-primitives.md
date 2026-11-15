@@ -511,10 +511,11 @@ The shared SHA-2 message-call prerequisites are in
 [`MGF1.lean`](../../CslibFrontier/Crypto/Primitives/Hash/MGF1.lean)
 [fips1981][fips1981] [rfc8017][rfc8017]. HMAC exposes the complete FIPS 198-1 key preprocessing:
 short keys are right-padded, exact-block keys are unchanged, and long keys are hashed before
-padding. MGF1 hashes `seed || I2OSP(counter, 4)` in increasing counter order, concatenates the
-typed digest blocks with `BitString.blocksEquiv.symm`, and uses `FixedBytes.take` for the requested
-leading bytes. Its source domain admits the inclusive `2^32 * hLen` output bound and avoids a
-spurious seed-length restriction for an empty mask. The
+padding. Its total executable functions are separate from predicates recording the standards'
+input domains. MGF1 hashes `seed || I2OSP(counter, 4)` in increasing counter order, concatenates
+the typed digest blocks with `BitString.blocksEquiv.symm`, and uses `Fin.take` for the requested
+leading bytes. Its source domain is the inclusive `2^32 * hLen` output bound; total SHA evaluation
+leaves the seed unrestricted. The
 [ordinary-import client](../../CslibFrontierTests/Crypto/HMACMGF1.lean) checks direct HMAC
 packaging, exact-block keys and the inclusive MGF1 bound. The
 [native test driver](../../CslibFrontierTestDriver.lean) checks RFC 4231 short- and long-key
