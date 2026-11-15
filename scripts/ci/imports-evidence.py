@@ -1,4 +1,4 @@
-"""Disposable targeted import-minimization evidence for #5567. DO NOT MERGE."""
+"""Disposable targeted import-minimization evidence for #5568. DO NOT MERGE."""
 import hashlib
 import json
 import os
@@ -8,20 +8,13 @@ import subprocess
 import sys
 import time
 
-TARGET = 'c64cd924b87738609bcf25fce248ae551f4ea7fb'
+TARGET = 'f1394960ce04d60473ccec78b4cc67b92fae55a6'
 BASE = '43199b2ea7edb8b5af0e81815ea18e9c77a8d0b9'
 PREFIX = 'CslibFrontier.Computability.Machines.Turing.MultiTape.'
 MODULES = [PREFIX + name for name in [
-    'Combinators.Reverse',
-    'Combinators.Transducer',
-    'Complexity.LogSpace',
-    'Complexity.Quantitative',
     'Complexity.Streaming',
-    'Complexity.WordTransducers',
-    'Internal.DecoderWordMachines',
-    'Internal.KernelReverse',
-    'Internal.KernelTransducer',
-    'Internal.WordMachines',
+    'Complexity.BigO.Constructible',
+    'Internal.NormalForm',
 ]]
 
 
