@@ -111,7 +111,8 @@ private theorem position_indexed : ∀ v : SplitVariable,
 private theorem index_lt : ∀ v : SplitVariable,
     splitVariables.idxOf v < geometry.variablePositions.length := by decide +kernel
 
-private theorem index_injective : Function.Injective (fun v : SplitVariable => splitVariables.idxOf v) := by
+private theorem index_injective :
+    Function.Injective (fun v : SplitVariable => splitVariables.idxOf v) := by
   intro v w h
   change splitVariables.idxOf v = _ at h
   apply variablePosition_injective

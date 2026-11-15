@@ -92,7 +92,8 @@ def PrefixCheck (g : LocalGeometry) : Prop :=
     e.clauseIndex < g.clausePositions.length ∧ e.variableIndex < g.variablePositions.length ∧
       e.route.head? = some (g.clausePosition e.clauseIndex) ∧
       e.route.getLast? = some (g.variablePosition e.variableIndex) ∧
-      IsOrthogonal e.route ∧ Cslib.Complexity.SAT.LocalGeometry.SimpleCheck e.route ∧ 2 ≤ e.route.length ∧
+      IsOrthogonal e.route ∧ Cslib.Complexity.SAT.LocalGeometry.SimpleCheck e.route ∧
+      2 ≤ e.route.length ∧
       (∀ p ∈ e.route, 0 ≤ p.1 ∧ p.1 ≤ g.size ∧ 0 ≤ p.2 ∧ p.2 ≤ g.size) ∧
       ∀ p ∈ e.route.dropLast, 0 < p.1 ∧ p.1 < g.size ∧ 0 < p.2 ∧ p.2 < g.size) ∧
   (∀ e ∈ g.incidenceRoutes, ∀ f ∈ g.incidenceRoutes, e ≠ f →
