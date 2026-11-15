@@ -20,15 +20,11 @@ import CslibFrontier.Computability.Probabilistic.UniformNat
 import CslibFrontier.Crypto.Game.HiddenBit
 import CslibFrontier.Crypto.Game.Hybrid
 import CslibFrontier.Crypto.Negligible.Dyadic
-import CslibFrontier.Crypto.Primitives.PRG.Game
 import CslibFrontier.Crypto.Primitives.PRG.NextBit
-import CslibFrontier.Languages.Probabilistic.Norm
 import CslibFrontier.Languages.Probabilistic.UniformNat
 import CslibFrontier.Probability.PMF.Bind
 import CslibFrontier.Probability.Product.Split
-import CslibFrontier.Tactic.PMFSwap
 import CslibFrontier.Tactic.PPT
-import CslibFrontier.Tactic.PolyTime
 
 /-!
 # Yao's next-bit theorem for uniform pseudorandom generators
