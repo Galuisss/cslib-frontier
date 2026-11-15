@@ -12,10 +12,11 @@ public import CslibFrontier.Crypto.Primitives.SLHDSA.XMSS.PublicKeyFromSignature
 /-!
 # Checked clients for FIPS 205 XMSS public-key reconstruction
 
-These ordinary clients cover Algorithm 11's even and odd block orders, mutable address evolution,
-all six standardized XMSS heights, executable composition with WOTS+ Algorithm 8, and the exact
-operation/query/static source ledgers. They do not claim generated-signature correctness,
-verification, security or compiled resource bounds.
+These checks cover all six standardized XMSS heights, executable composition with WOTS+
+Algorithm 8, and the source ledgers exposed for composition. The internal branch and mutable
+address invariants are proved privately in the implementation module. These tests are not a
+library caller and do not claim generated-signature correctness, verification, security or
+compiled resource bounds.
 -/
 
 public section
@@ -25,8 +26,6 @@ namespace SLHDSAXMSSPublicKeyTests
 open Cslib.Crypto Cslib.Crypto.SLHDSA Cslib.Crypto.SLHDSA.XMSS
 
 private def zeroBytes (p : SecurityBytes) : NBytes p := fun _ => 0
-private def oneBytes (p : SecurityBytes) : NBytes p := fun _ => 1
-private def twoBytes (p : SecurityBytes) : NBytes p := fun _ => 2
 private def zeroMessage (p : SecurityBytes) : WOTS.Message p := fun _ => 0
 private def zeroWOTSSignature (p : SecurityBytes) : WOTS.Signature p := fun _ _ => 0
 
@@ -54,67 +53,7 @@ example : signatureBytes .bytes16 .small = 704 := rfl
 example : signatureBlocks .bytes32 .fast = 71 := rfl
 example : signatureBytes .bytes32 .fast = 2272 := rfl
 
-/-! ### Branch order and mutable address evolution -/
-
-private def indexZero : LeafIndex .bytes16 .fast := ⟨0, by decide⟩
-private def indexOne : LeafIndex .bytes16 .fast := ⟨1, by decide⟩
 private def indexFive : LeafIndex .bytes16 .fast := ⟨5, by decide⟩
-private def levelZero : Fin (ParameterShape.xmssHeight .bytes16 .fast) := ⟨0, by decide⟩
-private def levelOne : Fin (ParameterShape.xmssHeight .bytes16 .fast) := ⟨1, by decide⟩
-
-example : nodeIsLeft indexZero.val levelZero.val = true := rfl
-example : nodeIsLeft indexOne.val levelZero.val = false := rfl
-
-example (node authenticationNode : NBytes .bytes16) :
-    authenticationInput indexZero levelZero node authenticationNode =
-      FixedBytes.pairBlocks node authenticationNode :=
-  authenticationInput_of_left indexZero levelZero node authenticationNode rfl
-
-example (node authenticationNode : NBytes .bytes16) :
-    authenticationInput indexOne levelZero node authenticationNode =
-      FixedBytes.pairBlocks authenticationNode node :=
-  authenticationInput_of_right indexOne levelZero node authenticationNode rfl
-
-private def initialFive : Address := initialTreeAddress baseAddress indexFive
-private def afterLevelZero : Address :=
-  authenticationStepAddress initialFive levelZero (nodeIsLeft indexFive.val levelZero.val)
-private def afterLevelOne : Address :=
-  authenticationStepAddress afterLevelZero levelOne (nodeIsLeft indexFive.val levelOne.val)
-
-example : initialFive.word7.val = 5 := rfl
-example : afterLevelZero.word6.val = 1 ∧ afterLevelZero.word7.val = 2 := ⟨rfl, rfl⟩
-example : afterLevelOne.word6.val = 2 ∧ afterLevelOne.word7.val = 1 := ⟨rfl, rfl⟩
-
--- Exercise the two block-order branches through the actual recursive evaluator, rather than only
--- through the detached input helper.
-example (family : HashFamily) :
-    (authenticationRootWithCalls family indexZero (fun _ => twoBytes .bytes16)
-      (zeroBytes .bytes16) baseAddress (oneBytes .bytes16) 1 (by decide)).output =
-      h family (zeroBytes .bytes16)
-        (authenticationStepAddress (initialTreeAddress baseAddress indexZero) levelZero true)
-        (FixedBytes.pairBlocks (oneBytes .bytes16) (twoBytes .bytes16)) := by
-  rw [authenticationRootWithCalls_succ_output]
-  rw [authenticationRootWithCalls_zero]
-  rw [authenticationInput_of_left indexZero levelZero (oneBytes .bytes16) (twoBytes .bytes16) rfl]
-  rfl
-
-example (family : HashFamily) :
-    (authenticationRootWithCalls family indexOne (fun _ => twoBytes .bytes16)
-      (zeroBytes .bytes16) baseAddress (oneBytes .bytes16) 1 (by decide)).output =
-      h family (zeroBytes .bytes16)
-        (authenticationStepAddress (initialTreeAddress baseAddress indexOne) levelZero false)
-        (FixedBytes.pairBlocks (twoBytes .bytes16) (oneBytes .bytes16)) := by
-  rw [authenticationRootWithCalls_succ_output]
-  rw [authenticationRootWithCalls_zero]
-  rw [authenticationInput_of_right indexOne levelZero (oneBytes .bytes16) (twoBytes .bytes16) rfl]
-  rfl
-
-example (family : HashFamily) :
-    AddressAtLevel baseAddress indexFive 2
-      (authenticationRootWithCalls family indexFive (fun _ => zeroBytes .bytes16)
-        (zeroBytes .bytes16) baseAddress (zeroBytes .bytes16) 2 (by decide)).address :=
-  authenticationRootWithCalls_addressAtLevel family indexFive (fun _ => zeroBytes .bytes16)
-    (zeroBytes .bytes16) baseAddress (zeroBytes .bytes16) 2 (by decide)
 
 /-! ### Complete executable clients -/
 
@@ -154,13 +93,13 @@ example (family : HashFamily) :
 
 /-! ### Exact source ledgers -/
 
-example : (authenticationCalls 5 3).hCalls = 3 := rfl
-example : (authenticationCalls 5 3).nodeFirstBranches = 1 := rfl
-example : (authenticationCalls 5 3).authenticationFirstBranches = 2 := rfl
 example : (operationLedger (zeroMessage .bytes16) indexFive).treeIndexWrites = 4 := rfl
-example : (operationLedger (zeroMessage .bytes16) indexFive).authentication.hCalls = 3 := rfl
-example : queryLedger.externalOracleQueries = 0 := rfl
-example : queryLedger.externalOracleHandlers = 0 := rfl
+example : (authenticationCalls 5 3).hCalls = 3 :=
+  (authenticationCalls_fixed 5 3).2.2.1
+example :
+    (authenticationCalls 5 3).nodeFirstBranches +
+      (authenticationCalls 5 3).authenticationFirstBranches = 3 :=
+  authenticationCalls_branch_partition 5 3
 example :
     (staticDescriptionLedger .bytes16 .fast).compiledDescriptionBytes = none := rfl
 example : (staticDescriptionLedger .bytes16 .fast).hInputBytes = 32 := rfl

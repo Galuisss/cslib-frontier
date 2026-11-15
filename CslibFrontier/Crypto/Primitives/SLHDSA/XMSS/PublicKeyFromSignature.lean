@@ -11,7 +11,7 @@ public import CslibFrontier.Crypto.Primitives.SLHDSA.WOTS.PublicKeyFromSignature
 import Mathlib.Tactic
 
 /-!
-# FIPS 205 XMSS public-key reconstruction
+# Definitions-only FIPS 205 XMSS public-key reconstruction
 
 This module implements FIPS 205, Section 6.3, Algorithm 11. It first reconstructs the WOTS+
 public key with Algorithm 8, then combines that leaf with the ordered XMSS authentication path.
@@ -19,41 +19,40 @@ At level `k`, the quotient `floor(idx / 2^k)` selects whether the current node p
 `AUTH[k]`; the concrete addressed function `H` is then called at tree height `k + 1` and tree
 index `floor(idx / 2^(k + 1))`.
 
-The executable evaluator carries exact operation, external-query and static-shape ledgers. The
+The executable evaluator carries source operation, external-query and static-shape ledgers. The
 operation ledger is assembled from the instrumented WOTS+ call and the instrumented authentication
 fold, rather than attached independently to the output. The external-query count is zero because
 this layer invokes the concrete hash functions, not oracle handlers. The static ledger records the
 source input/output shapes and deliberately records no compiled-program description size.
 
-This module does not implement XMSS tree generation or signing, WOTS+ key generation or signing,
-prove generated-signature correctness, define a generic Merkle tree, perform full SLH-DSA
-verification, or establish classical or quantum security. It gives no machine, program-size,
-gate, qubit, timing or constant-time bound.
+This is a definitions-only milestone. Its first semantic correctness property would say that a
+signature produced by FIPS 205 Algorithms 9--10 reconstructs the corresponding XMSS root; those
+algorithms are not yet formalized, so that property is not proved here. FIPS 205 Algorithm 13 is
+the next library consumer: it threads `d` calls to this evaluator through the hypertree layers.
+This module also does not define a generic Merkle tree, perform full SLH-DSA verification, or
+establish classical or quantum security. It gives no machine, program-size, gate, qubit, timing
+or constant-time bound.
 
 ## Main definitions
 
 * `Cslib.Crypto.SLHDSA.XMSS.Signature`: the exact WOTS+ signature and `h'`-node authentication
   path.
-* `Cslib.Crypto.SLHDSA.XMSS.authenticationRootWithCalls`: the ordered, instrumented `H` fold.
 * `Cslib.Crypto.SLHDSA.XMSS.xmssPkFromSigWithLedger`: Algorithm 11 with source ledgers.
 * `Cslib.Crypto.SLHDSA.XMSS.xmssPkFromSig`: FIPS 205 Algorithm 11.
 
 ## Main results
 
-* `Cslib.Crypto.SLHDSA.XMSS.authenticationInput_of_left`,
-  `authenticationInput_of_right`: the two source-prescribed block orders.
-* `Cslib.Crypto.SLHDSA.XMSS.authenticationRootWithCalls_zero`,
-  `authenticationRootWithCalls_succ_output`, `authenticationRootWithCalls_addressAtLevel`: the
-  actual fold's base state, semantic step and exact mutable address state.
-* `Cslib.Crypto.SLHDSA.XMSS.authenticationRootWithCalls_calls`: the recursive run has the exact
-  authentication-path ledger.
+* `Cslib.Crypto.SLHDSA.XMSS.authenticationCalls_fixed`: each authentication level contributes one
+  node read, pair construction, `H` call, height write and index write.
+* `Cslib.Crypto.SLHDSA.XMSS.authenticationCalls_branch_partition`: the two input orders partition
+  the authentication levels.
 * `Cslib.Crypto.SLHDSA.XMSS.xmssPkFromSigWithLedger_ledger`: the complete run agrees with the
   closed source ledger.
 
 ## References
 
 * [NIST, *Stateless Hash-Based Digital Signature Standard*, Table 2 and Section 6.3,
-  Algorithm 11][NISTFIPS205]
+  Algorithm 11, printed p. 25][NISTFIPS205]
 -/
 
 public section
@@ -77,19 +76,16 @@ structure Signature (p : SecurityBytes) (shape : ParameterShape) where
 @[expose] def signatureBytes (p : SecurityBytes) (shape : ParameterShape) : ℕ :=
   signatureBlocks p shape * p.count
 
-/-- The signature byte count is the FIPS 205 Section 6 data-format equation. -/
-theorem signatureBytes_eq (p : SecurityBytes) (shape : ParameterShape) :
-    signatureBytes p shape =
-      (WOTS.len p + ParameterShape.xmssHeight p shape) * p.count :=
-  rfl
-
 /-- A WOTS+ leaf index is bounded by the `2^h'` leaves of its standardized XMSS tree. -/
 abbrev LeafIndex (p : SecurityBytes) (shape : ParameterShape) :=
   Fin (2 ^ ParameterShape.xmssHeight p shape)
 
-/-- Every standardized XMSS leaf index fits in one four-byte address word. -/
-theorem leafCount_le_addressWord (p : SecurityBytes) (shape : ParameterShape) :
+private theorem leafCount_le_addressWord (p : SecurityBytes) (shape : ParameterShape) :
     2 ^ ParameterShape.xmssHeight p shape ≤ 2 ^ 32 := by
+  cases p <;> cases shape <;> decide
+
+private theorem xmssHeight_le_nine (p : SecurityBytes) (shape : ParameterShape) :
+    ParameterShape.xmssHeight p shape ≤ 9 := by
   cases p <;> cases shape <;> decide
 
 private def leafAddressWord {p : SecurityBytes} {shape : ParameterShape}
@@ -100,53 +96,26 @@ private def heightAddressWord {p : SecurityBytes} {shape : ParameterShape}
     (level : Fin (ParameterShape.xmssHeight p shape)) : AddressWord :=
   ⟨level.val + 1, by
     have hlevel := level.isLt
-    have hheight := ParameterShape.xmssHeight_le_nine p shape
+    have hheight := xmssHeight_le_nine p shape
     omega⟩
 
-/-- Algorithm 11 lines 1--2: clear to `WOTS_HASH` and write the selected leaf index. -/
-@[expose] def wotsHashAddress {p : SecurityBytes} {shape : ParameterShape}
+private def wotsHashAddress {p : SecurityBytes} {shape : ParameterShape}
     (address : Address) (idx : LeafIndex p shape) : Address :=
   (address.setTypeAndClear .wotsHash).setKeyPairAddress (leafAddressWord idx)
 
-@[simp] theorem wotsHashAddress_type {p : SecurityBytes} {shape : ParameterShape}
-    (address : Address) (idx : LeafIndex p shape) :
-    (wotsHashAddress address idx).addressType = .wotsHash :=
-  rfl
-
-@[simp] theorem wotsHashAddress_keyPair {p : SecurityBytes} {shape : ParameterShape}
-    (address : Address) (idx : LeafIndex p shape) :
-    (wotsHashAddress address idx).word5.val = idx.val :=
-  rfl
-
-@[simp] theorem wotsHashAddress_cleared {p : SecurityBytes} {shape : ParameterShape}
-    (address : Address) (idx : LeafIndex p shape) :
-    (wotsHashAddress address idx).word6 = 0 ∧ (wotsHashAddress address idx).word7 = 0 :=
-  ⟨rfl, rfl⟩
-
-theorem wotsHashAddress_valid {p : SecurityBytes} {shape : ParameterShape}
+private theorem wotsHashAddress_valid {p : SecurityBytes} {shape : ParameterShape}
     (address : Address) (idx : LeafIndex p shape) :
     WOTS.ValidHashAddress (wotsHashAddress address idx) :=
   rfl
 
-/-- Algorithm 11 lines 6--7: clear to `TREE` and initialize the mutable tree index with `idx`. -/
-@[expose] def initialTreeAddress {p : SecurityBytes} {shape : ParameterShape}
+private def initialTreeAddress {p : SecurityBytes} {shape : ParameterShape}
     (address : Address) (idx : LeafIndex p shape) : Address :=
   (address.setTypeAndClear .tree).setTreeIndex (leafAddressWord idx)
 
-@[simp] theorem initialTreeAddress_fields {p : SecurityBytes} {shape : ParameterShape}
-    (address : Address) (idx : LeafIndex p shape) :
-    (initialTreeAddress address idx).addressType = .tree ∧
-      (initialTreeAddress address idx).word5 = 0 ∧
-      (initialTreeAddress address idx).word6 = 0 ∧
-      (initialTreeAddress address idx).word7.val = idx.val :=
-  ⟨rfl, rfl, rfl, rfl⟩
-
-/-- The line 10 branch predicate at level `k`. -/
-@[expose] def nodeIsLeft (index level : ℕ) : Bool :=
+private def nodeIsLeft (index level : ℕ) : Bool :=
   (index / 2 ^ level) % 2 == 0
 
-/-- The branch predicate is true exactly when `floor(index / 2^level)` is even. -/
-theorem nodeIsLeft_eq_true_iff (index level : ℕ) :
+private theorem nodeIsLeft_eq_true_iff (index level : ℕ) :
     nodeIsLeft index level = true ↔ (index / 2 ^ level) % 2 = 0 := by
   simp [nodeIsLeft]
 
@@ -170,32 +139,15 @@ private theorem nextTreeIndexAddressWord_eq_half (current : AddressWord) (left :
     simp only [nextTreeIndexAddressWord, h, if_false]
     omega
 
-/-- Algorithm 11 lines 9 and 11/14: update the mutable tree address for one `H` call. -/
-def authenticationStepAddress {p : SecurityBytes} {shape : ParameterShape}
+private def authenticationStepAddress {p : SecurityBytes} {shape : ParameterShape}
     (current : Address) (level : Fin (ParameterShape.xmssHeight p shape))
     (left : Bool) : Address :=
   (current.setTreeHeight (heightAddressWord level)).setTreeIndex
     (nextTreeIndexAddressWord current.word7 left)
 
-/-- The step writes height `k + 1` and exactly the source-prescribed even/odd index update. -/
-@[simp] theorem authenticationStepAddress_fields {p : SecurityBytes} {shape : ParameterShape}
-    (current : Address) (level : Fin (ParameterShape.xmssHeight p shape)) (left : Bool) :
-    (authenticationStepAddress current level left).word6.val = level.val + 1 ∧
-      (authenticationStepAddress current level left).word7.val =
-        if left = true then current.word7.val / 2 else (current.word7.val - 1) / 2 := by
-  cases left <;> exact ⟨rfl, rfl⟩
-
-/-- A step preserves the type and common XMSS-tree location of its mutable address. -/
-@[simp] theorem authenticationStepAddress_fixed {p : SecurityBytes} {shape : ParameterShape}
-    (current : Address) (level : Fin (ParameterShape.xmssHeight p shape)) (left : Bool) :
-    (authenticationStepAddress current level left).addressType = current.addressType ∧
-      (authenticationStepAddress current level left).layerAddress = current.layerAddress ∧
-      (authenticationStepAddress current level left).treeAddress = current.treeAddress :=
-  ⟨rfl, rfl, rfl⟩
-
 /-- When the current index is `floor(idx / 2^levels)`, the source's even/odd update produces
 `floor(idx / 2^(levels + 1))`. -/
-theorem authenticationStepAddress_index {p : SecurityBytes} {shape : ParameterShape}
+private theorem authenticationStepAddress_index {p : SecurityBytes} {shape : ParameterShape}
     (current : Address) (idx : LeafIndex p shape) (levels : ℕ)
     (level : Fin (ParameterShape.xmssHeight p shape)) (_hlevel : level.val = levels)
     (hindex : current.word7.val = idx.val / 2 ^ levels) :
@@ -208,8 +160,7 @@ theorem authenticationStepAddress_index {p : SecurityBytes} {shape : ParameterSh
   rw [nextTreeIndexAddressWord_eq_half current.word7 (nodeIsLeft idx.val levels) hleft, hindex,
     Nat.div_div_eq_div_mul, ← pow_succ]
 
-/-- Exact mutable-address state after `levels` authentication steps. -/
-@[expose] def AddressAtLevel {p : SecurityBytes} {shape : ParameterShape}
+private def AddressAtLevel {p : SecurityBytes} {shape : ParameterShape}
     (initial : Address) (idx : LeafIndex p shape) (levels : ℕ) (current : Address) : Prop :=
   current.addressType = .tree ∧
     current.word5 = 0 ∧
@@ -219,13 +170,13 @@ theorem authenticationStepAddress_index {p : SecurityBytes} {shape : ParameterSh
     current.treeAddress = initial.treeAddress
 
 /-- Lines 6--7 establish the level-zero tree-address invariant. -/
-theorem addressAtLevel_initial {p : SecurityBytes} {shape : ParameterShape}
+private theorem addressAtLevel_initial {p : SecurityBytes} {shape : ParameterShape}
     (initial : Address) (idx : LeafIndex p shape) :
     AddressAtLevel initial idx 0 (initialTreeAddress initial idx) := by
   simp [AddressAtLevel, initialTreeAddress]
 
 /-- Lines 9 and 11/14 advance the exact mutable-address invariant by one level. -/
-theorem AddressAtLevel.step {p : SecurityBytes} {shape : ParameterShape}
+private theorem addressAtLevel_step {p : SecurityBytes} {shape : ParameterShape}
     {initial current : Address} {idx : LeafIndex p shape} {levels : ℕ}
     (hcurrent : AddressAtLevel initial idx levels current)
     (level : Fin (ParameterShape.xmssHeight p shape)) (hlevel : level.val = levels) :
@@ -237,29 +188,13 @@ theorem AddressAtLevel.step {p : SecurityBytes} {shape : ParameterShape}
   · exact authenticationStepAddress_index current idx levels level hlevel hindex
 
 /-- The exact ordered two-block input to `H` at one authentication level. -/
-def authenticationInput {p : SecurityBytes} {shape : ParameterShape}
+private def authenticationInput {p : SecurityBytes} {shape : ParameterShape}
     (idx : LeafIndex p shape) (level : Fin (ParameterShape.xmssHeight p shape))
     (node authenticationNode : NBytes p) : TwoNBytes p :=
   if nodeIsLeft idx.val level.val = true then
     FixedBytes.pairBlocks node authenticationNode
   else
     FixedBytes.pairBlocks authenticationNode node
-
-/-- On an even quotient, the current node is the left `H` input block. -/
-theorem authenticationInput_of_left {p : SecurityBytes} {shape : ParameterShape}
-    (idx : LeafIndex p shape) (level : Fin (ParameterShape.xmssHeight p shape))
-    (node authenticationNode : NBytes p) (hleft : nodeIsLeft idx.val level.val = true) :
-    authenticationInput idx level node authenticationNode =
-      FixedBytes.pairBlocks node authenticationNode := by
-  simp only [authenticationInput, hleft, if_true]
-
-/-- On an odd quotient, the authentication node is the left `H` input block. -/
-theorem authenticationInput_of_right {p : SecurityBytes} {shape : ParameterShape}
-    (idx : LeafIndex p shape) (level : Fin (ParameterShape.xmssHeight p shape))
-    (node authenticationNode : NBytes p) (hright : nodeIsLeft idx.val level.val = false) :
-    authenticationInput idx level node authenticationNode =
-      FixedBytes.pairBlocks authenticationNode node := by
-  simp only [authenticationInput, hright, Bool.false_eq_true, if_false]
 
 /-- Exact operations performed by an authentication-path prefix. -/
 structure AuthenticationCalls where
@@ -291,7 +226,7 @@ private def AuthenticationCalls.addStep (calls : AuthenticationCalls) (left : Bo
       calls.authenticationFirstBranches + if left = true then 0 else 1 }
 
 /-- Closed source-operation ledger for the first `levels` authentication nodes. -/
-@[expose] def authenticationCalls (index : ℕ) : ℕ → AuthenticationCalls
+def authenticationCalls (index : ℕ) : ℕ → AuthenticationCalls
   | 0 => ⟨0, 0, 0, 0, 0, 0, 0⟩
   | levels + 1 => (authenticationCalls index levels).addStep (nodeIsLeft index levels)
 
@@ -318,8 +253,7 @@ theorem authenticationCalls_branch_partition (index levels : ℕ) :
       cases hleft : nodeIsLeft index levels <;>
         simp [authenticationCalls, AuthenticationCalls.addStep, hleft, ih]
 
-/-- Output and structurally accumulated operations of an authentication-path fold. -/
-structure AuthenticationRun (p : SecurityBytes) where
+private structure AuthenticationRun (p : SecurityBytes) where
   /-- The current `n`-byte tree node. -/
   output : NBytes p
   /-- The mutable address after the processed prefix. -/
@@ -329,7 +263,7 @@ structure AuthenticationRun (p : SecurityBytes) where
 
 /-- Instrumented Algorithm 11 lines 8--18 for an authentication-path prefix. Calls occur in
 increasing level order, and each recursive step derives its output from the preceding output. -/
-def authenticationRootWithCalls (family : HashFamily) {p : SecurityBytes}
+private def authenticationRootWithCalls (family : HashFamily) {p : SecurityBytes}
     {shape : ParameterShape} (idx : LeafIndex p shape)
     (authentication : Fin (ParameterShape.xmssHeight p shape) → NBytes p)
     (publicSeed : NBytes p) (address : Address) (leaf : NBytes p) :
@@ -346,40 +280,7 @@ def authenticationRootWithCalls (family : HashFamily) {p : SecurityBytes}
         address := nextAddress
         calls := previous.calls.addStep left }
 
-/-- Direct semantic base equation for the actual recursive evaluator. Before the first `H` call,
-the output is the WOTS+ leaf and lines 6--7 have initialized the mutable tree address. -/
-theorem authenticationRootWithCalls_zero (family : HashFamily) {p : SecurityBytes}
-    {shape : ParameterShape} (idx : LeafIndex p shape)
-    (authentication : Fin (ParameterShape.xmssHeight p shape) → NBytes p)
-    (publicSeed : NBytes p) (address : Address) (leaf : NBytes p)
-    (hzero : 0 ≤ ParameterShape.xmssHeight p shape) :
-    authenticationRootWithCalls family idx authentication publicSeed address leaf 0 hzero =
-      { output := leaf
-        address := initialTreeAddress address idx
-        calls := authenticationCalls idx.val 0 } :=
-  rfl
-
-/-- Direct semantic successor equation for the actual recursive evaluator. The next output is one
-addressed `H` call over the source-ordered current/authentication pair. -/
-theorem authenticationRootWithCalls_succ_output (family : HashFamily) {p : SecurityBytes}
-    {shape : ParameterShape} (idx : LeafIndex p shape)
-    (authentication : Fin (ParameterShape.xmssHeight p shape) → NBytes p)
-    (publicSeed : NBytes p) (address : Address) (leaf : NBytes p) (levels : ℕ)
-    (hlevels : levels + 1 ≤ ParameterShape.xmssHeight p shape) :
-    (authenticationRootWithCalls family idx authentication publicSeed address leaf (levels + 1)
-      hlevels).output =
-      let previous := authenticationRootWithCalls family idx authentication publicSeed address leaf
-        levels (Nat.le_trans (Nat.le_succ levels) hlevels)
-      let level : Fin (ParameterShape.xmssHeight p shape) :=
-        ⟨levels, Nat.lt_of_lt_of_le (Nat.lt_succ_self levels) hlevels⟩
-      let left := nodeIsLeft idx.val levels
-      let nextAddress := authenticationStepAddress previous.address level left
-      h family publicSeed nextAddress
-        (authenticationInput idx level previous.output (authentication level)) :=
-  rfl
-
-/-- The instrumented authentication fold has exactly its closed recursive source ledger. -/
-@[simp] theorem authenticationRootWithCalls_calls (family : HashFamily) {p : SecurityBytes}
+private theorem authenticationRootWithCalls_calls (family : HashFamily) {p : SecurityBytes}
     {shape : ParameterShape} (idx : LeafIndex p shape)
     (authentication : Fin (ParameterShape.xmssHeight p shape) → NBytes p)
     (publicSeed : NBytes p) (address : Address) (leaf : NBytes p) (levels : ℕ)
@@ -393,7 +294,8 @@ theorem authenticationRootWithCalls_succ_output (family : HashFamily) {p : Secur
 
 /-- The address carried by the actual recursive run has the exact Algorithm 11 state after every
 processed prefix. -/
-theorem authenticationRootWithCalls_addressAtLevel (family : HashFamily) {p : SecurityBytes}
+private theorem authenticationRootWithCalls_addressAtLevel (family : HashFamily)
+    {p : SecurityBytes}
     {shape : ParameterShape} (idx : LeafIndex p shape)
     (authentication : Fin (ParameterShape.xmssHeight p shape) → NBytes p)
     (publicSeed : NBytes p) (address : Address) (leaf : NBytes p) (levels : ℕ)
@@ -409,25 +311,7 @@ theorem authenticationRootWithCalls_addressAtLevel (family : HashFamily) {p : Se
           (authenticationRootWithCalls family idx authentication publicSeed address leaf levels
             (by omega)).address
           ⟨levels, by omega⟩ (nodeIsLeft idx.val levels))
-      exact AddressAtLevel.step (ih (by omega)) ⟨levels, by omega⟩ rfl
-
-/-- Algorithm 11 lines 8--18 for the complete `h'`-node authentication path. -/
-def authenticationRoot (family : HashFamily) {p : SecurityBytes} {shape : ParameterShape}
-    (idx : LeafIndex p shape)
-    (authentication : Fin (ParameterShape.xmssHeight p shape) → NBytes p)
-    (publicSeed : NBytes p) (address : Address) (leaf : NBytes p) : NBytes p :=
-  (authenticationRootWithCalls family idx authentication publicSeed address leaf
-    (ParameterShape.xmssHeight p shape) le_rfl).output
-
-/-- The complete root is the output projection of the instrumented authentication fold. -/
-theorem authenticationRootWithCalls_output (family : HashFamily) {p : SecurityBytes}
-    {shape : ParameterShape} (idx : LeafIndex p shape)
-    (authentication : Fin (ParameterShape.xmssHeight p shape) → NBytes p)
-    (publicSeed : NBytes p) (address : Address) (leaf : NBytes p) :
-    (authenticationRootWithCalls family idx authentication publicSeed address leaf
-      (ParameterShape.xmssHeight p shape) le_rfl).output =
-      authenticationRoot family idx authentication publicSeed address leaf :=
-  rfl
+      exact addressAtLevel_step (ih (by omega)) ⟨levels, by omega⟩ rfl
 
 /-- Exact source operations of Algorithm 11, including the nested Algorithm 8 ledger. -/
 structure OperationLedger where
@@ -493,9 +377,6 @@ structure SourceLedger where
     treeIndexWrites := 1 + ParameterShape.xmssHeight p shape
     authentication := authenticationCalls idx.val (ParameterShape.xmssHeight p shape) }
 
-/-- Concrete hash calls in this module do not cross an external oracle boundary. -/
-@[expose] def queryLedger : QueryLedger := ⟨0, 0⟩
-
 /-- Closed static-shape ledger for one standardized Algorithm 11 invocation. -/
 @[expose] def staticDescriptionLedger (p : SecurityBytes) (shape : ParameterShape) :
     StaticDescriptionLedger :=
@@ -512,22 +393,8 @@ structure SourceLedger where
 @[expose] def sourceLedger {p : SecurityBytes} {shape : ParameterShape}
     (M : WOTS.Message p) (idx : LeafIndex p shape) : SourceLedger :=
   { operations := operationLedger M idx
-    queries := queryLedger
+    queries := ⟨0, 0⟩
     staticDescription := staticDescriptionLedger p shape }
-
-@[simp] theorem queryLedger_eq_zero :
-    queryLedger.externalOracleQueries = 0 ∧ queryLedger.externalOracleHandlers = 0 :=
-  ⟨rfl, rfl⟩
-
-@[simp] theorem staticDescriptionLedger_no_compiled_size
-    (p : SecurityBytes) (shape : ParameterShape) :
-    (staticDescriptionLedger p shape).compiledDescriptionBytes = none :=
-  rfl
-
-@[simp] theorem operationLedger_hCalls {p : SecurityBytes} {shape : ParameterShape}
-    (M : WOTS.Message p) (idx : LeafIndex p shape) :
-    (operationLedger M idx).authentication.hCalls = ParameterShape.xmssHeight p shape :=
-  (authenticationCalls_fixed idx.val (ParameterShape.xmssHeight p shape)).2.2.1
 
 /-- Reconstructed root and ledgers actually accumulated by Algorithm 11. -/
 structure PublicKeyFromSigRun (p : SecurityBytes) where
@@ -554,7 +421,7 @@ def xmssPkFromSigWithLedger (family : HashFamily) {p : SecurityBytes}
             keyPairAddressWrites := 1
             treeIndexWrites := 1 + ParameterShape.xmssHeight p shape
             authentication := authenticationRun.calls }
-        queries := queryLedger
+        queries := ⟨0, 0⟩
         staticDescription := staticDescriptionLedger p shape } }
 
 /-- FIPS 205 Algorithm 11 as the output projection of its instrumented evaluator. -/
@@ -577,16 +444,6 @@ theorem xmssPkFromSigWithLedger_output (family : HashFamily) {p : SecurityBytes}
     (M : WOTS.Message p) (publicSeed : NBytes p) (address : Address) :
     (xmssPkFromSigWithLedger family idx sig M publicSeed address).output =
       xmssPkFromSig family idx sig M publicSeed address :=
-  rfl
-
-/-- Algorithm 11 visibly composes Algorithm 8 with the ordered `h'`-level authentication fold. -/
-theorem xmssPkFromSig_eq (family : HashFamily) {p : SecurityBytes} {shape : ParameterShape}
-    (idx : LeafIndex p shape) (sig : Signature p shape) (M : WOTS.Message p)
-    (publicSeed : NBytes p) (address : Address) :
-    xmssPkFromSig family idx sig M publicSeed address =
-      authenticationRoot family idx sig.authentication publicSeed address
-        (WOTS.wotsPkFromSig family sig.wots M publicSeed (wotsHashAddress address idx)
-          (wotsHashAddress_valid address idx)) :=
   rfl
 
 end Cslib.Crypto.SLHDSA.XMSS

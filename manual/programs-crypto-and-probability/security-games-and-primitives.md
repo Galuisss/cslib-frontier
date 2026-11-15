@@ -510,9 +510,9 @@ records exact `F`/`T_len` calls, address writes and byte shapes, including the
 `len * (w - 1)` bound. It deliberately does not invent lower-level permutation/compression or
 machine-program costs that the current hash-call API does not expose.
 
-The verification-facing XMSS composition is in
+The definitions-only, verification-facing XMSS composition is in
 [`SLHDSA/XMSS/PublicKeyFromSignature.lean`](../../CslibFrontier/Crypto/Primitives/SLHDSA/XMSS/PublicKeyFromSignature.lean),
-with ordinary-import clients in
+with public-API checks in
 [`SLHDSAXMSSPublicKey.lean`](../../CslibFrontierTests/Crypto/SLHDSAXMSSPublicKey.lean).
 `XMSS.xmssPkFromSig` implements FIPS 205 Algorithm 11: it clears and initializes the WOTS hash
 address, invokes Algorithm 8, clears and initializes the tree address, then makes exactly `h'`
@@ -521,10 +521,15 @@ shape contains exactly `len` WOTS+ blocks and `h'` authentication blocks. The st
 accumulated operation ledger retains the nested WOTS+ counts and the branch/address operations;
 the separate query ledger records zero external oracle queries or handlers because all hashes are
 concrete. The static ledger records signature and hash-input shapes and explicitly leaves compiled
-description size unmeasured.
+description size unmeasured. The first library consumer is the separately scoped FIPS 205
+Algorithm 13 hypertree verifier in [#5656](https://github.com/cslib-community/cslib-frontier/issues/5656),
+which adds the `d`-layer signature representation, index slicing, address evolution and final root
+comparison.
 
-This milestone still does not define WOTS+ key generation or signing, XMSS tree generation or
-signing, or prove that a generated signature reconstructs its generated public key. FORS,
+The first semantic correctness property for this definition would state that an Algorithm 10
+signature reconstructs the corresponding Algorithm 9 root. This milestone does not prove that
+property because it does not yet define WOTS+ key generation or signing, XMSS tree generation or
+signing. FORS,
 hypertree and top-level sign/verify composition; classical or quantum reductions; and exact
 machine, program-size, gate, qubit and query costs remain obligations under the NIST post-quantum
 portfolio roadmap item.
