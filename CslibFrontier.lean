@@ -3881,6 +3881,12 @@ public import CslibFrontier.Computability.PointerMachine.Embedding
 public import CslibFrontier.Computability.PointerMachine.Renaming
 public import CslibFrontier.Computability.PointerMachine.Simulation
 public import CslibFrontier.Computability.PointerMachine.Symbols
+public import CslibFrontier.Computability.PointerMachine.WordRAM.Allocation
+public import CslibFrontier.Computability.PointerMachine.WordRAM.Compiler
+public import CslibFrontier.Computability.PointerMachine.WordRAM.Correctness
+public import CslibFrontier.Computability.PointerMachine.WordRAM.Effect
+public import CslibFrontier.Computability.PointerMachine.WordRAM.Encoding
+public import CslibFrontier.Computability.PointerMachine.WordRAM.Memory
 public import CslibFrontier.Computability.PolyTime.BitString.InitialTestsSearch
 public import CslibFrontier.Computability.PolyTime.BitString.TannerSearch
 public import CslibFrontier.Computability.PolyTime.BooleanAnalysis.BoundedIncidenceCounter
@@ -4230,6 +4236,7 @@ public import CslibFrontier.Computability.WordRAM.Allocation
 public import CslibFrontier.Computability.WordRAM.ArrayAppend
 public import CslibFrontier.Computability.WordRAM.ArrayNormalize
 public import CslibFrontier.Computability.WordRAM.Basis
+public import CslibFrontier.Computability.WordRAM.Blocks
 public import CslibFrontier.Computability.WordRAM.BoundedExec
 public import CslibFrontier.Computability.WordRAM.Call
 public import CslibFrontier.Computability.WordRAM.Compile

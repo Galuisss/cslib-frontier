@@ -117,6 +117,43 @@ The [embedding client](../../CslibFrontierTests/PointerMachineEmbedding.lean), c
 chain into a reordered four-node heap with extra incoming links. It checks fresh allocation,
 preservation of old address images, and a loop whose exact cost remains 15 instructions.
 
+To compile to the standard word RAM, import
+[`CslibFrontier.Computability.PointerMachine.WordRAM.Correctness`](../../CslibFrontier/Computability/PointerMachine/WordRAM/Correctness.lean)
+and use the namespace `Cslib.PointerMachine.WordRAM`. Supply `Scalars M L`: an injective
+single-word encoding of data, actual word-RAM programs for the scalar operations and tests,
+and proofs of their values, frames, admissibility conditions and instruction bounds.
+These hypotheses concern scalar routines only. The compiler implements pointer access,
+null behavior, field updates, allocation and control flow itself.
+
+`S.compile code` is a finite standard-word-RAM program. Each source instruction has a fixed-size
+code block, and branches jump directly to the corresponding block. A node occupies
+`stride L = max 1 (L.ptrFields + L.dataFields)` words; null is zero and node `a` has
+address `1 + stride L * a`. This address arithmetic belongs to the compiled implementation.
+The source instruction set still has no address arithmetic.
+
+`S.executes_compile` starts with `encodeState S.encode x`, the canonical encoding of the
+source state, at target label `S.blockSize code * x.pc`. If the valid source state executes
+successfully in `time` instructions, the theorem produces a target run ending at a state
+representing the entire source result, followed by a halt returning zero. The target run plus
+halt costs at most `S.overhead code * time`. The constant is computed from the fixed source
+program, layout and supplied scalar instruction bounds. `S.runs_compile` also handles finite
+runs from any represented state, and `S.length_compile` gives the compiled program length.
+
+The caller proves `Fits` at every source instruction boundary and the scalar admissibility
+conditions for calls that execute. `Fits` bounds encoded scalar values and the next-free
+address; validity then bounds all pointer words and occupied field addresses. The compiler
+proofs discharge intermediate address bounds and new-record initialization internally.
+`bounded_encodeState` proves that the canonical target registers and memory contain fitting
+words. Input-list preparation and output decoding are outside this theorem: it is a simulation
+from encoded machine states. The theorem bounds instruction time, not scalar routines'
+transient workspace; their memory frame constrains their final memory only. It does not prove
+fault correspondence, or supply encodings and scalar implementations for every possible `Model`.
+
+The [compiler client](../../CslibFrontierTests/PointerMachineWordRAM.lean) supplies concrete
+natural-number scalar routines and checks allocation, field access, arithmetic, branching and
+looping. Build it with
+`lake build CslibFrontierTests.PointerMachineWordRAM --wfail --iofail`.
+
 GenericRAM was assessed for reuse: its `evalOp` receives only register operands and
 fixed configuration, and `Data.mem` has no allocation state. Its `admissible` and
 `validMove` checks cannot consult a changing heap. Tagging values and restricting
