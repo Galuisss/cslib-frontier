@@ -201,7 +201,7 @@ private theorem rowSpec_of_check (e : ℕ × SplitVariable × Route)
     rw [hp]
     exact hav.resolve_left hwne
   · intro i hne
-    have hav := hc ⟨i.val, by simpa only [geometry] using i.isLt⟩
+    have hav := hc ⟨i.val, by simpa only [geometry, drawing_sizes.1] using i.isLt⟩
       (List.mem_finRange _)
     simp only [Bool.or_eq_true, beq_iff_eq] at hav
     exact hav.resolve_left hne
