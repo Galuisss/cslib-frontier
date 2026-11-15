@@ -747,10 +747,10 @@ private theorem prefetchDecaps_map_completionCache
       PMF.bind_map]
     apply PMF.bind_congr_on_support
     intro z _
-    split_ifs
-    · simp only [StateT.run_pure, OracleComp.run_interpret_pure, PMF.monad_pure_eq_pure,
-        PMF.pure_map]
-    · simpa only [stateT_map_apply, OracleComp.run_interpret_map,
+    split <;> rename_i henc
+    · simp only [henc, ↓reduceIte, StateT.run_pure, OracleComp.run_interpret_pure,
+        PMF.monad_pure_eq_pure, PMF.pure_map]
+    · simpa only [henc, ↓reduceIte, stateT_map_apply, OracleComp.run_interpret_map,
         OracleComp.run_interpret_query, PMF.map_comp, Function.comp_def, Prod.map_apply, id_eq,
         PMF.monad_map_eq_map] using
         congrArg (PMF.map (Prod.map some id))
