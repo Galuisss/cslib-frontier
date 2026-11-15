@@ -16,6 +16,7 @@ on:
           - hierarchy
           - succinct
           - degree
+          - imports
 
 # A new run for a pull request cancels that pull request's superseded run. Push runs on `main`
 # share `lean-ci-main` without `cancel-in-progress`: the active `main` run finishes and uploads the
@@ -622,5 +623,42 @@ jobs:
         with:
           name: degree-evidence-ef1d1d095
           path: ${{ runner.temp }}/degree-evidence
+          if-no-files-found: error
+          retention-days: 30
+
+  imports-evidence:
+    if: github.event_name == 'workflow_dispatch' && inputs.evidence == 'imports'
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    permissions:
+      contents: read
+    steps:
+      - name: Exact reviewed import-boundary target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: dad6003e4d424ec922aefa7e4c021071c2ff0f67
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Reviewed disposable harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: harness
+          persist-credentials: false
+      - name: Reclaim unused hosted-runner SDK space
+        continue-on-error: true
+        run: scripts/ci/prepare-runner.sh
+      - uses: ./.github/actions/install-lean
+      - name: Strict targeted build and read-only import suggestions
+        timeout-minutes: 100
+        env:
+          LAKE_CACHE_DIR: ${{ runner.temp }}/imports-lake-cache
+        run: python3 -u harness/scripts/ci/imports-evidence.py
+      - name: Retain all import-check evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: imports-evidence-dad6003e4
+          path: ${{ runner.temp }}/imports-evidence
           if-no-files-found: error
           retention-days: 30
