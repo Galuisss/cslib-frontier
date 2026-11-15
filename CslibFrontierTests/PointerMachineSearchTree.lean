@@ -8,6 +8,7 @@ module
 -- upstream: local-only (regression tests)
 
 import CslibFrontier.DataStructure.AVLTree.PointerMachine
+import CslibFrontier.DataStructure.SearchTree.PointerMachine.Update
 
 /-! A linked three-node tree with an unrelated record, metadata and client registers.
 Both outcomes and empty-tree termination are tested, together with the logarithmic theorem. -/
@@ -78,3 +79,22 @@ example : ¬ Represents (initial 1).heap none (.node (label 0 8) .nil .nil) := b
   intro h
   have data := congrArg (fun n => n.map (fun r => r.data 0)) h.1
   norm_num [initial, record, label] at data
+
+-- An arbitrary payload is stored at the cursor without changing any key or client register.
+example (value : ℕ) :
+    ∃ y, Executes [.storeData 1 0 2, .halt]
+        ((initial 2).setData 2 value) y 2 ∧
+      Represents y.heap none (updateData tree 0 1 value) ∧
+      y.ptr = (initial 2).ptr ∧
+      y.data = ((initial 2).setData 2 value).data ∧
+      y.heap.length = 4 ∧
+      (∀ b, b ≠ 0 → y.heap[b]? = (initial 2).heap[b]?) := by
+  exact storeData_correct ((initial 2).setData 2 value) tree none
+    (by simp [State.setData, Represents, initial, tree, root, label]) 0 0 rfl 1 2 rfl
+
+example (value : ℕ) : keys (updateData tree 0 1 value) = keys tree :=
+  keys_updateData tree 0 1 value (by decide)
+
+-- Writing the key itself is deliberately not covered by the key-preservation theorem.
+example : keys (updateData tree 0 0 8) =
+    .node 8 (.node 1 .nil .nil) (.node 3 .nil .nil) := by decide

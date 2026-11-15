@@ -5281,8 +5281,11 @@ public import CslibFrontier.DataStructure.SearchTree.Basic
 public import CslibFrontier.DataStructure.SearchTree.Cost
 public import CslibFrontier.DataStructure.SearchTree.Erase
 public import CslibFrontier.DataStructure.SearchTree.Impl
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Allocation
 public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Representation
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Rotation
 public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Search
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Update
 public import CslibFrontier.DataStructure.SplayTree.AccessLemma
 public import CslibFrontier.DataStructure.SplayTree.Basic
 public import CslibFrontier.DataStructure.SplayTree.Impl

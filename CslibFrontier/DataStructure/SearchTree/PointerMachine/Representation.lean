@@ -63,6 +63,19 @@ The first pointer is the external parent of the represented subtree. -/
   | p, .node x l r => heap[x.address]? = some (record (root l) (root r) p x) ∧
       Represents heap (some x.address) l ∧ Represents heap (some x.address) r
 
+/-- Appending fresh records preserves every existing linked-tree representation. -/
+theorem Represents.append {heap : List (Record M (layout extra regs))}
+    {parent : Pointer} {tree : BinaryTree (Label M extra)}
+    (h : Represents heap parent tree) (suffix : List (Record M (layout extra regs))) :
+    Represents (heap ++ suffix) parent tree := by
+  induction tree generalizing parent with
+  | nil => trivial
+  | node label left right ihl ihr =>
+    refine ⟨?_, ihl h.2.1, ihr h.2.2⟩
+    obtain ⟨bound, _⟩ := List.getElem?_eq_some_iff.mp h.1
+    rw [List.getElem?_append_left bound]
+    exact h.1
+
 /-- Forget addresses and metadata, retaining the keys in Frontier's existing tree type. -/
 @[expose] def keys (t : BinaryTree (Label M extra)) : BinaryTree M.Value :=
   t.map fun x => x.data 0

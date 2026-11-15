@@ -214,10 +214,29 @@ covers successful and unsuccessful searches, an empty root, metadata, client reg
 unrelated heap records. Run it with
 `lake build CslibFrontierTests.PointerMachineSearchTree --wfail --iofail`.
 
-This is the search milestone of a BST implementation, not a reverse RAM compiler. Remaining
-work includes constructing initial representations, porting rotations, implementing allocation
-and AVL insertion with a mutable value payload, and compiling RAM loads/stores through that
-dictionary. The eventual RAM simulation must state its scalar-operation assumptions and
+Import the linked-tree
+[`Allocation`](../../CslibFrontier/DataStructure/SearchTree/PointerMachine/Allocation.lean) and
+[`Update`](../../CslibFrontier/DataStructure/SearchTree/PointerMachine/Update.lean) modules
+for separately charged mutation primitives:
+`PointerMachine.allocate_correct` initializes a fresh leaf in `extra + 4` instructions,
+preserving the old heap; `Represents.append` preserves existing tree representations.
+`storeData_correct` proves a scalar-field write in two instructions including halt, with
+the register and unrelated-record frame. `keys_updateData` shows that payload and metadata
+writes preserve the key tree. Allocation does not attach the new leaf to its parent.
+The [allocation client](../../CslibFrontierTests/PointerMachineAllocation.lean) checks arbitrary
+key/payload initialization, old-tree preservation, and allocation into an empty heap.
+
+The [`Rotation`](../../CslibFrontier/DataStructure/SearchTree/PointerMachine/Rotation.lean)
+module implements a right subtree rotation in ten instructions, including halt.
+`rotateRight_represents` proves the new recursive representation, including the pivot
+and middle-subtree parent links, assuming distinct node addresses.
+`AddressesDistinct.rotateRight` preserves that invariant for subsequent rotations.
+The program leaves cached heights unchanged and does not reconnect the external parent's
+child link; those are separate steps needed by AVL insertion. Left rotation remains open.
+
+These are components of a BST implementation, not a reverse RAM compiler. Remaining work
+includes building full initial trees, connecting and composing mutations into AVL insertion
+with a mutable value payload, and compiling RAM loads/stores through that dictionary. The eventual RAM simulation must state its scalar-operation assumptions and
 initialization costs. Arithmetic on simulated RAM addresses is scalar arithmetic; resolving
 an address still requires pointer traversal.
 
