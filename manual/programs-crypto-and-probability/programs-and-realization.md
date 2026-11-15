@@ -118,6 +118,23 @@ runs a stateful adaptive handler whose second request depends on the first reply
 retained machine, non-head lookup, finite dispatch, zero clock, channel mismatch and malformed-word
 boundaries. This is a classical open-oracle realization, not a PPT/QROM security theorem.
 
+[`Universal/Interpreter/NativeHandler.lean`](../../CslibFrontier/Computability/Machines/Turing/MultiTape/Probabilistic/Universal/Interpreter/NativeHandler.lean)
+closes a nonempty fixed-channel interpreter against an actual retained local stateful handler. Its
+one-round artifact instantiates the same coin, table-lookup, command and controller pipeline as the
+open interpreter; there is no second controller semantics. Callers provide support-local reply
+installation bounds and an explicit typed-loop certificate consisting of a handler-state decoder,
+reachability invariant, per-phase time and workspace bounds, final stopping-round law and encoded
+state-length bound. The decoder and invariant are proof data, not executed callbacks. The final
+`Fin 0` artifact returns the source output together with the final private handler state, so no
+external validation channel or transcript is manufactured. Input initialization, handler
+marshalling, every later source request, reply truncation/decoding, loop control and final output
+copy remain charged. The final composed description is the only installed occurrence; its inlined
+handler, query branch, body and loop controls are not added again as separate static copies. The
+ordinary [retained-handler client](../../CslibFrontierTests/Machines/Turing/MultiTape/Probabilistic/Universal/NativeHandler.lean)
+uses a nonconstant all-false Boolean-state handler and exercises the public layout, semantic,
+loop-machine and singleton-static boundary. Application-specific agreement with a higher-level
+reduction still belongs in that reduction's dependent module rather than in this machine layer.
+
 The internal
 [`NativeOracleProgram`](../../CslibFrontier/Computability/Machines/Turing/MultiTape/Internal/NativeOracleProgram.lean)
 retains an actual Boolean `MultiTapePTM`, an explicit finite-control encoding and the resulting
