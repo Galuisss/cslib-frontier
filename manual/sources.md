@@ -619,6 +619,19 @@ coordinates; these counts are not a native cost model. The module does not cover
 conversion. Its separate final-scaling bound permits equality at
 `2^126` for `x = 0`, `ccs = 1`; the module does not claim the reference implementation's endpoint
 representability or the comment's empirical `2^-50` error observation.
+Algorithm 14 line 4 and the archive's
+`Reference_Implementation/falcon512/falcon512int/sign.c::BerExp`, line 1074, connect that integer
+core to the threshold formula `(2 * ApproxExp(r, ccs) - 1) >> s` after `s` is capped at 63.
+`CslibFrontier.Crypto.Falcon.berExpFixedPointThreshold` implements this formula for positive
+fixed-point output and proves its subtraction is nontruncating; the explicit premise excludes the
+module's total `ccs63 = 0` extension. The composed coin reuses the fixed 64-fair-bit threshold law,
+not the C implementation's lazy byte trace at lines 1082--1087. Its source ledger records the
+Algorithm 13 counts plus one threshold doubling, subtraction and shift, one denotational word
+comparison, 64 random bits, zero oracle queries and handler calls, and the occurrence-aware
+832-bit-table retained-size formula. These are not floating-point or approximation-error results,
+a SamplerZ/Gaussian law, a native runtime or program encoding, an asymptotic theorem, a security
+reduction or a claim about the still-developing FIPS 206 standard. The SamplerZ source boundary is
+the same file's `sampler`, lines 1107--1173.
 
 <a id="feige1998"></a>
 ## feige1998

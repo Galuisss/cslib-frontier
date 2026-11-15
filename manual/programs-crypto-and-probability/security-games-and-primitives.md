@@ -488,6 +488,24 @@ attack-resource profile. The wider rounded-input type is only a total bounded ex
 `x ∈ [0, ln 2]`. Floating-point conversion and a certified approximation-error bound remain
 unproved.
 
+Import
+[`Falcon/BerExpFixedPoint.lean`](../../CslibFrontier/Crypto/Computational/Falcon/BerExpFixedPoint.lean)
+for the exact bounded-integer connection between Algorithms 13 and 14.
+`Falcon.berExpFixedPointThreshold` implements line 4's
+`(2 * ApproxExp(r, ccs) - 1) >> s` after `s` has been capped at 63, with an explicit positive-output
+premise so natural subtraction does not silently model unsigned underflow at the total extension's
+`ccs63 = 0` input. `Falcon.berExpFixedPointCoin` reuses the threshold experiment above and proves
+the substituted acceptance mass exactly. The
+[ordinary-import client](../../CslibFrontierTests/Crypto/FalconBerExpFixedPoint.lean) checks the
+maximal threshold and capped `s = 63` endpoint. Its composed ledger derives the 13
+multiply/shifts, 12 Horner subtractions and zero external resources from `approxExpRun`, then adds
+one threshold doubling, subtraction and right shift, one denotational word comparison and 64 fair
+random bits. It reuses the 832-bit table payload and the occurrence-aware
+`controlBits + tableCopies * 832` retained-size formula; the control encoding remains an explicit
+input. This connector does not construct the floating values or rounded inputs, prove positivity
+from SamplerZ's range, certify approximation error, reproduce the lazy byte trace, or establish a
+Gaussian, native-cost, asymptotic, security or FIPS 206 result.
+
 The source-faithful SLH-DSA WOTS+ digit preprocessing from FIPS 205 is in
 [`SLHDSA/WOTS/Digits.lean`](../../CslibFrontier/Crypto/Primitives/SLHDSA/WOTS/Digits.lean), with
 edge checks in [`SLHDSAWOTSDigits.lean`](../../CslibFrontierTests/Crypto/SLHDSAWOTSDigits.lean)
