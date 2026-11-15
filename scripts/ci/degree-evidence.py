@@ -73,7 +73,7 @@ def instrument(source, diagnostic=False):
     assert source.count('private theorem ') == 8, 'unexpected source declarations'
     text = source.replace('namespace CslibFrontierTests.DegreePolyTime',
                           WRAPPER + 'namespace CslibFrontierTests.DegreePolyTime', 1)
-    text = text.replace('import CslibFrontier.', 'import Lean\n\nimport CslibFrontier.', 1)
+    text = text.replace('import CslibFrontier.', 'public meta import Lean.Elab.Command\n\nimport CslibFrontier.', 1)
     for name in NAMES:
         needle = 'private theorem ' + name
         assert text.count(needle) == 1, name
