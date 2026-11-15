@@ -9,6 +9,8 @@ module
 
 public import CslibFrontier.Crypto.Primitives.Hash.HMAC
 public import CslibFrontier.Crypto.Primitives.Hash.MGF1
+public meta import CslibFrontier.Crypto.Primitives.Hash.HMAC
+public meta import CslibFrontier.Crypto.Primitives.Hash.MGF1
 
 /-!
 # HMAC and MGF1 boundary clients
