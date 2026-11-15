@@ -130,7 +130,8 @@ theorem halfDecaps_bad_probability :
       ({} : HalfState)).toOuterMeasure {z | halfBad z.2} = ENNReal.ofReal (1 / 2 : ℝ) := by
   simpa only [halfBad, halfErrorScheme, halfErrorPKE_msgFailProb] using
     (halfErrorScheme.realHandler_decaps_bad_eq_msgFailProb () () halfChallenge
-      halfCiphertext false (st := ({} : HalfState)) (by decide) (by simp) rfl rfl)
+      halfCiphertext false (st := ({} : HalfState))
+        (by simp [halfCiphertext, halfChallenge]) (by simp) rfl rfl)
 
 /-- Direct-query execution under the real concrete handler. -/
 noncomputable def halfDirectReal : PMF Bool :=
