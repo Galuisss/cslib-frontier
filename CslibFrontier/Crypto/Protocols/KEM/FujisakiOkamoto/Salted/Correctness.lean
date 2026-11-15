@@ -1678,6 +1678,19 @@ theorem realHandler_decaps_bad_eq_msgFailProb
   change PMF.pure (none, st) = PMF.pure (none, st)
   rfl
 
+/-- The punctured keyless handler rejects its challenge ciphertext without changing the state. -/
+@[simp] theorem simHandler_decaps_challenge
+    [DecidableEq (JointInput JointPrefix M Salt)]
+    [DecidableEq (RejectionInput RejectPrefix Sigma CT Salt)]
+    [DecidableEq (Ciphertext CT Salt)]
+    (S : Scheme PK SK M R CT JointPrefix Salt RejectPrefix Sigma K)
+    (pk : PK) (challenge : Ciphertext CT Salt)
+    (st : CacheState JointPrefix M Salt RejectPrefix Sigma CT K R) :
+    S.simHandler pk challenge (.decaps challenge) st = PMF.pure (none, st) := by
+  simp only [simHandler, Query.dispatch, ↓reduceIte]
+  change PMF.pure (none, st) = PMF.pure (none, st)
+  rfl
+
 /-- A rejection-oracle query through the real handler cannot create a PKE correctness witness. -/
 theorem realHandler_rejection_bad_eq_zero
     [DecidableEq (JointInput JointPrefix M Salt)]
