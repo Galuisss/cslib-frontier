@@ -18,12 +18,12 @@ open Turing.MultiTapeTM Turing.MultiTapeTM.Internal Turing.MultiTapeTM.Universal
 namespace CslibFrontierTests.Internal.NativeCompilerWitness
 
 /-- A nonconstant direct compiler pipeline: preserve the input bit and attach a true tag. -/
-noncomputable def tagged :
+def tagged :
     NativeCompiler (fun b : Bool => (b, true)) encBool (encPair encBool encBool) :=
   (NativeCompiler.identity encBool).pair (NativeCompiler.const encBool encBool true)
 
 /-- Exercise direct composition after the pair constructor. -/
-noncomputable def pipeline :
+def pipeline :
     NativeCompiler (fun b : Bool => (b, true)) encBool (encPair encBool encBool) :=
   (NativeCompiler.identity (encPair encBool encBool)).comp tagged
 
@@ -110,15 +110,12 @@ example (b : Bool) : pipeline.workspace b =
         (NativeCompiler.identity (encPair encBool encBool)).tapeCount + 20) :=
   rfl
 
-example : pipeline.description =
-    @desc pipeline.tapeCount Bool pipeline.State pipeline.stateFintype inferInstance
-      pipeline.stateEncoding eBit pipeline.machine :=
-  pipeline.description_eq_desc
-
-example : pipeline.staticBits =
-    descLen (@desc pipeline.tapeCount Bool pipeline.State pipeline.stateFintype inferInstance
-      pipeline.stateEncoding eBit pipeline.machine) := by
-  rw [pipeline.staticBits_eq_descLen, pipeline.description_eq_desc]
+/-- The constructive description records every transition of a nontrivial composed compiler. -/
+example (state : pipeline.State) (input : Option Bool)
+    (work : Fin pipeline.tapeCount → Option Bool) :
+    pipeline.description.Holds (pipeline.machine.map pipeline.stateEncoding eBit)
+      (pipeline.stateEncoding state) (input.map eBit) (Option.map eBit ∘ work) :=
+  pipeline.description_holds state input work
 
 example (b : Bool) : pipeline.inputBits b = (encBool b).length :=
   rfl

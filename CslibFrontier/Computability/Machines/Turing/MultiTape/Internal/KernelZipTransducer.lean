@@ -13,6 +13,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Fr
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Frame.Lookup
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.OneWorkTape
 public import Mathlib.Data.Fintype.Option
+import Mathlib.Data.Fintype.Prod
 import Mathlib.Basic.Finite.Prod
 import Mathlib.Basic.Finite.Sum
 
@@ -107,6 +108,7 @@ public inductive State (Q : Type*) where
   | zip (q : Q) (pending : Option Bool)
   /-- Emitting the last output symbol before halting. -/
   | flush (b : Bool)
+  deriving DecidableEq
 
 /-- An encoding of the control states into a finite type. -/
 private def State.toSum {Q : Type*} : State Q → Fin 3 ⊕ (Q × Option Bool) ⊕ Bool
@@ -120,6 +122,15 @@ private def State.toSum {Q : Type*} : State Q → Fin 3 ⊕ (Q × Option Bool) �
 public instance State.instFinite {Q : Type*} [Finite Q] : Finite (State Q) :=
   Finite.of_injective State.toSum fun a b h => by
     cases a <;> cases b <;> simp_all [State.toSum]
+
+/-- Constructive enumeration of the zip-machine states from an enumeration of transducer
+states. -/
+public instance State.instFintype {Q : Type*} [Fintype Q] [DecidableEq Q] : Fintype (State Q) :=
+  ⟨{.copy, .copyBit, .rewind} ∪
+      (Finset.univ.product (Finset.univ : Finset (Option Bool))).image
+        (fun qp : Q × Option Bool => .zip qp.1 qp.2) ∪
+      Finset.univ.image .flush,
+    fun state => by cases state <;> simp⟩
 
 /-- `τ` as an explicit transition table with one work tape. On `frame u ++ v` it copies `u`
 to the work tape, rewinds the work tape, and then runs `τ` on `u` from the work tape and `v`

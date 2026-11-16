@@ -157,6 +157,13 @@ instance instFiniteClearListState : (n : ℕ) → Finite (ClearListState n)
     haveI := instFiniteClearListState n
     inferInstanceAs (Finite (ClearShadowedState ⊕ ClearListState n))
 
+/-- Constructive enumeration of the recursively nested control used to clear a list of tapes. -/
+instance instFintypeClearListState : (n : ℕ) → Fintype (ClearListState n)
+  | 0 => inferInstanceAs (Fintype Unit)
+  | n + 1 =>
+    haveI := instFintypeClearListState n
+    inferInstanceAs (Fintype (ClearShadowedState ⊕ ClearListState n))
+
 variable (m₀ m₁) in
 /-- Clear the work tapes in `l` along their shadows, one after the other. -/
 noncomputable def clearList :

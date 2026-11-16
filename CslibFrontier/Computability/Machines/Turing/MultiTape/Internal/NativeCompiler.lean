@@ -14,6 +14,8 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Ker
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Pair
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Bit
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Bound
+import Mathlib.Data.Finset.Sort
+import Mathlib.Data.List.Lex
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Correct
 public import Mathlib.Logic.Equiv.Nat
 public import Mathlib.Logic.Equiv.Option
@@ -62,8 +64,6 @@ existential computability proof can be extracted into a `NativeCompiler`.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.staticBits`: exact encoded compiler-machine length.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.stateBound`: numeric range of the recorded state
   encoding, computed from its actual codes rather than from state cardinality.
-* `Turing.MultiTapeTM.Internal.NativeCompiler.fintypeStateEncoding`: canonical numeric enumeration
-  for an inferred finite combinator-state type.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.transducerMachineStateEncoding`: constructive
   encoding of the full control state produced by `Transducer.toTM`.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.inputBits`: exact encoded input length.
@@ -78,8 +78,8 @@ existential computability proof can be extracted into a `NativeCompiler`.
 
 ## Main results
 
-* `Turing.MultiTapeTM.Internal.NativeCompiler.description_eq_desc`: identify the recorded
-  description with the universal description of the packaged machine.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.description_holds`: the recorded description
+  contains every transition of the packaged machine under its recorded encodings.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.computableInTimeAndSpace`: forget the named
   construction into the existing plain existential calculus.
 -/
@@ -146,16 +146,6 @@ end-of-input flag. -/
 @[expose] def unitStateEncoding : Unit ↪ ℕ :=
   ⟨fun _ => 0, by intro a b _; cases a; cases b; rfl⟩
 
-/-- Canonical numeric enumeration of an inferred finite state type. This is useful for deeply
-nested direct combinators whose state type is fixed by the machine term itself. -/
-@[expose] noncomputable def fintypeStateEncoding (State : Type*) [Fintype State] : State ↪ ℕ :=
-  (Fintype.equivFin State).toEmbedding.trans Fin.valEmbedding
-
-/-- The canonical finite-state enumeration lies in its actual `Fintype.card` range. -/
-theorem fintypeStateEncoding_lt_card (State : Type*) [Fintype State] (state : State) :
-    fintypeStateEncoding State state < Fintype.card State :=
-  (Fintype.equivFin State state).isLt
-
 /-- Explicit encoding of the input-rewinding states. -/
 @[expose] def rewindStateEncoding : RewindState ↪ ℕ :=
   ⟨fun q => match q with | .start => 0 | .walk => 1,
@@ -171,14 +161,45 @@ theorem fintypeStateEncoding_lt_card (State : Type*) [Fintype State] (state : St
   ⟨fun q => match q with | .start => 0 | .put => 1,
     by intro a b h; cases a <;> cases b <;> simp_all⟩
 
+private def descriptionSymbolCode : Option Bool → ℕ
+  | none => 0
+  | some false => 1
+  | some true => 2
+
+private theorem descriptionSymbolCode_injective : Function.Injective descriptionSymbolCode := by
+  rintro (_ | (_ | _)) (_ | (_ | _)) h <;> simp_all [descriptionSymbolCode]
+
+private def descriptionOrderKey {α β : Type*} {f : α → β}
+    {encIn : α ↪ List Bool} {encOut : β ↪ List Bool}
+    (compiler : NativeCompiler f encIn encOut)
+    (entry : compiler.State × Option Bool × (Fin compiler.tapeCount → Option Bool)) : List ℕ :=
+  compiler.stateEncoding entry.1 :: descriptionSymbolCode entry.2.1 ::
+    (List.ofFn entry.2.2).map descriptionSymbolCode
+
+private theorem descriptionOrderKey_injective {α β : Type*} {f : α → β}
+    {encIn : α ↪ List Bool} {encOut : β ↪ List Bool}
+    (compiler : NativeCompiler f encIn encOut) :
+    Function.Injective (descriptionOrderKey compiler) := by
+  rintro ⟨state, input, work⟩ ⟨state', input', work'⟩ h
+  simp only [descriptionOrderKey, List.cons.injEq] at h
+  rw [compiler.stateEncoding.injective h.1, descriptionSymbolCode_injective h.2.1,
+    List.ofFn_injective ((List.map_injective_iff.mpr descriptionSymbolCode_injective) h.2.2)]
+
+@[instance_reducible] private def descriptionEntryOrder {α β : Type*} {f : α → β}
+    {encIn : α ↪ List Bool} {encOut : β ↪ List Bool}
+    (compiler : NativeCompiler f encIn encOut) :
+    LinearOrder (compiler.State × Option Bool × (Fin compiler.tapeCount → Option Bool)) :=
+  LinearOrder.lift' (descriptionOrderKey compiler) (descriptionOrderKey_injective compiler)
+
 /-- The exact universal description obtained by enumerating the retained transition table. -/
-@[expose] noncomputable def description {α β : Type*} {f : α → β}
+def description {α β : Type*} {f : α → β}
     {encIn : α ↪ List Bool}
     {encOut : β ↪ List Bool} (compiler : NativeCompiler f encIn encOut) : Desc :=
   letI := compiler.stateFintype
+  letI := descriptionEntryOrder compiler
   ⟨compiler.tapeCount, compiler.stateEncoding compiler.table.initial,
     (Finset.univ : Finset
-      (compiler.State × Option Bool × (Fin compiler.tapeCount → Option Bool))).toList.map
+      (compiler.State × Option Bool × (Fin compiler.tapeCount → Option Bool))).sort (· ≤ ·) |>.map
       fun entry =>
         let action := MultiTapeMachine.Action.emptyOracleEquiv
           (compiler.table.tr entry.1 entry.2.1 entry.2.2 Empty.elim)
@@ -186,19 +207,35 @@ theorem fintypeStateEncoding_lt_card (State : Type*) [Fintype State] (state : St
           (Option.map eBit ∘ entry.2.2),
           Act.ofAction (action.map compiler.stateEncoding eBit))⟩
 
-/-- The recorded description is the universal description of the packaged machine under its
-recorded state encoding. -/
-theorem description_eq_desc {α β : Type*} {f : α → β} {encIn : α ↪ List Bool}
-    {encOut : β ↪ List Bool} (compiler : NativeCompiler f encIn encOut) :
-    compiler.description =
-      @desc compiler.tapeCount Bool compiler.State compiler.stateFintype inferInstance
-        compiler.stateEncoding eBit compiler.machine :=
-  by
-    simp only [description, machine, desc, MultiTapeMachine.toTM]
-    congr 1
-    apply List.map_congr_left
-    intro entry _
-    simp only [MultiTapeTM.tr_ofTr]
+/-- The recorded description contains the packaged table's transition at every state and choice
+of symbols under the recorded state and symbol encodings. -/
+theorem description_holds {α β : Type*} {f : α → β} {encIn : α ↪ List Bool}
+    {encOut : β ↪ List Bool} (compiler : NativeCompiler f encIn encOut)
+    (state : compiler.State) (input : Option Bool)
+    (work : Fin compiler.tapeCount → Option Bool) :
+    compiler.description.Holds (compiler.machine.map compiler.stateEncoding eBit)
+      (compiler.stateEncoding state) (input.map eBit) (Option.map eBit ∘ work) := by
+  have hmem : (key (compiler.stateEncoding state) (input.map eBit)
+      (Option.map eBit ∘ work),
+      Act.ofAction ((compiler.machine.tr state input work).map compiler.stateEncoding eBit)) ∈
+      compiler.description.table := by
+    rw [description]
+    refine List.mem_map.mpr ⟨(state, input, work), ?_, ?_⟩
+    · simp only [Finset.mem_sort, Finset.mem_univ]
+    · simp only [machine, MultiTapeMachine.toTM, MultiTapeTM.tr_ofTr]
+  obtain ⟨entry, hentry⟩ := Option.isSome_iff_exists.mp ((List.find?_isSome
+    (p := fun entry => decide (entry.1 = key (compiler.stateEncoding state)
+      (input.map eBit) (Option.map eBit ∘ work)))).mpr ⟨_, hmem, by simp⟩)
+  have hentry' := hentry
+  rw [description] at hentry'
+  obtain ⟨⟨state', input', work'⟩, -, rfl⟩ :=
+    List.mem_map.mp (List.mem_of_find?_eq_some hentry')
+  have hkey := List.find?_some hentry
+  simp only [decide_eq_true_eq] at hkey
+  cases key_injective compiler.stateEncoding eBit
+    (a₁ := (state', input', work')) (a₂ := (state, input, work)) hkey
+  rw [Desc.holds_iff]
+  simp [hentry, tr_map, machine, MultiTapeMachine.toTM]
 
 /-- Exact length of the compiler input under its recorded encoding. This is a separate resource
 coordinate, not runtime charged merely for presenting an already encoded input. -/
@@ -213,19 +250,13 @@ code, this is its emitted program-size charge even if compilation itself is offl
   (encOut (f a)).length
 
 /-- Exact unary-model static program length of the named machine. -/
-@[expose] noncomputable def staticBits {α β : Type*} {f : α → β} {encIn : α ↪ List Bool}
+@[expose] def staticBits {α β : Type*} {f : α → β} {encIn : α ↪ List Bool}
     {encOut : β ↪ List Bool} (compiler : NativeCompiler f encIn encOut) : ℕ :=
   descLen compiler.description
 
-/-- The static program charge is definitionally the length of the recorded description. -/
-theorem staticBits_eq_descLen {α β : Type*} {f : α → β} {encIn : α ↪ List Bool}
-    {encOut : β ↪ List Bool} (compiler : NativeCompiler f encIn encOut) :
-    compiler.staticBits = descLen compiler.description :=
-  rfl
-
 /-- One past the largest numeric code used by the recorded control-state encoding. This is an
 actual-code bound, not the cardinality of the state type. -/
-@[expose] noncomputable def stateBound {α β : Type*} {f : α → β}
+@[expose] def stateBound {α β : Type*} {f : α → β}
     {encIn : α ↪ List Bool} {encOut : β ↪ List Bool}
     (compiler : NativeCompiler f encIn encOut) : ℕ := by
   letI := compiler.stateFintype
@@ -260,7 +291,7 @@ theorem computableInTimeAndSpace {α β : Type*} {f : α → β} {encIn : α ↪
 
 /-- Retype the semantic input of a named compiler when its actual input word is unchanged. The
 same machine is retained and no runtime callback is introduced. -/
-@[expose] noncomputable def ofInputEq {α β γ : Type*} {f : β → γ}
+@[expose] def ofInputEq {α β γ : Type*} {f : β → γ}
     {encIn : α ↪ List Bool} {encMid : β ↪ List Bool} {encOut : γ ↪ List Bool}
     (compiler : NativeCompiler f encMid encOut) (toInput : α → β)
     (henc : ∀ input, encIn input = encMid (toInput input)) :
@@ -278,7 +309,7 @@ same machine is retained and no runtime callback is introduced. -/
 
 /-- Retype the semantic output of a named compiler when the actual emitted word is unchanged. The
 same machine and resource maps are retained. -/
-@[expose] noncomputable def ofOutputEq {α β γ : Type*} {f : α → β} {g : α → γ}
+@[expose] def ofOutputEq {α β γ : Type*} {f : α → β} {g : α → γ}
     {encIn : α ↪ List Bool} {encMid : β ↪ List Bool} {encOut : γ ↪ List Bool}
     (compiler : NativeCompiler f encIn encMid)
     (henc : ∀ input, encOut (g input) = encMid (f input)) :
@@ -295,7 +326,7 @@ same machine and resource maps are retained. -/
       exact compiler.computes input }
 
 /-- The named copy-and-rewind machine. -/
-@[expose] noncomputable def identity {α : Type*} (enc : α ↪ List Bool) :
+@[expose] def identity {α : Type*} (enc : α ↪ List Bool) :
     NativeCompiler (id : α → α) enc enc := by
   letI : Fintype (Unit ⊕ RewindState) := inferInstance
   exact {
@@ -388,7 +419,7 @@ theorem computesTidily_constantOutputTM (input out : List Bool) :
   · simp [MultiTapeNTM.RunPath.space]
 
 /-- A named constant-output machine with its exact output-length clock and zero workspace. -/
-@[expose] noncomputable def const {α β : Type*} (encIn : α ↪ List Bool)
+@[expose] def const {α β : Type*} (encIn : α ↪ List Bool)
     (encOut : β ↪ List Bool) (b : β) :
     NativeCompiler (Function.const α b) encIn encOut :=
   {
@@ -435,7 +466,7 @@ and retains every constant from its exact time and workspace theorem. -/
   }
 
 /-- Concatenate the raw-word outputs of two named machines on the same input. -/
-@[expose] noncomputable def append {α : Type*} {left right : α → List Bool}
+@[expose] def append {α : Type*} {left right : α → List Bool}
     {encIn : α ↪ List Bool}
     (leftCompiler : NativeCompiler left encIn encBits)
     (rightCompiler : NativeCompiler right encIn encBits) :
@@ -489,7 +520,7 @@ universe u v w
 
 /-- Direct standard-pair construction from two named machines on a common input. The left encoded
 output is framed by `encodeFrame`, then the right output is appended. -/
-@[expose] noncomputable def pair {α : Type u} {β : Type v} {γ : Type w}
+@[expose] def pair {α : Type u} {β : Type v} {γ : Type w}
     {f : α → β} {g : α → γ}
     {encIn : α ↪ List Bool} {encLeft : β ↪ List Bool} {encRight : γ ↪ List Bool}
     (left : NativeCompiler f encIn encLeft) (right : NativeCompiler g encIn encRight) :

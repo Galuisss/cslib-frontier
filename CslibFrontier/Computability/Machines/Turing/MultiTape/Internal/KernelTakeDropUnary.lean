@@ -112,6 +112,7 @@ public inductive State where
   | marker (inBit : Bool)
   /-- Streaming: expecting an inner symbol of kind `inBit`. -/
   | symbol (inBit : Bool)
+  deriving DecidableEq
 
 /-- An encoding of the control states into a finite type. -/
 private def State.toSum : State → Fin 4 ⊕ Bool ⊕ Bool
@@ -125,6 +126,11 @@ private def State.toSum : State → Fin 4 ⊕ Bool ⊕ Bool
 public instance State.instFinite : Finite State :=
   Finite.of_injective State.toSum fun a b h => by
     cases a <;> cases b <;> simp_all [State.toSum]
+
+/-- Constructive enumeration of the direct unary take/drop control states. -/
+public instance State.instFintype : Fintype State :=
+  ⟨{.skip, .skipBit, .copy, .rewind, .marker false, .marker true,
+      .symbol false, .symbol true}, fun state => by cases state <;> simp⟩
 
 /-- The explicit table with one work tape cutting `frame u ++ List.replicate n true`: it emits the
 inner frames of `u` while the count `n` lasts (`keep = true`) or after it is used up

@@ -31,7 +31,7 @@ namespace Turing.MultiTapeTM.Internal.NativeCompiler
 
 /-- Direct conditional composition of a named condition and two named branches. The condition
 emits `encTest`; no semantic Boolean callback is hidden behind the assembled machine. -/
-@[expose] noncomputable def ite {Alpha Beta : Type*} {condition : Alpha → Bool}
+@[expose] def ite {Alpha Beta : Type*} {condition : Alpha → Bool}
     {ifTrue ifFalse : Alpha → Beta} {encIn : Alpha ↪ List Bool}
     {encOut : Beta ↪ List Bool}
     (conditionCompiler : NativeCompiler condition encIn encTest)

@@ -102,7 +102,7 @@ theorem streamEmit_firstMatch (encValue : Value ↪ List Bool) (query : Key) :
           simpa using ih false
 
 /-- Retained next-state callback for first-match scanning. -/
-@[expose] noncomputable def firstMatchNextCompiler (encKey : Key ↪ List Bool)
+@[expose] def firstMatchNextCompiler (encKey : Key ↪ List Bool)
     (encValue : Value ↪ List Bool) :
     NativeCompiler firstMatchNext
       (encPair (encPair encKey encBool) (encPair encKey encValue))
@@ -123,7 +123,7 @@ theorem streamEmit_firstMatch (encValue : Value ↪ List Bool) (query : Key) :
     simp [firstMatchNext]
 
 /-- Retained emission callback for first-match scanning. -/
-@[expose] noncomputable def firstMatchEmitCompiler (encKey : Key ↪ List Bool)
+@[expose] def firstMatchEmitCompiler (encKey : Key ↪ List Bool)
     (encValue : Value ↪ List Bool) :
     NativeCompiler firstMatchEmit
       (encPair (encPair encKey encBool) (encPair encKey encValue))
@@ -145,14 +145,14 @@ theorem streamEmit_firstMatch (encValue : Value ↪ List Bool) (query : Key) :
     simp [firstMatchEmit]
 
 /-- Finalization emits no additional match. -/
-@[expose] noncomputable def firstMatchFinishCompiler (encKey : Key ↪ List Bool)
+@[expose] def firstMatchFinishCompiler (encKey : Key ↪ List Bool)
     (encValue : Value ↪ List Bool) :
     NativeCompiler (Function.const (FirstMatchState Key) (none : Option Value))
       (encPair encKey encBool) (encOption encValue) :=
   const (encPair encKey encBool) (encOption encValue) none
 
 /-- Explicit peak lifted-callback workspace over the actual scan rounds. -/
-@[expose] noncomputable def firstMatchSMax (encKey : Key ↪ List Bool)
+@[expose] def firstMatchSMax (encKey : Key ↪ List Bool)
     (encValue : Value ↪ List Bool) (input : FirstMatchState Key × List (Key × Value)) : ℕ :=
   let nextCompiler := firstMatchNextCompiler encKey encValue
   let emitCompiler := firstMatchEmitCompiler encKey encValue
@@ -179,7 +179,7 @@ theorem streamEmit_firstMatch (encValue : Value ↪ List Bool) (query : Key) :
       else 0)
 
 /-- The retained stream before input marshalling. -/
-@[expose] noncomputable def firstMatchStreamCompiler (encKey : Key ↪ List Bool)
+@[expose] def firstMatchStreamCompiler (encKey : Key ↪ List Bool)
     (encValue : Value ↪ List Bool) :
     NativeCompiler
       (fun ((query, found), table) =>
@@ -239,7 +239,7 @@ theorem streamEmit_firstMatch (encValue : Value ↪ List Bool) (query : Key) :
     exact hbound.trans (Nat.le_max_right _ _)
 
 /-- Retained marshalling from `(table, key)` to the stream's `((key, false), table)` layout. -/
-@[expose] noncomputable def firstMatchMarshalCompiler (encKey : Key ↪ List Bool)
+@[expose] def firstMatchMarshalCompiler (encKey : Key ↪ List Bool)
     (encValue : Value ↪ List Bool) :
     NativeCompiler
       (fun input : List (Key × Value) × Key => ((input.2, false), input.1))
@@ -253,7 +253,7 @@ theorem streamEmit_firstMatch (encValue : Value ↪ List Bool) (query : Key) :
   exact (key.pair isNew).pair table
 
 /-- Retained first-match lookup, including the charged table/key marshalling pass. -/
-@[expose] noncomputable def firstMatchCompiler (encKey : Key ↪ List Bool)
+@[expose] def firstMatchCompiler (encKey : Key ↪ List Bool)
     (encValue : Value ↪ List Bool) :
     NativeCompiler firstMatch
       (encPair (encList (encPair encKey encValue)) encKey) (encOption encValue) :=

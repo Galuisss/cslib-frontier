@@ -62,7 +62,7 @@ theorem zipStateToSum_injective {State : Type} :
 
 /-- Retain a zip transducer through the direct machine and the existing tidy normal form. The
 clock and workspace expose the kernel bound and every cleanup term. -/
-@[expose] noncomputable def ofZipTransducer {Alpha : Type u} {Beta : Type v}
+@[expose] def ofZipTransducer {Alpha : Type u} {Beta : Type v}
     {Gamma : Type*} {State : Type}
     [Fintype State]
     {f : Alpha × Beta → Gamma} (encFirst : Alpha ↪ List Bool) (encSecond : Beta ↪ List Bool)
@@ -74,8 +74,9 @@ clock and workspace expose the kernel bound and every cleanup term. -/
   let clearCount := (List.finRange 1).length
   let RawState := ZipTransducer.State State
   let CompilerState := ((Option RawState ⊕ ClearListState clearCount) ⊕ RewindState)
-  letI : Fintype RawState := Fintype.ofFinite RawState
-  letI : Fintype (ClearListState clearCount) := Fintype.ofFinite (ClearListState clearCount)
+  letI : DecidableEq State := stateEncoding.injective.decidableEq
+  letI : Fintype RawState := inferInstance
+  letI : Fintype (ClearListState clearCount) := inferInstance
   letI : Fintype CompilerState := inferInstance
   exact {
     tapeCount := 1 + 1
@@ -134,7 +135,7 @@ theorem wordEqT_run_q₀ (first second : List Bool) :
   simpa only [Bool.true_and] using wordEqT_run true first second
 
 /-- Equality of two values under a shared injective encoding, with one-bit Boolean output. -/
-@[expose] noncomputable def wordEqBool {Alpha : Type*} (enc : Alpha ↪ List Bool) :
+@[expose] def wordEqBool {Alpha : Type*} (enc : Alpha ↪ List Bool) :
     NativeCompiler (fun input : Alpha × Alpha => decide (enc input.1 = enc input.2))
       (encPair enc enc) encBool :=
   ofZipTransducer enc enc encBool wordEqT Universal.eBit fun input => by
@@ -143,7 +144,7 @@ theorem wordEqT_run_q₀ (first second : List Bool) :
     exact wordEqT_run_q₀ (enc input.1) (enc input.2)
 
 /-- Equality in the empty/nonempty branch-test encoding, with the conversion explicitly retained. -/
-@[expose] noncomputable def wordEqTest {Alpha : Type*} (enc : Alpha ↪ List Bool) :
+@[expose] def wordEqTest {Alpha : Type*} (enc : Alpha ↪ List Bool) :
     NativeCompiler (fun input : Alpha × Alpha => decide (enc input.1 = enc input.2))
       (encPair enc enc) encTest :=
   boolToTest.comp (wordEqBool enc)
