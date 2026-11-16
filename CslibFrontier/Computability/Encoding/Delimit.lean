@@ -6,7 +6,8 @@ Authors: Christian Reitwiessner
 
 module
 -- upstream: submitted #1213 @7f7b3ea9e5727322cbbab14821eb42ec96024b55
--- vendored: public Frontier Init import and mirrored import paths; API unchanged.
+-- vendored: public Frontier Init import and mirrored paths; explicit prefix reflexivity
+-- for pinned Lean; API unchanged.
 
 public import CslibFrontier.Init
 
@@ -127,6 +128,6 @@ theorem delimit_prefix_delimit {w v : List Bool} :
   · rintro ⟨_, hs⟩
     simpa using congrArg undelimit hs
   · rintro rfl
-    rfl
+    exact List.prefix_rfl
 
 end Cslib.Encoding
