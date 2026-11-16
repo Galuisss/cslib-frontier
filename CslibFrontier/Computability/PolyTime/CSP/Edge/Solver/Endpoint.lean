@@ -78,7 +78,7 @@ theorem computableInPolyTime_solve : ComputableInPolyTime solve
 theorem computableInPolyTime_decideSAT : ComputableInPolyTime decideSAT
     (encCSP encTable encNat) encBool := by
   unfold decideSAT
-  exact computableInPolyTime_solve.optionIsSome
+  exact computableInPolyTime_solve.optionIsSome (encB := encList encBool)
 
 /-- Every returned solver buffer is an actual valid optimal zero-defect labeling, of exact
 original occurrence width. The successful call supplies every model and consistency check. -/
