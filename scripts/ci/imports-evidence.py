@@ -51,6 +51,20 @@ MODULES = [
 ]
 
 
+# Usage and strict build coverage remain the complete 36-root inventory.
+# Pinned Lake rejects any legacy-format module in the loaded closure before --only.
+# This fixture is reviewed from source plus its exact-head strict compiled test;
+# it has no Shake clearance. Do not migrate test format merely to satisfy the tool.
+SHAKE_EXCEPTIONS = {
+    'CslibFrontierTests.Quantitative':
+        'Legacy fixture without module header; pinned Lake rejects it before analysis. '
+        'Source-level import review plus exact-head strict compiled test; not tool clearance.'
+}
+SHAKE_MODULES = [m for m in MODULES if m not in SHAKE_EXCEPTIONS]
+assert len(MODULES) == 36 and len(SHAKE_MODULES) == 35
+assert set(SHAKE_EXCEPTIONS) == {'CslibFrontierTests.Quantitative'}
+
+
 def run(args, out, label, timeout, required=True):
     """Keep the command, complete merged log, status and bound its whole process group."""
     start = time.monotonic()
@@ -86,9 +100,9 @@ def shake_command():
     # preserves every explicit public import (Shake.visitModule), without rewriting sources.
     args = ['lake', 'shake', '--add-public', '--keep-implied', '--keep-prefix',
             '--keep-public', '--force', '--explain']
-    for module in MODULES:
+    for module in SHAKE_MODULES:
         args += ['--only', module]
-    return args + MODULES
+    return args + SHAKE_MODULES
 
 
 def main():
@@ -121,6 +135,7 @@ def main():
         (out / ('lake-' + name)).write_bytes((tool_sources / name).read_bytes())
     (out / 'metadata.json').write_text(json.dumps(dict(
         target=head, harness=harness_head, harness_base=BASE, modules=MODULES,
+        shake_modules=SHAKE_MODULES, shake_exceptions=SHAKE_EXCEPTIONS,
         source_sha256=manifest,
         harness_sha256={name: hashlib.sha256((harness / name).read_bytes()).hexdigest()
             for name in ['scripts/ci/imports-evidence.py', '.github/workflows/lean_action_ci.yml']},
