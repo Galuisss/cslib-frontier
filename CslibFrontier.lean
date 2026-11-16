@@ -1706,6 +1706,7 @@ public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Code.NativeComp
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.Boundary
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.Circuit
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.ClassicalQuery
+public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.ClassicalQuery.Semantics
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.Handler
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.PointerWalk
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.Program
@@ -1739,6 +1740,7 @@ public import CslibFrontier.Computability.Circuit.Quantum.PhaseOracle
 public import CslibFrontier.Computability.Circuit.Quantum.RealEncoding
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.BlockCopy
+public import CslibFrontier.Computability.Circuit.Quantum.Reversible.BlockCopy.Deferred
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.BlockCopy.NativeCompiler
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Circuit
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Comparison
