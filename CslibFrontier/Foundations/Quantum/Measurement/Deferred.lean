@@ -135,8 +135,9 @@ theorem densityConj_blockDiagonal_swap_kronecker {ι' : Type*} [Fintype A]
 /-- **Deferred full-label readout followed by a controlled continuation.** Record the complete
 label twice, discard one orthogonal copy, and apply the label-selected rectangular map to the
 retained input.  The retained label remains classical and correlated with the complete evolved
-branch.  An arbitrary inaccessible reference may be included in the input and output indices of
-each `V y`; no product-state or normalization hypothesis is used. -/
+branch.  For an inaccessible reference `R`, instantiate `V y` as `W y ⊗ 1_R`; the generic
+statement permits arbitrary `V y` and does not itself enforce that `R` is untouched.  No
+product-state or normalization hypothesis is used. -/
 theorem partialTraceLeft_densityConj_controlled_coherentRecord_twice {ι' : Type*}
     [Fintype A] (f : ι → A) (V : A → Matrix ι' ι ℂ)
     (ρ : Matrix ι ι ℂ) :
