@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Deterministic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Replicate
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.StreamResourceBounds
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ReplicateResourceBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.PolyTime
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Output
 
@@ -355,20 +356,50 @@ private theorem interpreterStreamCompiler_workspace_le (description : Desc) (wor
     callbackSpace callbackSpace (L + 1) hstate helem
     (fun j hj => (hcallbacks j hj).2) (fun j hj => (hcallbacks j hj).1)
 
+private noncomputable def interpreterInputCompiler (description : Desc) :
+    NativeCompiler
+      (fun input : List ℕ × ℕ =>
+        (((description, input.1), Universal.init description), List.replicate input.2 true))
+      (encPair (encList encUnary) encUnary) (encPair eCtx (encList encBool)) := by
+  let encInput := encPair (encList encUnary) encUnary
+  let word := first (encList encUnary) encUnary
+  let ticks := unaryTrueListCompiler.comp (second (encList encUnary) encUnary)
+  let fixed := (const encInput eDesc description).pair word
+  let ctx := fixed.pair (const encInput eCfg (Universal.init description))
+  exact ctx.pair ticks
+
+private theorem interpreterInputCompiler_time_le (description : Desc) (word : List ℕ)
+    (count : ℕ) :
+    (interpreterInputCompiler description).time (word, count) ≤
+      1000 * (descLen description + (eCfg (Universal.init description)).length +
+        (encList encUnary word).length + count + 1) := by
+  have ht := unaryTrueListCompiler_time_le count
+  simp only [interpreterInputCompiler, pair, comp, first, second, const, ofTransducer,
+    encodeFrame, length_encPair, encUnary_apply, List.length_replicate, descLen,
+    Function.const_apply] at ht ⊢
+  omega
+
+private theorem interpreterInputCompiler_workspace_le (description : Desc) (word : List ℕ)
+    (count : ℕ) :
+    (interpreterInputCompiler description).workspace (word, count) ≤
+      1000 * (descLen description + (eCfg (Universal.init description)).length +
+        (encList encUnary word).length + count + 1) := by
+  have hs := unaryTrueListCompiler_workspace_le count
+  have hk : unaryTrueListCompiler.tapeCount = 2 := rfl
+  simp only [interpreterInputCompiler, pair, comp, first, second, const, ofTransducer,
+    encodeFrame, hk, length_encPair, encUnary_apply, List.length_replicate,
+    length_encList, descLen, Function.const_apply]
+  omega
+
 /-- Install a fixed deterministic description and execute the supplied number of simulated steps.
 The compiler's time and workspace fields charge its actual finite transition table, independently
 of the simulated clock. The output is valid even if the simulated program has not yet halted. -/
 noncomputable def simulateOutputCompiler (description : Desc) :
     NativeCompiler (fun input : List ℕ × ℕ => (simulate description input.1 input.2).1)
       (encPair (encList encUnary) encUnary) (encList encUnary) := by
-  let encInput := encPair (encList encUnary) encUnary
-  let word := first (encList encUnary) encUnary
-  let ticks := unaryTrueListCompiler.comp (second (encList encUnary) encUnary)
-  let fixed := (const encInput eDesc description).pair word
-  let ctx := fixed.pair (const encInput eCfg (Universal.init description))
-  exact (interpreterStreamCompiler.comp (ctx.pair ticks)).ofOutputEq fun input => by
-    simp only [simulate, List.length_replicate, Function.const_apply,
-      Ctx.desc, Ctx.input, Ctx.cfg]
+  exact (interpreterStreamCompiler.comp (interpreterInputCompiler description)).ofOutputEq
+    fun input => by
+    simp only [simulate, List.length_replicate, Ctx.desc, Ctx.input, Ctx.cfg]
 
 private def inputSymbolsCompiler :
     NativeCompiler (List.map Universal.eBit) encBits (encList encUnary) := by

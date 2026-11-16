@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.List
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Replicate
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.StreamResourceBounds
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ReplicateResourceBounds
 
 /-!
 # Retained unary polynomial clocks
@@ -90,18 +91,6 @@ private theorem unaryMulFold_tapeCount_eq : unaryMulFold.tapeCount = 15 := by
 private theorem streamState_unaryMul (value : ℕ) (bits : List Bool) (j : ℕ) :
     streamState value Prod.fst bits j = value := by
   simp [streamState]
-
-private theorem unaryTrueListCompiler_time_le (count : ℕ) :
-    unaryTrueListCompiler.time count ≤ 100 * (count + 1) := by
-  let seedCompiler : NativeCompiler unaryFrameSeed encUnary encBits :=
-    ofTransducer unaryFrameSeedT unitStateEncoding fun count => by
-      simpa only [encBits_apply] using unaryFrameSeedT_run count
-  have hseed : (unaryFrameSeed count).length ≤ seedCompiler.time count := by
-    simpa only [encBits_apply] using (seedCompiler.computes count).length_output_le
-  simp only [unaryTrueListCompiler, ofOutputEq, comp, ofTransducer, encUnary_apply,
-    List.length_replicate, encBits_apply]
-  simp only [seedCompiler, ofTransducer, encUnary_apply, List.length_replicate] at hseed
-  nlinarith
 
 private theorem unaryMulMarshal_time_le (left right : ℕ) :
     unaryMulMarshal.time (left, right) ≤ 200 * (left + 1) * (right + 1) := by
@@ -204,19 +193,6 @@ private theorem unaryMulFold_workspace_le (value : ℕ) (bits : List Bool) :
     ofTransducer, streamFramedNext, streamUnframedFinish, encodeFrame, unframeValue, comp,
     const]
   nlinarith
-
-private theorem unaryTrueListCompiler_workspace_le (count : ℕ) :
-    unaryTrueListCompiler.workspace count ≤ 100 * (count + 1) := by
-  let seedCompiler : NativeCompiler unaryFrameSeed encUnary encBits :=
-    ofTransducer unaryFrameSeedT unitStateEncoding fun count => by
-      simpa only [encBits_apply] using unaryFrameSeedT_run count
-  have hseed : (unaryFrameSeed count).length ≤ seedCompiler.time count := by
-    simpa only [encBits_apply] using (seedCompiler.computes count).length_output_le
-  simp only [unaryTrueListCompiler, ofOutputEq, comp, ofTransducer, encUnary_apply,
-    List.length_replicate, encBits_apply]
-  simp only [seedCompiler, ofTransducer, encUnary_apply, List.length_replicate] at hseed
-  have hscaled := Nat.mul_le_mul_left 5 hseed
-  omega
 
 private theorem unaryMulMarshal_workspace_le (left right : ℕ) :
     unaryMulMarshal.workspace (left, right) ≤ 500 * (left + right + 1) := by
