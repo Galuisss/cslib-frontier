@@ -48,6 +48,8 @@ from the retained Reed--Solomon, Reed--Muller and GF(256) prerequisites remains 
 * `Cslib.Crypto.HQC.b2ServiceReadout_classicalRun`: on every encoded sample, message pair and
   hidden bit, the service emits exactly `TruncatedSyndromeSample.toPKECiphertext` for the selected
   message and the supplied Boolean encoder.
+* `Cslib.Crypto.HQC.readBit_classicalRun_b2ServiceCodes_hidden`: the complete reversible service
+  leaves its hidden-bit input unchanged for every basis state.
 
 This construction is original infrastructure for [HQC2026], Theorem 6.3, pp. 61--64.
 -/
@@ -1043,6 +1045,80 @@ an asymptotic parameter-dependent NIST encoder family. -/
       b2ServiceCiphertextWidth, b2HeaderWidth, b2SampleWidth,
       encOracleCircuitDescription_apply, encOracleCircuitDescriptionFields,
       two_mul, Nat.add_assoc]
+
+/-- The complete reversible service leaves its hidden-bit input unchanged on every basis state.
+This is the protected-bit half of the full service-reply record: the controller copies this bit
+before the service and later pairs it with the service's ciphertext output. -/
+theorem readBit_classicalRun_b2ServiceCodes_hidden (P : PKEParams)
+    (securityParameter : ℕ)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen)
+    (state : Fin (b2ServiceDescription P securityParameter encoder).width → Bool) :
+    readBit (classicalRun (b2ServiceCodes P securityParameter encoder) state)
+        (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k) =
+      readBit state (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k) := by
+  let inputWidth := b2ServiceInputWidth P securityParameter
+  let hidden := inputWidth + 2 * P.k
+  let savedInput := b2ServiceSavedInputBase P securityParameter
+  let encoderBase := b2ServiceEncoderBase P securityParameter
+  let encoderWidth := samplerWidth P.k encoder.code
+  let width := b2ServiceWidth P securityParameter encoder
+  have hhiddenCiphertext : b2ServiceCiphertextWidth P ≤ hidden := by
+    dsimp only [hidden, inputWidth]
+    unfold b2ServiceCiphertextWidth b2ServiceInputWidth b2HeaderWidth b2SampleWidth
+    omega
+  have hhiddenSaved : hidden < savedInput := by
+    dsimp only [hidden, inputWidth, savedInput]
+    unfold b2ServiceSavedInputBase b2ServiceRequestWidth
+    omega
+  have hhiddenEncoder : hidden < encoderBase := by
+    dsimp only [hidden, inputWidth, encoderBase]
+    unfold b2ServiceEncoderBase b2ServiceSavedInputBase b2ServiceRequestWidth
+    omega
+  have hencoderFit : encoderBase + encoderWidth ≤ width := by
+    dsimp only [encoderBase, encoderWidth, width]
+    unfold b2ServiceWidth
+    rfl
+  change readBit (classicalRun (b2ServiceCodes P securityParameter encoder) state) hidden =
+    readBit state hidden
+  rw [b2ServiceCodes, classicalRun_append, classicalRun_append, classicalRun_append]
+  rw [readBit_classicalRun_blockCopyCodes_of_outside (Or.inr (by
+    dsimp only [hidden, inputWidth]
+    unfold b2ServiceInputWidth b2HeaderWidth b2SampleWidth
+    omega))]
+  change readBit (classicalRun
+      (b2ShiftCodes encoderBase (samplerClassicalCodes P.k encoder.code))
+      (classicalRun (b2SelectMessageCodes P securityParameter)
+        (classicalRun (b2PrepareCodes P securityParameter) state))) hidden =
+    readBit state hidden
+  calc
+    _ = readBit (classicalRun (b2SelectMessageCodes P securityParameter)
+          (classicalRun (b2PrepareCodes P securityParameter) state)) hidden :=
+      readBit_classicalRun_b2ShiftCodes_of_lt
+        (base := encoderBase) (width := width) hencoderFit
+        (isClassical_samplerClassicalCodes P.k encoder.code) hhiddenEncoder _
+    _ = readBit (classicalRun (b2PrepareCodes P securityParameter) state) hidden :=
+      readBit_classicalRun_b2SelectMessageCodes_of_outside
+        P securityParameter width hidden (Or.inl hhiddenEncoder) _
+    _ = readBit state hidden := by
+      rw [b2PrepareCodes, classicalRun_append, classicalRun_append]
+      calc
+        _ = readBit (classicalRun
+              (blockCopyCodes savedInput 0 (b2ServiceCiphertextWidth P))
+              (classicalRun (blockCopyCodes 0 savedInput inputWidth) state)) hidden :=
+          readBit_classicalRun_blockCopyCodes_of_outside
+            (source := savedInput + b2HeaderWidth securityParameter + 2 * P.n)
+            (target := 0) (count := b2ServiceCiphertextWidth P)
+            (width := width) (wire := hidden)
+            (Or.inr (by simpa only [Nat.zero_add] using hhiddenCiphertext)) _
+        _ = readBit (classicalRun (blockCopyCodes 0 savedInput inputWidth) state) hidden :=
+          readBit_classicalRun_blockCopyCodes_of_outside
+            (source := savedInput) (target := 0) (count := b2ServiceCiphertextWidth P)
+            (width := width) (wire := hidden)
+            (Or.inr (by simpa only [Nat.zero_add] using hhiddenCiphertext)) _
+        _ = readBit state hidden :=
+          readBit_classicalRun_blockCopyCodes_of_outside
+            (source := 0) (target := savedInput) (count := inputWidth)
+            (width := width) (wire := hidden) (Or.inl hhiddenSaved) _
 
 /-- The actual service circuit emits the HQC ciphertext determined by the sample, selected
 message and supplied Boolean encoder. This is a basis-state statement for the complete reversible

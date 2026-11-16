@@ -96,11 +96,8 @@ theorem matrix_copyHidden_zeroTarget_withReference (layout : ClassicalQueryLayou
       simp only [replyBase, serviceBase]
       omega) hsource htarget
   rw [hcopy]
-  ext ⟨label, restOut, referenceOut⟩ ⟨restIn, referenceIn⟩
-  simp only [Matrix.submatrix_apply, Equiv.prodAssoc_symm_apply,
-    kroneckerMap_apply, Matrix.one_apply, coherentRecord]
-  by_cases hreference : referenceOut = referenceIn <;>
-    simp [hreference]
+  exact coherentRecord_kronecker_one_reassociate
+    (Reference := Reference) (A := Fin 1 → Bool) sourceLabel
 
 /-- Copying the first-stage output into the controller's fresh request register and discarding
 that register gives exactly computational-basis readout of the request.  The original first-stage
@@ -182,12 +179,13 @@ theorem partialTraceLeft_copyRequest_zeroTarget_withReference
     (width := layout.width) (Or.inl (by simpa only [Nat.zero_add] using hdisjoint))
     (by simpa only [Nat.zero_add] using hsource) htarget
   have hphysical : physical = coherentRecord requestLabel := by
-    dsimp only [physical, copyMatrix, reassociate, requestLabel, sourceLabel, targetEmbedding]
+    dsimp only [physical, copyMatrix]
     rw [hcopy]
-    ext ⟨request, restOut, referenceOut⟩ ⟨restIn, referenceIn⟩
-    simp only [Matrix.submatrix_apply, kroneckerMap_apply, Matrix.one_apply, coherentRecord]
-    by_cases hreference : referenceOut = referenceIn <;>
-      simp [hreference]
+    rw [coherentRecord_kronecker_one_reassociate
+      (Reference := Reference) (A := Fin layout.first.outputWidth → Bool)]
+    apply congrArg coherentRecord
+    funext p i
+    simp only [requestLabel, sourceLabel, targetEmbedding, Function.comp_apply, Nat.zero_add]
   change partialTraceLeft (densityConj physical ρ) = _
   rw [hphysical, partialTraceLeft_densityConj_coherentRecord]
 

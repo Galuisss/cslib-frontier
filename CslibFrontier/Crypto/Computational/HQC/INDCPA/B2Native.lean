@@ -7,7 +7,7 @@ Authors: Samuel Schlesinger
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.ClassicalQuery.Semantics
+public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.ClassicalQuery
 public import CslibFrontier.Crypto.Computational.HQC.INDCPA.B2Service
 
 /-!

@@ -33,6 +33,8 @@ original formalization infrastructure.
 
 ## Main results
 
+* `Cslib.Quantum.coherentRecord_kronecker_one_reassociate`: extending a coherent record by the
+  identity on an arbitrary reference is the coherent record that ignores that reference.
 * `Cslib.Quantum.partialTraceLeft_densityConj_coherentRecord`: discarding the coherent record is
   exactly the sum of the corresponding classical density branches.
 * `Cslib.Quantum.partialTraceLeft_densityConj_coherentRecord_twice`: recording twice and
@@ -78,6 +80,21 @@ theorem densityConj_coherentRecord_apply (f : ι → A) (ρ : Matrix ι ι ℂ)
       simp [coherentRecord, Ne.symm hx])]
   by_cases hy : y = f i <;> by_cases hz : z = f j <;>
     simp [coherentRecord, conjTranspose_apply, hy, hz]
+
+omit [Fintype ι] in
+/-- Extending a coherent record by the identity on an arbitrary reference and reassociating the
+output is exactly the coherent record whose label ignores that reference.  This is the shared
+reference-lifting equality used by physical deferred-measurement clients. -/
+theorem coherentRecord_kronecker_one_reassociate {Reference : Type*}
+    [DecidableEq Reference] (f : ι → A) :
+    ((coherentRecord f ⊗ₖ (1 : Matrix Reference Reference ℂ)).submatrix
+      (Equiv.prodAssoc A ι Reference).symm id) =
+      coherentRecord (f ∘ Prod.fst) := by
+  ext ⟨label, indexOut, referenceOut⟩ ⟨indexIn, referenceIn⟩
+  simp only [Matrix.submatrix_apply, Equiv.prodAssoc_symm_apply,
+    kroneckerMap_apply, Matrix.one_apply, coherentRecord, Function.comp_apply]
+  by_cases hreference : referenceOut = referenceIn <;>
+    simp [hreference]
 
 /-- **Deferred classical readout.** Conjugate by the coherent-record isometry and discard only
 the fresh record.  The retained state is exactly the sum of the existing subnormalized branches.
