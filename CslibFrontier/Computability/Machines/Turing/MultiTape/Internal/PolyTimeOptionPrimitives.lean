@@ -19,6 +19,11 @@ The option encoding machines supply construction and fixed-default elimination. 
 retains every encoded input, including captured arguments and a runtime fallback. Empty value
 types need no inhabitant assumption.
 
+The `Tagged` search rules fix only the intermediate option format, leaving the payload encoding
+to the value certificate. Generic rules alone leave this intermediate encoding unconstrained in
+`fun_prop` (notably for list search followed by elimination). They remain available for explicitly
+supplied formats, including halt and silent protocols; no typeclass selects a default encoding.
+
 ## Main results
 
 * `ComputableInPolyTime.optionSome`: construct an optional value.
@@ -120,5 +125,41 @@ theorem optionMapWithInput {γ : Type} {encC : γ ↪ List Bool}
   convert h using 1
   funext a
   cases value a <;> rfl
+
+/-- Tagged-option inference rule: the payload encoding is supplied by the value certificate. -/
+@[fun_prop]
+theorem optionIsSomeTagged {value : α → Option β}
+    (hvalue : ComputableInPolyTime value encA (encOption encB)) :
+    ComputableInPolyTime (fun a => (value a).isSome) encA encBool :=
+  optionIsSome (encO := encOption encB) hvalue
+
+/-- Tagged-option inference rule: the payload encoding is supplied by the value certificate. -/
+@[fun_prop]
+theorem optionElimWithInputTagged {γ : Type} {encC : γ ↪ List Bool}
+    {value : α → Option β} {fallback : α → γ} {body : α → β → γ}
+    (hvalue : ComputableInPolyTime value encA (encOption encB))
+    (hfallback : ComputableInPolyTime fallback encA encC)
+    (hbody : ComputableInPolyTime (fun p : α × β => body p.1 p.2)
+      (encPair encA encB) encC) :
+    ComputableInPolyTime
+      (fun a => (value a).elim (fallback a) (body a)) encA encC :=
+  optionElimWithInput (encO := encOption encB) hvalue hfallback hbody
+
+/-- Tagged-option inference rule: the payload encoding is supplied by the value certificate. -/
+@[fun_prop]
+theorem optionGetDWithInputTagged {value : α → Option β} {fallback : α → β}
+    (hvalue : ComputableInPolyTime value encA (encOption encB))
+    (hfallback : ComputableInPolyTime fallback encA encB) :
+    ComputableInPolyTime (fun a => (value a).getD (fallback a)) encA encB :=
+  optionGetDWithInput (encO := encOption encB) hvalue hfallback
+
+/-- Tagged-option inference rule: the payload encoding is supplied by the value certificate. -/
+@[fun_prop]
+theorem optionMapWithInputTagged {γ : Type} {encC : γ ↪ List Bool}
+    {value : α → Option β} {f : α → β → γ}
+    (hvalue : ComputableInPolyTime value encA (encOption encB))
+    (hf : ComputableInPolyTime (fun p : α × β => f p.1 p.2) (encPair encA encB) encC) :
+    ComputableInPolyTime (fun a => (value a).map (f a)) encA (encOption encC) :=
+  optionMapWithInput (encO := encOption encB) (encOC := encOption encC) hvalue hf
 
 end Turing.MultiTapeTM.ComputableInPolyTime

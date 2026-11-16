@@ -43,8 +43,10 @@ public class PairEncoding (enc₁ : α ↪ List Bool) (enc₂ : β ↪ List Bool
   /-- The second projection is computable in linear time and space. -/
   snd : ComputableInDegree Prod.snd enc enc₂ 1 1
 
-/-- Construction and default elimination for an explicitly supplied option encoding. -/
-public class OptionEncoding (enc₁ : α ↪ List Bool) (enc : Option α ↪ List Bool) : Prop where
+/-- Construction and default elimination for an explicitly supplied option encoding.
+The payload encoding may be inferred from the supplied option encoding; this does not choose
+an option encoding from a payload type or encoding. -/
+public class OptionEncoding (enc₁ : semiOutParam (α ↪ List Bool)) (enc : Option α ↪ List Bool) : Prop where
   /-- Constructor classification has linear resource degree and constant output degree. -/
   isSome : ComputableInDegree Option.isSome enc encBool 1 0
   /-- `some` is computable in linear time and space. -/

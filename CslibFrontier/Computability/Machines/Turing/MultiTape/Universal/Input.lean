@@ -137,7 +137,10 @@ private theorem inputSymbol_pair_inO :
     simp [W, hj, encUnary_apply]
   have hsum (x : List ℕ) : ∑ j ∈ Finset.range x.length, W x j = (encList encUnary x).length := by
     have hmul : (x.map (fun a => 2 * a)).sum = 2 * x.sum := by
-      simpa only [List.map_id_fun'] using List.sum_map_mul_left x (fun a => a) 2
+      have h := List.sum_map_mul_left x (fun a => a) 2
+      change (x.map (fun a => 2 * a)).sum = 2 * (x.map id).sum at h
+      rw [List.map_id] at h
+      exact h
     simpa [W, List.flatMap_def, encList, Function.comp_def, hmul] using
       sum_length_getD (x.map fun a => frame (encUnary a))
   have hstate (q : ℕ × List ℕ) (j : ℕ) :

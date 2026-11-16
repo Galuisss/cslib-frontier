@@ -93,7 +93,7 @@ private theorem computableInPolyTime_step :
   rw [heq]
   have hargs (i : ℕ) : ComputableInPolyTime (fun p : List Bool × (Op × List ℕ) =>
       p.2.2[i]?.elim false (p.1.getD · false)) (encPair encBits encGate) encBool :=
-    optionElimWithInput (getElem? (snd _ _).snd' (const i)) (const false)
+    optionElimWithInput (encO := encOption encNat) (getElem? (snd _ _).snd' (const i)) (const false)
       (listGetD_binary false (fst _ _).fst' (snd _ _))
   have hvalue : ComputableInPolyTime (fun p : List Bool × (Op × List ℕ) =>
       p.2.1.value (p.2.2[0]?.elim false (p.1.getD · false))

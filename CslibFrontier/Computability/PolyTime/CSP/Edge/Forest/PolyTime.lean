@@ -159,12 +159,10 @@ private theorem scanStep_size (rs : List ℕ) (es : WorkLog) (a b : Record) (s :
   split
   · omega
   · split
-    · simp [encScanState, encList_append, encList_cons, length_frame]
-      omega
+    · simp_all [encScanState] <;> omega
     · split
       · omega
-      · simp [encScanState]
-        omega
+      · simp_all [encScanState] <;> omega
 
 private theorem poly_scanInit : ComputableInPolyTime
     (fun p : ScanArgs × List Record × List Record => (p.2.1, none))
@@ -255,7 +253,7 @@ private theorem step_size (input : Input) (s : State) :
         rcases out with ⟨os, event⟩
         have hos : (encList encRecord os).length ≤ B + 1 := by
           simp only [encScanState, length_encPair] at hs
-          simp only [encList_nil, List.length_nil, encOption_none] at hs
+          simp only [encList_nil, List.length_nil, encOption_none, List.length_singleton] at hs
           omega
         cases event with
         | none =>
@@ -265,20 +263,24 @@ private theorem step_size (input : Input) (s : State) :
           calc
             _ = 2 * (encWorkLog log).length + 4 * (encWorkExpansion (a, os)).length +
                 2 * (encList encRecord (remaining.filter
-                  (fun b => decide (b ∉ used ((a, os) :: log))))).length + 4 := by
+                  (fun b => decide (b ∉ used ((a, os) :: log))))).length + 5 := by
               simp only [encState, length_encPair, encWorkLog, encList_cons,
-                List.length_append, length_frame, encOption_none, List.length_cons, List.length_nil]
+                List.length_append, length_frame, encOption_none, List.length_cons, List.length_nil,
+                List.length_singleton]
               ring
             _ ≤ 2 * (encWorkLog log).length + 4 * (encWorkExpansion (a, os)).length +
-                2 * (encList encRecord remaining).length + 4 :=
+                2 * (encList encRecord remaining).length + 5 :=
               Nat.add_le_add_right
-                (Nat.add_le_add_left (Nat.mul_le_mul_left 2 hf) _) 4
+                (Nat.add_le_add_left (Nat.mul_le_mul_left 2 hf) _) 5
             _ ≤ (encState (log, remaining, status)).length + 32 * B + 32 := by
-              enc_len [encState, encWorkExpansion]
+              simp only [encState, encWorkExpansion, length_encPair]
+              omega
         | some b =>
           have hb : (encRecord b).length ≤ 2 * B + 2 := by
-            enc_len [encScanState] at hs
-          simp [encState, encEvent]
+            simp only [encScanState, length_encPair, encOption_some, List.length_cons,
+              encList_nil, List.length_nil, encOption_none, List.length_singleton] at hs
+            omega
+          simp only [encState, encEvent, length_encPair, encOption_some, List.length_cons]
           omega
       next => simp [encState]; omega
 

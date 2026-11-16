@@ -109,6 +109,7 @@ theorem Clause.isPolyTime_split3 {input : Input ↪ List Bool} {enc : W ↪ List
     cases c <;> rfl
   simp_rw [heq]
   apply optionElimWithInput (encB := encPair enc encBool)
+    (encO := encOption (encPair enc encBool))
     (encO := encOption (encPair enc encBool)) (by fun_prop) (by fun_prop)
   exact Clause.isPolyTime_splitAux (input := encPair input (encPair enc encBool))
     (fresh := fun p => fresh p.1) (index := fun p => index p.1) (carry := fun p => p.2)

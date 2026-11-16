@@ -83,6 +83,13 @@ not synonyms for canonical options. `HaltOptionEncoding` adds the stop-word law 
 constructor, classifier and default-elimination capabilities of `OptionEncoding`.
 `ComputableInDegree.optionTranslate` supplies native identity translations between supported
 formats; its classification and reconstruction are charged computations.
+For plain polynomial-time option composition, `fun_prop` has tagged rules for `isSome`,
+`getD`, `elim` and `map`. These recover the payload encoding from the value certificate;
+they do not select an encoding for its type. The generic rules still accept an explicit
+`encO` for other formats. When applying a generic rule directly and its intermediate format
+is absent from the goal, supply `(encO := encOption e)` (or the intended protocol format).
+`OptionEncoding` can infer its payload encoding from an already specified option encoding.
+
 `Decoder.option` reads the canonical Boolean tag, whereas `Decoder.silentOption` retains the
 empty-word test required by existing protocol words, including its previous malformed-word behavior.
 Cryptographic response encodings and their associated efficiency/security statements use the
