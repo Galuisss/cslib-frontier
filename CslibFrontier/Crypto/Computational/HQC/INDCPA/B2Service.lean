@@ -335,11 +335,11 @@ private def b2PrepareCodes (P : PKEParams) (securityParameter : ℕ) : List Gate
 
 private theorem readBit_classicalRun_b2PrepareCodes_of_middle
     (P : PKEParams) (securityParameter width : ℕ)
-    (input : List Bool) (hinput : input.length ≤ width)
+    (state : Fin width → Bool)
     {wire : ℕ} (hlower : b2ServiceCiphertextWidth P ≤ wire)
     (hupper : wire < b2ServiceSavedInputBase P securityParameter) :
     readBit (classicalRun (b2PrepareCodes P securityParameter)
-      (inputState width input)) wire = input.getD wire false := by
+      state) wire = readBit state wire := by
   rw [b2PrepareCodes, classicalRun_append, classicalRun_append]
   rw [readBit_classicalRun_blockCopyCodes_of_outside
     (source := b2ServiceSavedInputBase P securityParameter +
@@ -351,7 +351,6 @@ private theorem readBit_classicalRun_b2PrepareCodes_of_middle
   rw [readBit_classicalRun_blockCopyCodes_of_outside
     (source := 0) (target := b2ServiceSavedInputBase P securityParameter)
     (count := b2ServiceInputWidth P securityParameter) (Or.inl hupper)]
-  exact readBit_inputState hinput wire
 
 private theorem readBit_classicalRun_b2PrepareCodes
     (P : PKEParams) (securityParameter width : ℕ)
@@ -1099,26 +1098,9 @@ theorem readBit_classicalRun_b2ServiceCodes_hidden (P : PKEParams)
     _ = readBit (classicalRun (b2PrepareCodes P securityParameter) state) hidden :=
       readBit_classicalRun_b2SelectMessageCodes_of_outside
         P securityParameter width hidden (Or.inl hhiddenEncoder) _
-    _ = readBit state hidden := by
-      rw [b2PrepareCodes, classicalRun_append, classicalRun_append]
-      calc
-        _ = readBit (classicalRun
-              (blockCopyCodes savedInput 0 (b2ServiceCiphertextWidth P))
-              (classicalRun (blockCopyCodes 0 savedInput inputWidth) state)) hidden :=
-          readBit_classicalRun_blockCopyCodes_of_outside
-            (source := savedInput + b2HeaderWidth securityParameter + 2 * P.n)
-            (target := 0) (count := b2ServiceCiphertextWidth P)
-            (width := width) (wire := hidden)
-            (Or.inr (by simpa only [Nat.zero_add] using hhiddenCiphertext)) _
-        _ = readBit (classicalRun (blockCopyCodes 0 savedInput inputWidth) state) hidden :=
-          readBit_classicalRun_blockCopyCodes_of_outside
-            (source := savedInput) (target := 0) (count := b2ServiceCiphertextWidth P)
-            (width := width) (wire := hidden)
-            (Or.inr (by simpa only [Nat.zero_add] using hhiddenCiphertext)) _
-        _ = readBit state hidden :=
-          readBit_classicalRun_blockCopyCodes_of_outside
-            (source := 0) (target := savedInput) (count := inputWidth)
-            (width := width) (wire := hidden) (Or.inl hhiddenSaved) _
+    _ = readBit state hidden :=
+      readBit_classicalRun_b2PrepareCodes_of_middle P securityParameter width state
+        hhiddenCiphertext hhiddenSaved
 
 /-- The actual service circuit emits the HQC ciphertext determined by the sample, selected
 message and supplied Boolean encoder. This is a basis-state statement for the complete reversible
@@ -1183,21 +1165,27 @@ theorem b2ServiceReadout_classicalRun (P : PKEParams) (securityParameter : ℕ)
     exact getD_truncatedSyndromeWord_secondValue sample i
   have hpreparedMessageZero (i : Fin P.k) :
       readBit prepared (b2ServiceInputWidth P securityParameter + i) = messages.msg₀ i := by
-    rw [readBit_classicalRun_b2PrepareCodes_of_middle P securityParameter width input hinputWidth
+    rw [readBit_classicalRun_b2PrepareCodes_of_middle P securityParameter width
+      (inputState width input)
       (by unfold b2ServiceCiphertextWidth b2ServiceInputWidth b2HeaderWidth b2SampleWidth; omega)
       (by unfold b2ServiceSavedInputBase b2ServiceRequestWidth; omega)]
+    rw [readBit_inputState hinputWidth]
     exact getD_b2ServiceInputWord_messageZero P securityParameter sample messages hidden i
   have hpreparedMessageOne (i : Fin P.k) :
       readBit prepared (b2ServiceInputWidth P securityParameter + P.k + i) = messages.msg₁ i := by
-    rw [readBit_classicalRun_b2PrepareCodes_of_middle P securityParameter width input hinputWidth
+    rw [readBit_classicalRun_b2PrepareCodes_of_middle P securityParameter width
+      (inputState width input)
       (by unfold b2ServiceCiphertextWidth b2ServiceInputWidth b2HeaderWidth b2SampleWidth; omega)
       (by unfold b2ServiceSavedInputBase b2ServiceRequestWidth; omega)]
+    rw [readBit_inputState hinputWidth]
     exact getD_b2ServiceInputWord_messageOne P securityParameter sample messages hidden i
   have hpreparedHidden :
       readBit prepared (b2ServiceInputWidth P securityParameter + 2 * P.k) = hidden := by
-    rw [readBit_classicalRun_b2PrepareCodes_of_middle P securityParameter width input hinputWidth
+    rw [readBit_classicalRun_b2PrepareCodes_of_middle P securityParameter width
+      (inputState width input)
       (by unfold b2ServiceCiphertextWidth b2ServiceInputWidth b2HeaderWidth b2SampleWidth; omega)
       (by unfold b2ServiceSavedInputBase b2ServiceRequestWidth; omega)]
+    rw [readBit_inputState hinputWidth]
     exact getD_b2ServiceInputWord_hidden P securityParameter sample messages hidden
   have hpreparedEncoder (j : ℕ) : readBit prepared (encoderBase + j) = false := by
     apply readBit_classicalRun_b2PrepareCodes_of_encoderBase_le
