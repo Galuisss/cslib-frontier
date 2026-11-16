@@ -93,12 +93,13 @@ private theorem encNat_two_mul (n : ℕ) :
     encNat (2 * n) = if (encNat n).isEmpty then [] else false :: encNat n := by
   rcases Nat.eq_zero_or_pos n with rfl | hn
   · rfl
-  · have hne : n.bits ≠ [] := fun h => hn.ne' (encNat.injective h)
-    simp [hne, Nat.bit0_bits n hn.ne']
+  · have hne : n.bits ≠ [] := fun h =>
+      hn.ne' (encNat.injective (by simpa only [Cslib.Encoding.encNat_eq_bits] using h))
+    simp [Cslib.Encoding.encNat_eq_bits, hne, Nat.bit0_bits n hn.ne']
 
 private theorem encNat_two_mul_add_one (n : ℕ) :
-    encNat (2 * n + 1) = true :: encNat n :=
-  Nat.bit1_bits n
+    encNat (2 * n + 1) = true :: encNat n := by
+  simpa only [Cslib.Encoding.encNat_eq_bits] using Nat.bit1_bits n
 
 /-- Variable numbering after clause splitting is polynomial-time: original binary variables shift
 by one bit, and unary fresh-variable pairs are paired and converted to odd binary numbers. -/

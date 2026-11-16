@@ -238,7 +238,17 @@ private theorem poly_step : ComputableInPolyTime (fun p : Input × State => step
       · fun_prop
       · fun_prop
     · fun_prop
-    · fun_prop
+    · apply ComputableInPolyTime.ite_decide
+      · fun_prop
+      · apply ComputableInPolyTime.optionElimWithInput (encB := encRecord)
+          (encO := encOption encRecord) (encC := encState)
+        · fun_prop
+        · apply ComputableInPolyTime.prod
+          · fun_prop
+          · exact ComputableInPolyTime.prod (by fun_prop)
+              (ComputableInPolyTime.const (encOut := encOption (encOption encEvent)) none)
+        · fun_prop
+      · fun_prop
 
 
 private theorem scan_size (rs : List ℕ) (es : WorkLog) (a : Record)
@@ -368,7 +378,15 @@ private theorem poly_finish : ComputableInPolyTime (fun p : Input × State => fi
     · exact (ComputableInPolyTime.optionSome encResultCode).comp
         ((ComputableInPolyTime.sumInl (encList encExpansionCode)
           (encSum encMeetingCode encMeetingCode)).comp (by fun_prop))
-    · fun_prop
+    · apply (ComputableInPolyTime.optionSome encResultCode).comp
+      apply ComputableInPolyTime.ite_decide
+      · fun_prop
+      · exact ((ComputableInPolyTime.sumInr (encList encExpansionCode)
+          (encSum encMeetingCode encMeetingCode)).comp
+          (ComputableInPolyTime.sumInr encMeetingCode encMeetingCode)).comp (by fun_prop)
+      · exact ((ComputableInPolyTime.sumInr (encList encExpansionCode)
+          (encSum encMeetingCode encMeetingCode)).comp
+          (ComputableInPolyTime.sumInl encMeetingCode encMeetingCode)).comp (by fun_prop)
 
 attribute [local fun_prop] poly_finish
 

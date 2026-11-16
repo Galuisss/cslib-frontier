@@ -308,7 +308,8 @@ theorem computableInPolyTime_codeEdge
   option_match_to_elim
   have hfst := ComputableInPolyTime.fst encA (encFiniteCfg (k := k) (State := State))
   have hsnd := ComputableInPolyTime.snd encA (encFiniteCfg (k := k) (State := State))
-  refine (computableInPolyTime_decodeView hcode).optionElimWithInput (.const false) ?_
+  refine (computableInPolyTime_decodeView hcode).optionElimWithInput
+    (encB := encFiniteCfg (k := k) (State := State)) (.const false) ?_
   refine ComputableInPolyTime.ite'
     ((ComputableInPolyTime.headD (encA := encBool) false).comp (hnext.comp hfst)) ?_ ?_
   · exact ComputableInPolyTime.bool_and.comp
