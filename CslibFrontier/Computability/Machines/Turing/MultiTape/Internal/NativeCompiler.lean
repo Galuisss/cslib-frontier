@@ -114,12 +114,6 @@ structure NativeCompiler {α β : Type*} (f : α → β) (encIn : α ↪ List Bo
 
 namespace NativeCompiler
 
-/-- Deterministic semantics of the retained explicit transition table. -/
-def machine {Alpha Beta : Type*} {f : Alpha → Beta} {encIn : Alpha ↪ List Bool}
-    {encOut : Beta ↪ List Bool} (compiler : NativeCompiler f encIn encOut) :
-    MultiTapeTM compiler.tapeCount Bool compiler.State :=
-  compiler.table.toTM
-
 /-- Constructive disjoint-union encoding used by the core constructors. -/
 @[expose] def sumStateEncoding {S₁ S₂ : Type} (left : S₁ ↪ ℕ) (right : S₂ ↪ ℕ) :
     S₁ ⊕ S₂ ↪ ℕ :=
@@ -213,16 +207,16 @@ theorem description_holds {α β : Type*} {f : α → β} {encIn : α ↪ List B
     {encOut : β ↪ List Bool} (compiler : NativeCompiler f encIn encOut)
     (state : compiler.State) (input : Option Bool)
     (work : Fin compiler.tapeCount → Option Bool) :
-    compiler.description.Holds (compiler.machine.map compiler.stateEncoding eBit)
+    compiler.description.Holds (compiler.table.toTM.map compiler.stateEncoding eBit)
       (compiler.stateEncoding state) (input.map eBit) (Option.map eBit ∘ work) := by
   have hmem : (key (compiler.stateEncoding state) (input.map eBit)
       (Option.map eBit ∘ work),
-      Act.ofAction ((compiler.machine.tr state input work).map compiler.stateEncoding eBit)) ∈
+      Act.ofAction ((compiler.table.toTM.tr state input work).map compiler.stateEncoding eBit)) ∈
       compiler.description.table := by
     rw [description]
     refine List.mem_map.mpr ⟨(state, input, work), ?_, ?_⟩
     · simp only [Finset.mem_sort, Finset.mem_univ]
-    · simp only [machine, MultiTapeMachine.toTM, MultiTapeTM.tr_ofTr]
+    · simp only [MultiTapeMachine.toTM, MultiTapeTM.tr_ofTr]
   obtain ⟨entry, hentry⟩ := Option.isSome_iff_exists.mp ((List.find?_isSome
     (p := fun entry => decide (entry.1 = key (compiler.stateEncoding state)
       (input.map eBit) (Option.map eBit ∘ work)))).mpr ⟨_, hmem, by simp⟩)
@@ -235,7 +229,7 @@ theorem description_holds {α β : Type*} {f : α → β} {encIn : α ↪ List B
   cases key_injective compiler.stateEncoding eBit
     (a₁ := (state', input', work')) (a₂ := (state, input, work)) hkey
   rw [Desc.holds_iff]
-  simp [hentry, tr_map, machine, MultiTapeMachine.toTM]
+  simp [hentry, tr_map, MultiTapeMachine.toTM]
 
 /-- Exact length of the compiler input under its recorded encoding. This is a separate resource
 coordinate, not runtime charged merely for presenting an already encoded input. -/
@@ -276,7 +270,7 @@ theorem stateEncoding_lt_stateBound {α β : Type*} {f : α → β}
 /-- Forget tidiness while retaining the same named machine and independent bounds. -/
 theorem computesInTimeAndSpace {α β : Type*} {f : α → β} {encIn : α ↪ List Bool}
     {encOut : β ↪ List Bool} (compiler : NativeCompiler f encIn encOut) :
-    compiler.machine.ComputesFunInTimeAndSpace encIn encOut f compiler.time
+    compiler.table.toTM.ComputesFunInTimeAndSpace encIn encOut f compiler.time
       compiler.workspace :=
   fun a => (compiler.computes a).computesInTimeAndSpace
 
@@ -286,7 +280,7 @@ theorem computableInTimeAndSpace {α β : Type*} {f : α → β} {encIn : α ↪
     {encOut : β ↪ List Bool} (compiler : NativeCompiler f encIn encOut) :
     ComputableInTimeAndSpace f encIn encOut compiler.time compiler.workspace :=
   ⟨compiler.tapeCount, compiler.State, @Finite.of_fintype _ compiler.stateFintype,
-    compiler.machine,
+    compiler.table.toTM,
     compiler.computesInTimeAndSpace⟩
 
 /-- Retype the semantic input of a named compiler when its actual input word is unchanged. The
@@ -339,86 +333,70 @@ same machine and resource maps are retained. -/
     computes := fun a => MultiTapeMachine.computesTidily_tidyCopy (enc a)
   }
 
-/-- The constant-output transition table. -/
-@[expose] def constantOutputMachine (out : List Bool) :
-    MultiTapeMachine 0 Bool (Fin (out.length + 1)) Empty Id :=
-  MultiTapeMachine.ofTr ⟨0, by omega⟩ fun state _ _ =>
-    if h : state.val < out.length then
-      { inputTape := 0
-        workTapes := Fin.elim0
-        output := some out[state.val]
-        state := some ⟨state.val + 1, by omega⟩ }
-    else
-      { inputTape := 0, workTapes := Fin.elim0, output := none, state := none }
-
-/-- A zero-tape machine that ignores its input and emits `out`, one bit per state, then halts. -/
-@[expose] def constantOutputTM (out : List Bool) : MultiTapeTM 0 Bool (Fin (out.length + 1)) :=
-  (constantOutputMachine out).toTM
-
-private def constantOutputCfg (input out : List Bool) (n : ℕ) (hn : n ≤ out.length) :
-    Cfg 0 Bool (Fin (out.length + 1)) input :=
-  { state := some ⟨n, by omega⟩
-    inputPos := 1
-    workTapes := fun i => Fin.elim0 i
-    workTapePos := fun i => Fin.elim0 i
-    output := out.take n }
-
-private theorem step_constantOutputCfg (input out : List Bool) (n : ℕ)
-    (hn : n < out.length) :
-    (constantOutputTM out).step (constantOutputCfg input out n hn.le) =
-      constantOutputCfg input out (n + 1) hn := by
-  rw [MultiTapeTM.step_of_state rfl, constantOutputTM, constantOutputMachine,
-    MultiTapeMachine.toTM_ofTr, MultiTapeTM.tr_ofTr, dite_eq_left hn]
-  apply Cfg.ext_zero_tapes
-  · rfl
-  · rfl
-  · simp only [constantOutputCfg, Action.apply_output, Option.toList_some]
-    rw [List.take_add_one, List.getElem?_eq_getElem hn]
-    rfl
-
-private theorem step_constantOutputCfg_halt (input out : List Bool) :
-    (constantOutputTM out).step (constantOutputCfg input out out.length le_rfl) =
-      wordsCfg input none (fun _ => []) out := by
-  rw [MultiTapeTM.step_of_state rfl, constantOutputTM, constantOutputMachine,
-    MultiTapeMachine.toTM_ofTr, MultiTapeTM.tr_ofTr, dite_eq_right (Nat.not_lt.mpr le_rfl)]
-  apply Cfg.ext_zero_tapes
-  · rfl
-  · rfl
-  · simp [constantOutputCfg, Action.apply_output]
-
-private theorem runFrom_constantOutputCfg (input out : List Bool) (n : ℕ)
-    (hn : n ≤ out.length) :
-    (constantOutputTM out).runFrom ((constantOutputTM out).initCfg input) n =
-      constantOutputCfg input out n hn := by
-  induction n with
-  | zero => exact Cfg.ext_zero_tapes rfl rfl rfl
-  | succ n ih =>
-      rw [MultiTapeTM.runFrom_succ, ih (by omega), step_constantOutputCfg input out n (by omega)]
-
-/-- The constant-output machine computes tidily in exactly `out.length + 1` allowed steps and no
-workspace. -/
-theorem computesTidily_constantOutputTM (input out : List Bool) :
-    (constantOutputTM out).ComputesTidilyInTimeAndSpace input out (out.length + 1) 0 := by
-  rw [computesTidily_iff_runFrom]
-  constructor
-  · rw [show wordsCfg input (some (constantOutputTM out).q₀) (fun _ => []) [] =
-        (constantOutputTM out).initCfg input from (initCfg_eq_wordsCfg input).symm,
-      MultiTapeTM.runFrom_succ, runFrom_constantOutputCfg input out out.length le_rfl,
-      step_constantOutputCfg_halt]
-  · simp [MultiTapeNTM.RunPath.space]
-
 /-- A named constant-output machine with its exact output-length clock and zero workspace. -/
 @[expose] def const {α β : Type*} (encIn : α ↪ List Bool)
     (encOut : β ↪ List Bool) (b : β) :
-    NativeCompiler (Function.const α b) encIn encOut :=
-  {
+    NativeCompiler (Function.const α b) encIn encOut := by
+  let table : MultiTapeMachine 0 Bool (Fin ((encOut b).length + 1)) Empty Id :=
+    MultiTapeMachine.ofTr ⟨0, by omega⟩ fun state _ _ =>
+      if h : state.val < (encOut b).length then
+        { inputTape := 0
+          workTapes := Fin.elim0
+          output := some (encOut b)[state.val]
+          state := some ⟨state.val + 1, by omega⟩ }
+      else
+        { inputTape := 0, workTapes := Fin.elim0, output := none, state := none }
+  let cfg (input : List Bool) (n : ℕ) (hn : n ≤ (encOut b).length) :
+      Cfg 0 Bool (Fin ((encOut b).length + 1)) input :=
+    { state := some ⟨n, by omega⟩
+      inputPos := 1
+      workTapes := fun i => Fin.elim0 i
+      workTapePos := fun i => Fin.elim0 i
+      output := (encOut b).take n }
+  have step_cfg (input : List Bool) (n : ℕ) (hn : n < (encOut b).length) :
+      table.toTM.step (cfg input n hn.le) = cfg input (n + 1) hn := by
+    rw [MultiTapeTM.step_of_state rfl]
+    simp only [table, MultiTapeMachine.toTM_ofTr, MultiTapeTM.tr_ofTr, dite_eq_left hn]
+    apply Cfg.ext_zero_tapes
+    · rfl
+    · rfl
+    · simp only [cfg, Action.apply_output, Option.toList_some]
+      rw [List.take_add_one, List.getElem?_eq_getElem hn]
+      rfl
+  have step_cfg_halt (input : List Bool) :
+      table.toTM.step (cfg input (encOut b).length le_rfl) =
+        wordsCfg input none (fun _ => []) (encOut b) := by
+    rw [MultiTapeTM.step_of_state rfl]
+    simp only [table, MultiTapeMachine.toTM_ofTr, MultiTapeTM.tr_ofTr,
+      dite_eq_right (Nat.not_lt.mpr le_rfl)]
+    apply Cfg.ext_zero_tapes
+    · rfl
+    · rfl
+    · simp [cfg, Action.apply_output]
+  have runFrom_cfg (input : List Bool) (n : ℕ) (hn : n ≤ (encOut b).length) :
+      table.toTM.runFrom (table.toTM.initCfg input) n = cfg input n hn := by
+    induction n with
+    | zero => exact Cfg.ext_zero_tapes rfl rfl rfl
+    | succ n ih =>
+        rw [MultiTapeTM.runFrom_succ, ih (by omega), step_cfg input n (by omega)]
+  have computes (input : List Bool) :
+      table.toTM.ComputesTidilyInTimeAndSpace input (encOut b)
+        ((encOut b).length + 1) 0 := by
+    rw [computesTidily_iff_runFrom]
+    constructor
+    · rw [show wordsCfg input (some table.toTM.q₀) (fun _ => []) [] =
+          table.toTM.initCfg input from Cfg.ext_zero_tapes rfl rfl rfl,
+        MultiTapeTM.runFrom_succ, runFrom_cfg input (encOut b).length le_rfl,
+        step_cfg_halt]
+    · simp [MultiTapeNTM.RunPath.space]
+  exact {
     tapeCount := 0
     State := Fin ((encOut b).length + 1)
-    table := constantOutputMachine (encOut b)
+    table := table
     stateEncoding := Fin.valEmbedding
     time := fun _ => (encOut b).length + 1
     workspace := fun _ => 0
-    computes := fun a => computesTidily_constantOutputTM (encIn a) (encOut b)
+    computes := fun a => computes (encIn a)
   }
 
 /-- Direct composition of two named machines. The result contains the choice-free

@@ -99,7 +99,7 @@ private def copyWord (embedding : Fin (0 + 1 + 2) ↪ Fin K) (mark : Bool) :
       (MultiTapeTM.MarkWorkState ⊕
         ((Unit ⊕ MultiTapeTM.RewindState) ⊕ MultiTapeTM.RewindWorkState) ⊕
           MultiTapeTM.MarkWorkState) Empty Id :=
-  ((onWords (MultiTapeTM.MultiTapeMachine.tidyCopy Bool) mark).extendTapes embedding)
+  ((onWords (tidyCopy Bool) mark).extendTapes embedding)
 
 private theorem transformsTapes_copyWord
     (embedding : Fin (0 + 1 + 2) ↪ Fin K) (mark : Bool) (word : List Bool) :
@@ -111,9 +111,9 @@ private theorem transformsTapes_copyWord
       (3 * word.length + 10) (4 * word.length + K + 15) := by
   rw [copyWord, toTM_extendTapes]
   refine ((transformsTapes_onWords
-    (machine := MultiTapeTM.MultiTapeMachine.tidyCopy Bool)
+    (machine := tidyCopy Bool)
     (input := word) (output := word) mark
-    (MultiTapeTM.MultiTapeMachine.computesTidily_tidyCopy word)).extendTapes embedding).imp
+    (computesTidily_tidyCopy word)).extendTapes embedding).imp
     (P' := fun _ tapes =>
       tapes (embedding 1) = word ∧ tapes (embedding 0) = [] ∧ tapes (embedding 2) = [])
     (Q' := fun _ tapes tapes' emitted =>

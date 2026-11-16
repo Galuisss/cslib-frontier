@@ -21,8 +21,8 @@ open Turing.MultiTapeTM Turing.MultiTapeTM.Internal Turing.MultiTapeTM.Internal.
 /-- Encoding-equality retyping is a zero-runtime view of the same machine. -/
 example {Alpha : Type*} (enc : Alpha ↪ List Bool)
     (compiler : NativeCompiler id enc enc) :
-    (compiler.ofInputEq id (fun _ => rfl)).machine = compiler.machine ∧
-      (compiler.ofOutputEq (g := id) (fun _ => rfl)).machine = compiler.machine :=
+    (compiler.ofInputEq id (fun _ => rfl)).table = compiler.table ∧
+      (compiler.ofOutputEq (g := id) (fun _ => rfl)).table = compiler.table :=
   ⟨rfl, rfl⟩
 
 /-- Pair projections retain the direct frame parsers and expose their exact linear clocks. -/

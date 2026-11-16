@@ -11,7 +11,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Combinators.
 public import Cslib.Computability.Machines.Turing.MultiTape.Plumbing.ClearWork
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.ReadInput
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.WhileInput
-public import CslibFrontier.Foundations.Data.Fin.Tuple
+public import CslibFrontier.Foundations.Data.Fin.Embedding
 import CslibFrontier.Foundations.Data.List.Flatten
 import Mathlib.Tactic.FinCases
 
@@ -43,21 +43,6 @@ time and space in the size of the state and the token only.
 namespace Turing.MultiTapeTM
 
 variable {m K : ℕ} {Symbol S : Type*}
-
-/-! ### Specifications on selected tapes -/
-
-/-- An embedding of `Fin m` into a larger `Fin K` sending `i` to `a`. -/
-public theorem exists_embedding_eq (h : m ≤ K) (i : Fin m) (a : Fin K) :
-    ∃ e : Fin m ↪ Fin K, e i = a :=
-  ⟨(Fin.castLEEmb h).trans (Equiv.swap (Fin.castLE h i) a).toEmbedding, by simp⟩
-
-/-- An embedding of `Fin m` into a larger `Fin K` sending `i` to `a` and `o` to `b`. -/
-public theorem exists_embedding_eq₂ (h : m ≤ K) {i o : Fin m} (hio : i ≠ o) {a b : Fin K}
-    (hab : a ≠ b) : ∃ e : Fin m ↪ Fin K, e i = a ∧ e o = b := by
-  obtain ⟨e, he⟩ := exists_embedding_eq h i a
-  refine ⟨e.trans (Equiv.swap (e o) b).toEmbedding, ?_, by simp⟩
-  have hoa : e o ≠ a := fun h => hio (e.injective (h.trans he.symm)).symm
-  simp [he, Equiv.swap_apply_of_ne_of_ne hoa.symm hab]
 
 /-! ### The part of a round that does not use the input -/
 

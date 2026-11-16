@@ -11,6 +11,8 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Nat
 
 /-! # Checked named native compiler construction -/
 
+set_option linter.privateModule false
+
 public section
 
 open Turing.MultiTapeTM Turing.MultiTapeTM.Internal Turing.MultiTapeTM.Universal
@@ -18,18 +20,18 @@ open Turing.MultiTapeTM Turing.MultiTapeTM.Internal Turing.MultiTapeTM.Universal
 namespace CslibFrontierTests.Internal.NativeCompilerWitness
 
 /-- A nonconstant direct compiler pipeline: preserve the input bit and attach a true tag. -/
-def tagged :
+private def tagged :
     NativeCompiler (fun b : Bool => (b, true)) encBool (encPair encBool encBool) :=
   (NativeCompiler.identity encBool).pair (NativeCompiler.const encBool encBool true)
 
 /-- Exercise direct composition after the pair constructor. -/
-def pipeline :
+private def pipeline :
     NativeCompiler (fun b : Bool => (b, true)) encBool (encPair encBool encBool) :=
   (NativeCompiler.identity (encPair encBool encBool)).comp tagged
 
 /-- Decode the first frame using the total malformed-input convention, then frame that raw result.
 The composition therefore exercises an input outside the image of `encFramed encBits`. -/
-def malformedReframe : NativeCompiler (fun word => frame (unframe word)) encBits encBits :=
+private def malformedReframe : NativeCompiler (fun word => frame (unframe word)) encBits encBits :=
   (NativeCompiler.encodeFrame encBits).comp NativeCompiler.unframeDecoder
 
 -- State labels are composed constructively along with the machine terms.
@@ -113,7 +115,7 @@ example (b : Bool) : pipeline.workspace b =
 /-- The constructive description records every transition of a nontrivial composed compiler. -/
 example (state : pipeline.State) (input : Option Bool)
     (work : Fin pipeline.tapeCount → Option Bool) :
-    pipeline.description.Holds (pipeline.machine.map pipeline.stateEncoding eBit)
+    pipeline.description.Holds (pipeline.table.toTM.map pipeline.stateEncoding eBit)
       (pipeline.stateEncoding state) (input.map eBit) (Option.map eBit ∘ work) :=
   pipeline.description_holds state input work
 

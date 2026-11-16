@@ -9,10 +9,7 @@ module
 -- vendored: `spaceUsed` is the space of a run path since cslib #1133 and #1122
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.Cursor
-public import Cslib.Computability.Machines.Turing.MultiTape.Plumbing.ForwardWork
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.RewindWork
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.Equivalence
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelComp
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.WorkCursor
 
 /-!
 # Reading from the input at the input head

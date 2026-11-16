@@ -3675,6 +3675,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.Prog
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.Sequential
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.Simulation
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.Space
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.WorkCursor
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Map
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Nondeterministic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.OutView
@@ -6073,6 +6074,7 @@ public import CslibFrontier.Foundations.Data.Fin.Append
 public import CslibFrontier.Foundations.Data.Fin.BalancedBlocks
 public import CslibFrontier.Foundations.Data.Fin.Counting
 public import CslibFrontier.Foundations.Data.Fin.Decode
+public import CslibFrontier.Foundations.Data.Fin.Embedding
 public import CslibFrontier.Foundations.Data.Fin.Order
 public import CslibFrontier.Foundations.Data.Fin.Tuple
 public import CslibFrontier.Foundations.Data.Finset.ApplyUpdate

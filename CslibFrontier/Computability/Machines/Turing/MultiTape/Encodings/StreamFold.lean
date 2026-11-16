@@ -13,6 +13,7 @@ import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Basic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Combinators.StreamFold
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Pair
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Combinators.Comp
+import CslibFrontier.Foundations.Data.Fin.Embedding
 import CslibFrontier.Foundations.Data.List.Flatten
 import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.Ring
@@ -414,12 +415,14 @@ public theorem ComputableTidilyInTimeAndSpace.streamFold_sum_after {α : Type u}
   have hVN : V ≠ N := by simp [V, N, Fin.ext_iff]
   have hVF : V ≠ F := by simp [V, F, Fin.ext_iff]
   have hNF : N ≠ F := by simp [N, F, Fin.ext_iff]
-  obtain ⟨eI, heI⟩ := exists_embedding_eq (K := M + 3) (by omega) (Fin.last kI) V
-  obtain ⟨eE, heE⟩ := exists_embedding_eq (K := M + 3) (by omega) (Fin.natAdd kE (0 : Fin 2)) V
-  obtain ⟨eN, heN, heN'⟩ := exists_embedding_eq₂ (K := M + 3) (by omega)
+  obtain ⟨eI, heI⟩ := Fin.exists_embedding_eq (K := M + 3) (by omega) (Fin.last kI) V
+  obtain ⟨eE, heE⟩ := Fin.exists_embedding_eq (K := M + 3) (by omega)
+    (Fin.natAdd kE (0 : Fin 2)) V
+  obtain ⟨eN, heN, heN'⟩ := Fin.exists_embedding_eq₂ (K := M + 3) (by omega)
     (i := Fin.natAdd (kN + 1) (0 : Fin 2)) (o := (Fin.last kN).castAdd 2)
     (by simp [Fin.ext_iff]) hVN
-  obtain ⟨eF, heF⟩ := exists_embedding_eq (K := M + 3) (by omega) (Fin.natAdd kF (0 : Fin 2)) V
+  obtain ⟨eF, heF⟩ := Fin.exists_embedding_eq (K := M + 3) (by omega)
+    (Fin.natAdd kF (0 : Fin 2)) V
   refine ⟨(40 * M + 200) * (cfr + cN + cuf + cF + M + 100), _, _, inferInstance,
     streamTM r (I eI) ((tmE.inputFromWord true).extendTapes eE)
       ((tmN.onWords true).extendTapes eN) ((tmF.inputFromWord true).extendTapes eF)
