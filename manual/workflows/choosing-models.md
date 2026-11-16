@@ -72,6 +72,9 @@ Thus `some []` under `encBits` is `[true]`, while a nested `some none` is `[true
 A list still frames every element: replacing a formerly empty absent element adds two bits
 inside its frame. Product framing can amplify changes in an earlier component; do not assume
 that a nested record's size changes by only one bit.
+For example, Savitch's return register frames the absent option before its Boolean result:
+its encoded length is four bits (three for `frame [false]`, then one for the result).
+The state-size certificate still fits its existing independent resource bounds.
 
 Use `encHaltOption` only for the iteration kernel's empty-word stop signal, and
 `encSilentOption` for protocols or streaming callbacks whose absent response emits no bits.

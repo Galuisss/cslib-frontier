@@ -60,7 +60,7 @@ theorem optionIsSome {encO : Option β ↪ List Bool} [OptionEncoding encB encO]
     {value : α → Option β}
     (hvalue : ComputableTidilyInPolyTime value encA encO) :
     ComputableTidilyInPolyTime (fun a => (value a).isSome) encA encBool :=
-  (ComputableInPolyTime.optionIsSome hvalue.computableInPolyTime).tidy
+  (ComputableInPolyTime.optionIsSome (encB := encB) hvalue.computableInPolyTime).tidy
 
 /-- Read an option with a fallback supplied as part of the input. -/
 @[fun_prop]

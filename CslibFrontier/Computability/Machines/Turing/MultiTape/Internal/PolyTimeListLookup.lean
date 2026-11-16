@@ -59,7 +59,8 @@ theorem head? (enc : α ↪ List Bool) {encL : List α ↪ List Bool}
   · obtain ⟨fallback⟩ := h
     have hempty : ComputableInPolyTime List.isEmpty encL encBool := by
       exact (ListEncoding.isEmpty (enc₁ := enc) (enc := encL)).computableInPolyTime
-    have hread := hempty.ite (const none) ((optionSome enc (encO := encO)).comp (headPlain fallback))
+    have hread := hempty.ite (const none)
+      ((optionSome enc (encO := encO)).comp (headPlain fallback))
     convert hread using 1
     funext values
     cases values <;> rfl

@@ -276,7 +276,7 @@ private lemma toList_inO {δ : Type} {enc : δ ↪ List Bool} :
   have hp := hft.comp_linear he
   refine (hc.ite hp (const (encMid := encBits) [])).of_enc_eq (fun o => ?_) |>.mono
     2 (fun o => ?_) (fun o => ?_)
-  · cases o <;> simp [encBits_apply]
+  · cases o <;> simp
   all_goals split_ifs <;> omega
 
 /-- The sums of the costs of a run of `m + 1` rounds followed by a halting test, against a bound
@@ -291,7 +291,7 @@ private lemma sums_le {A B R : ℕ → ℕ} {m X : ℕ} (h : ∀ i < m, A i + B 
 
 private lemma length_encList_toList_le {δ : Type} (enc : δ ↪ List Bool) (o : Option δ) :
     (encList enc o.toList).length ≤ 2 * (encOption enc o).length := by
-  cases o <;> simp [length_frame]
+  cases o <;> simp
 
 variable (D : DivConq α β γ) {Tt St Tb Sb Tl Sl : α → ℕ} {Tm Sm : α × β → ℕ}
   {Tj Sj : γ × β → ℕ}
@@ -433,8 +433,8 @@ private lemma halt_inO : ComputableTidilyInO D.loop.halt (encVal encA encB) encB
     ((ComputableTidilyInDegree.headD (enc₁ := encBool) (enc := encBits) false).inO_one.prod
       ((ComputableTidilyInDegree.headD (enc₁ := encBool) (enc := encBits) false).inO_one.comp
         (of_linear (.of_tail (f := List.tail) (encIn := encBits) (encMid := encBits)
-          fun _ => rfl)))).mono 3 (fun w => by simp [encBits_apply]; omega)
-      (fun w => by simp [encBits_apply]; omega)
+          fun _ => rfl)))).mono 3 (fun w => by simp; omega)
+      (fun w => by simp; omega)
   refine (((ComputableTidilyInDegree.of_finite (encIn := encPair encBool encBool)
     (encMid := encBool) (fun p : Bool × Bool => p.1 && p.2)).inO_one.comp hw).comp
     (of_linear (.of_eq (f := fun v : Val α β => encVal encA encB v) (encIn := encVal encA encB)

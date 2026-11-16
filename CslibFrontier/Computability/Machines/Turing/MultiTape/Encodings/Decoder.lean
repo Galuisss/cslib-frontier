@@ -54,19 +54,19 @@ namespace Turing.MultiTapeTM
 
 /-- Dropping a frame does not lengthen a word. -/
 theorem length_dropFrame_le : ∀ w : List Bool, (dropFrame w).length ≤ w.length
-  | [] | [true] => by simp [Cslib.Encoding.dropDelimited]
-  | false :: w => by simp [Cslib.Encoding.dropDelimited]
+  | [] | [true] => by simp
+  | false :: w => by simp
   | true :: b :: w => by
-    have := length_dropFrame_le w
+    have hlen : (Cslib.Encoding.dropDelimited w).length ≤ w.length := length_dropFrame_le w
     simp only [Cslib.Encoding.dropDelimited_true_cons_cons, List.length_cons]
     omega
 
 /-- Dropping a frame shortens a nonempty word. -/
 theorem length_dropFrame_lt : ∀ {w : List Bool}, w ≠ [] → (dropFrame w).length < w.length
-  | [true], _ => by simp [Cslib.Encoding.dropDelimited]
-  | false :: w, _ => by simp [Cslib.Encoding.dropDelimited]
+  | [true], _ => by simp
+  | false :: w, _ => by simp
   | true :: b :: w, _ => by
-    have := length_dropFrame_le w
+    have hlen : (Cslib.Encoding.dropDelimited w).length ≤ w.length := length_dropFrame_le w
     simp only [Cslib.Encoding.dropDelimited_true_cons_cons, List.length_cons]
     omega
 
@@ -131,11 +131,10 @@ theorem framesT_run_symbol : ∀ v : List Bool, framesT.run .symbol v =
     frame (unframe v) ++ framesT.run .between (dropFrame v)
   | [] => rfl
   | [true] => rfl
-  | false :: v => by simp [Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited,
-    Cslib.Encoding.delimit]
+  | false :: v => by simp
   | true :: b :: v => by
-    simp only [Transducer.run_cons, framesT_step, List.nil_append, Cslib.Encoding.undelimit,
-      Cslib.Encoding.dropDelimited,
+    simp only [Transducer.run_cons, framesT_step, List.nil_append,
+      Cslib.Encoding.undelimit_true_cons_cons, Cslib.Encoding.dropDelimited_true_cons_cons,
       frame_cons, List.cons_append, framesT_run_symbol v]
 
 /-- **The transducer emits the encoded list of framed words.** -/
@@ -147,12 +146,13 @@ theorem framesT_run (w : List Bool) :
     rw [frames_of_ne_nil h, encList_cons, ← ih]
     rcases w with _ | ⟨_ | _, v⟩
     · exact absurd rfl h
-    · simp [Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited, Cslib.Encoding.delimit]
+    · simp
     · rcases v with _ | ⟨b, v⟩
       · rfl
       · simp only [Transducer.run_cons, framesT_step, List.nil_append, framesT_run_symbol v,
-          Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited, frame_cons, List.cons_append,
-            encBits_apply]
+          Cslib.Encoding.undelimit_true_cons_cons,
+          Cslib.Encoding.dropDelimited_true_cons_cons, frame_cons, List.cons_append,
+          encBits_apply]
 
 /-- **Splitting a word into framed words is linear.** -/
 theorem computableInDegree_frames :

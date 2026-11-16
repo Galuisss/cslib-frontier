@@ -69,7 +69,7 @@ private lemma keepFrame_drop {σ : Type} {encS : σ ↪ List Bool} {h : σ → �
     | succ k ih =>
       refine (((of_linear (.of_tail (f := List.tail) (encIn := encBits) (encMid := encBits)
         fun _ => rfl)).comp ih).of_enc_eq (g := fun s => (dropFrame (encS s)).drop (k + 1))
-        fun s => by simp [encBits_apply, List.tail_drop]).mono 2 (fun s => ?_) (fun s => ?_) <;>
+        fun s => by simp [List.tail_drop]).mono 2 (fun s => ?_) (fun s => ?_) <;>
       · have : ((dropFrame (encS s)).drop k).length ≤ (encS s).length := by
           obtain ⟨u, hs, -⟩ := hh s
           rw [hs, dropFrame_frame_append, List.length_drop, List.length_append]
@@ -217,7 +217,7 @@ private theorem optionElimSnd_tidy {f : π → ε} {g : π × α → ε} {Tf Sf 
   have hN : ComputableTidilyInO N ((Function.Embedding.subtype _).trans enc) encP
       (fun s => ((Function.Embedding.subtype _).trans enc s).length)
       (fun s => ((Function.Embedding.subtype _).trans enc s).length) :=
-    of_linear (.of_unframe fun ⟨⟨x, o⟩, _⟩ => by simp [enc, N, unframe_frame_append])
+    of_linear (.of_unframe fun ⟨⟨x, o⟩, _⟩ => by simp [enc, N])
   have hS := keepFrame_drop (encP := encP) (encA := encA)
     (encS := (Function.Embedding.subtype _).trans enc) (h := S) 1
     fun ⟨⟨x, o⟩, ho⟩ => by
