@@ -136,7 +136,7 @@ private theorem inputSymbol_pair_inO :
   have hW (x : List ℕ) (j : ℕ) (hj : j < x.length) : W x j = 2 * x[j] + 1 := by
     simp [W, hj, encUnary_apply]
   have hsum (x : List ℕ) : ∑ j ∈ Finset.range x.length, W x j = (encList encUnary x).length := by
-    simpa [W, List.flatMap_def, encList, Function.comp_def, List.sum_map_mul_left x id 2] using
+    simpa [W, List.flatMap_def, encList, Function.comp_def, List.sum_map_mul_left] using
       sum_length_getD (x.map fun a => frame (encUnary a))
   have hstate (q : ℕ × List ℕ) (j : ℕ) :
       (encNat (streamState q.1 inputNext q.2 j)).length ≤ B q := by

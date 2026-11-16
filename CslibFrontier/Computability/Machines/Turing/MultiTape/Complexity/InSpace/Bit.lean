@@ -51,7 +51,7 @@ theorem natTestBit :
   have hlen (q : ℕ × ℕ) (i : ℕ) :
       (encBits (List.tail^[i] q.1.bits)).length ≤ (encNat q.1).length := by
     induction i with
-    | zero => rfl
+    | zero => simp only [Function.iterate_zero_apply, encBits_apply, encNat_apply, le_refl]
     | succ i ih =>
       rw [Function.iterate_succ_apply']
       simp only [encBits_apply, List.length_tail] at ih ⊢

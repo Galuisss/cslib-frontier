@@ -716,8 +716,17 @@ theorem zip {α β : Type} (encA : α ↪ List Bool) (encB : β ↪ List Bool) :
     have hright : i < p.2.length := (Nat.lt_min.mp (by simpa using hi)).2
     simp only [List.getElem_zip, List.getElem_map, List.getElem_range,
       List.getD_eq_getElem _ _ hleft, List.getD_eq_getElem _ _ hright]
-  simp_rw [heq, List.getD_eq_getElem?_getD]
-  fun_prop
+  simp_rw [heq]
+  have hleft := fst (encList encA) (encList encB)
+  have hright := snd (encList encA) (encList encB)
+  have hlengthLeft := (length_list (enc := encA)).comp hleft
+  have hlengthRight := (length_list (enc := encB)).comp hright
+  apply mapWithInput (encA := encUnary)
+  · fun_prop
+  · exact ((listGetD (encA := encA) (encL := encList encA) a).comp
+      ((hleft.comp (fst _ encUnary)).prod (snd _ encUnary))).prod
+      ((listGetD (encA := encB) (encL := encList encB) b).comp
+        ((hright.comp (fst _ encUnary)).prod (snd _ encUnary)))
 
 
 end Turing.MultiTapeTM.ComputableTidilyInPolyTime
@@ -1000,8 +1009,13 @@ theorem zipIdx {α : Type} (enc : α ↪ List Bool) :
       simp only [List.length_zipIdx] at hi
       simp only [List.getElem_zipIdx, List.getElem_map, List.getElem_range,
         List.getD_eq_getElem _ _ hi, Nat.zero_add]
-    simp_rw [heq, List.getD_eq_getElem?_getD]
-    fun_prop
+    simp_rw [heq]
+    apply of_tidy
+    apply ComputableTidilyInPolyTime.mapWithInput (encA := encUnary)
+    · fun_prop
+    · exact ((ComputableTidilyInPolyTime.listGetD (encA := enc)
+        (encL := encList enc) fallback).prod
+          (ComputableTidilyInPolyTime.snd (encList enc) encUnary))
 
 end Turing.MultiTapeTM.ComputableInPolyTime
 
