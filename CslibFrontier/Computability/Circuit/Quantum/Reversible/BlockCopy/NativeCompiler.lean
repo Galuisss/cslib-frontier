@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.BlockCopy
+public import CslibFrontier.Computability.Circuit.Quantum.Uniform
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Range
 
 /-!

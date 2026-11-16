@@ -13,8 +13,9 @@ public import CslibFrontier.Computability.Circuit.Quantum.Classical
 # Copying a contiguous classical register
 
 `GateCode.blockCopyCodes source target count` emits one CNOT for each pair of corresponding
-wires in two contiguous blocks. The source and target blocks may occur in either order, but must
-be disjoint for the circuit to be well formed and to keep every source wire unchanged.
+wires in two contiguous blocks. The source and target blocks may occur in either order.
+Disjointness makes their joint action the parallel XOR copy stated below and keeps every source
+wire unchanged.
 
 ## Main definitions
 
@@ -34,7 +35,8 @@ public section
 
 namespace Cslib.Quantum.GateCode
 
-/-- Copy `count` consecutive source wires into the corresponding target wires with CNOTs. -/
+/-- XOR `count` consecutive source wires into the corresponding target wires with CNOTs. This
+is a literal copy when the target block starts in the all-zero state. -/
 @[expose] def blockCopyCodes (source target count : ℕ) : List GateCode :=
   (List.range count).map fun offset => (false, target + offset, [source + offset])
 
@@ -55,8 +57,15 @@ theorem isClassical_blockCopyCodes {source target count width : ℕ}
   simp only [WellFormed, List.length_cons, List.length_nil, Nat.zero_add,
     Nat.succ_le_succ_iff, Nat.zero_le, List.nodup_cons, List.mem_cons,
     List.not_mem_nil, or_false, List.nodup_nil, not_false_eq_true, and_true,
-    forall_eq_or_imp]
-  rcases hdisjoint with hdisjoint | hdisjoint <;> omega
+    true_and, forall_eq_or_imp, forall_eq]
+  constructor
+  · rcases hdisjoint with hdisjoint | hdisjoint
+    · exact ne_of_gt (((Nat.add_lt_add_left hoffset' source).trans_le hdisjoint).trans_le
+        (Nat.le_add_right target offset))
+    · exact ne_of_lt (((Nat.add_lt_add_left hoffset' target).trans_le hdisjoint).trans_le
+        (Nat.le_add_right source offset))
+  · exact ⟨(Nat.add_lt_add_left hoffset' target).trans_le htarget,
+      (Nat.add_lt_add_left hoffset' source).trans_le hsource⟩
 
 /-- Each target of a disjoint block copy is XORed with the corresponding source bit. This
 describes the exact basis-state action without assuming that the target block starts at zero. -/
@@ -76,7 +85,7 @@ theorem readBit_classicalRun_blockCopyCodes {source target count width : ℕ}
     exact hwellFormed.2.2 target (List.mem_cons_self ..)
   have hnd : ((blockCopyCodes source target count).map fun gate => gate.2.1).Nodup := by
     rw [blockCopyCodes, List.map_map]
-    exact (List.nodup_range count).map fun left right h => by
+    exact List.nodup_range.map fun left right h => by
       simp only [Function.comp_apply] at h
       omega
   have hread : ∀ gate ∈ blockCopyCodes source target count,
