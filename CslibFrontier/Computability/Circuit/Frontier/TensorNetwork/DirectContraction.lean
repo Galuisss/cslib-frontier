@@ -291,7 +291,9 @@ theorem weightMod_polyTime :
       (fun q : (ℕ × ExplicitTensorNetwork ℕ) × List Bool => weightMod q.1.1 q.1.2 q.2)
       encWeightInput encNat := ComputableInPolyTime.foldlWithInput_of_bounded_growth
     (encA := encPair (encList encNat) (encList encNat)) (encL := encVertices)
-    (step := fun q acc v => acc * entry v.2 (v.1.map fun i => q.2.getD i false) % 2 ^ q.1.1)
+    (step := fun (q : (ℕ × ExplicitTensorNetwork ℕ) × List Bool) (acc : ℕ)
+      (v : List ℕ × List ℕ) =>
+        acc * entry v.2 (v.1.map fun i => q.2.getD i false) % 2 ^ q.1.1)
     hinit ⟨hverts, hstep, inferInstance, inferInstance⟩
     (growth := fun q => q.1.1)
     ⟨PolyBounded.of_forall_le 1 1 fun q => by

@@ -354,7 +354,8 @@ private theorem zeroStep_polyTime :
     (encL := encList encBits) []
   have hbit := ComputableInPolyTime.listGetD (encA := encBool)
     (encL := encBits) false
-  polytime [zeroStep, zeroGate]
+  unfold zeroStep zeroGate
+  fun_prop
 
 /-- A label read at a wire number written in binary, capped by the number of labels. -/
 private theorem labelAt_polyTime {γ : Type} {encIn : γ ↪ List Bool}
@@ -438,7 +439,8 @@ private theorem gateRow_polyTime {γ : Type} {encIn : γ ↪ List Bool} {k g a b
     (encL := encList encBits) []
   have hbit := ComputableInPolyTime.listGetD (encA := encBool)
     (encL := encBits) false
-  polytime [gateRow]
+  unfold gateRow
+  fun_prop
 
 /-! ### Evaluation -/
 

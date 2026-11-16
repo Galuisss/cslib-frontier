@@ -208,7 +208,7 @@ theorem computableInPolyTime_schnorrExtractWord :
     (hword (k := fun p => p.2.2.2.2.1) (by fun_prop))
     (hword (k := fun p => p.2.2.2.2.2.1) (by fun_prop))
     (hword (k := fun p => p.2.2.2.2.2.2) (by fun_prop))
-  simpa only [encNat_apply, Function.comp_def, schnorrExtractWord] using hext.encoding_comp
+  simpa only [Turing.MultiTapeTM.encNat_apply, Function.comp_def, schnorrExtractWord] using hext.encoding_comp
 
 /-- `schnorrExtractWord` computes Schnorr's extractor `schnorrExtract` on encodings. -/
 theorem extractorRealizedBy_schnorrExtractWord :
@@ -575,7 +575,7 @@ theorem computableInPolyTime_schnorrRespondBits :
   have hsk_nat := ComputableInPolyTime.bitsToNat.comp hsk
   have hr_nat := ComputableInPolyTime.bitsToNat.comp hr
   have hro_nat := ComputableInPolyTime.bitsToNat.comp hro
-  simpa only [encNat_apply, Function.comp_def, schnorrRespondBits] using
+  simpa only [Turing.MultiTapeTM.encNat_apply, Function.comp_def, schnorrRespondBits] using
     (ComputableInPolyTime.binary_mod'
     (.binary_add' hr_nat (.binary_mul' hro_nat hsk_nat)) hq).encoding_comp
 

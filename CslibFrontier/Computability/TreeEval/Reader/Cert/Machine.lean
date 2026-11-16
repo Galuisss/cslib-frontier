@@ -82,6 +82,9 @@ private theorem addrT_inSpace :
   refine onTuple (f := fun y => addrT y.1) ?_
   have := len_le_stepBudget
   have := @offsetT_inSpace
+  have hsome (f : Tuple × Bool → ℕ)
+      (hf : ComputableInSpace f encStepInT encNat stepBudget) :=
+    ComputableInSpace.budget_optionSome (encO := encOption encNat) hf
   space [addrT]
 
 /-! ### On states -/

@@ -59,7 +59,7 @@ private theorem sessionAdvance_polyTime :
   have hsome := ComputableInPolyTime.optionSome (encPair encBool encBits)
     (encO := encSilentOption (encPair encBool encBits))
   cases op with
-  | open bit =>
+  | «open» bit =>
     have hbit := ComputableInPolyTime.const
       (encIn := encPair encUnary
         (encPair (encPair (encFinite SenderOperation) encBits) encSession))

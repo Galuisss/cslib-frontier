@@ -355,7 +355,7 @@ private theorem getElem?_bit (l : List α) {t j : ℕ} (ht : t < l.length)
   rw [encList_split enc l ht, List.getElem?_append_right (by simp [off]; omega),
     List.getElem?_append_left (by simp [off, length_frame]; omega)]
   have := getElem?_frame_two_mul_add_one hj
-  simpa [off, Nat.add_assoc] using this
+  convert this using 1 <;> congr 1 <;> omega
 
 end Offsets
 
@@ -536,7 +536,8 @@ private theorem reachesOut_lookupProgram :
     simp only [eval_reg, List.getD_cons_zero, List.getD_cons_succ,
       show off enc l k < n from hlt, ↓reduceIte]
     refine ReachesOut.emit (show lookupProgram.instr 12 = _ from rfl) hb ?_
-    simpa using reachesOut_copy hB hk le_rfl 0 (Nat.zero_le _)
+    simpa only [Nat.mul_zero, Nat.add_zero, List.drop_zero] using
+      reachesOut_copy hB hk le_rfl 0 (Nat.zero_le _)
   · have hoff : off enc l k = n := off_of_le enc l (by omega)
     refine ⟨(19, [n, k, off enc l k, k]), [], ?_, rfl, rfl, hb⟩
     rw [List.getElem?_eq_none (by omega)]
@@ -578,7 +579,8 @@ theorem range : ComputableInLogSpace List.range encUnary (encList encUnary) := b
   simp only [encUnary_apply, List.length_replicate, pow_one]
   obtain ⟨regs, h, hregs⟩ := reachesOut_rangeProgram n
   refine ⟨(11, regs), _, [], h, rfl, ?_, hregs⟩
-  simp [encList, Function.comp_def, frame_replicate]
+  change (List.range n).flatMap (fun i => frame (encUnary i)) = _
+  simp [encUnary_apply, frame_replicate]
 
 /-- **Looking up the element at a unary index** in a list, in logarithmic space. -/
 theorem getElem? {α : Type} (enc : α ↪ List Bool) :

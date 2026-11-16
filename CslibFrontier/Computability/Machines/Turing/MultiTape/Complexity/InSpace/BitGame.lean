@@ -179,7 +179,9 @@ private theorem iterate_stepS (L V P : α × List Bool → Bool) (k : ℕ) (x : 
 
 private theorem length_encList_encBool (w : List Bool) :
     (encList encBool w).length = 3 * w.length := by
-  simp [length_encList, encBool_apply, List.sum_replicate, Nat.mul_comm]
+  simp only [length_encList, encBool_apply, List.length_singleton, List.map_const,
+    List.sum_replicate]
+  omega
 
 /-- A step of the evaluation is computable within the space of the state and of the tests. -/
 private theorem stepS_inSpace {L V P : α × List Bool → Bool} {SL SV SP : α × List Bool → ℕ}
@@ -202,10 +204,10 @@ private theorem stepS_inSpace {L V P : α × List Bool → Bool} {SL SV SP : α 
   have hLx := budget_comp hL (budget_prod hx hwb) (.of_le fun _ => by omega)
   have hVx := budget_comp hV (budget_prod hx hwb) (.of_le fun _ => by omega)
   have hPx := budget_comp hP (budget_prod hx htb) (.of_le fun _ => by omega)
-  have hsome := budget_optionIsSome ho
+  have hsome := budget_optionIsSome (encB := encBool) ho
   have hempty := budget_isEmpty hw
   have hhead := budget_headD true hw
-  have hget := budget_optionGetD false ho
+  have hget := budget_optionGetD (encB := encBool) false ho
   have hc := budget_finite (encC := encBool)
     (fun p : Bool × Bool × Bool => (p.1 == false) && (p.2.1 != p.2.2))
     (budget_prod hhead (budget_prod hget hPx))
@@ -240,7 +242,7 @@ theorem bitGame_value {L V P : α × List Bool → Bool} {SL SV SP : α × List 
   have hdone : ComputableInSpace done encS encBool fun s => (encS s).length := by
     have hid := budget_id (enc := encS) (S := fun s => (encS s).length) (.refl _)
     exact budget_finite (encC := encBool) (fun p : Bool × Bool => p.1 && p.2)
-      (budget_prod (budget_isEmpty hid.snd'.fst') (budget_optionIsSome hid.snd'.snd'))
+      (budget_prod (budget_isEmpty hid.snd'.fst') (budget_optionIsSome (encB := encBool) hid.snd'.snd'))
   have hinit : ComputableInSpace (fun x : α => (x, ([] : List Bool), (none : Option Bool)))
       encIn encS fun x => (encIn x).length := by
     have hl : (fun x => (encIn x).length) ≼ fun x => (encIn x).length := .refl _
@@ -281,7 +283,7 @@ theorem bitGame_value {L V P : α × List Bool → Bool} {SL SV SP : α × List 
     dsimp only at this ⊢
     simp only [encS, length_encPair, length_encList_encBool]
     cases o <;> simp <;> omega
-  refine ((budget_optionGetD false h.snd'.snd').of_enc_eq fun x => ?_).weaken
+  refine ((budget_optionGetD (encB := encBool) false h.snd'.snd').of_enc_eq fun x => ?_).weaken
     ⟨20, fun x => by dsimp only; omega⟩
   rw [iterate_stepS]
   have hd := Nat.find_spec (hex x)

@@ -105,6 +105,7 @@ theorem AdversaryOf.IsPPT.restrict {Msg : Type} {encMsg : Msg ↪ List Bool}
     ppt
   guess := by
     have hguess := hadversary.guess
+    have hhead := ComputableInPolyTime.headD (encA := encBool) (encL := encBits) false
     dsimp only [AdversaryOf.restrict]
     ppt
 

@@ -876,7 +876,8 @@ theorem computableInPolyTime_findQueryInTrace
       ((ComputableInPolyTime.snd encBits encBits).comp
         (ComputableInPolyTime.snd encIn (encPair encBits encBits)))
       (hdigest.comp (ComputableInPolyTime.fst encIn (encPair encBits encBits))))
-  exact hfind.optionMapWithInput (f := fun _ p => p.1)
+  exact hfind.optionMapWithInput (encB := encPair encBits encBits)
+    (encC := encBits) (f := fun _ p => p.1)
     ((ComputableInPolyTime.fst encBits encBits).comp
       (ComputableInPolyTime.snd encIn (encPair encBits encBits)))
 

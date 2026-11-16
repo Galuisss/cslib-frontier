@@ -158,7 +158,10 @@ theorem computableInPolyTime_writeEntries :
         (⟨2 * bi.2 + 6, r, none :: List.replicate dp.1.tapes none⟩,
           (⟨.zero, [(some (some (eBit bi.1)), .pos)], none, some (2 * bi.2 + 4)⟩ : Act)))
       (encPair eDesc encBits) eTable := by
-    refine flatMapWithInput (encA := encPair encBool encUnary) (encB := encPair eKey eAct) hz ?_
+    refine flatMapWithInput (encIn := encPair eDesc encBits)
+      (encA := encPair encBool encUnary) (encB := encPair eKey eAct) hz ?_
+    apply mapConst
+    intro r hr
     fun_prop
   exact listAppend' h1 h2
 

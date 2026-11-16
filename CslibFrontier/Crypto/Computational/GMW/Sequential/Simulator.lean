@@ -367,7 +367,7 @@ private theorem computableInPolyTime_optionOr {α β : Type}
     ComputableInPolyTime (fun a => (left a).or (right a)) encA (encSilentOption encB) :=
   (congrArg (ComputableInPolyTime · encA (encSilentOption encB))
     (by funext a; cases left a <;> rfl)).mp
-    ((hleft.tidy.optionIsSome.computableInPolyTime).ite' hleft hright)
+    (((hleft.tidy.optionIsSome (encB := encB)).computableInPolyTime).ite' hleft hright)
 
 private abbrev SessionCtx (α : Type) (tapes : ℕ) (Control : Type) :=
   α × (ℕ × (ℕ × FiniteConfig tapes Bool Control Unit))

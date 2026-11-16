@@ -147,6 +147,11 @@ theorem computableInPolyTime_lyubashevskyExtractList :
       (encList encIntBin) := by
     unfold lyubashevskyExtractList
     dsimp only
+    have hget := ComputableInPolyTime.optionGetD (encList encIntBin)
+      (encO := encSilentOption (encList encIntBin))
+    have hcoord := ComputableInPolyTime.listGetD (encA := encIntBin)
+      (encL := encList encIntBin) (0 : ℤ)
+    have hbit := ComputableInPolyTime.listGetD (encA := encBool) (encL := encBits) false
     fun_prop
   have hfields : ComputableInPolyTime
       (fun r : LyubashevskyExtractInput => ((r.dims.m, r.dims.k),

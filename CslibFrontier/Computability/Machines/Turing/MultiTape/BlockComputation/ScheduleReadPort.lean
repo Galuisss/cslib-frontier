@@ -74,7 +74,7 @@ theorem providerPort_inSpace (k c : ℕ) :
   have hi := ht.fst'
   have hd := ht.snd'
   have hsearch := search_inSpace k c
-  have hj := budget_optionGetD 0 hsearch
+  have hj := budget_optionGetD (encB := encNat) 0 hsearch
   have hp := budget_comp_linear (port_inSpace k c)
     (budget_prod hs (budget_prod hi (budget_prod hd hj)))
   have hsome := budget_finite (encC := encOption (encFinite (Fin 3))) some hp
