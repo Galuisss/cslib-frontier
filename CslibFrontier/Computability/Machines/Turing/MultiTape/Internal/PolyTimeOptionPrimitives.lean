@@ -131,7 +131,7 @@ theorem optionMapWithInput {γ : Type} {encC : γ ↪ List Bool}
 theorem optionIsSomeTagged {value : α → Option β}
     (hvalue : ComputableInPolyTime value encA (encOption encB)) :
     ComputableInPolyTime (fun a => (value a).isSome) encA encBool :=
-  optionIsSome (encO := encOption encB) hvalue
+  optionIsSome (encB := encB) (encO := encOption encB) hvalue
 
 /-- Tagged-option inference rule: the payload encoding is supplied by the value certificate. -/
 @[fun_prop]
@@ -143,7 +143,7 @@ theorem optionElimWithInputTagged {γ : Type} {encC : γ ↪ List Bool}
       (encPair encA encB) encC) :
     ComputableInPolyTime
       (fun a => (value a).elim (fallback a) (body a)) encA encC :=
-  optionElimWithInput (encO := encOption encB) hvalue hfallback hbody
+  optionElimWithInput (encB := encB) (encO := encOption encB) hvalue hfallback hbody
 
 /-- Tagged-option inference rule: the payload encoding is supplied by the value certificate. -/
 @[fun_prop]
@@ -151,7 +151,7 @@ theorem optionGetDWithInputTagged {value : α → Option β} {fallback : α → 
     (hvalue : ComputableInPolyTime value encA (encOption encB))
     (hfallback : ComputableInPolyTime fallback encA encB) :
     ComputableInPolyTime (fun a => (value a).getD (fallback a)) encA encB :=
-  optionGetDWithInput (encO := encOption encB) hvalue hfallback
+  optionGetDWithInput (encB := encB) (encO := encOption encB) hvalue hfallback
 
 /-- Tagged-option inference rule: the payload encoding is supplied by the value certificate. -/
 @[fun_prop]
@@ -160,6 +160,6 @@ theorem optionMapWithInputTagged {γ : Type} {encC : γ ↪ List Bool}
     (hvalue : ComputableInPolyTime value encA (encOption encB))
     (hf : ComputableInPolyTime (fun p : α × β => f p.1 p.2) (encPair encA encB) encC) :
     ComputableInPolyTime (fun a => (value a).map (f a)) encA (encOption encC) :=
-  optionMapWithInput (encO := encOption encB) (encOC := encOption encC) hvalue hf
+  optionMapWithInput (encB := encB) (encO := encOption encB) (encOC := encOption encC) hvalue hf
 
 end Turing.MultiTapeTM.ComputableInPolyTime

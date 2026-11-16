@@ -89,6 +89,11 @@ they do not select an encoding for its type. The generic rules still accept an e
 `encO` for other formats. When applying a generic rule directly and its intermediate format
 is absent from the goal, supply `(encO := encOption e)` (or the intended protocol format).
 `OptionEncoding` can infer its payload encoding from an already specified option encoding.
+Degree-one and arbitrary-resource option elimination also have tagged search rules; these
+reuse the generic machines and retain their separate time and space charges.
+The universal input scanner keeps empty-word halt emissions internally and charges
+`optionFromHalt` when returning a canonical symbol. A blank work-tape symbol occupies one bit,
+so selecting a default blank from an empty encoded list requires an additive size allowance.
 
 `Decoder.option` reads the canonical Boolean tag, whereas `Decoder.silentOption` retains the
 empty-word test required by existing protocol words, including its previous malformed-word behavior.
