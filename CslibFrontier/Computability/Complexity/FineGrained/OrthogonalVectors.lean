@@ -247,7 +247,8 @@ theorem computableInPolyTime_clauseVector :
   have hbits : ComputableInPolyTime
       (fun p : (StreamState × Clause ℕ) × Literal ℕ => p.1.1.2.bits)
       (encPair (encPair encStreamState encC) encL) encBits :=
-    (of_eq (encIn := encNat) (encOut := encBits) fun _ => rfl).comp
+    (of_eq (encIn := encNat) (encOut := encBits) fun _ => by
+      simp only [encBits_apply, encNat_apply]).comp
       (by unfold encStreamState; fun_prop)
   have hidx : ComputableInPolyTime
       (fun p : (StreamState × Clause ℕ) × Literal ℕ => p.1.1.1.2.idxOf p.2.1)

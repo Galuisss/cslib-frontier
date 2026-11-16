@@ -45,8 +45,8 @@ public lemma length_le_encList_of_mem (enc : α ↪ List Bool) {l : List α} {a 
 -- vendored: universe-polymorphic `α`, as this library's users need (crei's file has `α : Type`).
 /-- The number of elements is at most the length of the encoded list. -/
 public lemma length_le_length_encList {α : Type*} (enc : α ↪ List Bool) (l : List α) :
-    l.length ≤ (encList enc l).length := by
-  induction l <;> grind [encList_cons, length_frame]
+    l.length ≤ (encList enc l).length :=
+  Cslib.Encoding.length_le_length_encList enc l
 
 /-- The element found in a list is no longer than the encoded list. -/
 public lemma length_encOption_find?_le (enc : α ↪ List Bool) (p : α → Bool) (l : List α) :

@@ -36,7 +36,8 @@ theorem natSize :
 /-- The binary width, returned in unary, in linear encoded-input space. -/
 theorem natSizeUnary :
     ComputableInSpace Nat.size encNat encUnary (fun n => (encNat n).length) :=
-  ((of_inO ComputableInO.lengthUnary).of_encIn_eq Nat.bits fun _ => rfl).of_enc_eq fun n => by
+  ((of_inO ComputableInO.lengthUnary).of_encIn_eq Nat.bits fun _ => by
+    simp only [encBits_apply, encNat_apply]).of_enc_eq fun n => by
     rw [Nat.size_eq_bits_len]
 
 end Turing.MultiTapeTM.ComputableInSpace

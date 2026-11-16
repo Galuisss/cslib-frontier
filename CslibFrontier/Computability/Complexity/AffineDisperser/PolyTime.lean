@@ -124,7 +124,8 @@ theorem computableInPolyTime_modBits :
 /-- The binary digits of a unary natural. -/
 theorem computableInPolyTime_bits_unary :
     ComputableInPolyTime Nat.bits encUnary encBits :=
-  (of_eq (f := Nat.bits) (encIn := encNat) (encOut := encBits) fun _ => rfl).comp
+  (of_eq (f := Nat.bits) (encIn := encNat) (encOut := encBits) fun _ => by
+    simp only [encBits_apply, encNat_apply]).comp
     unary_to_binary
 
 /-- The irreducibility test by trial division, on a unary code. -/

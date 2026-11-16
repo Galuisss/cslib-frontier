@@ -7,7 +7,10 @@ Authors: Christian Reitwiessner
 module
 -- upstream: vendored crei:crei/tidy-universal @7f7c0696 (unsubmitted)
 
+public import CslibFrontier.Computability.Encoding.Basic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Words
+
+-- vendored: layout-preserving aliases of Cslib.Encoding; machine certificates remain local.
 
 /-!
 # The encoding of options
@@ -27,8 +30,8 @@ universe u
 variable {α : Type u}
 
 /-- Options encoded with `none` as the empty word and `some a` as `true` followed by `enc a`. -/
-@[expose] public def encOption (enc : α ↪ List Bool) : Option α ↪ List Bool :=
-  ⟨fun o => o.elim [] (true :: enc ·), by rintro (_ | a) (_ | b) h <;> simp_all⟩
+public abbrev encOption (enc : α ↪ List Bool) : Option α ↪ List Bool :=
+  Cslib.Encoding.encOption enc
 
 variable {enc : α ↪ List Bool}
 

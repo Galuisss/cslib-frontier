@@ -37,6 +37,7 @@ theorem binary_pow : ComputableInPolyTime (fun p : ℕ × ℕ => p.1 ^ p.2)
     ((PolyBounded.self.mul .self).add (.const 1)) (by
       intro p i hi
       rw [mul_right_iterate_apply_one]
+      rw [encNat_apply]
       change (p.1 ^ i).bits.length ≤ _
       rw [Nat.size_eq_bits_len]
       have hs := Nat.size_pow_le p.1 i

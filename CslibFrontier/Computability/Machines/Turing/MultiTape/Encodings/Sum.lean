@@ -7,7 +7,10 @@ Authors: Samuel Schlesinger
 module
 -- upstream: candidate
 
+public import CslibFrontier.Computability.Encoding.Basic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Words
+
+-- vendored: layout-preserving aliases of Cslib.Encoding; machine certificates remain local.
 
 /-!
 # Tagged sum encodings
@@ -20,16 +23,15 @@ right summand. This permits differently encoded, possibly empty summands without
 * `Turing.MultiTapeTM.encSum`: a tagged sum of two supplied encodings.
 -/
 
-@[expose] public section
+public section
 
 namespace Turing.MultiTapeTM
 
 variable {α β : Type*}
 
 /-- Encode a sum with one tag bit followed by the corresponding payload. -/
-def encSum (left : α ↪ List Bool) (right : β ↪ List Bool) : α ⊕ β ↪ List Bool :=
-  ⟨Sum.elim (fun a => false :: left a) (fun b => true :: right b), by
-    rintro (a | b) (c | d) h <;> simp_all⟩
+abbrev encSum (left : α ↪ List Bool) (right : β ↪ List Bool) : α ⊕ β ↪ List Bool :=
+  Cslib.Encoding.encSum left right
 
 @[simp]
 theorem encSum_inl (left : α ↪ List Bool) (right : β ↪ List Bool) (a : α) :
@@ -43,6 +45,6 @@ theorem encSum_inr (left : α ↪ List Bool) (right : β ↪ List Bool) (b : β)
 theorem length_encSum (left : α ↪ List Bool) (right : β ↪ List Bool) (value : α ⊕ β) :
     (encSum left right value).length =
       value.elim (fun a => (left a).length) (fun b => (right b).length) + 1 := by
-  cases value <;> rfl
+  cases value <;> simp [Cslib.Encoding.length_encSum]
 
 end Turing.MultiTapeTM

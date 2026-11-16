@@ -45,7 +45,7 @@ def count (p : ℕ × ℕ) : ℕ := (2 * p.2 + 1) ^ p.1
 private theorem radix_polyTime :
     ComputableInPolyTime (fun D : ℕ => 2 * D + 1) encNat encNat := by
   have hbits : ComputableInPolyTime Nat.bits encNat encBits :=
-    ComputableInPolyTime.of_eq fun _ => rfl
+    ComputableInPolyTime.of_eq fun _ => by simp only [encBits_apply, encNat_apply]
   have h := ComputableInPolyTime.bitsCons (ComputableInPolyTime.const true) hbits
   apply h.of_enc_eq
   intro D

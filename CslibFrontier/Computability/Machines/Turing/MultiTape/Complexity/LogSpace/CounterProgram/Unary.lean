@@ -442,7 +442,7 @@ digits. -/
 theorem unarySize {f : γ → ℕ} (hf : ComputableInLogSpace f encIn encUnary) :
     ComputableInLogSpace (fun a => (f a).size) encIn encUnary :=
   (bitsLength.comp ((of_eq (encIn := encNat) (encMid := encBits) (f := Nat.bits)
-    fun _ => rfl).comp (unaryToBinary hf))).congr fun a => by
+    fun _ => by simp only [encBits_apply, encNat_apply]).comp (unaryToBinary hf))).congr fun a => by
       simp only [Function.comp_apply, encUnary_apply, Nat.size_eq_bits_len]
 
 /-- **`⌊log₂⌋` of a unary number**, in unary: one less than its binary length. -/

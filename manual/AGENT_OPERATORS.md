@@ -53,6 +53,13 @@ For orientation, it is useful to ask an agent to summarize `AGENTS.md` and the `
 its task, for its assigned role, and point to the relevant manual sections. Require source locations for substantive claims. The
 manuals provide a shared reference when a summary omits something or two agents disagree.
 
+For an upstream encoding adoption, give the worker the exact source revision and ask for
+layout equalities and representative machine clients, not just matching type signatures.
+Generic encodings and machine capability certificates have different import needs. Require
+explicit treatment of binary versus unary naturals and fixed-width versus unary finite ranks;
+see [encoding contracts](workflows/choosing-models.md#write-the-contract-before-the-proof).
+A source-only handoff must leave Lean validation and rendered-manual review visibly pending.
+
 ## Read a progress report
 
 Ask for the result and the next decision, rather than a transcript of every tool call. A useful

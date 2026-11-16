@@ -159,7 +159,7 @@ theorem natMul :
       (fun p => ((encPair encNat encNat p).length + 1) ^ 3)
       (fun p => (encPair encNat encNat p).length + 1) := by
   have hbits : ComputableInO Nat.bits encNat encBits (fun n => (encNat n).length)
-      (fun n => (encNat n).length) := of_eq fun _ => rfl
+      (fun n => (encNat n).length) := of_eq fun _ => by simp only [encBits_apply, encNat_apply]
   have hstate (p : ℕ × ℕ) (i : ℕ) :
       (encMul ((p.1.bits.take i).foldl NatMul.mulStep (0, p.2))).length ≤
         3 * (encPair encNat encNat p).length + 1 := by

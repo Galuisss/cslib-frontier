@@ -61,7 +61,8 @@ theorem computableInPolyTime_decodeIntBin :
       (encPair encBool encNat) encIntBin := by
     have hbits : ComputableInPolyTime (fun p : Bool × ℕ => p.2.bits)
         (encPair encBool encNat) encBits :=
-      (ComputableInPolyTime.snd encBool encNat).of_enc_eq fun _ => rfl
+      (ComputableInPolyTime.snd encBool encNat).of_enc_eq fun _ => by
+        simp only [encBits_apply, encNat_apply]
     have htag := ComputableInPolyTime.bool_and.comp
       ((ComputableInPolyTime.fst encBool encNat).prod
         (ComputableInPolyTime.bool_not.comp (ComputableInPolyTime.bitsIsEmpty.comp hbits)))

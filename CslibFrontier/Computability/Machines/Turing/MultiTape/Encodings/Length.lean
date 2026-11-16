@@ -37,9 +37,9 @@ variable {α : Type*} (enc : α ↪ List Bool)
 
 theorem length_encList (l : List α) :
     (encList enc l).length = (l.map fun a => 2 * (enc a).length + 1).sum := by
-  induction l with
-  | nil => rfl
-  | cons a l ih => simp [ih]
+  rw [Cslib.Encoding.length_encList]
+  simp only [List.sum_map_add, List.sum_map_mul_left, List.map_const', List.sum_replicate,
+    smul_eq_mul, mul_one]
 
 /-- Reversing a list preserves the full encoded size, including each element's framing. -/
 @[simp] theorem length_encList_reverse (l : List α) :

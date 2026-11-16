@@ -53,6 +53,26 @@ and independent callback bounds. Both reject higher tidy predicates while permit
 machine-level normalization kernel.
 
 
+Generic encodings live in [Encoding.Basic](../../CslibFrontier/Computability/Encoding/Basic.lean),
+under `Cslib.Encoding`, independently of the machine calculus. The machine-facing `encPair`
+is a reducible name for `Cslib.Encoding.encProd`; `frame`, `unframe` and `dropFrame` name
+`delimit`, `undelimit` and `dropDelimited`. Boolean, bit-word, unit, list, option and sum
+encodings likewise reuse the shared definitions. The existing machine modules provide the
+capability instances and time and space certificates. Thus generic injectivity and parsing
+proofs need no machine imports, while machine clients retain their existing API and automation.
+The [shared encoding regressions](../../CslibFrontierTests/SharedEncoding.lean) exercise the pure
+combinators; the [machine client](../../CslibFrontierTests/SharedEncodingMachine.lean) checks
+that shared product encodings support generated field projections and binary successor.
+
+Binary `encNat` agrees with `Nat.bits` by
+[`Cslib.Encoding.encNat_eq_bits`](../../CslibFrontier/Computability/Encoding/NatBits.lean).
+Use `encNat_apply` in arithmetic proofs rather than assuming the shared implementation unfolds
+to `Nat.bits`. This does not identify binary naturals with `encUnary`. Nor does upstream's
+fixed-width `encFin` or noncomputable `encFintype` replace the machine API's unary-rank
+`encFinEnum` and `encFinite`: the words and lengths differ. Only individual delimited words
+are prefix-free automatically; a list of delimited elements still needs outer framing before
+arbitrary data can follow it.
+
 To encode a structure as the tuple of its fields, import `CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure` and, inside a namespace, write `enc_structure eS : S where f₁ : e₁, …, fₙ : eₙ`. List every field of `S` once, in declaration order, and parenthesize compound encodings such as `(encList encUnary)`. List a parent structure either as the single field `toParent`, as in `S`'s constructor, encoded as one word, or as its own fields in place of `toParent`, which flattens them into the tuple; listing both is an error. To make a flattened parent projection available to automation, declare its encoding before `where`: `enc_structure eChild : Child flattened toParent : eParent where …`. The command checks that `toParent` is a parent field and is actually flattened. The generated proof also requires `eParent` to have exactly the selected word layout, so the annotation cannot silently change the encoding. `S` must be a structure, not a class. The command checks the list before declaring anything: an unknown, repeated or misplaced field, or any missing ones, is an error that names them and lists the fields of `S` in declaration order. That order fixes the encoded words: the simp lemma `eS_apply` unfolds `eS a` to `eSFields (a.f₁, …, a.fₙ)`, where `eSFields` is the right-nested `encPair e₁ (encPair e₂ … eₙ)`, so every field but the last is framed.
 
 Generated field and flattened-parent polynomial-time rules lift their degree certificate with `ComputableInDegree.computableInPolyTime`, then compose with the caller’s certificate. They share the degree proof rather than deriving the projection again in the polynomial-time calculus.
