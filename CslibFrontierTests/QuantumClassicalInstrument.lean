@@ -75,6 +75,35 @@ theorem coherent_record_ne_dephased_plus :
     classicalDensityBranch_apply, kroneckerMap_apply, plus_apply,
     Complex.star_def, ← Complex.ofReal_mul, Real.sq_sqrt] at hoff
 
+private def flipWorkOnLabel (label : Bool × Bool) :
+    Matrix (Bool × Bool) (Bool × Bool) ℂ :=
+  fun output input =>
+    if output = (input.1, input.2 ^^ label.2) then 1 else 0
+
+/-- Dephasing uses the complete two-field reply, and the retained reply selects its own
+continuation.  Both supported labels send the active work bit to `false`, while their retained
+label coherence vanishes. -/
+private theorem controlled_full_reply_dephases_and_selects :
+    let evolved := partialTraceLeft
+      (densityConj
+        (((1 : Matrix (Bool × Bool) (Bool × Bool) ℂ) ⊗ₖ
+            (Matrix.blockDiagonal flipWorkOnLabel).submatrix Prod.swap Prod.swap) *
+          (coherentRecord (Prod.fst : (Bool × Bool) × (Bool × Bool) → Bool × Bool) *
+            coherentRecord id))
+        (pureState requestMemory))
+    evolved ((false, true), (false, false)) ((false, true), (false, false)) = 1 / 2 ∧
+      evolved ((false, false), (false, false)) ((false, true), (false, false)) = 0 := by
+  dsimp only
+  rw [partialTraceLeft_densityConj_controlled_coherentRecord_twice]
+  constructor
+  all_goals
+    norm_num [Matrix.sum_apply, Fintype.sum_prod_type, Fintype.sum_bool,
+      pureState_apply, ket_apply, classicalDensityBranch_apply, densityConj_apply,
+      Matrix.mul_apply, flipWorkOnLabel, requestMemory_apply, kroneckerMap_apply,
+      Complex.star_def, ← Complex.ofReal_mul, Real.sq_sqrt]
+  rw [← mul_inv, ← Complex.ofReal_mul, Real.mul_self_sqrt (by norm_num)]
+  norm_num
+
 /-- Each Bell branch has probability one half and keeps its correlated joint basis state. -/
 theorem branch_bell (b : Bool) :
     classicalDensityBranch Prod.fst b (pureState bell) =
