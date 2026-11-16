@@ -194,11 +194,11 @@ def description {α β : Type*} {f : α → β}
   ⟨compiler.tapeCount, compiler.stateEncoding compiler.table.initial,
     (Finset.univ : Finset
       (compiler.State × Option Bool × (Fin compiler.tapeCount → Option Bool))).sort (· ≤ ·) |>.map
-      fun entry =>
+      fun ⟨state, input, work⟩ =>
         let action := MultiTapeMachine.Action.emptyOracleEquiv
-          (compiler.table.tr entry.1 entry.2.1 entry.2.2 Empty.elim)
-        (key (compiler.stateEncoding entry.1) (entry.2.1.map eBit)
-          (Option.map eBit ∘ entry.2.2),
+          (compiler.table.tr state input work Empty.elim)
+        (key (compiler.stateEncoding state) (input.map eBit)
+          (Option.map eBit ∘ work),
           Act.ofAction (action.map compiler.stateEncoding eBit))⟩
 
 /-- The recorded description contains the packaged table's transition at every state and choice
