@@ -8,11 +8,13 @@ module
 
 public import CslibFrontier.Crypto.Primitives.BlockCipher.LengthPrependedCBCMAC
 public import CslibFrontier.Crypto.Primitives.PRF.PrefixFreeEncoding
+public import CslibFrontier.Crypto.Primitives.PRF.RandPrefixFreeEncoding
 
 /-!
 # Tests for Deterministic Prefix-Free Encodings
 
-Concrete evaluations, client applications, empty-message counterexample, and axiom checks for
+Concrete evaluations, client applications, empty-message counterexample, compatibility with
+`IsRandPrefixFreeEncoding` at `ε = 0`, and axiom checks for
 `CslibFrontier.Crypto.PRF.IsPrefixFreeEncoding`, `stopBitEncode`, and
 `isPrefixFreeEncoding_prependLength`.
 -/
@@ -21,7 +23,7 @@ public section
 
 namespace CslibFrontierTests.Crypto.PrefixFreeEncoding
 
-open Cslib Cslib.Crypto Cslib.Crypto.PRF
+open Cslib Cslib.Crypto Cslib.Crypto.PRF Cslib.Probability
 
 private def blk01 : BitString 2 := fun i => decide (i.1 = 1)
 private def blk10 : BitString 2 := fun i => decide (i.1 = 0)
@@ -69,6 +71,19 @@ example (x y : LengthPrependedInput 8 3)
   (IsPrefixFreeEncoding.iff_forall_prefix.mp
     (isPrefixFreeEncoding_prependLength
       (blockCountBlock_injective (n := 8) (L := 3) (by decide)))).2 x y hpre
+
+/-- Every deterministic prefix-free encoding `IsPrefixFreeEncoding pf` induces a key-independent
+randomized `0`-prefix-free encoding `IsRandPrefixFreeEncoding seed (fun _ m => pf m) 0` for any
+key distribution `seed`. -/
+example {K M X : Type*} (seed : PMF K) {pf : M → List X} (h : IsPrefixFreeEncoding pf) :
+    IsRandPrefixFreeEncoding seed (fun _ m => pf m) 0 := by
+  refine ⟨fun _ m => h.ne_nil m, fun m₀ m₁ hne => ?_⟩
+  have hempty : {k : K | PrefixCompatible (pf m₀) (pf m₁)} = ∅ :=
+    Set.eq_empty_of_forall_notMem fun _ hcompat =>
+      hcompat.elim
+        (fun hpre => hne ((IsPrefixFreeEncoding.iff_forall_prefix.mp h).2 m₀ m₁ hpre))
+        (fun hpre => hne ((IsPrefixFreeEncoding.iff_forall_prefix.mp h).2 m₁ m₀ hpre).symm)
+  simp [hempty]
 
 /-- info: 'Cslib.Crypto.PRF.isPrefixFreeEncoding_stopBitEncode' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in
