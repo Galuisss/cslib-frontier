@@ -208,9 +208,8 @@ private theorem eval_run_frame (input rest : List Bool) (fuel : ℕ) (y : List B
     have hget : input[pre.length] = true := by subst hin; simp
     have hget' : input[pre.length + 1] = b := by
       subst hin
-      rw [List.getElem_append_right (by
-        simp only [List.length_append, length_frame, List.length_cons]
-        omega)]
+      rw [List.append_assoc]
+      rw [List.getElem_append_right (as := pre) (by omega)]
       simp only [Nat.add_sub_cancel_left]
       change (true :: b :: (frame y ++ rest))[1] = b
       rfl
