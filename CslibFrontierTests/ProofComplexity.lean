@@ -30,7 +30,7 @@ def wordsProofSystem : ProofSystem encBits Set.univ where
 example : wordsProofSystem [true, false] = [true, false] := rfl
 
 example : wordsProofSystem.PolynomiallyBounded :=
-  ⟨.X, fun a _ => ⟨a, rfl, by simp [encBits]⟩⟩
+  ⟨.X, fun a _ => ⟨a, rfl, by simp [encBits_apply]⟩⟩
 
 example : wordsProofSystem.PSimulates wordsProofSystem := .refl
 
@@ -107,7 +107,8 @@ example : ¬ ∃ a w : List Bool, frame a ++ w = [] := by
 
 private theorem decodedWordsProofSystem_nil : decodedWordsProofSystem [] = [] := by
   change (if ProofSystem.verifierAccepts bitsDecoder 0 (fun _ => true) [] then _ else _) = []
-  simp [ProofSystem.verifierAccepts, ProofSystem.verifierInstance, dropFrame, unframe,
+  simp [ProofSystem.verifierAccepts, ProofSystem.verifierInstance, Cslib.Encoding.dropDelimited,
+    Cslib.Encoding.undelimit,
     bitsDecoder]
 
 /-- A malformed proof can prove the decoded instance instead of the default. -/

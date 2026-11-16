@@ -262,11 +262,12 @@ theorem unaryListT_run_symbol : ∀ word : List Bool,
   | [true] => rfl
   | false :: word => by
       rw [Transducer.run_cons, unaryListT_step_symbol_false]
-      simp [unframe, dropFrame, frame]
+      simp [Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited, Cslib.Encoding.delimit]
   | true :: bit :: word => by
     rw [Transducer.run_cons, unaryListT_step_symbol_true, Transducer.run_cons,
       unaryListT_step_marker, unaryListT_run_symbol word]
-    simp only [List.nil_append, unframe, dropFrame, List.length_cons, encUnary_apply,
+    simp only [List.nil_append, Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited,
+      List.length_cons, encUnary_apply,
       List.replicate_succ, frame_cons, List.cons_append]
 
 /-- The streaming decoder emits the standard encoded list of all decoded unary lengths. -/
@@ -280,12 +281,14 @@ theorem unaryListT_run (word : List Bool) :
     rcases word with _ | ⟨_ | _, rest⟩
     · exact absurd rfl hword
     · rw [Transducer.run_cons, unaryListT_step_between_false]
-      simp [unframe, dropFrame, frame, encUnary_apply]
+      simp [Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited, Cslib.Encoding.delimit,
+        encUnary_apply]
     · rcases rest with _ | ⟨bit, rest⟩
       · rfl
       · rw [Transducer.run_cons, unaryListT_step_between_true, Transducer.run_cons,
           unaryListT_step_marker, unaryListT_run_symbol rest]
-        simp only [List.nil_append, unframe, dropFrame, List.length_cons, encUnary_apply,
+        simp only [List.nil_append, Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited,
+          List.length_cons, encUnary_apply,
           List.replicate_succ, frame_cons, List.cons_append]
 
 /-- The first projection of the standard framed pair encoding, using the frame parser directly. -/

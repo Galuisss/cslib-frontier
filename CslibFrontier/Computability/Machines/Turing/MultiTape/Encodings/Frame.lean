@@ -213,17 +213,17 @@ theorem getD_frame_two_mul_add_one (w : List Bool) (i : ℕ) :
 /-- The word framed at the start of a word is no longer than the word. -/
 theorem length_unframe_le : ∀ w : List Bool, (unframe w).length ≤ w.length
   | true :: _ :: v => by
-    simp only [unframe, List.length_cons]
+    simp only [Cslib.Encoding.undelimit_true_cons_cons, List.length_cons]
     have := length_unframe_le v
     omega
-  | [] | [true] | false :: _ => by simp [unframe]
+  | [] | [true] | false :: _ => by simp [Cslib.Encoding.undelimit]
 
 /-! ### Frames followed by a word -/
 
 /-- A frame split at a symbol. -/
 theorem frame_append_cons (w v : List Bool) (c : Bool) :
     frame (w ++ c :: v) = (w.flatMap fun b => [true, b]) ++ true :: c :: frame v := by
-  simp [frame]
+  simp [Cslib.Encoding.delimit]
 
 /-- Each pair of a frame starts with the tag `true`. -/
 theorem getElem?_frame_append_cons (w v x : List Bool) (c : Bool) :

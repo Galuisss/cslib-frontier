@@ -275,7 +275,7 @@ private lemma toList_inO {δ : Type} {enc : δ ↪ List Bool} :
   refine (hw.comp (of_linear (.of_eq (f := fun o : Option δ => encOption enc o)
     (encIn := encOption enc) (encMid := encBits) fun _ => rfl))).of_enc_eq (fun o => ?_) |>.mono
       2 (fun o => ?_) (fun o => ?_)
-  · cases o <;> simp [encBits]
+  · cases o <;> simp [encBits_apply]
   all_goals omega
 
 /-- The sums of the costs of a run of `m + 1` rounds followed by a halting test, against a bound
@@ -432,8 +432,8 @@ private lemma halt_inO : ComputableTidilyInO D.loop.halt (encVal encA encB) encB
     ((ComputableTidilyInDegree.headD (enc₁ := encBool) (enc := encBits) false).inO_one.prod
       ((ComputableTidilyInDegree.headD (enc₁ := encBool) (enc := encBits) false).inO_one.comp
         (of_linear (.of_tail (f := List.tail) (encIn := encBits) (encOut := encBits)
-          fun _ => rfl)))).mono 3 (fun w => by simp [encBits]; omega)
-      (fun w => by simp [encBits]; omega)
+          fun _ => rfl)))).mono 3 (fun w => by simp [encBits_apply]; omega)
+      (fun w => by simp [encBits_apply]; omega)
   refine (((ComputableTidilyInDegree.of_finite (encIn := encPair encBool encBool)
     (encMid := encBool) (fun p : Bool × Bool => p.1 && p.2)).inO_one.comp hw).comp
     (of_linear (.of_eq (f := fun v : Val α β => encVal encA encB v) (encIn := encVal encA encB)
@@ -558,14 +558,14 @@ theorem ComputableInO.divConq {δ α β γ : Type} {encIn : δ ↪ List Bool}
       (ComputableTidilyInLinearTimeAndSpace.of_eq (f := fun v => encV v) (encIn := encV)
         (encMid := encBits) fun _ => rfl))).of_enc_eq (fun v => ?_) |>.mono 3 (fun v => ?_)
         (fun v => ?_)
-    · simp only [Function.comp_apply, encBits, Function.Embedding.refl_apply]
+    · simp only [Function.comp_apply, encBits_apply]
       generalize encV v = w
       rcases w with _ | ⟨_, _ | ⟨_, _⟩⟩ <;> rfl
     all_goals simp; omega
   refine ((hdrop.comp hSL.tidy).of_enc_eq (g := F) fun x => ?_).computableInO.mono 4000
     (fun x => ?_) (fun x => ?_)
-  · simp only [Function.comp_apply, hfinal, hencV, encSum_inr, encBits,
-      Function.Embedding.refl_apply, List.drop_succ_cons, List.drop_zero]
+  · simp only [Function.comp_apply, hfinal, hencV, encSum_inr, encBits_apply, List.drop_succ_cons,
+    List.drop_zero]
   all_goals
     have hsx := hs x
     have hlx := hlen x

@@ -96,13 +96,12 @@ def decode (code : List Bool) : Description where
   cases desc
   simp only [decode, encoding, Function.Embedding.coeFn_mk, encPair_apply,
     unframe_frame_append, dropFrame_frame_append, encBool_apply, List.headD_cons,
-    encBits, Function.Embedding.refl_apply]
+    encBits_apply]
 
 @[simp] theorem length_encoding (desc : Description) :
     (encoding desc).length =
       2 * (desc.front.length + desc.back.length) + desc.coins.length + 8 := by
-  enc_len [encoding, Function.Embedding.coeFn_mk, List.length_singleton, encBits,
-    Function.Embedding.refl_apply]
+  enc_len [encoding, Function.Embedding.coeFn_mk, List.length_singleton, encBits_apply]
 
 /-- Insert a labeled example directly into the saved encoded input. -/
 def input (desc : Description) (observation : List Bool) : List Bool :=
@@ -112,7 +111,7 @@ def input (desc : Description) (observation : List Bool) : List Bool :=
 @[simp] theorem length_input (desc : Description) (observation : List Bool) :
     (desc.input observation).length =
       desc.front.length + desc.back.length + 4 * observation.length + 5 := by
-  enc_len [input, List.length_singleton, encBits, Function.Embedding.refl_apply]
+  enc_len [input, List.length_singleton, encBits_apply]
 
 end Description
 
@@ -190,7 +189,7 @@ private theorem input_splice (encoding : α ↪ List Bool) (base : List Bool)
       (encList (encPair encoding encBool) back) coins).input (encoding observation) =
       encPair encBits (encList (encPair encoding encBool))
         (base, front ++ (observation, trial) :: back) := by
-  simp [Description.input, encPair, List.append_assoc, encBits,
+  simp [Description.input, encPair, List.append_assoc, encBits_apply,
     encList_append, encList_cons]
 
 private theorem coinBudget_ge (desc : Description) (observation : List Bool) (c d width : ℕ)
@@ -324,7 +323,7 @@ theorem length_splice_le (encoding : α ↪ List Bool) (base : List Bool)
       (encPair encBits (encList (encPair encoding encBool))
         (base, front)).length + (encList (encPair encoding encBool) back).length ≤
       contextBound base.length (before + after) width := by
-    simp only [length_encPair, encBits, Function.Embedding.refl_apply]
+    simp only [length_encPair, encBits_apply]
     unfold contextBound
     rw [hfrontLength] at hfrontSize
     rw [hbackLength] at hbackSize

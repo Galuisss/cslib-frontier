@@ -241,7 +241,7 @@ def rangeProgram : CounterProgram where
 /-- The bits written for the element `i`: its unary digits, framed. -/
 private theorem frame_replicate (i : ℕ) :
     frame (List.replicate i true) = (List.range i).flatMap (fun _ => [true, true]) ++ [false] := by
-  simp only [frame, List.flatMap_replicate]
+  simp only [Cslib.Encoding.delimit, List.flatMap_replicate]
   congr 1
   induction i with
   | zero => rfl

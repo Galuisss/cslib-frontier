@@ -54,7 +54,8 @@ variable {Value : Type u}
 @[expose] noncomputable def listTailCompiler (encValue : Value ↪ List Bool) :
     NativeCompiler List.tail (encList encValue) (encList encValue) :=
   (dropFrameDecoder.ofInputEq (fun list => encList encValue list) fun _ => rfl).ofOutputEq
-    fun list => by cases list <;> simp [dropFrame, encList_cons, dropFrame_frame_append]
+    fun list => by cases list <;> simp [Cslib.Encoding.dropDelimited, encList_cons,
+      dropFrame_frame_append]
 
 /-- Retained standard-list constructor, framing the new head and appending the encoded tail. -/
 @[expose] noncomputable def listConsCompiler (encValue : Value ↪ List Bool) :

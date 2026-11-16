@@ -896,7 +896,7 @@ private theorem eval_gmwSeqInteract_eq_machine_of_isOraclePPTOn {α : Type} {enc
   have h := hspec (n, a, z) (Bool × List ProverCoins)
     (fun q state => PMF.pure (seqStep (honestReply1 generator m φ) (honestReply2 s φ) q.2 state))
     (false, coinsList)
-  simpa only [encBits, Function.Embedding.coe_refl, id_map] using h
+  simpa only [show (encBits : List Bool → List Bool) = id from funext encBits_apply, id_map] using h
 
 /-- **Pointwise finite multi-session GMW view reduction** for every valid instance, witness, and
 auxiliary word. Across `k n` sequential executions, the distinguishing advantage between the real

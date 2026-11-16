@@ -336,7 +336,7 @@ private def linearViews (fn encIn encOut : Term) (base : Name) : CommandElabM Un
     elabCommand (← `(@[scoped fun_prop] public theorem
       $(app matcher.getId "_deg"):ident : ComputableInDegree $matcher $eT encBool 1 0 :=
       (($test).mono (d' := 1) (e' := 0)).of_enc_eq (fun v => by
-        cases v <;> simp [$matcher:ident, $applyName:ident, $toSum:ident, encBits,
+        cases v <;> simp [$matcher:ident, $applyName:ident, $toSum:ident, encBits_apply,
           encBool, List.headD])))
     linearViews matcher eT (← `(encBool)) matcher.getId
     -- Include the complete payload and every individual field, without default inhabitants.
@@ -424,7 +424,7 @@ private def linearViews (fn encIn encOut : Term) (base : Name) : CommandElabM Un
               (fun v => by
                 cases v <;>
                   simp [$projection:ident, $matcher:ident, $applyName:ident, $toSum:ident,
-                    encBits, unframe_frame_append, dropFrame_frame_append]
+                    encBits_apply, unframe_frame_append, dropFrame_frame_append]
                 all_goals rfl)))
       linearViews projection eT (← `(encOption $out)) projection.getId
   -- case analysis on the payloads

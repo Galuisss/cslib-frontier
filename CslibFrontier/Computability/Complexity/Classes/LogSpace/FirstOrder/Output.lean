@@ -164,10 +164,9 @@ theorem encStructure_reject :
     induction n with
     | zero => rfl
     | succ n ih => simp only [List.replicate_succ, List.flatMap_cons,
-        MultiTapeTM.frame, List.flatMap_nil, List.nil_append, List.singleton_append, ih]
+        MultiTapeTM.frame_nil, List.singleton_append, ih]
   rw [encStructure_eq, h]
-  simp only [List.replicate_zero, MultiTapeTM.frame, List.flatMap_nil, List.nil_append,
-    List.singleton_append]
+  simp only [List.replicate_zero, MultiTapeTM.frame_nil, List.singleton_append]
   rfl
 
 end Cslib.Logic.Vocabulary.ModelChecker.Writer

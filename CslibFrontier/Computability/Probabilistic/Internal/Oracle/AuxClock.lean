@@ -685,7 +685,7 @@ theorem IsPPTWithAux.exists_eval_take {program : α → List Bool → ProbComp �
   obtain ⟨k, State, hfinite, machine, c, d, h⟩ := h
   refine ⟨c, d, fun a z {m} hm => PMF.map_injective output.injective ?_⟩
   rw [h a (z.take m), h a z]
-  simp only [encPair_apply, encBits, Function.Embedding.coe_refl, id]
+  simp only [encPair_apply, encBits_apply, id]
   rw [machine.runClosed_append_take_of_le hm]
 
 /-- **Prefix truncation for `IsOraclePPTWithAux`.** An oracle program clocked in `a` produces the
@@ -706,7 +706,7 @@ theorem IsOraclePPTWithAux.exists_run_interpret_take
   have h₂ := h a z State oracle s
   simp only [ProbOracleComp.runWith_map] at h₁ h₂
   rw [h₁, h₂]
-  simp only [encPair_apply, encBits, Function.Embedding.coe_refl, id]
+  simp only [encPair_apply, encBits_apply, id]
   rw [machine.runOracle_append_take_of_le hm]
 
 /-- Polynomial-time deterministic preprocessing of the primary input preserves `IsPPTWithAux`. -/

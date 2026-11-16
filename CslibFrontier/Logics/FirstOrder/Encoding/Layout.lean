@@ -55,7 +55,7 @@ open Turing.MultiTapeTM
 /-- The encoding of an input: its framed cardinality in unary, then its framed tables. -/
 theorem encStructure_eq (a : EncodedStructure) :
     encStructure a = frame (List.replicate a.1 true) ++ a.2.flatMap frame := by
-  simp only [encStructure, encList, encPair_apply, encUnary_apply, encBits]
+  simp only [encStructure, encList, encPair_apply, encUnary_apply, encBits_apply]
   rfl
 
 /-- The position of the `i`-th truth table in the encoding of an input; past the last table, the

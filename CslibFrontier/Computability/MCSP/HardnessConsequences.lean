@@ -133,10 +133,10 @@ private theorem computableInPolyTime_decodePair :
 /-- Re-encoding `decodePair w` increases the word length by at most `1`. -/
 private theorem length_encPair_decodePair_le :
     ∀ w : List Bool, (encPair encBits encBits (decodePair w)).length ≤ w.length + 1
-  | [] => by simp [decodePair, unframe, dropFrame]
-  | [false] => by simp [decodePair, unframe, dropFrame]
-  | [true] => by simp [decodePair, unframe, dropFrame]
-  | false :: b :: v => by simp [decodePair, unframe, dropFrame]
+  | [] => by simp [decodePair, Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited]
+  | [false] => by simp [decodePair, Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited]
+  | [true] => by simp [decodePair, Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited]
+  | false :: b :: v => by simp [decodePair, Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited]
   | true :: b :: v => by
     have ih := length_encPair_decodePair_le v
     enc_len [decodePair, unframe, dropFrame] at ih ⊢

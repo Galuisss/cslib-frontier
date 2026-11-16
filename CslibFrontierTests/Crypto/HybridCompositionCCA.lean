@@ -292,6 +292,6 @@ example (n : ℕ) : Game.advantage
       (hybridDecrypt identityDecaps echoCipher.decrypt) headAdversary true (n + 1))) = 1 := by
   simp [cca2GameOn, fixedKeyGen, fixedEncaps, hybridEncrypt, echoCipher, headAdversary,
     ChoiceOut.msg₀, ChoiceOut.msg₁, ChoiceOut.state, encPair_apply, encBits_apply,
-    dropFrame, List.replicate_succ, Game.advantage, Game.succProbability]
+    Cslib.Encoding.dropDelimited, List.replicate_succ, Game.advantage, Game.succProbability]
 
 end CslibFrontierTests.Crypto.HybridCompositionCCA

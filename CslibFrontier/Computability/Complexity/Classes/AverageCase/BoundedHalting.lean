@@ -345,7 +345,7 @@ theorem BH_mem_NP : BH ∈ NP encBits := by
     exact hy
   · rintro y ⟨c, z, t, rfl, v, hv, hrun⟩
     refine ⟨frame v, ?_, fun k => ?_⟩
-    · simp only [length_frame, encBits, Function.Embedding.coe_refl, id_eq, length_encode,
+    · simp only [length_frame, encBits_apply, length_encode,
         Polynomial.eval_add, Polynomial.eval_mul, Polynomial.eval_ofNat, Polynomial.eval_X,
         Polynomial.eval_one]
       omega

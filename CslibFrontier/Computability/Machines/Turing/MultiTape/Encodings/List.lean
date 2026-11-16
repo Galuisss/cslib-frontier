@@ -54,7 +54,7 @@ public lemma encList_append {α : Type*} (enc : α ↪ List Bool) (l₁ l₂ : L
 public instance : ListEncoding enc (encList enc) where
   headD d := .of_isEmpty_ite d (fun l hl => by cases l <;> simp_all)
     (.of_unframe fun ⟨l, hl⟩ => by cases l <;> simp at hl ⊢)
-  tail := .of_dropFrame fun l => by cases l <;> simp [dropFrame]
+  tail := .of_dropFrame fun l => by cases l <;> simp [Cslib.Encoding.dropDelimited]
   isEmpty := .of_isEmpty fun l => by cases l <;> simp
 
 /-- Lists of Booleans encoded as themselves. -/

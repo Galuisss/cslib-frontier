@@ -42,13 +42,15 @@ theorem getElem?_frame_append (u v : List Bool) {i : ℕ} (hi : i < u.length) :
       exact ⟨h₁, h₂⟩
 
 private theorem frame_append_eq_flatMap (u v : List Bool) :
-    frame u ++ v = (u.flatMap fun b => [true, b]) ++ false :: v := by simp [frame]
+    frame u ++ v = (u.flatMap fun b => [true, b]) ++ false :: v := by
+  simp [Cslib.Encoding.delimit]
 
 /-- The pairs of a frame have twice the length of the word. -/
 theorem length_flatMap_pair (u : List Bool) :
     (u.flatMap fun b => [true, b]).length = 2 * u.length := by
   have := length_frame u
-  simp only [frame, List.length_append, List.length_singleton] at this
+  rw [show frame u = (u.flatMap fun b => [true, b]) ++ [false] from rfl,
+    List.length_append, List.length_singleton] at this
   omega
 
 /-- After the pairs of a frame comes its terminator `false`. -/

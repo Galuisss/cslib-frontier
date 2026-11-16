@@ -190,7 +190,7 @@ theorem eval_prfKeyGen_zero {family : List Bool → List Bool → List Bool}
     let ke ← BitString.sampleList 0
     let km ← BitString.sampleList 0
     return encPair encBits encBits (ke, km)) = _
-  simp [BitString.sampleList, encPair_apply, encBits_apply, frame]
+  simp [BitString.sampleList, encPair_apply, encBits_apply, Cslib.Encoding.delimit]
 
 example {family : List Bool → List Bool → List Bool} (hprf : PseudorandomFunction family) :
     [true] ∈ (ProbComp.eval (BitString.sampleList 1)).support ∧
