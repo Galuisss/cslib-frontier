@@ -23,6 +23,8 @@ the simulation after `j` steps takes space linear in the number of visited cells
 of a symbol, plus the length of the input head in binary
 (`Turing.MultiTapeTM.Universal.length_eCfg_le_space`). For the description of a machine, the
 visited cells are those of the machine (`Turing.MultiTapeTM.Universal.simSpace_desc`).
+The same equality holds for any literal description with the correct header and transitions
+(`Turing.MultiTapeTM.Universal.simSpace_of_holds`).
 
 ## Main definitions
 
@@ -38,6 +40,8 @@ visited cells are those of the machine (`Turing.MultiTapeTM.Universal.simSpace_d
   visited cells.
 * `Turing.MultiTapeTM.Universal.simSpace_desc`: for descriptions of machines, the visited cells
   are the space of the machine.
+* `Turing.MultiTapeTM.Universal.simSpace_of_holds`: the same space equality for any description
+  holding the renamed machine's transitions.
 -/
 
 namespace Turing.MultiTapeTM.Universal
@@ -300,30 +304,48 @@ public theorem length_eCfg_le_space (j : ℕ) :
 
 /-! ### Descriptions of machines -/
 
-variable {k : ℕ} {Symbol State : Type} [Fintype State] [Fintype Symbol]
+variable {k : ℕ} {Symbol State : Type}
   (eS : State ↪ ℕ) (eY : Symbol ↪ ℕ)
 
-/-- The heads of the simulation are those of the machine. -/
-lemma headAt_desc (tm : MultiTapeTM k Symbol State) (x : List Symbol) (j : ℕ) (i : Fin k) :
-    headAt (desc eS eY tm) (x.map eY) j i = (tm.runFrom (tm.initCfg x) j).workTapePos i := by
-  have := congrArg (·.workTapePos i) (toCfg_iterate eS eY tm x j).1
+-- vendored: generalized to literal descriptions for retained native generators
+private lemma headAt_of_holds (tm : MultiTapeTM k Symbol State) (d : Desc)
+    (htapes : d.tapes = k) (hq₀ : d.q₀ = eS tm.q₀)
+    (holds : ∀ (q : State) (inp : Option Symbol) (work : Fin k → Option Symbol),
+      d.Holds (tm.map eS eY) (eS q) (inp.map eY) (Option.map eY ∘ work))
+    (x : List Symbol) (j : ℕ) (i : Fin k) :
+    headAt d (x.map eY) j i = (tm.runFrom (tm.initCfg x) j).workTapePos i := by
+  have := congrArg (·.workTapePos i)
+    (toCfg_iterate_of_holds eS eY tm d htapes hq₀ holds x j).1
   simpa [SCfg.toCfg, Cfg.map, headAt, run] using this.symm
 
-/-- **The space of the simulation** of the description of a machine is the space of the machine. -/
-public theorem simSpace_desc (tm : MultiTapeTM k Symbol State) (x : List Symbol) (j : ℕ) :
-    simSpace (desc eS eY tm) (x.map eY) j =
+/-- **The space of a literal simulation** is the space of its machine whenever the description
+has the same tape count and initial state and holds every renamed transition. -/
+public theorem simSpace_of_holds (tm : MultiTapeTM k Symbol State) (d : Desc)
+    (htapes : d.tapes = k) (hq₀ : d.q₀ = eS tm.q₀)
+    (holds : ∀ (q : State) (inp : Option Symbol) (work : Fin k → Option Symbol),
+      d.Holds (tm.map eS eY) (eS q) (inp.map eY) (Option.map eY ∘ work))
+    (x : List Symbol) (j : ℕ) :
+    simSpace d (x.map eY) j =
       (MultiTapeNTM.RunPath.ofDeterministic tm (tm.initCfg x) j).space := by
   -- vendored: `space` is the space of a run path since cslib #1117
   rw [MultiTapeNTM.RunPath.space]
   simp only [simSpace, MultiTapeNTM.RunPath.spaceUsedByTape]
-  rw [show (desc eS eY tm).tapes = k from rfl, Finset.sum_range]
+  rw [htapes, Finset.sum_range]
   refine Finset.sum_congr rfl fun i _ => congrArg Finset.card (Finset.ext fun z => ?_)
   rw [MultiTapeNTM.RunPath.mem_visitedByTapeHead_ofDeterministic]
-  simp only [visited, Finset.mem_image, Finset.mem_range, headAt_desc]
+  simp only [visited, Finset.mem_image, Finset.mem_range,
+    headAt_of_holds eS eY tm d htapes hq₀ holds]
   constructor
   · rintro ⟨n, hn, rfl⟩
     exact ⟨n, by omega, rfl⟩
   · rintro ⟨n, hn, rfl⟩
     exact ⟨n, by omega, rfl⟩
+
+/-- **The space of the simulation** of the description of a machine is the space of the machine. -/
+public theorem simSpace_desc [Fintype State] [Fintype Symbol]
+    (tm : MultiTapeTM k Symbol State) (x : List Symbol) (j : ℕ) :
+    simSpace (desc eS eY tm) (x.map eY) j =
+      (MultiTapeNTM.RunPath.ofDeterministic tm (tm.initCfg x) j).space :=
+  simSpace_of_holds eS eY tm (desc eS eY tm) rfl rfl (holds_desc eS eY tm) x j
 
 end Turing.MultiTapeTM.Universal

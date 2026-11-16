@@ -47,6 +47,8 @@ a machine from `ComputableInPolyTime`, `ComputableInO`, `ComputableInDegree`, or
 existence theorem. Their resource formulas retain the constants of those combinators. The exact
 static program charge is `NativeCompiler.staticBits`, the `eDesc` length of the packaged machine
 under its recorded state encoding.
+`NativeCompiler.description_header` exposes its tape count and encoded initial state to consumers
+of the literal description.
 
 The constructors assemble fixed machine terms at the proof level; they are not a free dynamic code
 generator. The functions and encodings in their types specify behavior and resource expressions,
@@ -80,8 +82,6 @@ existential computability proof can be extracted into a `NativeCompiler`.
 
 * `Turing.MultiTapeTM.Internal.NativeCompiler.description_holds`: the recorded description
   contains every transition of the packaged machine under its recorded encodings.
-* `Turing.MultiTapeTM.Internal.NativeCompiler.description_header`: the recorded description has
-  exactly the packaged machine's tape count and encoded initial state.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.computableInTimeAndSpace`: forget the named
   construction into the existing plain existential calculus.
 -/

@@ -48,37 +48,6 @@ namespace Cslib.Quantum.UniformOracleCircuitFamily.GeneratorCertificate
 
 open Turing MultiTapeTM
 
-private theorem headAt_nativeDescription {α β : Type*} {f : α → β}
-    {encIn : α ↪ List Bool} {encOut : β ↪ List Bool}
-    (compiler : Internal.NativeCompiler f encIn encOut) (x : List Bool) (j : ℕ)
-    (i : Fin compiler.tapeCount) :
-    Universal.headAt compiler.description (x.map Universal.eBit) j i =
-      (compiler.table.toTM.runFrom (compiler.table.toTM.initCfg x) j).workTapePos i := by
-  have hcfg := (Universal.toCfg_iterate_of_holds compiler.stateEncoding Universal.eBit
-    compiler.table.toTM compiler.description compiler.description_header.1
-      compiler.description_header.2 compiler.description_holds x j).1
-  have hhead := congrArg (·.workTapePos i) hcfg
-  simpa [Universal.SCfg.toCfg, Cfg.map, Universal.headAt, Universal.run] using hhead.symm
-
-private theorem simSpace_nativeDescription {α β : Type*} {f : α → β}
-    {encIn : α ↪ List Bool} {encOut : β ↪ List Bool}
-    (compiler : Internal.NativeCompiler f encIn encOut) (x : List Bool) (j : ℕ) :
-    Universal.simSpace compiler.description (x.map Universal.eBit) j =
-      (MultiTapeNTM.RunPath.ofDeterministic compiler.table.toTM
-        (compiler.table.toTM.initCfg x) j).space := by
-  rw [MultiTapeNTM.RunPath.space]
-  simp only [Universal.simSpace, MultiTapeNTM.RunPath.spaceUsedByTape]
-  rw [compiler.description_header.1, Finset.sum_range]
-  refine Finset.sum_congr rfl fun i _ => congrArg Finset.card (Finset.ext fun z => ?_)
-  rw [MultiTapeNTM.RunPath.mem_visitedByTapeHead_ofDeterministic]
-  simp only [Universal.visited, Finset.mem_image, Finset.mem_range,
-    headAt_nativeDescription]
-  constructor
-  · rintro ⟨n, hn, rfl⟩
-    exact ⟨n, by omega, rfl⟩
-  · rintro ⟨n, hn, rfl⟩
-    exact ⟨n, by omega, rfl⟩
-
 /-- Derive an encoded uniform-circuit generator certificate from an actual retained deterministic
 compiler. The two schedules are length-indexed upper bounds for the compiler's exact-form,
 semantic-input-indexed resource maps; no machine or computation proof is selected existentially.
@@ -114,7 +83,9 @@ separate generator programs. -/
         (time (encOracleInputSize input).length)).state = none := hrun.1
     exact Prod.ext rfl (by rw [hhalt]; rfl)
   workspace_le input := by
-    rw [simSpace_nativeDescription]
+    rw [Universal.simSpace_of_holds compiler.stateEncoding Universal.eBit compiler.table.toTM
+      compiler.description compiler.description_header.1 compiler.description_header.2
+      compiler.description_holds]
     exact (space_le_of_runsInSpace
       (compiler.computes input).computesInTimeAndSpace.2.2 _).trans (workspace_le input)
 
