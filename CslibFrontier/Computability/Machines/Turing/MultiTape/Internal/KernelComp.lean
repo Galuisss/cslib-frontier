@@ -408,7 +408,7 @@ theorem computesTidilyInTimeAndSpace_outputToWord
     omega
 
 /-- Place the explicit marker on the flag tape used by virtual-input execution. -/
-def markFlag (k : ℕ) (write : Option Symbol) :
+private def markFlag (k : ℕ) (write : Option Symbol) :
     MultiTapeMachine (k + 2) Symbol MultiTapeTM.MarkWorkState Empty Id :=
   (markWork Symbol write).extendTapes
     (MultiTapeTM.tapeEmb (Fin.natAdd k 1))
@@ -423,14 +423,6 @@ def inputFromWord (machine : MultiTapeMachine k₂ Symbol S₂ Empty Id) (mark :
 namespace InputFromWord
 
 variable {k : ℕ} {State : Type} {input : List Symbol}
-
-private theorem update_append_flag {Alpha : Type} (tapes : Fin k → Alpha)
-    (a b c : Alpha) :
-    Function.update (Fin.append tapes ![a, b]) (Fin.natAdd k 1) c =
-      Fin.append tapes ![a, c] := by
-  rw [← Fin.append_update_right]
-  congr 1
-  simp [funext_iff, Fin.forall_fin_two]
 
 private theorem oneTapeCfg_flag (write : Option Symbol) (tapes : Fin k → ℤ → Option Symbol)
     (virtualInput flag : ℤ → Option Symbol) (out : List Symbol)
@@ -464,7 +456,7 @@ private theorem exists_runPath_markFlag (write : Option Symbol)
       ((markWork Symbol write).toTM.runFrom (MultiTapeTM.oneTapeCfg _ cfg) 2) _ _ = _
     rw [oneTapeCfg_flag, runFrom_markWork (Symbol := Symbol), MultiTapeTM.embed_tapeEmb]
     refine Cfg.ext rfl rfl ?_ ?_ rfl
-    · simpa [cfg] using update_append_flag tapes virtualInput flag
+    · simpa [cfg] using MultiTapeTM.update_append_flag tapes virtualInput flag
         (Function.update flag (-1) write)
     · funext tape
       simp [cfg, Function.update_apply]

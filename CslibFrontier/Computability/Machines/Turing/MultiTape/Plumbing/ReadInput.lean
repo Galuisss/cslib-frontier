@@ -220,19 +220,9 @@ public def InputReader.appendOne (r : InputReader Symbol Q) :
   r.appendOneTable.toTM
 
 /-- `r` run on work tape `i`, appending what it emits to the word there. -/
-public def appendRead (r : InputReader Symbol Q) (i : Fin k) :
+@[expose] public def appendRead (r : InputReader Symbol Q) (i : Fin k) :
     MultiTapeTM k Symbol (Unit ⊕ Q ⊕ RewindWorkState) :=
   (r.appendReadTable i).toTM
-
-/-- The one-tape reader machine is the deterministic view of its explicit table. -/
-public theorem InputReader.toTM_appendOneTable (r : InputReader Symbol Q) :
-    r.appendOneTable.toTM = r.appendOne := by
-  rfl
-
-/-- The selected-tape reader machine is the deterministic view of its explicit table. -/
-public theorem InputReader.toTM_appendReadTable (r : InputReader Symbol Q) (i : Fin k) :
-    (r.appendReadTable i).toTM = appendRead r i := by
-  rfl
 
 namespace InputReader
 

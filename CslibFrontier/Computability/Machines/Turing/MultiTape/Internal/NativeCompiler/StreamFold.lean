@@ -61,7 +61,8 @@ theorem read_frameValueReader (word rest : List Bool) :
       frameValueReader.read_cons_of_some (q' := false) _ rfl, ih]
     simp [frameValueReader, Nat.add_assoc]
 
-/-- The next-state callback followed by the retained framing transducer required by `streamTM`. -/
+/-- The next-state callback followed by the retained framing transducer required by the explicit
+stream table. -/
 @[expose] def streamFramedNext {Alpha Sigma : Type*}
     {next : Sigma × Alpha → Sigma} {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool}
     (compiler : NativeCompiler next (encPair encS encA) encS) :
@@ -69,8 +70,8 @@ theorem read_frameValueReader (word rest : List Bool) :
       (encPair encS encA) encBits :=
   (encodeFrame encS).comp compiler
 
-/-- The final callback preceded by the retained typed unframing transducer required by
-`streamTM`. -/
+/-- The final callback preceded by the retained typed unframing transducer required by the
+explicit stream table. -/
 @[expose] def streamUnframedFinish {Sigma Phi : Type*}
     {finish : Sigma → Phi} {encS : Sigma ↪ List Bool} {encF : Phi ↪ List Bool}
     (compiler : NativeCompiler finish encS encF) :
@@ -448,7 +449,7 @@ callback workspaces in each round; `lMax` bounds every encoded stream state and 
     (hstate input) (helem input)
   have hF := MultiTapeMachine.transformsTapes_inputFromWord_extendTapes true
     (unframedFinish.computes finalState) layout.finishInput
-  rw [← rawFrameReader.toTM_appendReadTable layout.V] at hinit'
+  unfold Turing.MultiTapeTM.appendRead at hinit'
   rw [← MultiTapeMachine.toTM_whileInput
     (MultiTapeMachine.streamRound frameValueReader emitter nextMachine
       layout.V layout.N layout.F layout.hVN layout.hVF layout.hNF)] at hloop

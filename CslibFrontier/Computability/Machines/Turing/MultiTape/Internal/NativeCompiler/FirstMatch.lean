@@ -15,8 +15,9 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Nat
 # Named native streaming first-match lookup
 
 This module retains a generic first-match table scan. The required input is a table paired with a
-key. A retained marshalling compiler copies it to the stream layout, then a concrete `streamTM`
-reads each framed entry once. The callback state keeps the search key and whether a prior entry
+key. A retained marshalling compiler copies it to the stream layout, then a concrete
+`MultiTapeMachine.stream` table reads each framed entry once. The callback state keeps the search
+key and whether a prior entry
 matched; only the first matching value is emitted.
 
 The peak callback workspace and encoded state/entry size are explicit finite suprema over the

@@ -3602,6 +3602,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Ker
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelOnWords
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelReverse
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelStackLoop
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelStreamTable
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelTakeDropUnary
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelTransducer
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelZeroSpace

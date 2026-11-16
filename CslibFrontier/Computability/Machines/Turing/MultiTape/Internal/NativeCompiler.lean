@@ -353,19 +353,7 @@ same machine and resource maps are retained. -/
 
 /-- A zero-tape machine that ignores its input and emits `out`, one bit per state, then halts. -/
 @[expose] def constantOutputTM (out : List Bool) : MultiTapeTM 0 Bool (Fin (out.length + 1)) :=
-  MultiTapeTM.ofTr ⟨0, by omega⟩ fun q _ _ =>
-    if h : q.val < out.length then
-      { inputTape := 0
-        workTapes := Fin.elim0
-        output := some out[q.val]
-        state := some ⟨q.val + 1, by omega⟩ }
-    else
-      { inputTape := 0, workTapes := Fin.elim0, output := none, state := none }
-
-/-- Forgetting the retained constant-output table recovers its deterministic semantics. -/
-theorem toTM_constantOutputMachine (out : List Bool) :
-    (constantOutputMachine out).toTM = constantOutputTM out := by
-  rw [constantOutputMachine, MultiTapeMachine.toTM_ofTr, constantOutputTM]
+  (constantOutputMachine out).toTM
 
 private def constantOutputCfg (input out : List Bool) (n : ℕ) (hn : n ≤ out.length) :
     Cfg 0 Bool (Fin (out.length + 1)) input :=
@@ -379,7 +367,8 @@ private theorem step_constantOutputCfg (input out : List Bool) (n : ℕ)
     (hn : n < out.length) :
     (constantOutputTM out).step (constantOutputCfg input out n hn.le) =
       constantOutputCfg input out (n + 1) hn := by
-  rw [MultiTapeTM.step_of_state rfl, constantOutputTM, MultiTapeTM.tr_ofTr, dite_eq_left hn]
+  rw [MultiTapeTM.step_of_state rfl, constantOutputTM, constantOutputMachine,
+    MultiTapeMachine.toTM_ofTr, MultiTapeTM.tr_ofTr, dite_eq_left hn]
   apply Cfg.ext_zero_tapes
   · rfl
   · rfl
@@ -390,8 +379,8 @@ private theorem step_constantOutputCfg (input out : List Bool) (n : ℕ)
 private theorem step_constantOutputCfg_halt (input out : List Bool) :
     (constantOutputTM out).step (constantOutputCfg input out out.length le_rfl) =
       wordsCfg input none (fun _ => []) out := by
-  rw [MultiTapeTM.step_of_state rfl, constantOutputTM, MultiTapeTM.tr_ofTr,
-    dite_eq_right (Nat.not_lt.mpr le_rfl)]
+  rw [MultiTapeTM.step_of_state rfl, constantOutputTM, constantOutputMachine,
+    MultiTapeMachine.toTM_ofTr, MultiTapeTM.tr_ofTr, dite_eq_right (Nat.not_lt.mpr le_rfl)]
   apply Cfg.ext_zero_tapes
   · rfl
   · rfl
@@ -429,13 +418,12 @@ theorem computesTidily_constantOutputTM (input out : List Bool) :
     stateEncoding := Fin.valEmbedding
     time := fun _ => (encOut b).length + 1
     workspace := fun _ => 0
-    computes := fun a => by
-      rw [toTM_constantOutputMachine]
-      exact computesTidily_constantOutputTM (encIn a) (encOut b)
+    computes := fun a => computesTidily_constantOutputTM (encIn a) (encOut b)
   }
 
-/-- Direct composition of two named machines. The result definitionally contains `MultiTapeTM.comp`
-and retains every constant from its exact time and workspace theorem. -/
+/-- Direct composition of two named machines. The result contains the choice-free
+`MultiTapeMachine.comp` table and retains every constant from its exact time and workspace
+theorem. -/
 @[expose] def comp {α β γ : Type*} {g : α → β} {f : β → γ}
     {encIn : α ↪ List Bool} {encMid : β ↪ List Bool} {encOut : γ ↪ List Bool}
     (outer : NativeCompiler f encMid encOut) (inner : NativeCompiler g encIn encMid) :

@@ -386,11 +386,6 @@ def nop (k : ℕ) (Symbol : Type*) : MultiTapeMachine k Symbol Unit Empty Id :=
   ofTr () fun _ _ _ =>
     { inputTape := 0, workTapes := fun _ => (none, 0), output := none, state := none }
 
-/-- Forgetting the explicit no-op table recovers the legacy no-op machine. -/
-theorem toTM_nop (k : ℕ) (Symbol : Type*) :
-    (nop k Symbol).toTM = MultiTapeTM.nop k Symbol := by
-  rw [nop, toTM_ofTr, MultiTapeTM.nop]
-
 /-- Clear the selected work tapes and their shadows in sequence, retaining every transition
 table used by the cleanup. -/
 def clearList (m₀ m₁ : Symbol) :
@@ -410,7 +405,7 @@ theorem toTM_clearList (m₀ m₁ : Symbol) (tapes : List (Fin k)) :
   induction tapes with
   | nil =>
       change (nop (k + k) Symbol).toTM = MultiTapeTM.nop (k + k) Symbol
-      exact toTM_nop (k + k) Symbol
+      rw [nop, toTM_ofTr, MultiTapeTM.nop]
   | cons tape tapes ih =>
       change (((clearShadowed m₀ m₁).extendTapes (MultiTapeTM.pairEmb tape)).seq
           (clearList m₀ m₁ tapes)).toTM =

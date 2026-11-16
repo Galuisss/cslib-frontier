@@ -21,7 +21,7 @@ tables. Its correctness theorems use the established tape-transformation specifi
 transition function is recovered from a relation or from the legacy noncomputable assembly.
 -/
 
-@[expose] public section
+public section
 
 namespace Turing.MultiTapeMachine
 
@@ -94,7 +94,7 @@ theorem transformsTapes_onWords_extendTapes {k : ℕ} {State : Type}
     (fun _ _ _ _ _ hpost => hpost) le_rfl le_rfl
 
 /-- Copy the word on selected source tape `embedding 1` to blank target `embedding 0`. -/
-def copyWord (embedding : Fin (0 + 1 + 2) ↪ Fin K) (mark : Bool) :
+private def copyWord (embedding : Fin (0 + 1 + 2) ↪ Fin K) (mark : Bool) :
     MultiTapeMachine K Bool
       (MultiTapeTM.MarkWorkState ⊕
         ((Unit ⊕ MultiTapeTM.RewindState) ⊕ MultiTapeTM.RewindWorkState) ⊕
@@ -135,7 +135,7 @@ private theorem transformsTapes_copyWord
     · rw [hextra tape htape, Function.update_of_ne fun h => htape ⟨0, h.symm⟩]
 
 /-- Emit from `value`, compute a next state into `next`, move it back to `value`, and clean up. -/
-def frozenRound (emitter : MultiTapeMachine K Bool EmitState Empty Id)
+private def frozenRound (emitter : MultiTapeMachine K Bool EmitState Empty Id)
     (nextMachine : MultiTapeMachine K Bool NextState Empty Id)
     (value next flag : Fin K) (hValueNext : value ≠ next)
     (hValueFlag : value ≠ flag) (hNextFlag : next ≠ flag) :=
@@ -282,7 +282,7 @@ theorem transformsTapesAt_streamRound
     (fun _ _ tapes ⟨hinput, hpos, htapes⟩ =>
       ⟨hinput, hpos, by simp [htapes]⟩)
     (fun _ _ _ _ _ _ _ h => h) le_rfl le_rfl
-  rw [← reader.toTM_appendReadTable value] at hread
+  unfold Turing.MultiTapeTM.appendRead at hread
   have hfrozen := (transformsTapes_frozenRound hValueNext hValueFlag hNextFlag
     hEmitter hNext).freezeInput
   rw [streamRound, toTM_seq, toTM_freezeInput]

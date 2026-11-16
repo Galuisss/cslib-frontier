@@ -20,15 +20,15 @@ namespace CslibFrontierTests.Machines.Turing.MultiTape.Internal.NativeCompilerCo
 
 open Turing.MultiTapeTM Turing.MultiTapeTM.Internal Turing.MultiTapeTM.Internal.NativeCompiler
 
-private noncomputable def condition :
+private def condition :
     NativeCompiler (Function.const ℕ true) encUnary encTest :=
   const encUnary encTest true
 
-private noncomputable def trueBranch :
+private def trueBranch :
     NativeCompiler (Function.const ℕ 1) encUnary encUnary :=
   const encUnary encUnary 1
 
-private noncomputable def falseBranch :
+private def falseBranch :
     NativeCompiler (Function.const ℕ 0) encUnary encUnary :=
   const encUnary encUnary 0
 
