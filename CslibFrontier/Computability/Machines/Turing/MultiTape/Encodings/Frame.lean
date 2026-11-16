@@ -214,10 +214,9 @@ theorem getD_frame_two_mul_add_one (w : List Bool) (i : ℕ) :
 theorem length_unframe_le : ∀ w : List Bool, (unframe w).length ≤ w.length
   | true :: _ :: v => by
     change (unframe v).length + 1 ≤ v.length + 1 + 1
-    simp only [List.length_cons]
     have := length_unframe_le v
     omega
-  | [] | [true] | false :: _ => by simp [Cslib.Encoding.undelimit]
+  | [] | [true] | false :: _ => by simp
 
 /-! ### Frames followed by a word -/
 

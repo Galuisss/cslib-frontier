@@ -278,8 +278,8 @@ theorem recoverOrders_polyTime : ComputableInPolyTime recoverOrders
   intro I i hi
   rcases completeVertex_fold I ((List.range I.graph.vertices.length).take i) with
     hn | ⟨J, hj, _, _, hb⟩
-  · rw [hn, encOption_none, List.length_nil]
-    exact Nat.zero_le _
+  · rw [hn, encOption_none, List.length_cons, List.length_nil]
+    omega
   · rw [hj, encOption_some, List.length_cons]
     have hlen : ((List.range I.graph.vertices.length).take i).length ≤
         I.graph.vertices.length := by simp

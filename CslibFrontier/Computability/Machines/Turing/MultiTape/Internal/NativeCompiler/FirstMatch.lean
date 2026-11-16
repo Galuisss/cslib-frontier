@@ -305,10 +305,12 @@ theorem tableBits_le_time_firstMatchCompiler (encKey : Key ↪ List Bool)
     (encList (encPair encKey encValue) input.1).length ≤
       (firstMatchCompiler encKey encValue).time input := by
   rw [time_firstMatchCompiler]
-  change _ ≤ (firstMatchMarshalCompiler encKey encValue).time input +
-    (firstMatchStreamCompiler encKey encValue).time ((input.2, false), input.1) +
-    4 * ((encPair (encPair encKey encBool) (encList (encPair encKey encValue)))
-      ((input.2, false), input.1)).length + 9 + _
+  have hraw : (firstMatchHaltCompiler encKey encValue).time input =
+      (firstMatchMarshalCompiler encKey encValue).time input +
+      (firstMatchStreamCompiler encKey encValue).time ((input.2, false), input.1) +
+      4 * ((encPair (encPair encKey encBool) (encList (encPair encKey encValue)))
+        ((input.2, false), input.1)).length + 9 := rfl
+  rw [hraw]
   have h : (encList (encPair encKey encValue) input.1).length ≤
       (firstMatchStreamCompiler encKey encValue).time ((input.2, false), input.1) := by
     simpa only using tableBits_le_time_firstMatchStreamCompiler encKey encValue

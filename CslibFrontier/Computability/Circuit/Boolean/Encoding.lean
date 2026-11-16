@@ -409,8 +409,8 @@ variable {σ : Signature}
 `encOp : σ.Op ↪ List Bool`: the input count `n` in unary, followed by the code of the circuit
 (`encCode encOp`). -/
 def encCircuit (encOp : σ.Op ↪ List Bool) (m : ℕ) : (Σ n, Circuit σ n m) ↪ List Bool :=
-  Cslib.Encoding.encSigma encUnary fun _ =>
-    (⟨Circuit.code, Circuit.code_injective⟩ : Circuit σ _ m ↪ _).trans (encCode encOp)
+  Cslib.Encoding.encSigma encUnary fun n =>
+    (⟨Circuit.code, Circuit.code_injective⟩ : Circuit σ n m ↪ _).trans (encCode encOp)
 
 /-- Unfolding formula for `encCircuit encOp m c`. -/
 theorem encCircuit_apply (encOp : σ.Op ↪ List Bool) (c : Σ n, Circuit σ n m) :

@@ -55,7 +55,7 @@ public class OptionEncoding (enc₁ : α ↪ List Bool) (enc : Option α ↪ Lis
 /-- Option capabilities for the empty-word halt protocol of the iteration kernel.
 Canonical tagged options do not satisfy this protocol. -/
 public class HaltOptionEncoding (enc₁ : α ↪ List Bool) (enc : Option α ↪ List Bool)
-    extends OptionEncoding enc₁ enc : Prop where
+    : Prop extends OptionEncoding enc₁ enc where
   /-- The kernel stops on the empty word. -/
   none_eq : enc none = []
 

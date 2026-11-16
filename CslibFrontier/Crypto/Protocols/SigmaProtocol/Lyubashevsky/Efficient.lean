@@ -332,7 +332,7 @@ def intMatrixDecoder : Decoder (encList (encList encIntBin)) :=
 
 /-- Total polynomial-time decoder for optional framed integer lists. -/
 def responseListDecoder : Decoder (encSilentOption (encList encIntBin)) :=
-  Decoder.option intListDecoder
+  Decoder.silentOption intListDecoder
 
 @[local fun_prop]
 private theorem computableInPolyTime_decodeIntList :

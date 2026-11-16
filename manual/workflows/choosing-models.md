@@ -64,6 +64,48 @@ The [shared encoding regressions](../../CslibFrontierTests/SharedEncoding.lean) 
 combinators; the [machine client](../../CslibFrontierTests/SharedEncodingMachine.lean) checks
 that shared product encodings support generated field projections and binary successor.
 
+The mirrored upstream revision is `9f9d02ffd929cd830e9b2d030975f8a75afd9542` of
+[CSLib #1213](https://github.com/leanprover/cslib/pull/1213).
+Canonical `encOption e` uses the generic sum `Unit ⊕ α`: `none` is `[false]`,
+`some a` is `true :: e a`, and the lengths are respectively `1` and `1 + (e a).length`.
+Thus `some []` under `encBits` is `[true]`, while a nested `some none` is `[true, false]`.
+A list still frames every element: replacing a formerly empty absent element adds two bits
+inside its frame. Product framing can amplify changes in an earlier component; do not assume
+that a nested record's size changes by only one bit.
+
+Use `encHaltOption` only for the iteration kernel's empty-word stop signal, and
+`encSilentOption` for protocols or streaming callbacks whose absent response emits no bits.
+Both retain `none = []` and the same `some` word as before; they are explicit formats,
+not synonyms for canonical options. `HaltOptionEncoding` adds the stop-word law to the
+constructor, classifier and default-elimination capabilities of `OptionEncoding`.
+`ComputableInDegree.optionTranslate` supplies native identity translations between supported
+formats; its classification and reconstruction are charged computations.
+`Decoder.option` reads the canonical Boolean tag, whereas `Decoder.silentOption` retains the
+empty-word test required by existing protocol words, including its previous malformed-word behavior.
+Cryptographic response encodings and their associated efficiency/security statements use the
+silent format to preserve rejection responses and admitted machine classes.
+
+The [first-match native compiler](../../CslibFrontier/Computability/Machines/Turing/MultiTape/Internal/NativeCompiler/FirstMatch.lean)
+keeps its silent streaming callbacks, then charges `optionFromHalt` at the canonical result
+boundary. `time_firstMatchCompiler` includes that conversion and its composition overhead;
+its time and workspace maps remain separate. The
+[stack pop machine](../../CslibFrontier/Computability/Machines/Turing/MultiTape/Plumbing/WordMoves.lean)
+writes `[true, false, false]`, the frame of the canonical absent option, in three steps on an
+empty stack; its nonempty branch retains the former word and clock. Fold and counted iteration
+keep the empty halt format and their independent bounds.
+The [machine regressions](../../CslibFrontierTests/SharedEncodingMachine.lean) cover the distinct
+formats, classification, translations and first-match result boundary.
+
+The [circuit encoding](../../CslibFrontier/Computability/Circuit/Boolean/Encoding.lean) uses
+`encSigma encUnary` with the circuit-code embedding selected by its input arity.
+Generic dependent-pair injectivity replaces recovery of the arity by hand, while its old
+framed unary-count/code word and class-membership clients remain unchanged.
+The [partializer](../../CslibFrontier/Computability/Machines/Turing/MultiTape/Halting/Partialize.lean)
+uses `encSum encBits (encSubsingleton Unit)`, preserving its intentional opposite verdict:
+`none = [true]` and `some w = false :: w`.
+The mirrored delimiter retains one documented `List.prefix_rfl` proof adaptation for pinned Lean;
+this changes no encoding or parsing API.
+
 Binary `encNat` agrees with `Nat.bits` by
 [`Cslib.Encoding.encNat_eq_bits`](../../CslibFrontier/Computability/Encoding/NatBits.lean).
 Use `encNat_apply` in arithmetic proofs rather than assuming the shared implementation unfolds

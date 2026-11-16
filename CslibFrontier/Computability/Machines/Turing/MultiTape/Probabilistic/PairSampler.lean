@@ -193,9 +193,9 @@ private theorem eval_run_frame (input rest : List Bool) (fuel : ℕ) (y : List B
   induction y with
   | nil =>
     intro pre output hin
-    have hlt : pre.length < input.length := by subst hin; simp [frame_cons]
-    have hget : input[pre.length] = false := by subst hin; simp [frame_cons]
-    rw [show (frame []).length + fuel = fuel + 1 by simp [frame_cons]; lia,
+    have hlt : pre.length < input.length := by subst hin; simp
+    have hget : input[pre.length] = false := by subst hin; simp
+    rw [show (frame []).length + fuel = fuel + 1 by simp; lia,
       eval_run_succ hlt]
     simp only [hget, next, emit, Option.toList_some, ProbComp.eval_bind]
     change (ProbComp.eval (ProbComp.uniform Bool)).bind (fun _ => _) = _
@@ -203,16 +203,17 @@ private theorem eval_run_frame (input rest : List Bool) (fuel : ℕ) (y : List B
     rfl
   | cons b y ih =>
     intro pre output hin
-    have hlt : pre.length < input.length := by subst hin; simp [frame_cons]
-    have hlt' : pre.length + 1 < input.length := by subst hin; simp [frame_cons]
-    have hget : input[pre.length] = true := by subst hin; simp [frame_cons]
+    have hlt : pre.length < input.length := by subst hin; simp
+    have hlt' : pre.length + 1 < input.length := by subst hin; simp
+    have hget : input[pre.length] = true := by subst hin; simp
     have hget' : input[pre.length + 1] = b := by
       subst hin
-      simp only [frame_cons, List.cons_append]
-      rw [List.getElem_append_right (by simp)]
-      simp
+      rw [List.getElem_append_right (by omega)]
+      simp only [Nat.add_sub_cancel_left]
+      change (true :: b :: (frame y ++ rest))[1] = b
+      rfl
     have hlen : (frame (b :: y)).length + fuel = ((frame y).length + fuel + 1) + 1 := by
-      simp [frame_cons]; lia
+      simp; lia
     rw [hlen, eval_run_succ hlt]
     simp only [hget, next, emit, Option.toList_some, ProbComp.eval_bind]
     change (ProbComp.eval (ProbComp.uniform Bool)).bind (fun _ => _) = _
@@ -221,12 +222,12 @@ private theorem eval_run_frame (input rest : List Bool) (fuel : ℕ) (y : List B
     change (ProbComp.eval (ProbComp.uniform Bool)).bind (fun _ => _) = _
     rw [PMF.bind_const]
     have hpre : input = (pre ++ [true, b]) ++ frame y ++ rest := by
-      subst hin; simp [frame_cons]
+      subst hin; simp
     have := ih (pre ++ [true, b]) (output ++ [true] ++ [b]) hpre
     simp only [List.length_append, List.length_cons, List.length_nil] at this
     convert this using 3
     · congr 1
-      · simp [frame_cons]; lia
+      · simp; lia
       · simp
 
 end PairSampler

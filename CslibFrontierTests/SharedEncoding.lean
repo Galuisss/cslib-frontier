@@ -178,3 +178,7 @@ example (l l' : List (Bool × List Bool)) (h : encList (encProd encBool encBits)
     encList (encProd encBool encBits) l') : l = l' := by grind
 
 end CslibTests.Encoding
+
+example (o : Option Bool) : Cslib.Encoding.encOption Cslib.Encoding.encBool o =
+    Cslib.Encoding.encSum (Cslib.Encoding.encSubsingleton Unit) Cslib.Encoding.encBool
+      (o.elim (.inl ()) .inr) := by cases o <;> rfl

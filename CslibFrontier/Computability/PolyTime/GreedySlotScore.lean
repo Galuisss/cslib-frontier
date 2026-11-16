@@ -970,7 +970,7 @@ theorem length_encSlotSelectState_run_le (n Q r C : ℕ) (edges : List (ℕ × �
       6 * Q * (encNat r).length + 4 * Q + 2 * (encNat r).length + (encNat C).length +
         2 * (encNat edges.length).length + 2 * (encNat n).length + 2 * (encNat Q).length + 20 := by
     rcases Nat.eq_zero_or_pos j with rfl | hjpos
-    · simp only [IndexFold.run_zero, init, encOption_none, List.length_nil]; omega
+    · simp only [IndexFold.run_zero, init, encOption_none, List.length_cons, List.length_nil]; omega
     · obtain ⟨jStar, hjStar_lt, hopt, _, _, _⟩ :=
         run_selectSlotStep_spec n Q r C edges scheds slot hjpos
       rw [hopt, encOption_some, List.length_cons, length_encPair]

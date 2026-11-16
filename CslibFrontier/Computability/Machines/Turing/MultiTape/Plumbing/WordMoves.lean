@@ -306,7 +306,7 @@ theorem runsBetween_eraseFrame (w rest : List Bool) (o : ℤ) {input : List Bool
         (fun _ => o + (frame w).length) out)
       (2 * w.length + 1) (2 * w.length + 1 + 1) :=
   (RunsBetween.of_runFrom (runFrom_eraseFrame (input := input) w rest _ o _ rfl
-    (by simp [length_frame]) out)).mono le_rfl (by omega)
+    (by simp) out)).mono le_rfl (by omega)
 
 /-! ### Popping a framed word -/
 
@@ -409,7 +409,7 @@ theorem runFrom_popFrame_loop (w rest u acc acc' : List Bool) (oS oS' oR hR' : �
           · dsimp only [Fin.mk_one, Matrix.cons_val_one, Matrix.cons_val_zero]
             exact update_shifted_append _ _ _)
         (fun i => by fin_cases i <;> simp; omega)]
-    exact ih _ _ (oS + 1 + 1) rfl (by simp [hacc, frame_cons]) (by simp [hS]; omega)
+    exact ih _ _ (oS + 1 + 1) rfl (by simp [hacc]) (by simp [hS]; omega)
 
 /-- On a blank stack, `popFrame` writes the framed canonical absent option in three steps. -/
 theorem runsBetween_popFrame_nil (oS oR : ℤ) {input : List Bool} (out : List Bool) :
@@ -469,8 +469,8 @@ theorem runsBetween_popFrame_frame (w rest : List Bool) (oS oR : ℤ) {input : L
         · rfl
         · simpa using update_shifted_append ([true] : List Bool) true oR)
       (fun i => by fin_cases i <;> simp; omega)]
-  exact runFrom_popFrame_loop w rest _ [true, true] _ oS _ oR _ rfl (by simp [frame_cons])
-    (by simp [length_frame]) (by simp [length_frame]) out
+  exact runFrom_popFrame_loop w rest _ [true, true] _ oS _ oR _ rfl (by simp)
+    (by simp) (by simp) out
 
 end MultiTapeTM
 

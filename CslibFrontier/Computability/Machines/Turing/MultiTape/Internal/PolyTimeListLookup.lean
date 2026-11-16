@@ -51,8 +51,9 @@ theorem dropUnary {encL : List α ↪ List Bool} [ListEncoding encA encL]
 /-- Read an optional head in any list encoding, without an inhabitant of the element type. -/
 @[fun_prop]
 theorem head? (enc : α ↪ List Bool) {encL : List α ↪ List Bool}
+    {encO : Option α ↪ List Bool} [OptionEncoding enc encO]
     [_inst3 : ListEncoding enc encL] :
-    ComputableInPolyTime List.head? encL (encOption enc) := by
+    ComputableInPolyTime List.head? encL encO := by
   rcases isEmpty_or_nonempty α with h | h
   · exact of_finite _
   · obtain ⟨fallback⟩ := h
@@ -67,12 +68,13 @@ theorem head? (enc : α ↪ List Bool) {encL : List α ↪ List Bool}
 determines its encoding before proof search checks the corresponding operation and size rules. -/
 @[fun_prop]
 theorem getElem? {α γ : Type} {encA : α ↪ List Bool} {encIn : γ ↪ List Bool}
+    {encO : Option α ↪ List Bool} [OptionEncoding encA encO]
     {encL : List α ↪ List Bool}
     {list : γ → List α} {index : γ → ℕ}
     (hlist : ComputableInPolyTime list encIn encL)
     (hindex : ComputableInPolyTime index encIn encUnary)
     [ListEncoding encA encL] [SizedListEncoding encA encL] :
-    ComputableInPolyTime (fun x => (list x)[index x]?) encIn (encOption encA) := by
+    ComputableInPolyTime (fun x => (list x)[index x]?) encIn encO := by
   simpa only [Function.comp_def, List.head?_drop] using
     (head? encA).comp ((dropUnary (encA := encA)).comp (hlist.prod hindex))
 

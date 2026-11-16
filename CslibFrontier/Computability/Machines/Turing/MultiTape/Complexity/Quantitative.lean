@@ -458,8 +458,9 @@ theorem listIsEmpty {α : Type*} (enc : α ↪ List Bool) :
 
 /-- The option encoding determines the encoding used for the payload and fallback. -/
 @[fun_prop]
-theorem optionGetD {α : Type*} (enc : α ↪ List Bool) (fallback : α) :
-    ComputableTidilyInDegree (fun o => o.getD fallback) (encOption enc) enc 1 1 :=
+theorem optionGetD {α : Type*} (enc : α ↪ List Bool) (fallback : α)
+    {encO : Option α ↪ List Bool} [OptionEncoding enc encO] :
+    ComputableTidilyInDegree (fun o => o.getD fallback) encO enc 1 1 :=
   getD (enc₁ := enc) fallback
 
 /-- Copy an encoded value. This identity rule also lets `fun_prop` retain a shared let binding. -/

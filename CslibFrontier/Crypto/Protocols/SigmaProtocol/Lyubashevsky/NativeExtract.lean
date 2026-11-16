@@ -96,7 +96,7 @@ def decodeLyubashevskyExtractInput (word : List Bool) : LyubashevskyExtractInput
 
 private theorem extractInput_decoder :
     ∃ D : Decoder encLyubashevskyExtractInput, D.decode = decodeLyubashevskyExtractInput := by
-  let row := Decoder.pair Decoder.bits (Decoder.option (Decoder.list Decoder.intBin))
+  let row := Decoder.pair Decoder.bits (Decoder.silentOption (Decoder.list Decoder.intBin))
   let decoder := Decoder.pair (Decoder.pair Decoder.unary Decoder.unary) (Decoder.pair row row)
   exact ⟨decoder.map (fun p => ⟨⟨p.1.1, p.1.2⟩, ⟨p.2.1.1, p.2.1.2⟩, ⟨p.2.2.1, p.2.2.2⟩⟩)
     (fun r => ((r.dims.m, r.dims.k), ((r.first.challenge, r.first.response),

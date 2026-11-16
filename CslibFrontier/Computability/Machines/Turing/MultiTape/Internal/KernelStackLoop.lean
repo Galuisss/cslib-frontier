@@ -630,7 +630,7 @@ private lemma runs_pop_stack (ea : List Bool) (stk : List γ) :
   cases stk with
   | nil =>
     have := runs_pop_nil (input := input) (kk := kk) ea [] [] 0 0 []
-    simpa [encOption_none, frame_nil] using this
+    simpa using this
   | cons g t =>
     have := runs_pop_frame (input := input) (kk := kk) ea [] [] (encG g) (encList encG t) 0
       (-((encList encG (g :: t)).length : ℤ)) []
@@ -640,8 +640,8 @@ private lemma runs_pop_stack (ea : List Bool) (stk : List γ) :
       ring
     rw [ho] at this
     refine (by simpa [encOption_some] using this : RunsBetween _ _ _ _ _).mono ?_ ?_
-    · simp [length_frame]
-    · simp [length_frame]
+    · simp
+    · simp
 
 end Stack
 

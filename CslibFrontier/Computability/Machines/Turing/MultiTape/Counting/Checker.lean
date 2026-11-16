@@ -259,7 +259,7 @@ theorem computableInPolyTime_runBinary [Finite State]
     simp only [encBits_apply] at hinput hword
     cases hs : r.2 with
     | none =>
-      simp only [length_encPair, encBits_apply, hs, encOption_none, List.length_nil]
+      simp only [length_encPair, encBits_apply, hs, encOption_none, List.length_cons, List.length_nil]
       nlinarith [hr.1]
     | some finite =>
       have hfinite := hstorage p.1.length i 0 finite (hr.2 finite hs)

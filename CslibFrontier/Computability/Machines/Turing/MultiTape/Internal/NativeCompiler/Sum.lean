@@ -49,10 +49,12 @@ namespace Turing.MultiTapeTM.Internal.NativeCompiler
 conditional charges its emptiness test, copy and fixed `[false]` fallback. -/
 @[expose] noncomputable def optionFromHalt {Alpha : Type*} (enc : Alpha ↪ List Bool) :
     NativeCompiler (id : Option Alpha → Option Alpha) (encHaltOption enc) (encOption enc) := by
-  let empty := boolToTest.comp
+  let empty : NativeCompiler (fun o : Option Alpha => (encHaltOption enc o).isEmpty)
+      (encHaltOption enc) encTest := boolToTest.comp
     (isEmpty.ofInputEq (fun value => encHaltOption enc value) fun _ => rfl)
   let absent := const (encHaltOption enc) encBits [false]
-  let word := (identity encBits).ofInputEq (fun value => encHaltOption enc value) fun _ => rfl
+  let word : NativeCompiler (fun o : Option Alpha => encHaltOption enc o)
+      (encHaltOption enc) encBits := (identity encBits).ofInputEq (fun value => encHaltOption enc value) fun _ => rfl
   exact (ite empty absent word).ofOutputEq fun value => by cases value <;> rfl
 
 /-- Test whether a standard encoded list is empty. -/

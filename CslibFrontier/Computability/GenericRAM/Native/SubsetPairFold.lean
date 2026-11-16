@@ -730,7 +730,7 @@ private theorem length_bucketState_le (rowN : List ℕ) (n j i L : ℕ)
       simpa [Nat.size_eq_bits_len] using
         Nat.size_le_size (Nat.sub_le j (∑ s ∈ Finset.range i, 2 ^ s * rowN.getD s 0))
     have hsub_len := hsub_le.trans hj_le
-    rw [hspec]; simp only [length_encPair, encOption_none, List.length_nil]; omega
+    rw [hspec]; simp only [length_encPair, encOption_none, List.length_cons, List.length_nil]; omega
 
 private theorem computableInPolyTime_bucketStep :
     ComputableInPolyTime

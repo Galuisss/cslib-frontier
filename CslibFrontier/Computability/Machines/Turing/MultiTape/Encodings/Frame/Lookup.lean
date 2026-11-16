@@ -34,7 +34,7 @@ theorem getElem?_frame_append (u v : List Bool) {i : ℕ} (hi : i < u.length) :
   | nil => simp at hi
   | cons b u ih =>
     rcases i with _ | i
-    · simp [frame_cons]
+    · simp
     · obtain ⟨h₁, h₂⟩ := ih (i := i) (by simpa using hi)
       have e₁ : 2 * (i + 1) = 2 * i + 1 + 1 := by omega
       simp only [frame_cons, List.cons_append, e₁, List.getElem?_cons_succ,

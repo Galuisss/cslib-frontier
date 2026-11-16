@@ -417,8 +417,8 @@ private def linearViews (fn encIn encOut : Term) (base : Name) : CommandElabM Un
         elabCommand (← `(@[scoped fun_prop] public theorem
           $(app projection.getId "_deg"):ident :
           ComputableInDegree $projection $eT (encOption $out) 1 1 := by
-          have hn : ComputableInDegree (fun _ : $T => ([] : List Bool)) $eT encBits 1 1 :=
-            (ComputableInDegree.const (encMid := encBits) []).mono
+          have hn : ComputableInDegree (fun _ : $T => ([false] : List Bool)) $eT encBits 1 1 :=
+            (ComputableInDegree.const (encMid := encBits) [false]).mono
           exact ((($(app matcher.getId "_deg")).ite
             (($someWord).restrict _) (hn.restrict _)).mono (d' := 1) (e' := 1)).of_enc_eq
               (fun v => by

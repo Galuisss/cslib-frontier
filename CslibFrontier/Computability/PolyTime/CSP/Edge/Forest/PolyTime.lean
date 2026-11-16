@@ -267,7 +267,7 @@ private theorem step_size (input : Input) (s : State) :
                 2 * (encList encRecord (remaining.filter
                   (fun b => decide (b ∉ used ((a, os) :: log))))).length + 4 := by
               simp only [encState, length_encPair, encWorkLog, encList_cons,
-                List.length_append, length_frame, encOption_none, List.length_nil]
+                List.length_append, length_frame, encOption_none, List.length_cons, List.length_nil]
               ring
             _ ≤ 2 * (encWorkLog log).length + 4 * (encWorkExpansion (a, os)).length +
                 2 * (encList encRecord remaining).length + 4 :=

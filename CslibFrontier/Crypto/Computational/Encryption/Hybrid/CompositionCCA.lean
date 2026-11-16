@@ -80,7 +80,7 @@ noncomputable def hybridKEMCCAHandler (E : SymmetricCipher)
     else do
       let reply ← List.take (decBound n (unframe request.2)) <$>
         ProbOracleComp.query ((), unframe request.2)
-      return encSilentOption encBits (((Decoder.option Decoder.bits).decode reply).elim none
+      return encSilentOption encBits (((Decoder.silentOption Decoder.bits).decode reply).elim none
         (fun k => E.decrypt n (F n k) (dropFrame request.2)))
   else pure []
 
@@ -331,7 +331,7 @@ private theorem computableInPolyTime_hybridKEMReply (E : SymmetricCipher)
       (encPair encUnary encBits) encBits) :
     ComputableInPolyTime
       (fun p : ℕ × List Bool × List Bool => encSilentOption encBits
-        (((Decoder.option Decoder.bits).decode p.2.2).elim none
+        (((Decoder.silentOption Decoder.bits).decode p.2.2).elim none
           (fun k => E.decrypt p.1 (F p.1 k) p.2.1)))
       (encPair encUnary (encPair encBits encBits)) encBits := by
   let I := encPair encUnary (encPair encBits encBits)
@@ -339,7 +339,7 @@ private theorem computableInPolyTime_hybridKEMReply (E : SymmetricCipher)
   have ht := ComputableInPolyTime.snd encUnary (encPair encBits encBits)
   have hp := ComputableInPolyTime.fst I encBits
   have hk := ComputableInPolyTime.snd I encBits
-  have hdecode := (Decoder.option Decoder.bits).computableInPolyTime.comp ht.snd'
+  have hdecode := (Decoder.silentOption Decoder.bits).computableInPolyTime.comp ht.snd'
   have hbody := E.decrypt_polyTime.comp
     ((hn.comp hp).prod ((hF.comp ((hn.comp hp).prod hk)).prod (ht.fst'.comp hp)))
   exact (hdecode.optionElimWithInput (ComputableInPolyTime.const none) hbody).encoding_comp

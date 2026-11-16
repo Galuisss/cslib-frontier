@@ -45,6 +45,6 @@ theorem encSum_inr (left : α ↪ List Bool) (right : β ↪ List Bool) (b : β)
 theorem length_encSum (left : α ↪ List Bool) (right : β ↪ List Bool) (value : α ⊕ β) :
     (encSum left right value).length =
       value.elim (fun a => (left a).length) (fun b => (right b).length) + 1 := by
-  cases value <;> simp [Cslib.Encoding.length_encSum]
+  cases value <;> simp
 
 end Turing.MultiTapeTM

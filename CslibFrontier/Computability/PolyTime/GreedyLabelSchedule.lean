@@ -621,7 +621,7 @@ theorem length_encPartialSchedules_le {n m Q r : ℕ}
     have hle : ∀ x ∈ L.map (fun o => 2 * (encOption (encList encNat) o).length + 1),
         x ≤ 2 * Q * (2 * (encNat r).length + 1) + 3 := by
       intro x hx; obtain ⟨o, ho, rfl⟩ := List.mem_map.mp hx; cases o with
-      | none => simp only [encOption_none, List.length_nil]; omega
+      | none => simp only [encOption_none, List.length_cons, List.length_nil]; omega
       | some w =>
         obtain ⟨hlw, hmw⟩ := hw (some w) ho w rfl
         have hwl := (length_encList_word_le hlw hmw).trans_eq
