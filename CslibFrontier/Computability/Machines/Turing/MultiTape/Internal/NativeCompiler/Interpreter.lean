@@ -702,4 +702,109 @@ private theorem simulateBitOutputCompiler_resources_le (description : Desc)
         outputBitsCompiler.tapeCount + 20) ≤ _
     exact hscalar _ _ _ _ _ _ _ hi.2 hspace hdSpace hm ho
 
+private theorem interpreterStepInput_length_le (description : Desc) (word : List ℕ)
+    (count j : ℕ) (hj : j ≤ count) :
+    (encPair eDesc (encPair (encList encUnary) eCfg)
+      (description, word,
+        ((stepOut description word)^[j] (Universal.init description, [])).1)).length ≤
+      ctxBound (descLen description) (encList encUnary word).length count := by
+  have h := (length_eCtx_le description word (inv_iterate description word j).1).trans
+    (ctxBound_mono hj)
+  simp only [eCtx, length_encPair, descLen] at h ⊢
+  omega
+
+private theorem simulateBitOutputCompiler_time_le_of_stepBound (description : Desc)
+    (coefficient degree : ℕ)
+    (hstep : ∀ word cfg, stepCompiler.time (description, word, cfg) ≤
+      coefficient *
+        ((encPair eDesc (encPair (encList encUnary) eCfg) (description, word, cfg)).length +
+          1) ^ degree)
+    (word : List Bool) (count : ℕ) :
+    let M := descLen description + (eCfg (Universal.init description)).length + 1
+    let x := word.length + count + 1
+    (simulateBitOutputCompiler description).time (word, count) ≤
+      2 * coefficient * (101 * M ^ 2) ^ degree * x ^ (degree + 1) +
+        1000000 * M ^ 2 * x ^ 2 := by
+  let D := descLen description
+  let I := (eCfg (Universal.init description)).length
+  let M := D + I + 1
+  let x := word.length + count + 1
+  let raw := word.map Universal.eBit
+  let N := (encList encUnary raw).length
+  let L := ctxBound D N count
+  let P := 101 * M ^ 2
+  let stepTime := coefficient * (L + 1) ^ degree
+  have hbits : N ≤ 3 * word.length := length_encList_map_eBit_le word
+  have hx : 1 ≤ x := by dsimp only [x]; omega
+  have hM : 1 ≤ M := by dsimp only [M]; omega
+  have hcount : count ≤ x := by dsimp only [x]; omega
+  have hM2 : M ≤ M ^ 2 := Nat.le_self_pow (by decide) M
+  have hM2x : M ≤ M ^ 2 * x := hM2.trans (Nat.le_mul_of_pos_right _ hx)
+  have hxx : x ≤ M ^ 2 * x :=
+    Nat.le_mul_of_pos_left _ (Nat.pow_pos hM)
+  have hD : D ≤ M := by dsimp only [M]; omega
+  have hD2 : D ^ 2 ≤ M ^ 2 := Nat.pow_le_pow_left hD 2
+  have hDx : D ≤ M ^ 2 * x := hD.trans hM2x
+  have hcountOne : count + 1 ≤ x := by dsimp only [x]; omega
+  have hL : L ≤ 100 * M ^ 2 * x := by
+    have hcoef : 24 * D ^ 2 + 40 * D ≤ 64 * M ^ 2 := by nlinarith
+    have hmain := Nat.mul_le_mul hcoef hcount
+    have hN : N ≤ 3 * x := by dsimp only [x]; omega
+    have heq : L = (24 * D ^ 2 + 40 * D) * count + 15 * D + 4 * N + 9 := by
+      dsimp only [L, ctxBound, cfgBound, tapeBound]
+      ring
+    rw [heq]
+    nlinarith
+  have hL1 : L + 1 ≤ P * x := by dsimp only [P]; nlinarith
+  have hZ : L + D + count + 1 ≤ 102 * M ^ 2 * x := by nlinarith
+  have hA : D + I + N + count + 1 ≤ 4 * M ^ 2 * x := by
+    have hsmall : N + count ≤ 3 * x := by dsimp only [x]; omega
+    have heq : D + I + N + count + 1 = M + (N + count) := by dsimp only [M]; omega
+    rw [heq]
+    nlinarith
+  have hO : count * (2 * D + 1) + 1 ≤ 2 * M * x := by
+    have hc := Nat.mul_le_mul_right (2 * D + 1) hcount
+    have hD : D + 1 ≤ M := by dsimp only [M]; omega
+    have hd := Nat.mul_le_mul_right x hD
+    nlinarith
+  have hstepTime : stepTime ≤ coefficient * P ^ degree * x ^ degree := by
+    refine (Nat.mul_le_mul_left coefficient (Nat.pow_le_pow_left hL1 degree)).trans ?_
+    rw [Nat.mul_pow]
+    exact le_of_eq (Nat.mul_assoc _ _ _).symm
+  have hs := simulateOutputCompiler_time_le description raw count stepTime (by
+    intro j hj
+    exact (hstep raw _).trans (Nat.mul_le_mul_left coefficient
+      (Nat.pow_le_pow_left (Nat.add_le_add_right
+        (interpreterStepInput_length_le description raw count j hj.le) 1) degree)))
+  have hb := (simulateBitOutputCompiler_resources_le description word count _
+    ((simulateOutputCompiler description).workspace (raw, count)) hs le_rfl).1
+  have hmain : count * (2 * stepTime) ≤
+      2 * coefficient * P ^ degree * x ^ (degree + 1) := by
+    calc
+      _ ≤ x * (2 * (coefficient * P ^ degree * x ^ degree)) :=
+        Nat.mul_le_mul hcount (Nat.mul_le_mul_left 2 hstepTime)
+      _ = _ := by rw [pow_succ]; ring
+  have hZTime : count * (5000 * (L + D + count + 1)) ≤
+      510000 * M ^ 2 * x ^ 2 := by
+    calc
+      _ ≤ x * (5000 * (102 * M ^ 2 * x)) :=
+        Nat.mul_le_mul hcount (Nat.mul_le_mul_left 5000 hZ)
+      _ = _ := by ring
+  have hZ' : L + D + count + 1 ≤ 102 * M ^ 2 * x ^ 2 :=
+    hZ.trans (Nat.mul_le_mul_left _ (Nat.le_self_pow (by decide) x))
+  have hA' : D + I + N + count + 1 ≤ 4 * M ^ 2 * x ^ 2 :=
+    hA.trans (Nat.mul_le_mul_left _ (Nat.le_self_pow (by decide) x))
+  have hx' : x ≤ M ^ 2 * x ^ 2 :=
+    hxx.trans (Nat.mul_le_mul_left _ (Nat.le_self_pow (by decide) x))
+  have hO' : (count * (2 * D + 1) + 1) ^ 2 ≤ 4 * M ^ 2 * x ^ 2 := by
+    exact (Nat.pow_le_pow_left hO 2).trans (le_of_eq (by ring))
+  change _ ≤ 2 * coefficient * P ^ degree * x ^ (degree + 1) +
+    1000000 * M ^ 2 * x ^ 2
+  change (simulateBitOutputCompiler description).time (word, count) ≤
+    count * (2 * stepTime + 5000 * (L + D + count + 1)) +
+      100 * (L + D + count + 1) + 1100 * (D + I + N + count + 1) +
+      10000 * x + 10000 * (count * (2 * D + 1) + 1) ^ 2 at hb
+  rw [Nat.mul_add] at hb
+  nlinarith
+
 end Turing.MultiTapeTM.Internal.NativeCompiler
