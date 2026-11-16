@@ -147,6 +147,12 @@ private theorem firstMatchMarshalCompiler_time_le {Key Value : Type*}
   simp [firstMatchMarshalCompiler, first, second, ofTransducer, pair, comp, encodeFrame, const]
   omega
 
+private theorem firstMatchMarshalCompiler_tapeCount_le {Key Value : Type*}
+    (encKey : Key ↪ List Bool) (encValue : Value ↪ List Bool) :
+    (firstMatchMarshalCompiler encKey encValue).tapeCount ≤ 100 := by
+  simp [firstMatchMarshalCompiler, first, second, ofTransducer, pair, comp, encodeFrame,
+    const]
+
 /-- The actual retained first-match compiler has quadratic time in the complete encoded table and
 query. Its installed program description remains a separate static coordinate. -/
 theorem firstMatchCompiler_time_le {Key Value : Type*} [DecidableEq Key]
@@ -255,9 +261,7 @@ theorem firstMatchCompiler_tapeCount_le {Key Value : Type*} [DecidableEq Key]
     (encKey : Key ↪ List Bool) (encValue : Value ↪ List Bool) :
     (firstMatchCompiler encKey encValue).tapeCount ≤ 1002 := by
   have hstream := firstMatchStreamCompiler_tapeCount_le encKey encValue
-  have hmarshal : (firstMatchMarshalCompiler encKey encValue).tapeCount ≤ 100 := by
-    simp [firstMatchMarshalCompiler, first, second, const, pair, ofTransducer, comp,
-      encodeFrame]
+  have hmarshal := firstMatchMarshalCompiler_tapeCount_le encKey encValue
   change ((firstMatchStreamCompiler encKey encValue).comp
     (firstMatchMarshalCompiler encKey encValue)).tapeCount ≤ 1002
   simp only [comp]
@@ -401,9 +405,7 @@ theorem firstMatchCompiler_workspace_le {Key Value : Type*} [DecidableEq Key]
     simp [firstMatchMarshalCompiler, first, second, ofTransducer, pair, comp, encodeFrame,
       const, L]
     omega
-  have hmarshalTapes : (firstMatchMarshalCompiler encKey encValue).tapeCount ≤ 100 := by
-    simp [firstMatchMarshalCompiler, first, second, ofTransducer, pair, comp, encodeFrame,
-      const]
+  have hmarshalTapes := firstMatchMarshalCompiler_tapeCount_le encKey encValue
   have hmax : max (firstMatchMarshalCompiler encKey encValue).tapeCount
       (firstMatchStreamCompiler encKey encValue).tapeCount ≤ 1000 :=
     max_le (hmarshalTapes.trans (by omega))

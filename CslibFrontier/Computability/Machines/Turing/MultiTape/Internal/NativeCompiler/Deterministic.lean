@@ -363,6 +363,32 @@ private theorem stepWithKeyComponentTime_le (input : StepWithInput) :
     omega
   exact ⟨hstate, hsymbol, hworkInput⟩
 
+private theorem stepWithKeyComponentTapeCount_le :
+    let tail := second eDesc (encPair eCfg eSym)
+    let cfg := (first eCfg eSym).comp tail
+    let symbol := (second eCfg eSym).comp tail
+    let state := (optionGetD 0 encUnary).comp (cfgState.comp cfg)
+    let workInput := cfgWorkTapes.comp cfg
+    state.tapeCount ≤ 1000 ∧ symbol.tapeCount ≤ 100 ∧ workInput.tapeCount ≤ 100 := by
+  dsimp only
+  let tail := second eDesc (encPair eCfg eSym)
+  let cfg := (first eCfg eSym).comp tail
+  let symbol := (second eCfg eSym).comp tail
+  let state := (optionGetD 0 encUnary).comp (cfgState.comp cfg)
+  let workInput := cfgWorkTapes.comp cfg
+  change state.tapeCount ≤ 1000 ∧ symbol.tapeCount ≤ 100 ∧
+    workInput.tapeCount ≤ 100
+  have hstate : state.tapeCount ≤ 1000 := by
+    simp [state, cfg, tail, cfgState, first, second, optionGetD, optionPayload,
+      tailDecoder, optionIsSomeTest, optionIsSomeBool, boolDecoder, boolToTest,
+      ofTransducer, comp, ite, const, ofInputEq, ofOutputEq]
+  have hsymbol : symbol.tapeCount ≤ 100 := by
+    simp [symbol, tail, second, ofTransducer, comp]
+  have hworkInput : workInput.tapeCount ≤ 100 := by
+    simp [workInput, cfg, tail, cfgWorkTapes, cfgTail₂, first, second, ofTransducer,
+      comp, ofInputEq]
+  exact ⟨hstate, hsymbol, hworkInput⟩
+
 private theorem stepWithKeyCompiler_time_le (input : StepWithInput) :
     stepWithKeyCompiler.time input ≤
       1000000000000000 * ((eStepWithInput input).length + 1) ^ 2 := by
@@ -408,6 +434,13 @@ private theorem stepWithKeyCompiler_workspace_le (input : StepWithInput) :
     omega
   have hcomponentTime := stepWithKeyComponentTime_le input
   obtain ⟨hstateTime, hsymbolTime, hworkInputTime⟩ := hcomponentTime
+  have hcomponentTapes := stepWithKeyComponentTapeCount_le
+  have hstateTapes := hcomponentTapes.1
+  change state.tapeCount ≤ 1000 at hstateTapes
+  have hsymbolTapes := hcomponentTapes.2.1
+  change symbol.tapeCount ≤ 100 at hsymbolTapes
+  have hworkInputTapes := hcomponentTapes.2.2
+  change workInput.tapeCount ≤ 100 at hworkInputTapes
   have hstateSpace : state.workspace input ≤ 1000000000 * (L + 1) := by
     cases hoption : input.2.1.state <;>
       simp [state, cfg, tail, cfgState, first, second, optionGetD, optionPayload,
@@ -415,22 +448,13 @@ private theorem stepWithKeyCompiler_workspace_le (input : StepWithInput) :
         ofTransducer, comp, ite, const, ofInputEq, ofOutputEq, encTest_false,
         encTest_true, hoption, L] at hstateBits ⊢ <;>
       omega
-  have hstateTapes : state.tapeCount ≤ 1000 := by
-    simp [state, cfg, tail, cfgState, first, second, optionGetD, optionPayload,
-      tailDecoder, optionIsSomeTest, optionIsSomeBool, boolDecoder, boolToTest,
-      ofTransducer, comp, ite, const, ofInputEq, ofOutputEq]
   have hsymbolSpace : symbol.workspace input ≤ 1000000 * (L + 1) := by
     simp [symbol, tail, second, ofTransducer, comp, L]
     omega
-  have hsymbolTapes : symbol.tapeCount ≤ 100 := by
-    simp [symbol, tail, second, ofTransducer, comp]
   have hworkInputSpace : workInput.workspace input ≤ 1000000000 * (L + 1) := by
     simp [workInput, cfg, tail, cfgWorkTapes, cfgTail₂, first, second, ofTransducer,
       comp, ofInputEq, L]
     omega
-  have hworkInputTapes : workInput.tapeCount ≤ 100 := by
-    simp [workInput, cfg, tail, cfgWorkTapes, cfgTail₂, first, second, ofTransducer,
-      comp, ofInputEq]
   have hreadsSpace := reads_workspace_le input.2.1.workTapes
   have hreadsTapes := reads_tapeCount_le
   have hworkMax : max workInput.tapeCount reads.tapeCount ≤ 1002 :=
@@ -468,19 +492,26 @@ private theorem stepWithKeyCompiler_tapeCount_le : stepWithKeyCompiler.tapeCount
   let state := (optionGetD 0 encUnary).comp (cfgState.comp cfg)
   let workInput := cfgWorkTapes.comp cfg
   let work := reads.comp workInput
-  have hstate : state.tapeCount ≤ 1000 := by
-    simp [state, cfg, tail, cfgState, first, second, optionGetD, optionPayload,
-      tailDecoder, optionIsSomeTest, optionIsSomeBool, boolDecoder, boolToTest,
-      ofTransducer, comp, ite, const, ofInputEq, ofOutputEq]
-  have hsymbol : symbol.tapeCount ≤ 100 := by
-    simp [symbol, tail, second, ofTransducer, comp]
-  have hworkInput : workInput.tapeCount ≤ 100 := by
-    simp [workInput, cfg, tail, cfgWorkTapes, cfgTail₂, first, second, ofTransducer,
-      comp, ofInputEq]
+  have hcomponentTapes := stepWithKeyComponentTapeCount_le
+  have hstate := hcomponentTapes.1
+  change state.tapeCount ≤ 1000 at hstate
+  have hsymbol := hcomponentTapes.2.1
+  change symbol.tapeCount ≤ 100 at hsymbol
+  have hworkInput := hcomponentTapes.2.2
+  change workInput.tapeCount ≤ 100 at hworkInput
   have hreads := reads_tapeCount_le
   change (state.pair (symbol.pair work)).tapeCount ≤ 1008
   simp only [pair, work, comp, encodeFrame]
   omega
+
+private theorem stepWithLookupTable_tapeCount_le :
+    let description := first eDesc (encPair eCfg eSym)
+    (descTable.comp description).tapeCount ≤ 100 := by
+  dsimp only
+  let description := first eDesc (encPair eCfg eSym)
+  let table := descTable.comp description
+  change table.tapeCount ≤ 100
+  simp [table, description, descTable, first, second, ofTransducer, comp, ofInputEq]
 
 private theorem stepWithLookupInput_tapeCount_le :
     let description := first eDesc (encPair eCfg eSym)
@@ -490,7 +521,7 @@ private theorem stepWithLookupInput_tapeCount_le :
   let description := first eDesc (encPair eCfg eSym)
   let table := descTable.comp description
   have htable : table.tapeCount ≤ 100 := by
-    simp [table, description, descTable, first, second, ofTransducer, comp, ofInputEq]
+    simpa only [table, description] using stepWithLookupTable_tapeCount_le
   have hkey := stepWithKeyCompiler_tapeCount_le
   have hframedTable : ((encodeFrame (encList (encPair eKey eAct))).comp table).tapeCount ≤
       102 := by
@@ -523,7 +554,7 @@ private theorem stepWithLookupInputResource_le (input : StepWithInput) :
     simp [table, description, descTable, first, second, ofTransducer, comp, ofInputEq, L]
     omega
   have htableTapes : table.tapeCount ≤ 100 := by
-    simp [table, description, descTable, first, second, ofTransducer, comp, ofInputEq]
+    simpa only [table, description] using stepWithLookupTable_tapeCount_le
   have hkeyTime : stepWithKeyCompiler.time input ≤
       1000000000000000 * (L + 1) ^ 2 := by
     simpa only [L] using stepWithKeyCompiler_time_le input
