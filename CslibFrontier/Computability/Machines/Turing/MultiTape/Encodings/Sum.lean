@@ -73,14 +73,19 @@ theorem sumRightD (left : α ↪ List Bool) (right : β ↪ List Bool) (default 
         value.val.elim (Function.const α default) id)
       ((Function.Embedding.subtype fun value : α ⊕ β => value.isRight = true).trans
         (encSum left right)) right 1 1 :=
-    ComputableInDegree.of_tail fun ⟨value, h⟩ => by cases value <;> simp_all
+    ComputableInDegree.of_tail fun ⟨value, h⟩ => by
+      cases value with
+      | inl value => cases h
+      | inr value => rfl
   convert ComputableInDegree.ite
     (f := Sum.elim (Function.const α default) id) (g := fun _ => default)
     (sumIsRight left right) payload
     ((ComputableInDegree.const (encIn := encSum left right) (encMid := right) default).restrict
       (fun value : α ⊕ β => value.isRight = false)) using 1
-  funext value
-  cases value <;> rfl
+  · funext value
+    cases value <;> rfl
+  · decide
+  · decide
 
 end ComputableInDegree
 

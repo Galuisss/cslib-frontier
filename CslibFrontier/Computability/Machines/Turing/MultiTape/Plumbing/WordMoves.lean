@@ -326,7 +326,8 @@ inductive PopFrameState
   | bit
   deriving DecidableEq
 
-instance : Fintype PopFrameState := ⟨{.start, .pre, .absentBit, .absentEnd, .loop, .bit}, fun q => by cases q <;> simp⟩
+instance : Fintype PopFrameState :=
+  ⟨{.start, .pre, .absentBit, .absentEnd, .loop, .bit}, fun q => by cases q <;> simp⟩
 
 /-- If tape `0` is blank under its head, writes `frame [false]` to tape `1`. Otherwise writes
 `[true, true]` and then moves the framed word at the head of tape `0` there, erasing it. Both
@@ -421,12 +422,18 @@ theorem runsBetween_popFrame_nil (oS oR : ℤ) {input : List Bool} (out : List B
     step_tapesCfg (a := ⟨0, ![(none, 0), (some (some true), 1)], none, some .absentBit⟩)
       (ws' := ![[], [true]]) (o' := ![oS, oR]) (h' := ![oS, oR + 1])
       (by simp only [popFrame, tr_ofTr, q₀_ofTr, Matrix.cons_val_zero, tapeOfList_nil]) rfl rfl
-      (fun i => by fin_cases i; rfl; simpa using update_shifted_append ([] : List Bool) true oR)
+      (fun i => by
+        fin_cases i
+        · rfl
+        · simpa using update_shifted_append ([] : List Bool) true oR)
       (fun i => by fin_cases i <;> simp),
     step_tapesCfg (a := ⟨0, ![(none, 0), (some (some false), 1)], none, some .absentEnd⟩)
       (ws' := ![[], [true, false]]) (o' := ![oS, oR]) (h' := ![oS, oR + 2])
       (by simp only [popFrame, tr_ofTr]) rfl rfl
-      (fun i => by fin_cases i; rfl; simpa using update_shifted_append ([true] : List Bool) false oR)
+      (fun i => by
+        fin_cases i
+        · rfl
+        · simpa using update_shifted_append ([true] : List Bool) false oR)
       (fun i => by fin_cases i <;> simp; omega), runFrom_one]
   refine step_tapesCfg (a := ⟨0, ![(none, 0), (some (some false), 1)], none, none⟩)
     (by simp only [popFrame, tr_ofTr]) rfl rfl ?_ ?_
