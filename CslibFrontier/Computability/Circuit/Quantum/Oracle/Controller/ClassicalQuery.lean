@@ -20,7 +20,6 @@ public import CslibFrontier.Computability.Circuit.Quantum.Reversible.BlockCopy.N
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Sampling.Prefix.NativeCompiler
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Comparison
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.List
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ResourceBounds
 
 /-!
 # A query-free circuit for one classical interaction boundary
@@ -49,6 +48,8 @@ arbitrary-state zero-oracle theorem justifies that erasure when this constructio
 
 * `Cslib.Quantum.ClassicalQueryLayout`: the independent security, public-key and component
   description coordinates used by the concrete linker.
+* `Cslib.Quantum.encClassicalQueryLayout`: their field-order encoding used by the retained
+  compiler.
 * `Cslib.Quantum.ClassicalQueryLayout.Compatible`: the one shape contract shared by
   well-formedness and the pending semantic theorem.
 * `Cslib.Quantum.compileClassicalQuery`: the complete query-free finite description.
@@ -94,6 +95,13 @@ structure ClassicalQueryLayout where
   service : OracleCircuitDescription
   /-- Second adversary-stage description, specialized to the ciphertext suffix. -/
   second : OracleCircuitDescription
+
+/-- Encoding of a classical-query layout, in field order: the oracle input sizes, public-key
+width, first-stage description, service description and second-stage description. -/
+enc_structure encClassicalQueryLayout : ClassicalQueryLayout where
+  input : encOracleInputSize, publicKeyWidth : encUnary,
+  first : encOracleCircuitDescription, service : encOracleCircuitDescription,
+  second : encOracleCircuitDescription
 
 namespace ClassicalQueryLayout
 
@@ -437,16 +445,6 @@ private theorem wellFormed_gateInstructions {width : ℕ} {codes : List GateCode
   obtain ⟨code, hcode, rfl⟩ := List.mem_map.mp hinstruction
   simpa only [OracleGateCode.WellFormed, PhaseGateCode.WellFormed] using hcodes code hcode
 
-private theorem wellFormed_appendInstructions {queryWidth responseWidth width : ℕ}
-    {left right : OracleCircuit}
-    (hleft : ∀ instruction ∈ left,
-      instruction.WellFormed queryWidth responseWidth width)
-    (hright : ∀ instruction ∈ right,
-      instruction.WellFormed queryWidth responseWidth width) :
-    ∀ instruction ∈ left ++ right,
-      instruction.WellFormed queryWidth responseWidth width := by
-  simpa only [List.forall_mem_append] using And.intro hleft hright
-
 private theorem wellFormed_zeroOracleRelabel {input : OracleInputSize}
     {description : OracleCircuitDescription} (hdescription : description.WellFormed input)
     {width : ℕ} (embedding : Fin description.width ↪ Fin width) (wireMap : ℕ → ℕ)
@@ -639,32 +637,38 @@ theorem ClassicalQueryLayout.Compatible.wellFormed_compileClassicalQuery
       (GateCode.compareBits layout.replyBase 0).map
           (fun code => OracleGateCode.gate (false, code)) at hinstruction
     simp only [List.append_assoc] at hinstruction
-    exact
-      wellFormed_appendInstructions
-        (wellFormed_gateInstructions fun code hcode => (hcopyServiceInput code hcode).2)
-        (wellFormed_appendInstructions
-          (wellFormed_gateInstructions fun code hcode => (hcopySecondHeader code hcode).2)
-          (wellFormed_appendInstructions hfirstRelabel
-            (wellFormed_appendInstructions
-              (wellFormed_gateInstructions fun code hcode => (hcopyRequest code hcode).2)
-              (wellFormed_appendInstructions
-                (wellFormed_gateInstructions (wellFormed_hadamardCodes hhiddenFit))
-                (wellFormed_appendInstructions
-                  (wellFormed_gateInstructions fun code hcode => (hcopyHidden code hcode).2)
-                  (wellFormed_appendInstructions hserviceRelabel
-                    (wellFormed_appendInstructions
-                      (wellFormed_gateInstructions fun code hcode =>
-                        (hcopyServiceOutput code hcode).2)
-                      (wellFormed_appendInstructions
-                        (wellFormed_gateInstructions fun code hcode =>
-                          (hcopySecondCiphertext code hcode).2)
-                        (wellFormed_appendInstructions hsecondRelabel
-                          (wellFormed_appendInstructions
-                            (wellFormed_gateInstructions fun code hcode =>
-                              (hmoveGuess code hcode).2)
-                            (wellFormed_gateInstructions fun code hcode =>
-                              (hcompare code hcode).2)))))))))))
-        instruction hinstruction
+    rcases List.mem_append.mp hinstruction with hinstruction | hinstruction
+    · exact wellFormed_gateInstructions
+        (fun code hcode => (hcopyServiceInput code hcode).2) instruction hinstruction
+    rcases List.mem_append.mp hinstruction with hinstruction | hinstruction
+    · exact wellFormed_gateInstructions
+        (fun code hcode => (hcopySecondHeader code hcode).2) instruction hinstruction
+    rcases List.mem_append.mp hinstruction with hinstruction | hinstruction
+    · exact hfirstRelabel instruction hinstruction
+    rcases List.mem_append.mp hinstruction with hinstruction | hinstruction
+    · exact wellFormed_gateInstructions
+        (fun code hcode => (hcopyRequest code hcode).2) instruction hinstruction
+    rcases List.mem_append.mp hinstruction with hinstruction | hinstruction
+    · exact wellFormed_gateInstructions
+        (wellFormed_hadamardCodes hhiddenFit) instruction hinstruction
+    rcases List.mem_append.mp hinstruction with hinstruction | hinstruction
+    · exact wellFormed_gateInstructions
+        (fun code hcode => (hcopyHidden code hcode).2) instruction hinstruction
+    rcases List.mem_append.mp hinstruction with hinstruction | hinstruction
+    · exact hserviceRelabel instruction hinstruction
+    rcases List.mem_append.mp hinstruction with hinstruction | hinstruction
+    · exact wellFormed_gateInstructions
+        (fun code hcode => (hcopyServiceOutput code hcode).2) instruction hinstruction
+    rcases List.mem_append.mp hinstruction with hinstruction | hinstruction
+    · exact wellFormed_gateInstructions
+        (fun code hcode => (hcopySecondCiphertext code hcode).2) instruction hinstruction
+    rcases List.mem_append.mp hinstruction with hinstruction | hinstruction
+    · exact hsecondRelabel instruction hinstruction
+    rcases List.mem_append.mp hinstruction with hinstruction | hinstruction
+    · exact wellFormed_gateInstructions
+        (fun code hcode => (hmoveGuess code hcode).2) instruction hinstruction
+    exact wellFormed_gateInstructions
+      (fun code hcode => (hcompare code hcode).2) instruction hinstruction
 
 /-- The compiled classical-query controller is genuinely query-free even when its three input
 descriptions contain oracle-query instructions. -/
@@ -731,16 +735,6 @@ copies assembled above; callers do not supply a separate adapter program or effi
       (fun input => compileClassicalQuery
         ⟨input, publicKeyWidth input, firstFamily input, serviceFamily input, secondFamily input⟩)
       encOracleInputSize encOracleCircuitDescription := by
-  let ClassicalQueryPack :=
-    OracleInputSize ×
-      (ℕ × (OracleCircuitDescription × (OracleCircuitDescription × OracleCircuitDescription)))
-  
-  let encClassicalQueryPack : ClassicalQueryPack ↪ List Bool :=
-    encPair encOracleInputSize
-      (encPair encUnary
-        (encPair encOracleCircuitDescription
-          (encPair encOracleCircuitDescription encOracleCircuitDescription)))
-  
   let OracleDescriptionFields :=
     ℕ × (ℕ × (ℕ × (ℕ × (ℕ × OracleCircuit))))
   
@@ -817,15 +811,15 @@ copies assembled above; callers do not supply a separate adapter program or effi
       NativeCompiler OracleInputSize.classicalInputLength encOracleInputSize encUnary :=
     (second encUnary encUnary).comp oracleInputFieldsCompiler
   
-  let appendOracleCircuitCompiler {left right : ClassicalQueryPack → OracleCircuit}
-      (leftCompiler : NativeCompiler left encClassicalQueryPack (encList encOracleGateCode))
-      (rightCompiler : NativeCompiler right encClassicalQueryPack (encList encOracleGateCode)) :
-      NativeCompiler (fun input => left input ++ right input) encClassicalQueryPack
+  let appendOracleCircuitCompiler {left right : ClassicalQueryLayout → OracleCircuit}
+      (leftCompiler : NativeCompiler left encClassicalQueryLayout (encList encOracleGateCode))
+      (rightCompiler : NativeCompiler right encClassicalQueryLayout (encList encOracleGateCode)) :
+      NativeCompiler (fun input => left input ++ right input) encClassicalQueryLayout
         (encList encOracleGateCode) := by
     let leftRaw : NativeCompiler (fun input => encList encOracleGateCode (left input))
-        encClassicalQueryPack encBits := leftCompiler.ofOutputEq fun _ => rfl
+        encClassicalQueryLayout encBits := leftCompiler.ofOutputEq fun _ => rfl
     let rightRaw : NativeCompiler (fun input => encList encOracleGateCode (right input))
-        encClassicalQueryPack encBits := rightCompiler.ofOutputEq fun _ => rfl
+        encClassicalQueryLayout encBits := rightCompiler.ofOutputEq fun _ => rfl
     exact (leftRaw.append rightRaw).ofOutputEq fun input => by
       simp only [encList_append, encBits_apply]
   let classicalQueryGates (codes : List GateCode) : OracleCircuit :=
@@ -841,16 +835,21 @@ copies assembled above; callers do not supply a separate adapter program or effi
         encOracleGateCode :=
       ((optionSome encPhaseGateCode).comp phase).ofOutputEq fun _ => rfl
     exact (listMapCompiler encGateCode encOracleGateCode instruction).ofOutputEq fun _ => rfl
-  let linker : NativeCompiler
-      (fun pack : ClassicalQueryPack =>
-        compileClassicalQuery
-          ⟨pack.1, pack.2.1, pack.2.2.1, pack.2.2.2.1, pack.2.2.2.2⟩)
-      encClassicalQueryPack encOracleCircuitDescription := by
+  let linker : NativeCompiler compileClassicalQuery encClassicalQueryLayout
+      encOracleCircuitDescription := by
     let encDescriptions := encPair encOracleCircuitDescription
       (encPair encOracleCircuitDescription encOracleCircuitDescription)
     let encRest := encPair encUnary encDescriptions
-    let input := first encOracleInputSize encRest
-    let rest := second encOracleInputSize encRest
+    let layoutFields (layout : ClassicalQueryLayout) :=
+      (layout.input,
+        (layout.publicKeyWidth, (layout.first, (layout.service, layout.second))))
+    let layoutFieldsCompiler : NativeCompiler layoutFields encClassicalQueryLayout
+        (encPair encOracleInputSize encRest) :=
+      (identity encClassicalQueryLayout).ofOutputEq fun layout => by
+        rw [encClassicalQueryLayout_apply]
+        rfl
+    let input := (first encOracleInputSize encRest).comp layoutFieldsCompiler
+    let rest := (second encOracleInputSize encRest).comp layoutFieldsCompiler
     let publicKeyWidth := (first encUnary encDescriptions).comp rest
     let descriptions := (second encUnary encDescriptions).comp rest
     let firstDescription :=
@@ -866,8 +865,8 @@ copies assembled above; callers do not supply a separate adapter program or effi
     let security := oracleInputSecurityCompiler.comp input
     let sampleWidth := oracleInputLengthCompiler.comp input
     let twoSecurity := unaryAdd.comp (security.pair security)
-    let one := const encClassicalQueryPack encUnary 1
-    let zero := const encClassicalQueryPack encUnary 0
+    let one := const encClassicalQueryLayout encUnary 1
+    let zero := const encClassicalQueryLayout encUnary 0
     let headerWidth := unaryAdd.comp (twoSecurity.pair one)
     let ciphertextWidth := unarySub.comp (sampleWidth.pair publicKeyWidth)
     let fullInputWidth := unaryAdd.comp (headerWidth.pair sampleWidth)
@@ -885,29 +884,23 @@ copies assembled above; callers do not supply a separate adapter program or effi
     let replyAfterHidden := unaryAdd.comp (replyBase.pair one)
     let secondBase := unaryAdd.comp (replyAfterHidden.pair ciphertextWidth)
     let width := unaryAdd.comp (secondBase.pair secondWidth)
-    let wireEncoding := encPair encClassicalQueryPack encUnary
-    let wireContext := first encClassicalQueryPack encUnary
-    let wire := second encClassicalQueryPack encUnary
+    let wireEncoding := encPair encClassicalQueryLayout encUnary
+    let wireContext := first encClassicalQueryLayout encUnary
+    let wire := second encClassicalQueryLayout encUnary
     let firstWire : NativeCompiler
-        (fun value : ClassicalQueryPack × ℕ =>
-          ClassicalQueryLayout.firstWire
-            ⟨value.1.1, value.1.2.1, value.1.2.2.1, value.1.2.2.2.1, value.1.2.2.2.2⟩
-            value.2)
+        (fun value : ClassicalQueryLayout × ℕ => value.1.firstWire value.2)
         wireEncoding encUnary := by
       let cut := firstInputWidth.comp wireContext
       let shift := ciphertextWidth.comp wireContext
       let beforeCut := unaryLtTest.comp (wire.pair cut)
       let shifted := unaryAdd.comp (wire.pair shift)
       exact (ite beforeCut wire shifted).ofOutputEq fun value => by
-        simp only [ClassicalQueryLayout.firstWire, ClassicalQueryLayout.firstInputWidth,
-          ClassicalQueryLayout.ciphertextWidth, two_mul]
-        by_cases h : value.2 < value.1.1.securityParameter +
-            value.1.1.securityParameter + 1 + value.1.2.1 <;> simp [h]
+        simp only [layoutFields, ClassicalQueryLayout.firstWire,
+          ClassicalQueryLayout.firstInputWidth, ClassicalQueryLayout.ciphertextWidth, two_mul]
+        by_cases h : value.2 < value.1.input.securityParameter +
+            value.1.input.securityParameter + 1 + value.1.publicKeyWidth <;> simp [h]
     let serviceWire : NativeCompiler
-        (fun value : ClassicalQueryPack × ℕ =>
-          ClassicalQueryLayout.serviceWire
-            ⟨value.1.1, value.1.2.1, value.1.2.2.1, value.1.2.2.2.1, value.1.2.2.2.2⟩
-            value.2)
+        (fun value : ClassicalQueryLayout × ℕ => value.1.serviceWire value.2)
         wireEncoding encUnary := by
       let fullInput := fullInputWidth.comp wireContext
       let request := requestBase.comp wireContext
@@ -922,18 +915,16 @@ copies assembled above; callers do not supply a separate adapter program or effi
       let inner := unaryAdd.comp (request.pair offset)
       exact (ite beforeInputEnd outer (ite insideRequestAndHidden inner outer)).ofOutputEq
         fun value => by
-          simp only [ClassicalQueryLayout.serviceWire, ClassicalQueryLayout.fullInputWidth,
-            ClassicalQueryLayout.serviceBase, ClassicalQueryLayout.hiddenWire,
-            ClassicalQueryLayout.requestBase, ClassicalQueryLayout.ciphertextWidth, two_mul]
-          by_cases hinput : value.2 < value.1.1.securityParameter +
-              value.1.1.securityParameter + 1 + value.1.1.classicalInputLength
+          simp only [layoutFields, ClassicalQueryLayout.serviceWire,
+            ClassicalQueryLayout.fullInputWidth, ClassicalQueryLayout.serviceBase,
+            ClassicalQueryLayout.hiddenWire, ClassicalQueryLayout.requestBase,
+            ClassicalQueryLayout.ciphertextWidth, two_mul]
+          by_cases hinput : value.2 < value.1.input.securityParameter +
+              value.1.input.securityParameter + 1 + value.1.input.classicalInputLength
           · simp [hinput]
           · simp [hinput]
     let secondWire : NativeCompiler
-        (fun value : ClassicalQueryPack × ℕ =>
-          ClassicalQueryLayout.secondWire
-            ⟨value.1.1, value.1.2.1, value.1.2.2.1, value.1.2.2.2.1, value.1.2.2.2.2⟩
-            value.2)
+        (fun value : ClassicalQueryLayout × ℕ => value.1.secondWire value.2)
         wireEncoding encUnary := by
       let secondInput := secondInputWidth.comp wireContext
       let firstRegisterWidth := firstWidth.comp wireContext
@@ -945,46 +936,42 @@ copies assembled above; callers do not supply a separate adapter program or effi
       let inner := firstWire.comp (wireContext.pair offset)
       exact (ite beforeInputEnd outer (ite insideSavedFirst inner outer)).ofOutputEq
         fun value => by
-          simp only [ClassicalQueryLayout.secondWire, ClassicalQueryLayout.secondInputWidth,
-            ClassicalQueryLayout.ciphertextWidth, ClassicalQueryLayout.secondBase,
-            ClassicalQueryLayout.replyBase,
+          simp only [layoutFields, ClassicalQueryLayout.secondWire,
+            ClassicalQueryLayout.secondInputWidth, ClassicalQueryLayout.ciphertextWidth,
+            ClassicalQueryLayout.secondBase, ClassicalQueryLayout.replyBase,
             ClassicalQueryLayout.serviceBase, ClassicalQueryLayout.hiddenWire,
             ClassicalQueryLayout.requestBase, ClassicalQueryLayout.firstWire, two_mul]
-          by_cases hinput : value.2 < value.1.1.securityParameter +
-              value.1.1.securityParameter + 1 +
-                (value.1.1.classicalInputLength - value.1.2.1)
+          by_cases hinput : value.2 < value.1.input.securityParameter +
+              value.1.input.securityParameter + 1 +
+                (value.1.input.classicalInputLength - value.1.publicKeyWidth)
           · simp [hinput]
           · by_cases hsaved :
-                value.2 - (value.1.1.securityParameter + value.1.1.securityParameter + 1 +
-                  (value.1.1.classicalInputLength - value.1.2.1)) < value.1.2.2.1.width
+                value.2 - (value.1.input.securityParameter +
+                  value.1.input.securityParameter + 1 +
+                    (value.1.input.classicalInputLength - value.1.publicKeyWidth)) <
+                      value.1.first.width
             · simp [hinput, hsaved]
               rfl
             · simp [hinput, hsaved]
     let firstInstructions := oracleDescriptionInstructionsCompiler.comp firstDescription
     let serviceInstructions := oracleDescriptionInstructionsCompiler.comp serviceDescription
     let secondInstructions := oracleDescriptionInstructionsCompiler.comp secondDescription
-    let packIdentity := identity encClassicalQueryPack
+    let layoutIdentity := identity encClassicalQueryLayout
     let firstRelabelled :=
       (zeroOracleRelabel
-        (wireMap := fun pack wire =>
-          ClassicalQueryLayout.firstWire
-            ⟨pack.1, pack.2.1, pack.2.2.1, pack.2.2.2.1, pack.2.2.2.2⟩ wire)
-        encClassicalQueryPack firstWire).comp
-        (packIdentity.pair firstInstructions)
+        (wireMap := fun layout wire => layout.firstWire wire)
+        encClassicalQueryLayout firstWire).comp
+        (layoutIdentity.pair firstInstructions)
     let serviceRelabelled :=
       (zeroOracleRelabel
-        (wireMap := fun pack wire =>
-          ClassicalQueryLayout.serviceWire
-            ⟨pack.1, pack.2.1, pack.2.2.1, pack.2.2.2.1, pack.2.2.2.2⟩ wire)
-        encClassicalQueryPack serviceWire).comp
-        (packIdentity.pair serviceInstructions)
+        (wireMap := fun layout wire => layout.serviceWire wire)
+        encClassicalQueryLayout serviceWire).comp
+        (layoutIdentity.pair serviceInstructions)
     let secondRelabelled :=
       (zeroOracleRelabel
-        (wireMap := fun pack wire =>
-          ClassicalQueryLayout.secondWire
-            ⟨pack.1, pack.2.1, pack.2.2.1, pack.2.2.2.1, pack.2.2.2.2⟩ wire)
-        encClassicalQueryPack secondWire).comp
-        (packIdentity.pair secondInstructions)
+        (wireMap := fun layout wire => layout.secondWire wire)
+        encClassicalQueryLayout secondWire).comp
+        (layoutIdentity.pair secondInstructions)
     let copiedServiceInput := gateInstructionsCompiler.comp
       (GateCode.blockCopyCodesCompiler.comp (zero.pair (serviceBase.pair fullInputWidth)))
     let copiedSecondHeader := gateInstructionsCompiler.comp
@@ -1021,17 +1008,26 @@ copies assembled above; callers do not supply a separate adapter program or effi
     let instructions := appendOracleCircuitCompiler instructions₁₀ comparedGuess
     let fields := width.pair
       (zero.pair (zero.pair (zero.pair (one.pair instructions))))
-    exact fields.ofOutputEq fun pack => by
-      simp [compileClassicalQuery, encOracleCircuitDescription_apply,
+    exact fields.ofOutputEq fun layout => by
+      simp [layoutFields, compileClassicalQuery, encOracleCircuitDescription_apply,
         encOracleCircuitDescriptionFields,
         ClassicalQueryLayout.width, ClassicalQueryLayout.requestBase,
         ClassicalQueryLayout.hiddenWire, ClassicalQueryLayout.serviceBase,
         ClassicalQueryLayout.replyBase, ClassicalQueryLayout.secondBase,
         ClassicalQueryLayout.fullInputWidth, ClassicalQueryLayout.ciphertextWidth,
         classicalQueryGates, List.append_assoc, two_mul]
-  exact linker.comp
-    ((identity encOracleInputSize).pair
+  let layoutFields :=
+    (identity encOracleInputSize).pair
       (publicKeyWidthCompiler.pair
-        (firstCompiler.pair (serviceCompiler.pair secondCompiler))))
+        (firstCompiler.pair (serviceCompiler.pair secondCompiler)))
+  let layoutCompiler : NativeCompiler
+      (fun input =>
+        ClassicalQueryLayout.mk input (publicKeyWidth input) (firstFamily input)
+          (serviceFamily input) (secondFamily input))
+      encOracleInputSize encClassicalQueryLayout :=
+    layoutFields.ofOutputEq fun input => by
+      rw [encClassicalQueryLayout_apply]
+      rfl
+  exact linker.comp layoutCompiler
 
 end Cslib.Quantum
