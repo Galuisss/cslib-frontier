@@ -43,8 +43,12 @@ private theorem listGetNat_streamState_invariant (list : List ℕ) (index : ℕ)
   intro j hj
   induction j with
   | zero =>
-      simp only [streamState_zero, Prod.fst, Prod.snd]
-      exact ⟨le_rfl, fun _ h => Option.noConfusion h⟩
+      simp only [streamState_zero]
+      constructor
+      · exact le_rfl
+      · intro value hvalue
+        exfalso
+        simpa using hvalue
   | succ j ih =>
       have hj' : j < list.length := by omega
       rw [show j + 1 = j + 1 by rfl, streamState_succ (index, none) listGetNatNext list hj']
@@ -55,8 +59,8 @@ private theorem listGetNat_streamState_invariant (list : List ℕ) (index : ℕ)
       | none =>
           cases remaining with
           | zero =>
-              simp only [listGetNatNext, Option.isSome_none, Bool.false_eq_true, if_false,
-                if_pos rfl, Prod.fst, Prod.snd]
+              simp only [listGetNatNext, Option.isSome_none, Bool.false_eq_true, ite_false,
+                ite_true]
               constructor
               · exact Nat.zero_le _
               · intro value hvalue
@@ -64,14 +68,15 @@ private theorem listGetNat_streamState_invariant (list : List ℕ) (index : ℕ)
                 subst value
                 exact List.getElem_mem hj'
           | succ remaining =>
-              simp only [listGetNatNext, Option.isSome_none, Bool.false_eq_true, if_false,
-                Nat.succ_ne_zero, Nat.succ_sub_one, Prod.fst, Prod.snd]
+              simp only [listGetNatNext, Option.isSome_none, Bool.false_eq_true, ite_false,
+                Nat.succ_ne_zero, Nat.succ_sub_one]
               constructor
               · omega
               · intro value hvalue
-                exact Option.noConfusion hvalue
+                exfalso
+                simpa using hvalue
       | some selected =>
-          simpa only [listGetNatNext, Option.isSome_some, if_true] using hprevious
+          simpa only [listGetNatNext, Option.isSome_some, ite_true] using hprevious
 
 private theorem listGetNat_state_length_le (list : List ℕ) (index j : ℕ)
     (hj : j ≤ list.length) :
@@ -89,12 +94,12 @@ private theorem listGetNat_state_length_le (list : List ℕ) (index j : ℕ)
   have hselected : ((encOption encUnary) state.2).length ≤
       (encPair (encList encUnary) encNat (list, index)).length + 1 := by
     cases hoption : state.2 with
-    | none => simp only [hoption, encOption_none, List.length_nil]; omega
+    | none => simp only [encOption_none, List.length_nil]; omega
     | some value =>
         have hmem := hinvariant.2 value hoption
         have hvalue := (length_le_encList_of_mem encUnary hmem).trans
           (length_le_encPair_left (encList encUnary) encNat (list, index))
-        simp only [hoption, encOption_some, List.length_cons]
+        simp only [encOption_some, List.length_cons]
         omega
   rw [length_encPair]
   omega
@@ -113,10 +118,11 @@ private theorem listGetNatNextCompiler_time_le
       10000 * (((encPair (encPair encNat (encOption encUnary)) encUnary) input).length + 1) := by
   rcases input with ⟨⟨remaining, selected⟩, element⟩
   cases selected <;> cases remaining <;>
-    simp [listGetNatNextCompiler, listGetNatNext, ite, pair, comp, first, second,
+    simp [listGetNatNextCompiler, listGetNatNext, ofOutputEq, ofInputEq, ite, pair, comp,
+      first, second,
       optionIsSomeTest, optionIsSomeBool, boolToTest, natIsZeroTest, natIsZeroBool,
-      natPred, optionSome, const, ofTransducer, encodeFrame, encPair_apply, length_frame,
-      encNat_apply, encUnary_apply]
+      boolDecoder, natPred, optionSome, const, ofTransducer, encodeFrame, encPair_apply,
+      length_frame, encNat_apply, encUnary_apply]
     <;> omega
 
 private theorem listGetNatNextCompiler_workspace_le
@@ -125,11 +131,32 @@ private theorem listGetNatNextCompiler_workspace_le
       10000 * (((encPair (encPair encNat (encOption encUnary)) encUnary) input).length + 1) := by
   rcases input with ⟨⟨remaining, selected⟩, element⟩
   cases selected <;> cases remaining <;>
-    simp [listGetNatNextCompiler, listGetNatNext, ite, pair, comp, first, second,
+    simp [listGetNatNextCompiler, listGetNatNext, ofOutputEq, ofInputEq, ite, pair, comp,
+      first, second,
       optionIsSomeTest, optionIsSomeBool, boolToTest, natIsZeroTest, natIsZeroBool,
-      natPred, optionSome, const, ofTransducer, encodeFrame, encPair_apply, length_frame,
-      encNat_apply, encUnary_apply]
+      boolDecoder, natPred, optionSome, const, ofTransducer, encodeFrame, encPair_apply,
+      length_frame, encNat_apply, encUnary_apply]
     <;> omega
+
+private theorem listGetNatNextCompiler_tapeCount_le :
+    (listGetNatNextCompiler encUnary).tapeCount ≤ 100 := by
+  simp [listGetNatNextCompiler, ofOutputEq, ofInputEq, ite, pair, comp, first, second,
+    optionIsSomeTest, optionIsSomeBool, boolToTest, natIsZeroTest, natIsZeroBool,
+    boolDecoder, natPred, optionSome, const, ofTransducer, encodeFrame]
+
+private theorem listGetNatOptionStreamCompiler_tapeCount_le :
+    (listGetNatOptionStreamCompiler encUnary).tapeCount ≤ 200 := by
+  change streamFoldPairTapeCount (listGetNatNextCompiler encUnary)
+    (listGetNatEmitCompiler encUnary) (listGetNatOptionFinishCompiler encUnary) ≤ 200
+  have hnext := listGetNatNextCompiler_tapeCount_le
+  simp only [streamFoldPairTapeCount, streamFramedNext, streamUnframedFinish,
+    listGetNatEmitCompiler, listGetNatOptionFinishCompiler, const, comp, encodeFrame,
+    unframeValue, second, ofTransducer]
+  omega
+
+private theorem listGetNatMarshalCompiler_tapeCount_le :
+    (listGetNatMarshalCompiler encUnary).tapeCount ≤ 20 := by
+  simp [listGetNatMarshalCompiler, pair, first, second, const, ofTransducer, encodeFrame]
 
 private theorem listGetNatMarshalCompiler_time_le (input : List ℕ × ℕ) :
     (listGetNatMarshalCompiler encUnary).time input ≤
@@ -148,6 +175,7 @@ private theorem listGetNatMarshalCompiler_workspace_le (input : List ℕ × ℕ)
 private theorem listGetNatLMax_le (list : List ℕ) (index : ℕ) :
     listGetNatLMax encUnary ((index, none), list) ≤
       4 * ((encPair (encList encUnary) encNat (list, index)).length + 1) := by
+  simp only [listGetNatLMax, Prod.snd]
   apply max_le
   · apply Finset.sup_le
     intro j hj
@@ -175,15 +203,19 @@ private theorem listGetNatOptionSMax_le (list : List ℕ) (index : ℕ) :
   have hpair :
       ((encPair (encPair encNat (encOption encUnary)) encUnary) pair).length ≤
         9 * ((encPair (encList encUnary) encNat (list, index)).length + 1) := by
-    simp only [pair, length_encPair]
+    dsimp only [pair, state]
+    rw [length_encPair]
     omega
   have hnext := listGetNatNextCompiler_workspace_le pair
-  simp only [listGetNatOptionSMax, hj', dite_true, pair, state,
+  have hnextState := listGetNat_state_length_le list index (j + 1) (by omega)
+  rw [streamState_succ (index, none) listGetNatNext list hj'] at hnextState
+  simp only [hj', dite_true,
     inputFromWordWorkspace, onWordsWorkspace, streamFoldPairTapeCount,
     streamFramedNext, streamUnframedFinish, listGetNatEmitCompiler,
-    listGetNatOptionFinishCompiler, ofOutputEq, const, comp, encodeFrame, unframeValue,
+    listGetNatOptionFinishCompiler, const, comp, encodeFrame, unframeValue,
     second, ofTransducer]
-  simp only [pair, state] at hnext hpair ⊢
+  dsimp only [pair, state] at hnext hpair ⊢
+  simp only [encBits_apply, length_frame] at hnextState ⊢
   omega
 
 private theorem listGetNatOptionStreamCompiler_time_le (list : List ℕ) (index : ℕ) :
@@ -205,11 +237,15 @@ private theorem listGetNatOptionStreamCompiler_time_le (list : List ℕ) (index 
       ((encPair encNat (encOption encUnary))
         (streamState (index, none) listGetNatNext list j)).length ≤ lengthBound := by
     intro j hj
-    exact (listGetNat_state_length_le list index j hj).trans (by simp [lengthBound, B]; omega)
+    exact (listGetNat_state_length_le list index j hj).trans (by
+      dsimp only [lengthBound, B]
+      omega)
   have helem : ∀ j (hj : j < list.length),
       (encUnary list[j]).length ≤ lengthBound := by
     intro j hj
-    exact (listGetNat_element_length_le list index j hj).trans (by simp [lengthBound, B]; omega)
+    exact (listGetNat_element_length_le list index j hj).trans (by
+      dsimp only [lengthBound, B]
+      omega)
   have hemit : ∀ j (hj : j < list.length),
       (listGetNatEmitCompiler encUnary).time
         (streamState (index, none) listGetNatNext list j, list[j]) ≤ 1 := by
@@ -217,17 +253,17 @@ private theorem listGetNatOptionStreamCompiler_time_le (list : List ℕ) (index 
     simp [listGetNatEmitCompiler, const]
   have hnext : ∀ j (hj : j < list.length),
       (listGetNatNextCompiler encUnary).time
-        (streamState (index, none) listGetNatNext list j, list[j]) ≤ 100000 * B := by
+        (streamState (index, none) listGetNatNext list j, list[j]) ≤ 200000 * B := by
     intro j hj
     have h := listGetNatNextCompiler_time_le
       (streamState (index, none) listGetNatNext list j, list[j])
-    have hs := hstate j hj.le
-    have he := helem j hj
+    have hs := listGetNat_state_length_le list index j hj.le
+    have he := listGetNat_element_length_le list index j hj
     have hp :
         ((encPair (encPair encNat (encOption encUnary)) encUnary)
-          (streamState (index, none) listGetNatNext list j, list[j])).length ≤ 21 * B := by
-      simp only [length_encPair]
-      simp only [lengthBound] at hs he
+          (streamState (index, none) listGetNatNext list j, list[j])).length ≤ 10 * B := by
+      rw [length_encPair]
+      dsimp only [B] at hs he ⊢
       omega
     omega
   have hfinish :
@@ -239,13 +275,14 @@ private theorem listGetNatOptionStreamCompiler_time_le (list : List ℕ) (index 
     omega
   have h := streamFoldPairTime_le (listGetNatNextCompiler encUnary)
     (listGetNatEmitCompiler encUnary) (listGetNatOptionFinishCompiler encUnary)
-    ((index, none), list) 1 (100000 * B) (100 * B) lengthBound
+    ((index, none), list) 1 (200000 * B) (100 * B) lengthBound
     hinput hstate helem hemit hnext hfinish
   have hcount : list.length ≤ B := by
     have hl := length_le_length_encList encUnary list
     have hp := length_le_encPair_left (encList encUnary) encNat (list, index)
-    simp only [B]
+    change list.length ≤ (encPair (encList encUnary) encNat (list, index)).length + 1
     omega
+  have hB : 1 ≤ B := by dsimp only [B]; omega
   dsimp only [lengthBound] at h
   nlinarith
 
@@ -268,14 +305,18 @@ private theorem listGetNatOptionStreamCompiler_workspace_le (list : List ℕ) (i
     (listGetNatEmitCompiler encUnary) (listGetNatOptionFinishCompiler encUnary)
     (listGetNatOptionSMax encUnary) (listGetNatLMax encUnary) ((index, none), list)
     (1000000 * B) (4 * B) 0 (by simpa only [B] using hsMax)
-    (by simpa only [B] using hlMax) (by simpa only [B] using hinitial)
+    (by simpa only [B] using hlMax) (by simpa only [B, streamState_zero] using hinitial)
     (by simpa only [B] using hfinal) hfinish
+  let K := streamFoldPairTapeCount (listGetNatNextCompiler encUnary)
+    (listGetNatEmitCompiler encUnary) (listGetNatOptionFinishCompiler encUnary)
+  have hK : K ≤ 200 := by
+    simpa only [K] using listGetNatOptionStreamCompiler_tapeCount_le
   refine h.trans ?_
-  simp only [streamFoldPairTapeCount, streamFramedNext, streamUnframedFinish,
-    listGetNatNextCompiler, listGetNatEmitCompiler, listGetNatOptionFinishCompiler,
-    ofOutputEq, ite, pair, comp, first, second, optionIsSomeTest, optionIsSomeBool,
-    boolToTest, natIsZeroTest, natIsZeroBool, natPred, optionSome, const, ofTransducer,
-    encodeFrame, unframeValue]
+  change 2 * K * (1000000 * B + 16 * (4 * B) + 4 * K + 26) + 0 +
+      13 * (4 * B) + 8 * (listGetNatOptionFinishCompiler encUnary).tapeCount +
+        5 * K + 43 ≤ _
+  simp only [listGetNatOptionFinishCompiler, second, ofTransducer]
+  have hB : 1 ≤ B := by dsimp only [B]; omega
   dsimp only [B]
   nlinarith
 
@@ -303,8 +344,11 @@ theorem workspace_listGetNatOptionCompiler_le (input : List ℕ × ℕ) :
   have hmarshalSpace := listGetNatMarshalCompiler_workspace_le input
   have hstream := listGetNatOptionStreamCompiler_workspace_le input.1 input.2
   have hone : 1 ≤ (encPair (encList encUnary) encNat input).length + 1 := by omega
-  simp only [listGetNatMarshalCompiler, pair, first, second, const, ofTransducer,
-    encodeFrame, comp, Nat.max_eq_left (Nat.zero_le _)] at hcomp
+  have hmarshalTapes := listGetNatMarshalCompiler_tapeCount_le
+  have hstreamTapes := listGetNatOptionStreamCompiler_tapeCount_le
+  have hmax : max (listGetNatMarshalCompiler encUnary).tapeCount
+      (listGetNatOptionStreamCompiler encUnary).tapeCount ≤ 200 :=
+    max_le (hmarshalTapes.trans (by omega)) hstreamTapes
   exact hcomp.trans (by nlinarith)
 
 end Turing.MultiTapeTM.Internal.NativeCompiler
