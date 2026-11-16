@@ -1,4 +1,4 @@
-"""Disposable targeted import-minimization evidence for #5819. DO NOT MERGE."""
+"""Disposable targeted import-minimization evidence for #5822. DO NOT MERGE."""
 import hashlib
 import json
 import os
@@ -8,18 +8,47 @@ import subprocess
 import sys
 import time
 
-TARGET = 'aa30184e57888504d8031b991c50c1271f6b8859'
-BASE = 'a2cb84b6e29f2e852753f3b687235c55dff52ad5'
+TARGET = 'ae3fcd1c14da7d291d9589bf63c0de8e74dd10c3'
+BASE = '11fd8ab3cd273f2b60ce90e820d70cb23d5b7ffa'
 PREFIX = 'CslibFrontier.Computability.Machines.Turing.MultiTape.'
-MODULES = [PREFIX + name for name in [
-    'Halting',
-    'Halting.Computable',
-    'Halting.Rice',
-    'Halting.Partrec',
-    'Internal.TotalComputability',
-    'Internal.RiceDispatch',
-    'Universal.DescriptionLookup',
-]] + ['CslibFrontierTests.HaltingComputablePlain']
+MODULES = [
+    'CslibFrontier.Computability.Complexity.FineGrained.Diameter',
+    'CslibFrontier.Computability.Complexity.Reduction.Autoreducibility',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Combinators.DivConq',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Combinators.Encoding',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.Cases',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.Constructible',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Degree',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Doubled',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Lists',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.Composition.SmallSpace',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Routines',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.QueryMachine',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolySpace',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Primitives',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Space.Decode',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Space.Reachability',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Streaming',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Translate',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Basic',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.MultiPass',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.NatPower',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.StreamFold',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.DegreeClosure',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NormalForm',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.ReplayInput',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.InPlace',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.PolyTime',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.WindowedInit',
+    'CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.WindowedParts',
+    'CslibFrontierTests.LinearCodecs',
+    'CslibFrontierTests.Quantitative',
+    'CslibFrontierTests.Williams',
+]
 
 
 def run(args, out, label, timeout, required=True):
