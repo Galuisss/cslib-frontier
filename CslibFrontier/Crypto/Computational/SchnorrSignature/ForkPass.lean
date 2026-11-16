@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Crypto.Computational.SchnorrSignature.EncodedROM
+public import CslibFrontier.Crypto.Computational.SchnorrEavesdrop
 public import CslibFrontier.Crypto.Computational.Signature.WordRandomOracle
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.BitString
 import CslibFrontier.Computability.Probabilistic.OracleSimulation
@@ -56,8 +57,8 @@ theorem are separate steps (#2568).
 * `schnorrForkRun`: the guarded replay run against `schnorrForkStep`.
 * `schnorrForkFinish`: the final check.
 * `schnorrForkPass`: one native pass.
-* `forkIndexCode`, `forkRunWords`, `transcriptWords`: the native code of a named fork index, the
-  words a pass returns for one typed run, and the native view of a typed transcript.
+* `forkIndexCode`, `forkRunWords`: the native code of a named fork index and the words a pass
+  returns for one typed run.
 
 ## Main results
 
@@ -230,12 +231,14 @@ theorem computableInPolyTime_schnorrForkStep :
       (fun p : StepInput × SchnorrForkEntry => p.2.point == p.1.2.1.2)
       (encPair encStepInput encSchnorrForkEntry) encBool := by fun_prop
   have hfind := ComputableInPolyTime.findWithInput
+    (encO := encOption encSchnorrForkEntry)
     (test := fun x (entry : SchnorrForkEntry) => entry.point == x.2.1.2) htable htest
   have hanswers : ComputableInPolyTime (fun x : StepInput => x.1.answers) encStepInput
       (encList encBits) := by fun_prop
   have hcount : ComputableInPolyTime (fun x : StepInput => x.2.2.count)
       encStepInput encUnary := by fun_prop
-  have hanswer := ComputableTidilyInPolyTime.getElem? (encA := encBits) hanswers.tidy hcount.tidy
+  have hanswer := ComputableTidilyInPolyTime.getElem? (encA := encBits)
+    (encO := encOption encBits) hanswers.tidy hcount.tidy
   have hmiss := ComputableInPolyTime.optionElimWithInput hanswer.computableInPolyTime
     (hskip.comp (hid.prod (ComputableInPolyTime.const [])))
     (body := fun x c => forkFreshFrom (x, c)) hfresh
@@ -492,6 +495,7 @@ private theorem computableInPolyTime_schnorrForkFinish_proj :
     exact (show ComputableInPolyTime (fun p : FinishInput F × SchnorrForkEntry =>
       p.2.1) _ encBits by fun_prop).beq (hpoint.comp hfst)
   have hfind := ComputableInPolyTime.findWithInput
+    (encO := encOption encSchnorrForkEntry)
     (test := fun x (entry : SchnorrForkEntry) => entry.point ==
       encPair encBits encBits (x.2.1.1, ((Decoder.bits.pair Decoder.bits).decode x.2.1.2).1))
     htable htest
@@ -599,11 +603,6 @@ private abbrev TypedState (m : ℕ) :=
 private def positionTag : Option ℕ → ℕ
   | none => 0
   | some i => i + 1
-
-/-- The native view of a typed transcript. -/
-@[expose] def transcriptWords :
-    List Bool × BitString m × List Bool → List Bool × List Bool × List Bool
-  | (t, c, z) => (t, List.ofFn c, z)
 
 /-- The native view of a typed table entry. -/
 private def nativeEntry : List Bool × BitString m × Option ℕ → SchnorrForkEntry
