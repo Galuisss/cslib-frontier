@@ -362,7 +362,10 @@ end Offsets
 /-- The program looking up the element at a unary index in a list: the header reads the length
 `n` of the list encoding and the index `k`; the loop at `4` skips `k` framed elements with
 register `2` as the position, guarded by `reg 2 < n`; if an element remains, the code at `11`
-writes `true` and copies the element's digits. -/
+writes `true` and copies the element's digits. Otherwise label `19` emits `false` before
+halting at `20`. Thus the output is the canonical tagged option, including `[true]` for a
+present empty word and `[false]` for a missing element (also on an empty list). Only this
+output-format boundary changes; the lookup function and register bound are unchanged. -/
 def lookupProgram : CounterProgram where
   code := List.flatten [
     headerCode, forCode 4 3 (reg 1) 7 11,
@@ -378,6 +381,7 @@ def lookupProgram : CounterProgram where
      emit false 17,
      assign 2 (add (reg 2) (const 2)) 13,
      halt [],
+     emit false 20,
      halt []]]
   registers := 4
 
@@ -497,7 +501,7 @@ private theorem reachesOut_lookupProgram :
     ∃ s fin, lookupProgram.ReachesOut X
       (lookupProgram.Active (((frame (encList enc l) ++ List.replicate k true).length + 1) ^ 1))
       lookupProgram.init s
-      ((l[k]?).elim [] fun a => true :: enc a) ∧ lookupProgram.instr s.1 = .halt fin ∧ fin = [] ∧
+      ((l[k]?).elim [false] fun a => true :: enc a) ∧ lookupProgram.instr s.1 = .halt fin ∧ fin = [] ∧
       ∀ r ∈ s.2, r ≤ ((frame (encList enc l) ++ List.replicate k true).length + 1) ^ 1 := by
   set n := (encList enc l).length
   have hlen : (frame (encList enc l) ++ List.replicate k true).length = 2 * n + 1 + k :=
@@ -539,11 +543,13 @@ private theorem reachesOut_lookupProgram :
     simpa only [Nat.mul_zero, Nat.add_zero, List.drop_zero] using
       reachesOut_copy hB hk le_rfl 0 (Nat.zero_le _)
   · have hoff : off enc l k = n := off_of_le enc l (by omega)
-    refine ⟨(19, [n, k, off enc l k, k]), [], ?_, rfl, rfl, hb⟩
+    refine ⟨(20, [n, k, off enc l k, k]), [], ?_, rfl, rfl, hb⟩
     rw [List.getElem?_eq_none (by omega)]
     refine hpre.trans (ReachesOut.lt (show lookupProgram.instr 11 = _ from rfl) hb ?_)
     simp only [eval_reg, List.getD_cons_zero, List.getD_cons_succ, hoff, lt_irrefl, ↓reduceIte]
-    exact ReachesOut.refl _
+    exact ReachesOut.emit (show lookupProgram.instr 19 = _ from rfl)
+      (by simpa only [hoff] using hb)
+      (ReachesOut.refl _)
 
 end Lookup
 
@@ -588,7 +594,7 @@ theorem getElem? {α : Type} (enc : α ↪ List Bool) :
       (encOption enc) := by
   refine lookupProgram.computableInLogSpace_of_reachesOut 1 fun ⟨l, k⟩ => ?_
   obtain ⟨s, fin, h, hhalt, rfl, hs⟩ := reachesOut_lookupProgram (enc := enc) (l := l) (k := k)
-  exact ⟨s, _, [], h, hhalt, by simp [encOption], hs⟩
+  exact ⟨s, _, [], h, hhalt, by cases hopt : l[k]? <;> simp [hopt], hs⟩
 
 /-! ### Automation -/
 
