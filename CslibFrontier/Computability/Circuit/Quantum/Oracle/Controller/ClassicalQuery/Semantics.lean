@@ -26,6 +26,9 @@ final comparison measurement with the native success experiment remain separate 
 
 * `Cslib.Quantum.ClassicalQueryLayout.matrix_copyHidden_zeroTarget_withReference`: the actual
   protected-hidden-bit copy is a coherent record while retaining every other wire and reference.
+* `Cslib.Quantum.ClassicalQueryLayout.partialTraceLeft_copyRequest_zeroTarget_withReference`:
+  discarding the actual copied request gives exactly the sum of request density branches,
+  including an arbitrary inaccessible reference.
 
 ## References
 
@@ -98,5 +101,94 @@ theorem matrix_copyHidden_zeroTarget_withReference (layout : ClassicalQueryLayou
     kroneckerMap_apply, Matrix.one_apply, coherentRecord]
   by_cases hreference : referenceOut = referenceIn <;>
     simp [hreference]
+
+/-- Copying the first-stage output into the controller's fresh request register and discarding
+that register gives exactly computational-basis readout of the request.  The original first-stage
+register and an arbitrary inaccessible reference remain in every subnormalized branch.  This is
+the physical density-matrix boundary used before the request-controlled service continuation. -/
+theorem partialTraceLeft_copyRequest_zeroTarget_withReference
+    {layout : ClassicalQueryLayout} (h : layout.Compatible)
+    {Reference : Type*} [Fintype Reference] [DecidableEq Reference]
+    (ρ :
+      let htarget : layout.requestBase + layout.first.outputWidth ≤ layout.width := by
+        simp only [requestBase, width, secondBase, replyBase, serviceBase, hiddenWire]
+        omega
+      let targetEmbedding := blockEmb layout.requestBase htarget
+      let Rest := {j : Fin layout.width // ¬ ∃ i, targetEmbedding i = j}
+      Matrix ((Rest → Bool) × Reference) ((Rest → Bool) × Reference) ℂ) :
+    let htarget : layout.requestBase + layout.first.outputWidth ≤ layout.width := by
+      simp only [requestBase, width, secondBase, replyBase, serviceBase, hiddenWire]
+      omega
+    let targetEmbedding := blockEmb layout.requestBase htarget
+    let Rest := {j : Fin layout.width // ¬ ∃ i, targetEmbedding i = j}
+    let sourceLabel : (Rest → Bool) → Fin layout.first.outputWidth → Bool :=
+      fun rest i =>
+        (splitEquiv targetEmbedding).symm (fun _ => false, rest) ⟨i, by omega⟩
+    let requestLabel : ((Rest → Bool) × Reference) →
+        (Fin layout.first.outputWidth → Bool) :=
+      fun p => sourceLabel p.1
+    let reassociate :
+        (((Fin layout.first.outputWidth → Bool) × (Rest → Bool)) × Reference) ≃
+          ((Fin layout.first.outputWidth → Bool) × ((Rest → Bool) × Reference)) :=
+      Equiv.prodAssoc _ _ _
+    let copyMatrix :=
+      (Circuit.matrix (Circuit.ofCodes layout.width
+        (blockCopyCodes 0 layout.requestBase layout.first.outputWidth)) : Matrix _ _ ℂ).submatrix
+        (fun p => (splitEquiv targetEmbedding).symm p)
+        (fun rest => (splitEquiv targetEmbedding).symm (fun _ => false, rest))
+    let physical := (copyMatrix ⊗ₖ
+      (1 : Matrix Reference Reference ℂ)).submatrix reassociate.symm id
+    partialTraceLeft (densityConj physical ρ) =
+      ∑ request, classicalDensityBranch requestLabel request ρ := by
+  classical
+  dsimp only
+  have hinput := h.first_wellFormed.input_le
+  rw [h.first_quantumInputWidth, Nat.add_zero] at hinput
+  have houtput := h.first_output_le
+  have hsourceFirst : layout.first.outputWidth ≤ layout.first.width :=
+    houtput.trans hinput
+  let hsource : layout.first.outputWidth ≤ layout.width := by
+    simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase,
+      ClassicalQueryLayout.replyBase, ClassicalQueryLayout.serviceBase,
+      ClassicalQueryLayout.hiddenWire, ClassicalQueryLayout.requestBase]
+    omega
+  let htarget : layout.requestBase + layout.first.outputWidth ≤ layout.width := by
+    simp only [requestBase, width, secondBase, replyBase, serviceBase, hiddenWire]
+    omega
+  let targetEmbedding := blockEmb layout.requestBase htarget
+  let Rest := {j : Fin layout.width // ¬ ∃ i, targetEmbedding i = j}
+  let sourceLabel : (Rest → Bool) → Fin layout.first.outputWidth → Bool :=
+    fun rest i =>
+      (splitEquiv targetEmbedding).symm (fun _ => false, rest) ⟨i, by omega⟩
+  let requestLabel : ((Rest → Bool) × Reference) →
+      (Fin layout.first.outputWidth → Bool) :=
+    fun p => sourceLabel p.1
+  let reassociate :
+      (((Fin layout.first.outputWidth → Bool) × (Rest → Bool)) × Reference) ≃
+        ((Fin layout.first.outputWidth → Bool) × ((Rest → Bool) × Reference)) :=
+    Equiv.prodAssoc _ _ _
+  let copyMatrix :=
+    (Circuit.matrix (Circuit.ofCodes layout.width
+      (blockCopyCodes 0 layout.requestBase layout.first.outputWidth)) : Matrix _ _ ℂ).submatrix
+      (fun p => (splitEquiv targetEmbedding).symm p)
+      (fun rest => (splitEquiv targetEmbedding).symm (fun _ => false, rest))
+  let physical := (copyMatrix ⊗ₖ
+    (1 : Matrix Reference Reference ℂ)).submatrix reassociate.symm id
+  have hdisjoint : layout.first.outputWidth ≤ layout.requestBase := by
+    simp only [requestBase]
+    omega
+  have hcopy := Circuit.matrix_blockCopyCodes_zeroTarget
+    (source := 0) (target := layout.requestBase) (count := layout.first.outputWidth)
+    (width := layout.width) (Or.inl (by simpa only [Nat.zero_add] using hdisjoint))
+    (by simpa only [Nat.zero_add] using hsource) htarget
+  have hphysical : physical = coherentRecord requestLabel := by
+    dsimp only [physical, copyMatrix, reassociate, requestLabel, sourceLabel, targetEmbedding]
+    rw [hcopy]
+    ext ⟨request, restOut, referenceOut⟩ ⟨restIn, referenceIn⟩
+    simp only [Matrix.submatrix_apply, kroneckerMap_apply, Matrix.one_apply, coherentRecord]
+    by_cases hreference : referenceOut = referenceIn <;>
+      simp [hreference]
+  change partialTraceLeft (densityConj physical ρ) = _
+  rw [hphysical, partialTraceLeft_densityConj_coherentRecord]
 
 end Cslib.Quantum.ClassicalQueryLayout

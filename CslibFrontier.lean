@@ -4584,6 +4584,7 @@ public import CslibFrontier.Crypto.Computational.GoldwasserMicali
 public import CslibFrontier.Crypto.Computational.GoldwasserMicali.Malleability
 public import CslibFrontier.Crypto.Computational.HQC.DQCSD
 public import CslibFrontier.Crypto.Computational.HQC.INDCPA
+public import CslibFrontier.Crypto.Computational.HQC.INDCPA.B2Native
 public import CslibFrontier.Crypto.Computational.HQC.INDCPA.B2Service
 public import CslibFrontier.Crypto.Computational.HardCore
 public import CslibFrontier.Crypto.Computational.HashAndSign
