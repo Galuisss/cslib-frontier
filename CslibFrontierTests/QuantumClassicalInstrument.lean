@@ -6,7 +6,7 @@ Authors: Samuel Schlesinger
 
 module
 
-public import CslibFrontier.Foundations.Quantum.Measurement.Classical
+public import CslibFrontier.Foundations.Quantum.Measurement.Deferred
 public import CslibFrontierTests.QuantumState
 import CslibFrontier.Foundations.Quantum.Bipartite
 
@@ -57,6 +57,23 @@ theorem full_measurement_changes_requestMemory :
   norm_num [Matrix.sum_apply, Fintype.sum_prod_type, Fintype.sum_bool,
     classicalDensityBranch_apply, pureState_apply, requestMemory_apply,
     Complex.star_def, ← Complex.ofReal_mul] at he
+
+/-- One coherent record retains the off-diagonal entry of `|+⟩⟨+|`, whereas recording twice
+and discarding one copy dephases the retained classical label.  This rules out the false
+untraced identity between coherent recording and a classical branch mixture. -/
+theorem coherent_record_ne_dephased_plus :
+    densityConj (coherentRecord id) (pureState plus) ≠
+      partialTraceLeft
+        (densityConj
+          (coherentRecord (Prod.fst : Bool × Bool → Bool) * coherentRecord id)
+          (pureState plus)) := by
+  intro h
+  have hoff := congrFun (congrFun h (false, false)) (true, true)
+  rw [densityConj_coherentRecord_apply,
+    partialTraceLeft_densityConj_coherentRecord_twice] at hoff
+  norm_num [Matrix.sum_apply, Fintype.sum_bool, pureState_apply, ket_apply,
+    classicalDensityBranch_apply, kroneckerMap_apply, plus_apply,
+    Complex.star_def, ← Complex.ofReal_mul, Real.sq_sqrt] at hoff
 
 /-- Each Bell branch has probability one half and keeps its correlated joint basis state. -/
 theorem branch_bell (b : Bool) :
