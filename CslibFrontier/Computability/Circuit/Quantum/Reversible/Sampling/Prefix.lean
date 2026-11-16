@@ -65,7 +65,7 @@ theorem listOfFn_castLEEmb_eq_blockReadout {count width : ℕ} (h : count ≤ wi
 namespace GateCode
 
 /-- Swap the block `source, …, source + count - 1` with the output prefix. -/
-def prefixSwapCodes (source count : ℕ) : List GateCode :=
+@[expose] def prefixSwapCodes (source count : ℕ) : List GateCode :=
   (List.range count).flatMap fun j => swapWireCodes j (source + j)
 
 @[simp] theorem length_prefixSwapCodes (source count : ℕ) :

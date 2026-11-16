@@ -22,9 +22,10 @@ occurrence, and returns an explicit default when the index is out of range.
 
 * `Turing.MultiTapeTM.Internal.NativeCompiler.listGetDNatCompiler`: total binary-indexed lookup.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.listGet?NatCompiler`: optional binary-indexed lookup.
-* `Turing.MultiTapeTM.Internal.NativeCompiler.listEmitWithStateCompiler`: retained contextual
-  emission over a standard encoded list.
-* `Turing.MultiTapeTM.Internal.NativeCompiler.listMapWithStateCompiler`: its ordinary map client.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.listFoldEmitCompiler`: retained stateful emission
+  over a standard encoded list.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.listMapWithStateCompiler`: its fixed-context map
+  client.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.listFilterMapWithStateCompiler`: retained
   contextual filtering and mapping with an explicit default used only by the option decoder.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.listMapCompiler`: retained standard-list mapping.
@@ -406,26 +407,26 @@ theorem listBits_le_time_listGetDNatCompiler (default : Value)
 
 variable {Input : Type u} {Output : Type v} {State : Type w}
 
-/-- Emit one raw word per element of a standard encoded list while retaining one shared encoded
-context. The words are concatenated in order; the context is fold state and is not duplicated
-into the semantic output. -/
-@[expose] def listEmitWithStateCompiler {emit : State × Input → List Bool}
+/-- Run one retained state update and emit one raw word per element of a standard encoded list.
+The emitted words are concatenated in order; neither the initial nor final fold state is added to
+the semantic output. -/
+@[expose] def listFoldEmitCompiler {next : State × Input → State}
+    {emit : State × Input → List Bool}
     {result : State × List Input → Output}
     (encState : State ↪ List Bool) (encInput : Input ↪ List Bool)
     (encOutput : Output ↪ List Bool)
+    (nextCompiler : NativeCompiler next (encPair encState encInput) encState)
     (compiler : NativeCompiler emit (encPair encState encInput) encBits)
     (hresult : ∀ input, encOutput (result input) =
-      input.2.flatMap fun value => emit (input.1, value)) :
+      streamEmit next emit input.1 input.2) :
     NativeCompiler result (encPair encState (encList encInput)) encOutput := by
-  let nextCompiler : NativeCompiler Prod.fst (encPair encState encInput) encState :=
-    first encState encInput
   let finishCompiler : NativeCompiler (Function.const State ([] : List Bool)) encState encBits :=
     const encState encBits []
   let K := streamFoldPairTapeCount nextCompiler compiler finishCompiler
   let sMax := fun input : State × List Input =>
     (Finset.range input.2.length).sup fun j =>
       if hj : j < input.2.length then
-        let pair := (streamState input.1 Prod.fst input.2 j, input.2[j])
+        let pair := (streamState input.1 next input.2 j, input.2[j])
         inputFromWordWorkspace K compiler pair +
           onWordsWorkspace K (streamFramedNext nextCompiler) pair
       else 0
@@ -433,23 +434,19 @@ into the semantic output. -/
     max
       ((Finset.range (input.2.length + 1)).sup fun j =>
         if hj : j ≤ input.2.length then
-          (encState (streamState input.1 Prod.fst input.2 j)).length
+          (encState (streamState input.1 next input.2 j)).length
         else 0)
       ((Finset.range input.2.length).sup fun j =>
         if hj : j < input.2.length then (encInput input.2[j]).length else 0)
   apply streamFoldPair nextCompiler compiler finishCompiler
     (sMax := sMax) (lMax := lMax)
   · intro input
-    rw [hresult input]
-    induction input.2 with
-    | nil => rfl
-    | cons element list ih =>
-        simpa [streamEmit] using ih
+    simp only [hresult input, encBits_apply, Function.const_apply, List.append_nil]
   · intro input j hj
     have hsup := Finset.le_sup
       (s := Finset.range input.2.length)
       (f := fun j => if hj : j < input.2.length then
-        let pair := (streamState input.1 Prod.fst input.2 j, input.2[j])
+        let pair := (streamState input.1 next input.2 j, input.2[j])
         inputFromWordWorkspace
             (streamFoldPairTapeCount nextCompiler compiler finishCompiler)
             compiler pair +
@@ -463,7 +460,7 @@ into the semantic output. -/
     have hsup := Finset.le_sup
       (s := Finset.range (input.2.length + 1))
       (f := fun j => if hj : j ≤ input.2.length then
-        (encState (streamState input.1 Prod.fst input.2 j)).length else 0)
+        (encState (streamState input.1 next input.2 j)).length else 0)
       (Finset.mem_range.mpr (by omega : j < input.2.length + 1))
     refine Nat.le_trans ?_ (Nat.le_max_left _ _)
     simpa only [lMax, hj, dite_true] using hsup
@@ -491,11 +488,13 @@ The context is streamed as fold state and is not duplicated into the semantic ou
       (fun input => frame (encOutput (mapWithState input)))
       (encPair encState encInput) encBits :=
     ((framedValue encOutput).comp compiler).ofOutputEq fun _ => rfl
-  exact listEmitWithStateCompiler encState encInput (encList encOutput) emitCompiler fun input => by
-    change (input.2.map fun value => mapWithState (input.1, value)).flatMap
-      (frame ∘ encOutput) = _
-    rw [List.flatMap_map]
-    simp only [Function.comp_apply]
+  apply listFoldEmitCompiler encState encInput (encList encOutput)
+    (first encState encInput) emitCompiler
+  intro input
+  induction input.2 with
+  | nil => rfl
+  | cons element list ih =>
+      simpa [streamEmit, encList_cons] using ih
 
 /-- Filter and map a standard encoded list while retaining one shared encoded context for every
 element. `default` is consulted only inside the total option decoder on a branch whose output is
@@ -521,13 +520,14 @@ discarded; it does not appear in the semantic result. -/
       (encPair encState encInput) encBits :=
     (ite present framed empty).ofOutputEq fun input => by
       cases h : filterMapValue input <;> simp
-  apply listEmitWithStateCompiler encState encInput (encList encOutput) emitCompiler
+  apply listFoldEmitCompiler encState encInput (encList encOutput)
+    (first encState encInput) emitCompiler
   intro input
   induction input.2 with
   | nil => rfl
   | cons element list ih =>
       cases h : filterMapValue (input.1, element) <;>
-        simp [h, ih, encList_cons]
+        simp [streamEmit, h, ih, encList_cons]
 
 /-- Retained standard-list map, including marshalling and every element callback. -/
 @[expose] def listMapCompiler {mapValue : Input → Output}
