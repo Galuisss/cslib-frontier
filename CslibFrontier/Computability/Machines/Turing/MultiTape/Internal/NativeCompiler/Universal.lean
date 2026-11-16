@@ -123,7 +123,7 @@ explicitly accept that constructor. -/
   cases movement <;> simp [sub_eq_add_neg]
 
 /-- Retained projection of a zipper's two cell lists. -/
-noncomputable def tapeTail :
+@[expose] noncomputable def tapeTail :
     NativeCompiler (fun tape : Tape => (tape.left, tape.right)) eTape
       (encPair (encList eSym) (encList eSym)) :=
   (second encIntUnary (encPair (encList eSym) (encList eSym))).ofInputEq
@@ -139,7 +139,7 @@ noncomputable def tapeLeft : NativeCompiler Tape.left eTape (encList eSym) :=
   (first (encList eSym) (encList eSym)).comp tapeTail
 
 /-- Retained projection of the cells at and right of the work-tape head. -/
-noncomputable def tapeRight :
+@[expose] noncomputable def tapeRight :
     NativeCompiler Tape.right eTape (encList eSym) :=
   (second (encList eSym) (encList eSym)).comp tapeTail
 
