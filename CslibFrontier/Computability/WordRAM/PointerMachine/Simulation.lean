@@ -86,6 +86,8 @@ theorem executes_compile {p : Program .standard r} {x : State r} {v n : ℕ}
 /-- Every successful standard word-RAM run from a list input has an actual pointer-machine
 execution returning the same word. For `n` source instructions and `N` input words it uses
 at most `N + n` records and `n * (294 * log₂ (N + n + 1) + 56)` instructions, including halt.
+Target scalars are unbounded naturals carrying the standard word operations at source width `w`,
+together with AVL height operations; this is not a simulation by an atom-only scalar model.
 Input encoding is explicitly constructed by `inputState` and is not charged in either model.
 This simulates successful deterministic runs, without asserting fault equivalence. -/
 theorem executes_input {p : Program .standard r} {input : List ℕ} {v n : ℕ}

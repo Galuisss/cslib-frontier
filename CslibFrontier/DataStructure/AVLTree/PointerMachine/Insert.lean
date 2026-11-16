@@ -397,8 +397,9 @@ private theorem rebalance_correct [LinearOrder M.Value]
     · intro z f hf
       exact (payloadB z f hf).trans (payload z f hf)
 
-/-- Complete heap and register outcome of set insertion. Existing records retain all scalar
-fields except the height cache; a new record receives its explicit client payload. -/
+/-- Linked-tree, register and scalar-payload outcome of set insertion. Existing records retain
+all scalar fields except the height cache; a new record receives its explicit client payload.
+This contract does not assert a full frame for records outside the tree. -/
 structure InsertResult [LinearOrder M.Value] (encode : ℕ → M.Value)
     (field : Fin (extra + 1)) (source : Fin (extra + 1) → Fin (regs + 3))
     (s t : State M (layout extra (regs + 1)))

@@ -19,8 +19,8 @@ and the middle subtree's parent link, including the empty-middle case. The calle
 reconnect the external parent's child link (or update its root register). Scalar payloads,
 including cached heights, are unchanged; height recomputation belongs to AVL balancing.
 
-The child rewiring adapts the program in Stefan Langerman's
-`RotationBST.Models.RealWorld.PointerMachine.Rotation`, extended with parent links.
+The child rewiring adapts Stefan Langerman's earlier `lean-bst` rotation programs,
+extended here with parent links.
 -/
 
 public section

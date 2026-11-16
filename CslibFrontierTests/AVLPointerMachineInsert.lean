@@ -50,7 +50,8 @@ private def code : List (Instr model (layout 2 2)) :=
   AVLTree.PointerMachine.insert (M := model) false true 0 1 2 1 source
 
 -- An arbitrary query has an actual finite-program execution with the complete insertion
--- outcome. The unrelated third record and all client data are covered by that outcome.
+-- outcome. It preserves non-height scalar fields of all old records, including the unrelated
+-- third record; it does not assert a full frame for that record's pointer and height fields.
 example (query : ℕ) : ∃ t result time,
     Executes code (initial query) t time ∧ time ≤ 315 ∧
     InsertResult id 1 source (initial query) t tree result original := by

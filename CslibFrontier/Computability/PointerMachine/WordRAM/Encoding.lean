@@ -78,11 +78,11 @@ theorem repr_encodeState (e : M.Value ↪ ℕ) (x : State M L) :
     have hd : ¬L.ptrRegs + L.dataRegs + 1 < L.ptrRegs + L.dataRegs := by omega
     simp [encodeState, zeroReg, hp, hd]
   heapPtr a n hn f := by
-    have hf : f.val < stride L := by have := f.isLt; unfold stride; omega
+    have hf : f.val < stride L := ptrField_lt_stride f
     rw [encodeState_cell hn hf]
     simp [f.isLt]
   heapData a n hn f := by
-    have hf : L.ptrFields + f.val < stride L := by have := f.isLt; unfold stride; omega
+    have hf : L.ptrFields + f.val < stride L := dataField_lt_stride f
     have hsum : L.ptrFields + f.val < L.ptrFields + L.dataFields := by have := f.isLt; omega
     rw [encodeState_cell hn hf]
     simp [hsum]
@@ -95,8 +95,8 @@ theorem bounded_encodeState {e : M.Value ↪ ℕ} {w : ℕ} {x : State M L}
     simp only [encodeState]
     split_ifs with hp hs he
     · exact hf.ptrWord (hv.1 ⟨r.val, hp⟩)
-    · exact hf.2.1 _
-    · exact hf.1
+    · exact hf.data _
+    · exact hf.free
     · exact Cslib.WordRAM.fits_zero w
   · intro a
     by_cases ha : a = 0
@@ -107,7 +107,7 @@ theorem bounded_encodeState {e : M.Value ↪ ℕ} {w : ℕ} {x : State M L}
       | some n =>
         split_ifs with hp hd
         · exact hf.ptrWord (hv.2 n (List.mem_of_getElem? hn) ⟨_, hp⟩)
-        · exact hf.2.2 n (List.mem_of_getElem? hn) _
+        · exact hf.heapData n (List.mem_of_getElem? hn) _
         · exact Cslib.WordRAM.fits_zero w
 
 end Cslib.PointerMachine.WordRAM

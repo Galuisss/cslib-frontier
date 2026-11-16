@@ -133,7 +133,7 @@ private theorem execution : Executes code initial (state 17) 18 :=
   ⟨17, run 17 le_rfl, rfl, rfl⟩
 
 private theorem traceFits (n : Fin 18) : Fits (scalars layout).encode 4 (state n) := by
-  fin_cases n <;> unfold Fits <;> decide
+  fin_cases n <;> constructor <;> decide
 
 example : (state 17).data 0 = 6 ∧ (state 17).data 1 = 3 ∧ (state 17).ptr 0 = none :=
   ⟨rfl, rfl, rfl⟩
@@ -162,7 +162,7 @@ example : ∃ z, ExecWithin 2 ((scalars emptyLayout).effect (.create 0))
       (encodeState (scalars emptyLayout).encode emptyInput) z 4 ∧
     Repr (scalars emptyLayout).encode ((Instr.create 0).effect emptyInput) z :=
   (scalars emptyLayout).create_spec 0 (repr_encodeState _ _) (by
-    simp [Fits, Instr.effect, emptyInput, State.empty, Record.blank, scalars, model,
+    constructor <;> simp [Instr.effect, emptyInput, State.empty, Record.blank, scalars, model,
       nodeAddr, stride, emptyLayout, Cslib.WordRAM.Fits])
 
 -- One bit cannot hold the post-allocation next-free address. The emitted code really faults.

@@ -96,7 +96,8 @@ private theorem step_compile {w : ℕ} {code : List (Instr M L)}
       Cslib.WordRAM.Runs w (S.compile code) ⟨S.blockSize code * x.pc, y⟩
         ⟨S.blockSize code * x'.pc, z⟩ n ∧ Repr S.encode x' z := by
   obtain ⟨i, hi, hne, rfl⟩ := step_eq_some_iff.mp hs
-  obtain ⟨z, ⟨n, hn, he⟩, hz, ht⟩ := S.effect_correct i hv hy hfit hfit' (hsafe i hi)
+  obtain ⟨z, ⟨n, hn, he⟩, hz, ht⟩ := S.effect_correct i hv hy hfit
+    ⟨hfit'.free, hfit'.data, hfit'.heapData⟩ (hsafe i hi)
   have hc := S.contains_raw hi
   have hcost := S.overhead_bound (List.mem_of_getElem? hi)
   cases i with

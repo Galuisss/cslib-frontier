@@ -40,14 +40,6 @@ variable {M : Model} {extra regs : ℕ}
     (encodeHeap l (base + 1) (some base) ++
       encodeHeap r (base + 1 + l.numNodes) (some base))
 
-/-- Forgetting assigned addresses recovers the input scalar tree. -/
-@[simp] theorem map_data_labelTree (base : ℕ)
-    (t : BinaryTree (Fin (extra + 1) → M.Value)) :
-    (labelTree base t).map Label.data = t := by
-  induction t generalizing base with
-  | nil => rfl
-  | node data l r il ir => simp [labelTree, BinaryTree.map, il, ir]
-
 /-- Encoding uses one record per node. -/
 @[simp] theorem length_encodeHeap (t : BinaryTree (Fin (extra + 1) → M.Value))
     (base : ℕ) (parent : Pointer) :
