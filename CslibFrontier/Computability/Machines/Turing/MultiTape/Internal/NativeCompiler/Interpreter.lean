@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Deterministic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Replicate
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.StreamResourceBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.PolyTime
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Output
 
@@ -190,6 +191,97 @@ private noncomputable def interpreterStreamCompiler :
   listFoldEmitCompiler eCtx encBool (encList encUnary)
     interpreterNextCompiler interpreterEmitCompiler fun input =>
       (interpreterEmit_eq input.1 input.2).symm
+
+private theorem interpreterStreamCompiler_time_le (description : Desc) (word : List ℕ)
+    (tokens : List Bool) (stepTime : ℕ)
+    (hstep : ∀ j, j < tokens.length →
+      stepCompiler.time (description, word,
+        ((stepOut description word)^[j] (Universal.init description, [])).1) ≤ stepTime) :
+    let lengthBound := ctxBound (descLen description) (encList encUnary word).length tokens.length
+    interpreterStreamCompiler.time (((description, word), Universal.init description), tokens) ≤
+      tokens.length * (2 * stepTime +
+        5000 * (lengthBound + descLen description + tokens.length + 1)) +
+      100 * (lengthBound + descLen description + tokens.length + 1) := by
+  let L := ctxBound (descLen description) (encList encUnary word).length tokens.length
+  let B := 2 * L + 3 * tokens.length + 1
+  let input : Ctx × List Bool := (((description, word), Universal.init description), tokens)
+  let callbackTime := stepTime + 1024 * (L + descLen description + 1)
+  have hinput : (encPair eCtx (encList encBool) input).length ≤ B := by
+    have hinitial := interpreter_state_length_le description word tokens 0 (Nat.zero_le _)
+    rw [streamState_zero] at hinitial
+    simp only [eCtx, length_encPair] at hinitial
+    have hlist : (encList encBool tokens).length = 3 * tokens.length := by
+      simp [length_encList, encBool_apply, Nat.mul_comm]
+    simp only [input, length_encPair, hlist]
+    dsimp only [B, L]
+    omega
+  have hstate : ∀ j, j ≤ input.2.length →
+      (eCtx (streamState input.1 interpreterNext input.2 j)).length ≤ B := by
+    intro j hj
+    have h := interpreter_state_length_le description word tokens j hj
+    dsimp only [input, B, L]
+    omega
+  have helem : ∀ j (hj : j < input.2.length), (encBool input.2[j]).length ≤ B := by
+    intro j hj
+    simp only [encBool_apply, List.length_singleton]
+    dsimp only [B]
+    omega
+  have hcallbacks : ∀ j (hj : j < input.2.length),
+      interpreterNextCompiler.time (streamState input.1 interpreterNext input.2 j,
+        input.2[j]) ≤ callbackTime ∧
+      interpreterEmitCompiler.time (streamState input.1 interpreterNext input.2 j,
+        input.2[j]) ≤ callbackTime := by
+    intro j hj
+    let ctx : Ctx := streamState input.1 interpreterNext input.2 j
+    have hl := interpreter_state_length_le description word tokens j hj.le
+    have ho := interpreter_step_output_length_le description word tokens j hj
+    have hm := contextStepCompiler_time_le ctx
+    have hn := interpreterNextCompiler_time_le (ctx, input.2[j])
+    have he := interpreterEmitCompiler_time_le (ctx, input.2[j])
+    have ht : stepCompiler.time (ctx.desc, ctx.input, ctx.cfg) ≤ stepTime := by
+      dsimp only [ctx, input]
+      rw [interpreter_state description word tokens j hj.le]
+      exact hstep j hj
+    change (eCtx ctx).length ≤ L at hl
+    change (encPair eCfg eSym (Universal.step ctx.desc ctx.input ctx.cfg)).length ≤
+      2 * L + descLen description + 2 at ho
+    change interpreterNextCompiler.time (ctx, input.2[j]) ≤ callbackTime ∧
+      interpreterEmitCompiler.time (ctx, input.2[j]) ≤ callbackTime
+    have hcontext : contextStepCompiler.time ctx ≤ stepTime + 128 * (L + 1) :=
+      hm.trans (Nat.add_le_add ht (Nat.mul_le_mul_left 128 (Nat.add_le_add_right hl 1)))
+    have hlength : (eCtx ctx).length +
+        (encPair eCfg eSym (Universal.step ctx.desc ctx.input ctx.cfg)).length + 1 ≤
+          L + (2 * L + descLen description + 2) + 1 :=
+      Nat.add_le_add_right (Nat.add_le_add hl ho) 1
+    have hcommon : contextStepCompiler.time ctx +
+        256 * ((eCtx ctx).length +
+          (encPair eCfg eSym (Universal.step ctx.desc ctx.input ctx.cfg)).length + 1) ≤
+        callbackTime := by
+      refine (Nat.add_le_add hcontext (Nat.mul_le_mul_left 256 hlength)).trans ?_
+      dsimp only [callbackTime]
+      omega
+    exact ⟨hn.trans hcommon, he.trans hcommon⟩
+  have hfinish : (const eCtx encBits []).time
+      (streamState input.1 interpreterNext input.2 input.2.length) ≤ 1 := by
+    simp [const, encBits_apply]
+  have h := streamFoldPairTime_le interpreterNextCompiler interpreterEmitCompiler
+    (const eCtx encBits []) input callbackTime callbackTime 1 B hinput hstate helem
+    (fun j hj => (hcallbacks j hj).2) (fun j hj => (hcallbacks j hj).1) hfinish
+  change streamFoldPairTime interpreterNextCompiler interpreterEmitCompiler
+    (const eCtx encBits []) input ≤ _
+  have hround : callbackTime + callbackTime + 46 * B + 60 ≤
+      2 * stepTime + 5000 * (L + descLen description + tokens.length + 1) := by
+    dsimp only [callbackTime, B]
+    omega
+  have htail : 1 + 24 * B + 40 ≤
+      100 * (L + descLen description + tokens.length + 1) := by
+    dsimp only [B]
+    omega
+  calc
+    _ ≤ tokens.length * (callbackTime + callbackTime + 46 * B + 60) +
+        (1 + 24 * B + 40) := by
+      simpa only [input, Nat.add_assoc] using h
+    _ ≤ _ := Nat.add_le_add (Nat.mul_le_mul_left tokens.length hround) htail
 
 /-- Install a fixed deterministic description and execute the supplied number of simulated steps.
 The compiler's time and workspace fields charge its actual finite transition table, independently
