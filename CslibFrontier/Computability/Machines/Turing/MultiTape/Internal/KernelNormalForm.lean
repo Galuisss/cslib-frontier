@@ -449,6 +449,9 @@ def tidy (m₀ m₁ : Symbol) (machine : MultiTapeMachine k Symbol State Empty I
     (rewindInput Symbol).extendTapes (MultiTapeTM.noTapes (k + k))
   (shadowed.seq cleared).seq rewound
 
+/-- Clear each listed work tape together with its shadow, in list order. -/
+add_decl_doc tidy.clear
+
 /-- The local recursive cleanup has exactly the legacy deterministic semantics. -/
 private theorem toTM_clearList (m₀ m₁ : Symbol) (tapes : List (Fin k)) :
     (tidy.clear m₀ m₁ tapes).toTM = MultiTapeTM.clearList m₀ m₁ tapes := by
