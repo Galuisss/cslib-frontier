@@ -17,12 +17,19 @@ An actual retained list compiler embeds each ordinary `GateCode` as a non-phase 
 instruction. It charges both the per-instruction option wrapper and the framed list traversal,
 rather than treating the conversion as a free representation change.
 
-The construction is original formalization infrastructure.
-
 ## Main definitions
 
 * `Turing.MultiTapeTM.Internal.NativeCompiler.oracleGateCodeList`: compile a list of ordinary
   gate codes to its query-free oracle-circuit instruction list.
+
+## Main results
+
+The returned `NativeCompiler` certifies the exact mapped instruction list under the existing
+gate-code and oracle-instruction encodings.
+
+## References
+
+This retained compiler constructor is original formalization infrastructure.
 -/
 
 public section
