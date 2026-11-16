@@ -33,6 +33,35 @@ namespace Turing.MultiTapeTM.Internal.NativeCompiler
 
 open Turing.MultiTapeTM.Universal
 
+private theorem readsSecond_time_le (tapes : List Tape) (j : ℕ) (hj : j < tapes.length)
+    (state : Unit) :
+    (second encUnit eTape).time (state, tapes[j]) ≤
+      100 * ((encList eTape tapes).length + 4) := by
+  have h := length_le_encList_of_mem eTape (List.getElem_mem hj)
+  simp only [eTape_apply, length_encPair] at h
+  simp [second, ofTransducer]
+  omega
+
+private theorem readsCallback_time_le (tapes : List Tape) (j : ℕ) (hj : j < tapes.length)
+    (state : Unit) :
+    (tapeRead.comp (second encUnit eTape)).time (state, tapes[j]) ≤
+      6000 * ((encList eTape tapes).length + 4) := by
+  have hcomp := time_comp_le tapeRead (second encUnit eTape) (state, tapes[j])
+  have hsecond := readsSecond_time_le tapes j hj state
+  have htape : tapeRead.time tapes[j] ≤
+      2000 * ((encList eTape tapes).length + 4) := by
+    have h := tapeRead_time_le tapes[j]
+    have he := length_le_encList_of_mem eTape (List.getElem_mem hj)
+    omega
+  exact hcomp.trans (by nlinarith)
+
+private theorem readsMarshal_time_le (tapes : List Tape) :
+    ((const (encList eTape) encUnit ()).pair (identity (encList eTape))).time tapes ≤
+      100 * ((encList eTape tapes).length + 1) := by
+  have h := time_pair_le (const (encList eTape) encUnit ())
+    (identity (encList eTape)) tapes
+  exact h.trans (by simp [const, identity]; omega)
+
 /-- The actual retained work-head map has quadratic time in the complete encoded tape list. -/
 theorem reads_time_le (tapes : List Tape) :
     reads.time tapes ≤ 1000000 * ((encList eTape tapes).length + 1) ^ 2 := by
@@ -72,21 +101,9 @@ theorem reads_time_le (tapes : List Tape) :
         50000 * (L + 4) := by
     intro j hj
     let pair := (streamState () (fun input : Unit × Tape => input.1) tapes j, tapes[j])
-    have hsecond := time_comp_le tapeRead (second encUnit eTape) pair
-    change (tapeRead.comp (second encUnit eTape)).time pair ≤
-      5 * (second encUnit eTape).time pair + tapeRead.time tapes[j] + 9 at hsecond
-    have hsecondTime : (second encUnit eTape).time pair ≤ 100 * (L + 4) := by
-      have h := helem j hj
-      simp only [eTape_apply, length_encPair] at h
-      simp [second, ofTransducer, pair] at h ⊢
-      omega
-    have htape : tapeRead.time tapes[j] ≤ 2000 * (L + 4) := by
-      have h := tapeRead_time_le tapes[j]
-      have he := helem j hj
-      omega
     have hcallback : callback.time pair ≤ 6000 * (L + 4) := by
       simp only [callback]
-      exact hsecond.trans (by omega)
+      simpa only [pair, L] using readsCallback_time_le tapes j hj pair.1
     have hframed := time_comp_le (framedValue eSym) callback pair
     change ((framedValue eSym).comp callback).time pair ≤
       5 * callback.time pair + (4 * (eSym pair.2.read).length + 8) + 9 at hframed
@@ -123,12 +140,8 @@ theorem reads_time_le (tapes : List Tape) :
       (listMapWithStateCompiler encUnit eTape eSym callback).time ((), tapes) ≤
         400000 * (L + 1) ^ 2 := by
     omega
-  have hmarshalRaw := time_pair_le (const (encList eTape) encUnit ())
-    (identity (encList eTape)) tapes
   have hmarshal : marshal.time tapes ≤ 100 * (L + 1) := by
-    change ((const (encList eTape) encUnit ()).pair
-      (identity (encList eTape))).time tapes ≤ 100 * (L + 1)
-    exact hmarshalRaw.trans (by simp [const, identity]; omega)
+    simpa only [marshal, L] using readsMarshal_time_le tapes
   have hcomp := time_comp_le (listMapWithStateCompiler encUnit eTape eSym callback)
     marshal tapes
   change ((listMapWithStateCompiler encUnit eTape eSym callback).comp marshal).time tapes ≤
@@ -174,18 +187,11 @@ theorem reads_workspace_le (tapes : List Tape) :
     intro j hj
     let pair := (streamState () (fun input : Unit × Tape => input.1) tapes j, tapes[j])
     have hsecondTime : (second encUnit eTape).time pair ≤ 100 * (L + 4) := by
-      have h := helem j hj
-      simp only [eTape_apply, length_encPair] at h
-      simp [second, ofTransducer, pair] at h ⊢
-      omega
+      simpa only [pair, L] using readsSecond_time_le tapes j hj pair.1
     have hsecondSpace : (second encUnit eTape).workspace pair ≤ 100 * (L + 4) := by
       have h := helem j hj
       simp only [eTape_apply, length_encPair] at h
       simp [second, ofTransducer, pair] at h ⊢
-    have htapeTime : tapeRead.time tapes[j] ≤ 2000 * (L + 4) := by
-      have h := tapeRead_time_le tapes[j]
-      have he := helem j hj
-      omega
     have htapeSpace : tapeRead.workspace tapes[j] ≤ 2000 * (L + 4) := by
       have h := tapeRead_workspace_le tapes[j]
       have he := helem j hj
@@ -195,13 +201,11 @@ theorem reads_workspace_le (tapes : List Tape) :
       have hread := tapeRead_tapeCount_le
       simp [second, ofTransducer]
       omega
-    have hcallbackTimeRaw := time_comp_le tapeRead (second encUnit eTape) pair
-    simp only [pair] at hsecondTime hsecondSpace hcallbackTimeRaw
     have hcallbackTime : callback.time pair ≤ 6000 * (L + 4) := by
       simp only [callback]
-      exact hcallbackTimeRaw.trans (by omega)
+      simpa only [pair, L] using readsCallback_time_le tapes j hj pair.1
     have hcallbackSpaceRaw := workspace_comp_le tapeRead (second encUnit eTape) pair
-    simp only [pair] at hcallbackSpaceRaw
+    simp only [pair] at hsecondSpace hcallbackSpaceRaw
     have hcallbackSpace : callback.workspace pair ≤ 10000 * (L + 4) := by
       simp only [callback]
       exact hcallbackSpaceRaw.trans (by nlinarith)
@@ -218,14 +222,8 @@ theorem reads_workspace_le (tapes : List Tape) :
     change emitCompiler.workspace pair ≤ 100000 * (L + 4)
     simp only [emitCompiler, ofOutputEq]
     exact hframed.trans (by nlinarith)
-  have hresult : ∀ input : Unit × List Tape,
-      encList eSym (input.2.map fun tape => tape.read) =
-        streamEmit (fun pair : Unit × Tape => pair.1)
-          (fun pair => frame (eSym pair.2.read)) input.1 input.2 := by
-    intro input
-    induction input.2 with
-    | nil => rfl
-    | cons tape tapes ih => simpa [streamEmit, encList_cons] using ih
+  have hresult := encList_map_eq_streamEmit eSym
+    (fun pair : Unit × Tape => pair.2.read)
   have hstreamRaw := listFoldEmitCompiler_workspace_le nextCompiler emitCompiler hresult
     ((), tapes) (100000 * (L + 4)) (100 * (L + 4)) (L + 4)
     hstate helem hemit hnext
@@ -247,12 +245,8 @@ theorem reads_workspace_le (tapes : List Tape) :
           20 * K + 90) + 13 * (L + 4) + 5 * K + 43 at hstreamRaw
     have hB : L + 4 ≤ 4 * (L + 1) := by omega
     exact hstreamRaw.trans (by nlinarith)
-  have hmarshalTimeRaw := time_pair_le (const (encList eTape) encUnit ())
-    (identity (encList eTape)) tapes
   have hmarshalTime : marshal.time tapes ≤ 100 * (L + 1) := by
-    change ((const (encList eTape) encUnit ()).pair
-      (identity (encList eTape))).time tapes ≤ 100 * (L + 1)
-    exact hmarshalTimeRaw.trans (by simp [const, identity]; omega)
+    simpa only [marshal, L] using readsMarshal_time_le tapes
   have hmarshalSpaceRaw := workspace_pair_le (const (encList eTape) encUnit ())
     (identity (encList eTape)) tapes
   have hmarshalSpace : marshal.workspace tapes ≤ 100 * (L + 1) := by
