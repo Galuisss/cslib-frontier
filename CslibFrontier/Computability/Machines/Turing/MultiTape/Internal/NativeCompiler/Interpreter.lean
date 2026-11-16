@@ -391,6 +391,17 @@ private theorem interpreterInputCompiler_workspace_le (description : Desc) (word
     length_encList, descLen, Function.const_apply]
   omega
 
+private theorem interpreterInput_length_le (description : Desc) (word : List ℕ) (count : ℕ) :
+    (encPair eCtx (encList encBool)
+      (((description, word), Universal.init description), List.replicate count true)).length ≤
+      8 * (descLen description + (eCfg (Universal.init description)).length +
+        (encList encUnary word).length + count + 1) := by
+  have ht := length_encList_le encBool (List.replicate count true) (b := 1)
+    (by intro bit hbit; simp [encBool_apply])
+  simp only [List.length_replicate] at ht
+  simp only [eCtx, length_encPair, descLen]
+  omega
+
 /-- Install a fixed deterministic description and execute the supplied number of simulated steps.
 The compiler's time and workspace fields charge its actual finite transition table, independently
 of the simulated clock. The output is valid even if the simulated program has not yet halted. -/
@@ -400,6 +411,73 @@ noncomputable def simulateOutputCompiler (description : Desc) :
   exact (interpreterStreamCompiler.comp (interpreterInputCompiler description)).ofOutputEq
     fun input => by
     simp only [simulate, List.length_replicate, Ctx.desc, Ctx.input, Ctx.cfg]
+
+private theorem simulateOutputCompiler_time_le (description : Desc) (word : List ℕ)
+    (count stepTime : ℕ)
+    (hstep : ∀ j, j < count →
+      stepCompiler.time (description, word,
+        ((stepOut description word)^[j] (Universal.init description, [])).1) ≤ stepTime) :
+    let L := ctxBound (descLen description) (encList encUnary word).length count
+    (simulateOutputCompiler description).time (word, count) ≤
+      count * (2 * stepTime + 5000 * (L + descLen description + count + 1)) +
+        100 * (L + descLen description + count + 1) +
+        1100 * (descLen description + (eCfg (Universal.init description)).length +
+          (encList encUnary word).length + count + 1) := by
+  let A := descLen description + (eCfg (Universal.init description)).length +
+    (encList encUnary word).length + count + 1
+  have hi := interpreterInputCompiler_time_le description word count
+  have hm := interpreterInput_length_le description word count
+  have hs := interpreterStreamCompiler_time_le description word (List.replicate count true)
+    stepTime (by simpa only [List.length_replicate] using hstep)
+  simp only [List.length_replicate] at hs
+  have hscalar (a b m s : ℕ) (ha : a ≤ 1000 * A) (hb : b ≤ s) (hm : m ≤ 8 * A) :
+      a + b + 4 * m + 9 ≤ s + 1100 * A := by
+    dsimp only [A] at *
+    omega
+  change (interpreterInputCompiler description).time (word, count) +
+    interpreterStreamCompiler.time
+      (((description, word), Universal.init description), List.replicate count true) +
+    4 * (encPair eCtx (encList encBool)
+      (((description, word), Universal.init description), List.replicate count true)).length +
+    9 ≤ _
+  exact hscalar _ _ _ _ hi hs hm
+
+private theorem simulateOutputCompiler_workspace_le (description : Desc) (word : List ℕ)
+    (count stepSpace : ℕ)
+    (hstep : ∀ j, j < count →
+      stepCompiler.workspace (description, word,
+        ((stepOut description word)^[j] (Universal.init description, [])).1) ≤ stepSpace) :
+    let L := ctxBound (descLen description) (encList encUnary word).length count
+    let K := streamFoldPairTapeCount interpreterNextCompiler interpreterEmitCompiler
+      (const eCtx encBits [])
+    let callbackSpace := stepSpace + 1024 * (L + descLen description + 1) +
+      256 * (contextStepCompiler.tapeCount + 1) + 6 * max 4 stepCompiler.tapeCount
+    (simulateOutputCompiler description).workspace (word, count) ≤
+      (2 * K * (callbackSpace + callbackSpace + 48 * (L + 1) + 20 * K + 90) +
+        13 * (L + 1) + 5 * K + 43) +
+      1100 * (descLen description + (eCfg (Universal.init description)).length +
+        (encList encUnary word).length + count + 1) +
+      6 * max (interpreterInputCompiler description).tapeCount
+        interpreterStreamCompiler.tapeCount := by
+  let A := descLen description + (eCfg (Universal.init description)).length +
+    (encList encUnary word).length + count + 1
+  have hi := interpreterInputCompiler_workspace_le description word count
+  have hm := interpreterInput_length_le description word count
+  have hs := interpreterStreamCompiler_workspace_le description word (List.replicate count true)
+    stepSpace (by simpa only [List.length_replicate] using hstep)
+  simp only [List.length_replicate] at hs
+  have hscalar (a b m s k : ℕ) (ha : a ≤ 1000 * A) (hb : b ≤ s) (hm : m ≤ 8 * A) :
+      a + b + 5 * m + (6 * k + 20) ≤ s + 1100 * A + 6 * k := by
+    dsimp only [A] at *
+    omega
+  change (interpreterInputCompiler description).workspace (word, count) +
+    interpreterStreamCompiler.workspace
+      (((description, word), Universal.init description), List.replicate count true) +
+    5 * (encPair eCtx (encList encBool)
+      (((description, word), Universal.init description), List.replicate count true)).length +
+    (6 * max (interpreterInputCompiler description).tapeCount interpreterStreamCompiler.tapeCount +
+      20) ≤ _
+  exact hscalar _ _ _ _ _ hi hs hm
 
 private def inputSymbolsCompiler :
     NativeCompiler (List.map Universal.eBit) encBits (encList encUnary) := by
