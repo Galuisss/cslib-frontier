@@ -173,15 +173,17 @@ private theorem computableInPolyTime_labelStep : ComputableInPolyTime
   have hlookup : ComputableInPolyTime
       (fun p : Labelling × ℕ => p.1.getD p.2 none)
       (encPair encLabelling encUnary) (encOption (encList encEdge)) :=
-    listGetD (encA := encOption (encList encEdge)) none
+    ComputableInPolyTime.listGetD (encA := encOption (encList encEdge)) none
   have hsome : ComputableInPolyTime
       (fun p : Labelling × ℕ => (p.1.getD p.2 none).isSome)
       (encPair encLabelling encUnary) encBool :=
-    optionIsSome (encB := encList encEdge) hlookup
+    ComputableInPolyTime.optionIsSome (encB := encList encEdge) hlookup
   have hpath : ComputableInPolyTime
       (fun p : Labelling × ℕ => (p.1.getD p.2 none).getD [])
       (encPair encLabelling encUnary) (encList encEdge) :=
-    optionGetDWithInput (encB := encList encEdge) hlookup (const [])
+    ComputableInPolyTime.optionGetDWithInput (encB := encList encEdge) hlookup (const [])
+  have hhead := ComputableInPolyTime.head? (encList encEdge)
+    (encL := encList (encList encEdge)) (encO := encOption (encList encEdge))
   simp only [labelStep, labelCandidates, adj]
   fun_prop
 

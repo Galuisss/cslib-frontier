@@ -107,7 +107,7 @@ theorem Clause.isPolyTime_orChainAux {input : Input ↪ List Bool} {enc : W ↪ 
       (encPair input encUnary) (encPair enc encBool) := by
     apply optionGetDWithInput (encB := encPair enc encBool)
       (encO := encOption (encPair enc encBool))
-    · apply getElem? (encA := encPair enc encBool) <;> fun_prop
+    · apply getElem? (encA := encPair enc encBool) (encL := encList (encPair enc encBool)) <;> fun_prop
     · fun_prop
   have hz : ComputableInPolyTime (fun p : Input × ℕ => fresh p.1 (index p.1 + p.2))
       (encPair input encUnary) enc := by
@@ -137,7 +137,9 @@ theorem Clause.isPolyTime_orSplit3 {input : Input ↪ List Bool} {enc : W ↪ Li
     cases c <;> rfl
   simp_rw [heq]
   apply optionElimWithInput (encB := encPair enc encBool)
-    (encO := encOption (encPair enc encBool)) (by fun_prop) (by fun_prop)
+    (encO := encOption (encPair enc encBool))
+    ((ComputableInPolyTime.head? (encPair enc encBool)
+      (encL := encList (encPair enc encBool))).comp hclause) (by fun_prop)
   exact Clause.isPolyTime_orChainAux (input := encPair input (encPair enc encBool))
     (fresh := fun p => fresh p.1) (index := fun p => index p.1) (carry := fun p => p.2)
     (rest := fun p => (clause p.1).tail) (by fun_prop) (by fun_prop)

@@ -560,6 +560,10 @@ private theorem computableInPolyTime_cnfToOrderedSize :
   unfold cnfToOrderedSize
   fun_prop
 
+section EncodingOpacity
+
+attribute [local semireducible] encNat
+
 private theorem computableInPolyTime_cnfToOrderedEntry (b : Bool) :
     ComputableInPolyTime
       (fun p : (PL.CNF ℕ × ℕ) × ℕ =>
@@ -646,6 +650,8 @@ private theorem computableInPolyTime_cnfToOrderedEntry (b : Bool) :
     · simp only [h, decide_false, Bool.false_eq_true, ↓reduceIte, Bool.decide_and]
   rw [heq]
   exact ComputableInPolyTime.ite hcond hdiag hbody
+
+end EncodingOpacity
 
 private theorem computableInPolyTime_cnfToOrderedTable (b : Bool) :
     ComputableInPolyTime (cnfToOrderedTable b) encCNF encBits := by

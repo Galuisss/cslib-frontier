@@ -175,7 +175,7 @@ private lemma candBound_spec (L : ℕ) (c : Fin L → Bool) :
   omega
 
 private lemma length_encList_replicate_none {α : Type} (n : ℕ) (enc : α ↪ List Bool) :
-    (encList (encOption enc) (List.replicate n none)).length = n := by
+    (encList (encOption enc) (List.replicate n none)).length = 3 * n := by
   induction n with
   | zero => simp
   | succ n ih =>
@@ -1002,7 +1002,7 @@ private theorem poly_run (L : ℕ) [NeZero L] :
   induction j with
   | zero =>
     simp only [List.take_zero, List.foldl_nil, init, List.length_replicate, true_and]
-    have htab : (encUGTable L (List.replicate (slots g) none)).length = slots g :=
+    have htab : (encUGTable L (List.replicate (slots g) none)).length = 3 * slots g :=
       length_encList_replicate_none (slots g) (encUGFn L)
     have hcand := candBound_spec L (fun _ : Fin L => true)
     rw [length_encUGState_eq]

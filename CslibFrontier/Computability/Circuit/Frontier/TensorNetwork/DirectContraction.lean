@@ -226,6 +226,10 @@ private theorem vertices_polyTime :
   (ComputableInPolyTime.snd encUnary encVertices).comp
     (ComputableInPolyTime.of_eq (f := DescribedNetwork.equivProd) fun _ => rfl)
 
+section EncodingOpacity
+
+attribute [local semireducible] encNat
+
 /-- The weight of the current word modulo `2 ^ P` is computable in polynomial time. -/
 theorem weightMod_polyTime :
     ComputableInPolyTime (fun q : (ℕ × ExplicitTensorNetwork ℕ) × List Bool =>
@@ -294,6 +298,8 @@ theorem weightMod_polyTime :
       fun q acc v _ => (length_encNat_le_of_lt_two_pow (Nat.mod_lt _ (Nat.two_pow_pos _))).trans
         (Nat.le_add_left _ _)⟩
   exact hfold
+
+end EncodingOpacity
 
 /-- The encoding of the live state `((P, d), acc)` of direct summation: the precision `P` in unary
 (framed) paired with the network `d` (`encExplicitNetwork`), that pair framed, followed by the

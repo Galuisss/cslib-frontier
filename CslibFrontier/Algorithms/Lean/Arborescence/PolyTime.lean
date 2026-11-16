@@ -895,7 +895,7 @@ private theorem computableInPolyTime_contractStep :
           ContractState.mk q.1.adj q.1.cost q.1.root true (some q.2) q.1.stack)
         (encPair encContractState (encList encUnary)) encContractState := by fun_prop
     have hcfrom := computableInPolyTime_contractFromParent
-    refine optionElimWithInput hcyc helse2 ?_
+    refine optionElimWithInput (encB := encUnary) hcyc helse2 ?_
     exact hcfrom
   exact hstep.of_enc_eq fun s => by unfold contractStep; rfl
 
@@ -1378,7 +1378,7 @@ theorem computableInPolyTime_edmondsTableAuxList :
         let final := contractStep^[x.fuel] ⟨x.adj, x.cost, x.root, false, none, []⟩
         final.result.map fun base => final.stack.foldl (fun q lvl => expandLevelList lvl q) base)
       encTableAuxInput (encOption (encList encUnary)) := by
-    refine optionMapWithInput (encB := encList encUnary) (by polytime) ?_
+    refine optionMapWithInput (encB := encList encUnary) (encC := encList encUnary) (by polytime) ?_
     have hfold : ComputableInPolyTime
         (fun p : TableAuxInput × List ℕ =>
           let final := contractStep^[p.1.fuel] ⟨p.1.adj, p.1.cost, p.1.root, false, none, []⟩

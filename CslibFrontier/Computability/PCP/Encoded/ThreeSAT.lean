@@ -93,7 +93,11 @@ theorem isPolyTime_clauseHolds :
     p.1.1[i.val]?.elim false (fun l => p.1.2 i == l.2)) (snd _ _)
   intro i
   apply optionElimWithInput (encB := encPair encUnary encBool)
-    (encO := encOption (encPair encUnary encBool)) <;> fun_prop
+    (encO := encOption (encPair encUnary encBool))
+  · apply ComputableInPolyTime.getElem? (encA := encPair encUnary encBool)
+      (encL := encClause encUnary) <;> fun_prop
+  · fun_prop
+  · fun_prop
 
 /-- The per-edge program charges clause lookup, endpoints, and all 64 entries of its relation. -/
 @[fun_prop]

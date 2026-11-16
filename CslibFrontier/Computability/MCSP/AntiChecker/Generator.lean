@@ -108,8 +108,7 @@ private theorem map_frameSrc (v : BitString K) (w : List (Source K)) :
 private theorem encQuery_eq_append (n s ℓ u : ℕ) (P : List (List Bool × Bool)) :
     encQuery ⟨n, s, ℓ, u, P⟩ =
       encQuery ⟨n, s, ℓ, u, []⟩ ++ P.flatMap fun p => frame (frame p.1 ++ [p.2]) := by
-  simp [encQuery_apply, encQueryFields, Cslib.Encoding.encList, Function.comp_def,
-    encPair_apply, encBits_apply]
+  simp [encQuery_apply, encQueryFields, Cslib.Encoding.encList, Function.comp_def]
 
 /-- The sources of the query with parameters `n`, `s`, `ℓ`, `u` and samples whose inputs and labels
 are read from the sources `P`: the parameters as constants, then the frame of each sample. -/
