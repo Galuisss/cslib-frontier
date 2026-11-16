@@ -62,7 +62,8 @@ theorem streamFoldPairTime_le
     streamFoldPairTime nextCompiler emitCompiler finishCompiler input ≤
       input.2.length * (emitTime + nextTime + 46 * lengthBound + 60) +
         finishTime + 24 * lengthBound + 40 := by
-  have hinitial := hstate 0 (Nat.zero_le _)
+  have hinitial : (encS input.1).length ≤ lengthBound := by
+    simpa only [streamState_zero] using hstate 0 (Nat.zero_le _)
   have hfinal := hstate input.2.length le_rfl
   have hlist : (encList encA input.2).length ≤ lengthBound :=
     (length_le_encPair_right encS (encList encA) input).trans hinput
@@ -131,8 +132,8 @@ theorem streamFoldPairWorkspace_le
     Nat.sub_le _ _
   have hsub₂ : K - 1 ≤ K := Nat.sub_le _ _
   simp only [streamFoldPairWorkspace, K, streamUnframedFinish, comp, unframeValue,
-    ofTransducer, inputFromWordWorkspace, encFramed_apply, length_frame]
-    at hsub₁ hsub₂ hfinish ⊢
+    ofTransducer, inputFromWordWorkspace, encFramed_apply, length_frame, Nat.max_eq_right]
+    at hbulk hsub₁ hsub₂ hfinish ⊢
   omega
 
 end Turing.MultiTapeTM.Internal.NativeCompiler
