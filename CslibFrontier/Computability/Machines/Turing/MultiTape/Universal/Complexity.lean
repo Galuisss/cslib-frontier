@@ -161,7 +161,7 @@ lemma length_eSym_headD_le (l : List (Option ℕ)) :
 lemma length_encList_eq_le (l : List (Option ℕ)) :
     2 * (eSym (l.headD none)).length + (encList eSym l.tail).length ≤
       (encList eSym l).length + 2 := by
-  cases l <;> simp [eSym]
+  cases l <;> simp [eSym]; omega
 
 /-- Applying an action at most doubles a work tape, up to the length of the action. -/
 lemma length_eTape_apply (t : Tape) (a : Option (Option ℕ) × SignType) :
@@ -174,7 +174,8 @@ lemma length_eTape_apply (t : Tape) (a : Option (Option ℕ) × SignType) :
   have := length_encIntUnary_sub_one_le h
   rcases w with _ | o <;> rcases m with _ | _ | _ <;>
     simp only [Tape.apply, Tape.move, Tape.write, Tape.read, Option.elim, eTape_apply,
-      length_encPair, encList_cons, List.length_append, length_frame, encOption_some, encOption_none,
+      length_encPair, encList_cons, List.length_append, length_frame,
+      encOption_some, encOption_none,
       List.length_nil, List.length_cons, List.headD_cons, List.tail_cons] <;> omega
 
 /-- An integer's unary encoding is nonempty. Its natural home is the `Primitives` module, next to

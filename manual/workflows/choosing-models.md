@@ -88,7 +88,11 @@ For plain polynomial-time option composition, `fun_prop` has tagged rules for `i
 they do not select an encoding for its type. The generic rules still accept an explicit
 `encO` for other formats. When applying a generic rule directly and its intermediate format
 is absent from the goal, supply `(encO := encOption e)` (or the intended protocol format).
-`OptionEncoding` can infer its payload encoding from an already specified option encoding.
+Capability synthesis still needs a determined payload encoding: for a direct application,
+supply `(encB := e)` as well as `encO` when synthesis remains stuck. Likewise, supply
+`(encA := e)` to list lookup and search certificates. For optional heads, compose
+`ComputableInPolyTime.head? e` with the list certificate directly when automation cannot
+recover the element encoding. These arguments specify the intended encoding explicitly.
 Degree-one and arbitrary-resource option elimination also have tagged search rules; these
 reuse the generic machines and retain their separate time and space charges.
 The universal input scanner keeps empty-word halt emissions internally and charges
