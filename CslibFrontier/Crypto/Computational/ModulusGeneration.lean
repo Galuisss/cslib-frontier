@@ -483,13 +483,11 @@ theorem isPPTOn_primeAttempt :
 /-- **The generator is a strict PPT program** in `n`, given in unary. -/
 theorem isPPTOn_randomPrime : Probability.IsPPTOn encUnary (encSilentOption encNat) randomPrime := by
   have hfst : ComputableInPolyTime (fun found : Option (ℕ × Bool) => found.map Prod.fst)
-      (encSilentOption (encPair encNat encBool)) (encSilentOption encNat) := by
-    have heq : (fun found : Option (ℕ × Bool) => found.map Prod.fst) =
-        fun found => found.elim none fun a => some a.1 := by
-      funext found
-      cases found <;> rfl
-    rw [heq]
-    fun_prop
+      (encOption (encPair encNat encBool)) (encSilentOption encNat) :=
+    ComputableInPolyTime.optionMapWithInput (encB := encPair encNat encBool)
+      (encC := encNat) (encOC := encSilentOption encNat)
+      ComputableInPolyTime.id'
+      ((ComputableInPolyTime.fst encNat encBool).comp (ComputableInPolyTime.snd _ _))
   refine ((isPPTOn_primeAttempt.retry (good := fun a => a.2) (fuel := fun n => 3 * n ^ 2)
     (by fun_prop) (by fun_prop)).map hfst).congr fun n => ?_
   simp only [randomPrime, ProbComp.eval_map, ProbComp.eval_bind, ProbComp.eval_pure]
@@ -503,7 +501,8 @@ private theorem computableInPolyTime_combine :
       (encSilentOption (encPair encNat (encPair encNat encNat))) := by
   have htriple : ComputableInPolyTime (fun pq : ℕ × ℕ => some (pq.1 * pq.2, pq.1, pq.2))
       (encPair encNat encNat) (encSilentOption (encPair encNat (encPair encNat encNat))) :=
-    (ComputableInPolyTime.optionSome _).comp
+    (ComputableInPolyTime.optionSome _
+      (encO := encSilentOption (encPair encNat (encPair encNat encNat)))).comp
       ((ComputableInPolyTime.binary_mul' (ComputableInPolyTime.fst encNat encNat)
         (ComputableInPolyTime.snd encNat encNat)).prod
         ((ComputableInPolyTime.fst encNat encNat).prod (ComputableInPolyTime.snd encNat encNat)))

@@ -64,7 +64,8 @@ theorem openPairs_polyTime :
     ((ComputableInPolyTime.length_bits.comp hchoices).beq
       ((ComputableInPolyTime.length_list (encPair encBool encBool)).comp hpairs))
   have hbody := (hlen.bool_and' hall).ite
-    ((ComputableInPolyTime.optionSome encBool).comp hbit) (ComputableInPolyTime.const none)
+    ((ComputableInPolyTime.optionSome encBool (encO := encSilentOption encBool)).comp hbit)
+    (ComputableInPolyTime.const none)
   unfold openPairs
   exact ComputableInPolyTime.optionElimWithInput
     ((ComputableInPolyTime.snd encBits (encSilentOption encSubmission)).comp

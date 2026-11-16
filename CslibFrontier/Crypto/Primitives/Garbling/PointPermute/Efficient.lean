@@ -129,7 +129,8 @@ attribute [local fun_prop] labelWord_polyTime tweak_polyTime wireWidth_polyTime 
 theorem decodeWord_polyTime :
     ComputableInPolyTime (fun (d, Y) => decodeWord d Y) (encPair encBits encBits)
       (encSilentOption encBits) := by
-  polytime [decodeWord]
+  dsimp only [decodeWord]
+  fun_prop
 
 include hf in
 private theorem evalGate_step :
@@ -137,7 +138,8 @@ private theorem evalGate_step :
         evalGate family p.1.1.1 p.1.1.2.1 p.1.1.2.2 p.1.2 p.2)
       (encPair (encPair (encPair encUnary (encPair encUnary encBits)) (encList encBits)) encUnary)
       (encList encBits) := by
-  polytime [evalGate]
+  dsimp only [evalGate]
+  fun_prop
 
 private theorem length_evalGate_le (k w : ℕ) (body : List Bool) (labels : List (List Bool))
     (g : ℕ) : (encList encBits (evalGate family k w body labels g)).length ≤

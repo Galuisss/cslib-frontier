@@ -433,8 +433,8 @@ theorem isOraclePPTOn_decapsNotBot (hP : P.IsEfficient)
           (x.1, x.2.1.sk, x.2.2)) encDecapsNotBotInput (encKeyedInput encBits))
   have hm : ComputableInPolyTime
       (fun x : ℕ × ImplicitSK (List Bool) (List Bool) (List Bool) × List Bool =>
-        ((P.toExplicitCoin x.1).dec x.2.1.sk x.2.2).getD []) encDecapsNotBotInput encBits := by
-    fun_prop
+        ((P.toExplicitCoin x.1).dec x.2.1.sk x.2.2).getD []) encDecapsNotBotInput encBits :=
+    hD.optionGetDWithInput (ComputableInPolyTime.const [])
   have hfallback : IsOraclePPTOn encDecapsNotBotInput encBits
       (fun x : ℕ × ImplicitSK (List Bool) (List Bool) (List Bool) × List Bool =>
         queryH keyLen x.1 (true, x.2.1.fallback, x.2.2)) :=
@@ -481,7 +481,8 @@ theorem isOraclePPTOn_decapsNotBot (hP : P.IsEfficient)
         queryH keyLen x.1 (false, ((P.toExplicitCoin x.1).dec x.2.1.sk x.2.2).getD [], x.2.2)
       else queryH keyLen x.1 (true, x.2.1.fallback, x.2.2)) hG hafter
   have hbody := IsOraclePPTOn.cond'
-    (ComputableTidilyInPolyTime.optionIsSome hD.tidy).computableInPolyTime hsome hfallback
+    (ComputableTidilyInPolyTime.optionIsSome (encB := encBits) hD.tidy).computableInPolyTime
+    hsome hfallback
   have hall := IsOraclePPTOn.ite'
     (condition := fun x : ℕ × ImplicitSK (List Bool) (List Bool) (List Bool) × List Bool =>
       x.2.2.length ≤ P.ctLen x.1)
@@ -523,8 +524,8 @@ theorem isOraclePPTOn_decapsBot (hP : P.IsEfficient)
         (x.1, x.2.2.1, x.2.2.2)) encDecapsBotInput (encKeyedInput encBits))
   have hm : ComputableInPolyTime
       (fun x : ℕ × List Bool × List Bool × List Bool =>
-        ((P.toExplicitCoin x.1).dec x.2.2.1 x.2.2.2).getD []) encDecapsBotInput encBits := by
-    fun_prop
+        ((P.toExplicitCoin x.1).dec x.2.2.1 x.2.2.2).getD []) encDecapsBotInput encBits :=
+    hD.optionGetDWithInput (ComputableInPolyTime.const [])
   have hmQ : ComputableInPolyTime
       (fun p : (ℕ × List Bool × List Bool × List Bool) × List Bool =>
         ((P.toExplicitCoin p.1.1).dec p.1.2.2.1 p.1.2.2.2).getD [])
@@ -566,7 +567,8 @@ theorem isOraclePPTOn_decapsBot (hP : P.IsEfficient)
           (false, ((P.toExplicitCoin x.1).dec x.2.2.1 x.2.2.2).getD [], x.2.2.2)
       else pure none) hG hafter
   have hbody := IsOraclePPTOn.cond'
-    (ComputableTidilyInPolyTime.optionIsSome hD.tidy).computableInPolyTime hsome hnone
+    (ComputableTidilyInPolyTime.optionIsSome (encB := encBits) hD.tidy).computableInPolyTime
+    hsome hnone
   have hall := IsOraclePPTOn.ite'
     (condition := fun x : ℕ × List Bool × List Bool × List Bool =>
       x.2.2.2.length ≤ P.ctLen x.1)
