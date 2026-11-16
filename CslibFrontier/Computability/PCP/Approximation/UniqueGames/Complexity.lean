@@ -1007,6 +1007,8 @@ private theorem poly_run (L : ℕ) [NeZero L] :
     have hcand := candBound_spec L (fun _ : Fin L => true)
     rw [length_encUGState_eq]
     simp only [htab, encUGVerts, encList_nil, List.length_nil, runBound]
+    have ht := length_encUGTable_le_mul L (List.replicate (slots g) none)
+    simp only [List.length_replicate, htab] at ht
     omega
   | succ j ih =>
     obtain ⟨hlen, hbound⟩ := ih (Nat.le_of_succ_le hj)

@@ -228,7 +228,8 @@ private theorem vertices_polyTime :
 
 section EncodingOpacity
 
-attribute [local semireducible] encNat
+-- Keep proof search from unfolding the shared binary representation.
+attribute [local irreducible] Cslib.Encoding.encNat ComputableInPolyTime
 
 /-- The weight of the current word modulo `2 ^ P` is computable in polynomial time. -/
 theorem weightMod_polyTime :

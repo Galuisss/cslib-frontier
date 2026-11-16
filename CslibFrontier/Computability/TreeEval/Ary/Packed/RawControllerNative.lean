@@ -257,7 +257,8 @@ private theorem beginRound_budget {α : Type} {encIn : α ↪ List Bool} {S : α
   have hreg := reg_budget hd ht hz
   exact (state_budget (scale_budget hp hr hreg (budget_natSucc hi) hb)
     (budget_cons (frame_budget hi hz (budget_const false hlen) hc ht) hs)
-    (budget_optionSome (encO := encOption (encPair encNat encNat)) (budget_prod hone hreg))).of_enc_eq fun _ => rfl
+    (budget_optionSome (encO := encOption (encPair encNat encNat)) (budget_prod hone
+      hreg))).of_enc_eq fun _ => rfl
 
 private def checkedCall (p d r : ℕ) (reply : Reply) (bank : List ℕ) (stack : List Frame)
     (ct : ℕ × ℕ) : State :=

@@ -131,8 +131,8 @@ def lyubashevskyExtractList (input : LyubashevskyExtractInput) : List ℤ :=
     (lyubashevskyExtractList input).length = input.dims.m + input.dims.k := by
   simp [lyubashevskyExtractList]
 
-/-- One native extractor handles runtime dimensions and all binary integer magnitudes. -/
 attribute [local irreducible] ComputableInPolyTime in
+/-- One native extractor handles runtime dimensions and all binary integer magnitudes. -/
 @[fun_prop]
 theorem computableInPolyTime_lyubashevskyExtractList :
     ComputableInPolyTime lyubashevskyExtractList encLyubashevskyExtractInput

@@ -57,11 +57,13 @@ queries and decryption queries in arbitrary order:
   - **Encryption / challenge query** (`.challenge m₀ m₁`): if `valid n pk m₀ m₁` holds, the
     challenger encrypts `if bit then m₁ else m₀` (`ct ← encrypt n pk (if bit then m₁ else m₀)`),
     prepends `ct` to the forbidden set `S`, and returns `Sum.inl (some ct)` (encoded as
-    `encSilentOption encBits (some ct) = true :: ct`); otherwise it returns `Sum.inl none` (`[]`) with `S`
+    `encSilentOption encBits (some ct) = true :: ct`); otherwise it returns `Sum.inl none` (`[]`)
+      with `S`
     unchanged.
   - **Decryption query** (`.decrypt c`): if `c ∈ S` (where `S` is the list of challenge ciphertexts
     produced *so far*), the challenger rejects with `Sum.inr none` (`[]`); otherwise it returns
-    `Sum.inr (decrypt n sk c)` (encoded as `encSilentOption encOut (decrypt n sk c)`) with `S` unchanged.
+    `Sum.inr (decrypt n sk c)` (encoded as `encSilentOption encOut (decrypt n sk c)`) with `S`
+      unchanged.
     Crucially, a ciphertext `c` queried to `.decrypt c` *before* `c` happens to be produced by a
     later `.challenge` query is decrypted normally, whereas any `.decrypt c` query *after* `c` was
     returned by `.challenge` is rejected.
@@ -230,7 +232,8 @@ on `.decrypt _`. -/
       encPair (encSilentOption (encPair encMsg encMsg)) encBits q.toOptionPair := rfl
 
 /-- Encode the payload of a `CCAResponse Out (List Bool)` as an optional bit word
-(`encSilentOption encBits` on encryption responses and `encSilentOption encOut` on decryption responses). -/
+(`encSilentOption encBits` on encryption responses and `encSilentOption encOut` on decryption
+  responses). -/
 @[expose] def encodeCCAResponseWord {Out : Type} (encOut : Out ↪ List Bool) :
     CCAResponse Out (List Bool) → List Bool
   | Sum.inl ctOpt => encSilentOption encBits ctOpt
@@ -1260,7 +1263,7 @@ private theorem length_interleavedOpenRoundStep_le_aux {Msg : Type} [Inhabited M
     simp only [CCAQuery.isChallenge, ↓reduceIte, CCAQuery.challengePair] at hbranch
     have hmLen : (encMsg (if roundBit then m₁ else m₀)).length ≤ B := by
       simp only [encCCAQuery_apply, CCAQuery.toOptionPair, length_encPair,
-        encSilentOption_some, encSilentOption_none, List.length_cons, List.length_nil,
+        encSilentOption_some, List.length_cons, List.length_nil,
         encBits_apply] at hqLen
       cases roundBit <;> simp only [↓reduceIte, Bool.false_eq_true] <;> omega
     by_cases hv : valid n pk m₀ m₁ = true

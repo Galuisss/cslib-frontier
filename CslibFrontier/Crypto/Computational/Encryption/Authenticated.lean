@@ -103,7 +103,8 @@ Section 5.4.1, Example 5.2 and Theorem 5.2, printed pp. 183–187) are formalize
   the text stipulates that "The restriction we impose is that the adversary may not ask for the
   decryptions of any of these ciphertexts." In
   `ccaOracle`, decryption queries on previously returned challenge ciphertexts
-  (`queriedCiphertexts`) are instead answered with `[] = encSilentOption encBits none` (rejection), which
+  (`queriedCiphertexts`) are instead answered with `[] = encSilentOption encBits none`
+    (rejection), which
   is equivalent for adversaries respecting the restriction and makes `ccaOracle` a total function on
   all queries.
 * **Power-of-two index range in Theorem 9.1**: in equations (9.3) and (9.4) of [BonehShoup2023]
@@ -1427,7 +1428,8 @@ theorem AuthenticatedEncryption.oneTimeAuthenticatedEncryption {E : SymmetricCip
   both have length `n`, encrypt `if bit then m1 else m0` under `k`, prepend the resulting
   ciphertext `ct` to `queriedCiphertexts`, and return `ct`; otherwise return `[]`.
 * On a decryption query `(true, ct)`: if `queriedCiphertexts.contains ct` is `true`, return `[]`
-  (prohibited challenge ciphertext); otherwise return `encSilentOption encBits (E.decrypt n k ct)`. -/
+  (prohibited challenge ciphertext); otherwise return `encSilentOption encBits (E.decrypt n k
+    ct)`. -/
 noncomputable def ccaOracle (E : SymmetricCipher) (n : ℕ) (k : List Bool) (bit : Bool)
     (request : Bool × List Bool) : StateT (List (List Bool)) ProbComp (List Bool) :=
   fun queriedCiphertexts =>
@@ -1653,7 +1655,8 @@ def INDCCA (E : SymmetricCipher) : Prop :=
   have length `n`, encrypt `if bit then m1 else m0` under `k`, record `[ct]`, and return `ct`;
   otherwise return `[]`.
 * On a decryption query `(true, ct)`: if `queriedCiphertexts.contains ct` is `true`, return `[]`
-  (prohibited challenge ciphertext); otherwise return `encSilentOption encBits (E.decrypt n k ct)`. -/
+  (prohibited challenge ciphertext); otherwise return `encSilentOption encBits (E.decrypt n k
+    ct)`. -/
 noncomputable def oneTimeCCAOracle (E : SymmetricCipher) (n : ℕ) (k : List Bool) (bit : Bool)
     (request : Bool × List Bool) : StateT (List (List Bool)) ProbComp (List Bool) :=
   fun queriedCiphertexts =>
@@ -1966,7 +1969,8 @@ theorem isOraclePPT_ccaLimitToOneEncryptionQuery {ctBound : ℕ → ℕ}
   simpa only [bind_pure_comp] using (hrun.map' (ComputableInPolyTime.fst _ _)).isOraclePPT
 
 /-- When `ctBound n` bounds all ciphertext lengths produced by `E.encrypt n k` on `n`-bit messages
-and `decBound n ct` bounds all encoded decryption replies `encSilentOption encBits (E.decrypt n k ct)`,
+and `decBound n ct` bounds all encoded decryption replies `encSilentOption encBits (E.decrypt n k
+  ct)`,
 running `ccaLimitToOneEncryptionQuery ctBound decBound adversary` in `ccaGame` has the exact same
 output distribution as `ccaOneTimeGame adversary`. -/
 theorem eval_ccaGame_ccaLimitToOneEncryptionQuery (E : SymmetricCipher) (ctBound : ℕ → ℕ)

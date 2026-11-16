@@ -178,7 +178,8 @@ private theorem computableInPolyTime_finish {NOf : P → ℕ}
 
 section EncodingOpacity
 
-attribute [local semireducible] encNat
+-- Keep proof search from unfolding the shared binary representation.
+attribute [local irreducible] Cslib.Encoding.encNat ComputableInPolyTime
 
 /-- Normalize one total declared-count leaf implementation. The intermediate declared count is
 charged explicitly in both resource bounds; semantic correctness still requires the support and

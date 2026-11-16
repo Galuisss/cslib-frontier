@@ -359,7 +359,8 @@ def cca2Phase1Oracle {Out : Type} (encOut : Out ↪ List Bool)
 /-- Phase 2 decryption oracle ([BonehShoup2023], Section 12.1, Attack Game 12.1 and Definition 12.2,
 printed pp. 467–468): reject the challenge ciphertext (`request.2 == ct`) with `[]`
 (`encSilentOption encOut none`), and answer all other queries `request.2 ≠ ct` with
-`encSilentOption encOut (decrypt n sk request.2)`. Since the adversary receives `ct` as input to `guess`
+`encSilentOption encOut (decrypt n sk request.2)`. Since the adversary receives `ct` as input to
+  `guess`
 and can simulate the constant `[]` reply on `ct` itself, returning `[]` on `ct` is equivalent to
 forbidding the query `ĉ = c` (matching `SymmetricCipher.ccaOracle` in
 `CslibFrontier/Crypto/Computational/Encryption/Authenticated.lean`). -/
@@ -1092,7 +1093,8 @@ abbrev WordMultiCCA2Adversary.IsPPT (adversary : WordMultiCCA2Adversary) : Prop 
 
 /-- Multi-challenge Phase 2 decryption oracle ([BonehShoup2023], Section 12.1, Attack Game 12.1 and
 Definition 12.1, printed pp. 467–468): reject any decryption query matching one of the challenge
-ciphertexts (`decide (request.2 ∈ cts)`) with `[]` (`encSilentOption encOut none`), and answer all other
+ciphertexts (`decide (request.2 ∈ cts)`) with `[]` (`encSilentOption encOut none`), and answer
+  all other
 queries `request.2 ∉ cts` with `encSilentOption encOut (decrypt n sk request.2)`. -/
 def cca2MultiPhase2Oracle {Out : Type} (encOut : Out ↪ List Bool)
     (decrypt : ℕ → List Bool → List Bool → Option Out)

@@ -429,7 +429,8 @@ def cca2ADPhase1Oracle {Out : Type} (encOut : Out ↪ List Bool)
 
 /-- Phase 2 decryption oracle with associated data ([BonehShoup2023], Section 12.7,
 Definition 12.7, printed pp. 501–502): unpack `request.2` into `(unframe request.2,
-dropFrame request.2)`, reject the challenge pair `(ct, ad)` with `[]` (`encSilentOption encOut none`),
+dropFrame request.2)`, reject the challenge pair `(ct, ad)` with `[]` (`encSilentOption encOut
+  none`),
 and answer all other queries with
 `encSilentOption encOut (decrypt n sk (unframe request.2) (dropFrame request.2))`. -/
 def cca2ADPhase2Oracle {Out : Type} (encOut : Out ↪ List Bool)

@@ -83,6 +83,7 @@ rejects and returns `decrypt sk ct`. -/
 @[expose] def flipCiphertext (pk ct : List Bool) : List Bool :=
   mulCiphertexts pk ct (dropFrame pk)
 
+attribute [local irreducible] ComputableInPolyTime in
 /-- `flipCiphertext` is computable in polynomial time. -/
 theorem computableInPolyTime_flipCiphertext :
     ComputableInPolyTime (fun ⟨pk, ct⟩ => flipCiphertext pk ct) (encPair encBits encBits)

@@ -105,9 +105,8 @@ theorem AdversaryOf.IsPPT.restrict {Msg : Type} {encMsg : Msg ↪ List Bool}
     ppt
   guess := by
     have hguess := hadversary.guess
-    exact hguess.preprocess (by
-      unfold AdversaryOf.restrict
-      fun_prop)
+    dsimp only [AdversaryOf.restrict]
+    ppt
 
 /-- Unrestricted IND-CPA implies IND-CPA under every polynomial-time admissibility predicate. -/
 theorem INDCPAOf.indcpaOn {Msg : Type} {encMsg : Msg ↪ List Bool}

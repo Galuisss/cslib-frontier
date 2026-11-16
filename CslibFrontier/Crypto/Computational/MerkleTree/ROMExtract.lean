@@ -870,6 +870,7 @@ theorem computableInPolyTime_findQueryInTrace
     ComputableInPolyTime (fun a => findQueryInTrace (tr a) (digest a)) encIn
       (encSilentOption encBits) := by
   have hfind := ComputableInPolyTime.findWithInput
+    (encO := encOption (encPair encBits encBits))
     (test := fun a (p : List Bool × List Bool) => p.2 == digest a) htr
     (ComputableInPolyTime.beq
       ((ComputableInPolyTime.snd encBits encBits).comp
@@ -996,6 +997,7 @@ theorem computableInPolyTime_extractTraceCollision
     dsimp only [Function.comp_def]
     cases findQueryInTrace (tr p.1) (H (k p.1) p.2) <;> rfl
   have hfind := ComputableInPolyTime.findWithInput
+    (encO := encOption encBits)
     (test := fun a q => findQueryInTrace (tr a) (H (k a) q) != some q) hinputs htest
   have hbody := hq.prod
     (hlookup.optionGetDWithInput (encB := encBits) (ComputableInPolyTime.const []))

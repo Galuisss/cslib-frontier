@@ -107,7 +107,8 @@ theorem Clause.isPolyTime_orChainAux {input : Input ↪ List Bool} {enc : W ↪ 
       (encPair input encUnary) (encPair enc encBool) := by
     apply optionGetDWithInput (encB := encPair enc encBool)
       (encO := encOption (encPair enc encBool))
-    · apply getElem? (encA := encPair enc encBool) (encL := encList (encPair enc encBool)) <;> fun_prop
+    · apply getElem? (encA := encPair enc encBool) (encL := encList (encPair enc encBool)) <;>
+      fun_prop
     · fun_prop
   have hz : ComputableInPolyTime (fun p : Input × ℕ => fresh p.1 (index p.1 + p.2))
       (encPair input encUnary) enc := by

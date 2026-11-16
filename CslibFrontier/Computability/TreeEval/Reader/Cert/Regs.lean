@@ -189,7 +189,7 @@ private theorem subElem_inSpace :
   have hget : ComputableInSpace (fun q : (ℕ × ℕ) × ℕ × Option ℕ => q.2.2.getD 0)
       encSubArg encNat (fun q => (encSubArg q).length) :=
     budget_optionGetD (encB := encNat) 0 ((snd _ _).snd')
-  apply budget_optionSome (encO := encOption encNat)
+  apply budget_optionSome (encB := encNat) (encO := encOption encNat)
   space [subElem, addMod, negMod, mulMod]
 
 private theorem length_encList_mapIdx_le (l : List ℕ) (f : ℕ → ℕ → ℕ) (P : ℕ)

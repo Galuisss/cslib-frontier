@@ -289,6 +289,7 @@ theorem step_polyTime : ComputableInPolyTime (fun x : CongestionCode × List Boo
   unfold step
   apply ComputableInPolyTime.optionElimWithInput
     (encB := encPair encUnary encUnary)
+    (encO := encOption (encPair encUnary encUnary))
   · apply ComputableInPolyTime.findWithInput (encA := encPair encUnary encUnary) <;> fun_prop
   · fun_prop
   · fun_prop

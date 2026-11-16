@@ -395,10 +395,10 @@ private noncomputable def guessWords (k : ℕ) (st : ReductionState G) (V : Opti
         st.params.evaluatorLen) (V.getD ⟨[], [], []⟩),
     encPi encBits fun _ : Fin 2 => st.output)
 
+attribute [local irreducible] ComputableInPolyTime in
 /-- **The reduction is PPT** whenever the environment `Z` is PPT for `encoding G encFn`, the public
 parameters are drawn by a PPT sampler `samp`, and `G` reads input lengths (`hinLen`) and evaluates
 `ev` (`hev`) in polynomial time. -/
-attribute [local irreducible] ComputableInPolyTime in
 theorem isPPT_evaluatorToPrvSim {encFn : Fn ↪ List Bool} {samp : ℕ → ProbComp (Params G)}
     {Z : Environment (family G) {1}} (hinLen : ComputableInPolyTime G.inLen encFn encUnary)
     (hev : ComputableInPolyTime (fun (f, x) => G.ev f x) (encPair encFn encBits) encBits)

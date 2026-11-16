@@ -350,6 +350,10 @@ private theorem zeroStep_polyTime :
         zeroStep hash p.1.1.1 p.1.1.2.1 p.1.1.2.2 p.1.2 p.2)
       (encPair (encPair (encPair encUnary (encPair encUnary encBits)) (encList encBits))
         (encPair encNat (encPair encNat encBits))) (encList encBits) := by
+  have hlookup := ComputableInPolyTime.listGetD (encA := encBits)
+    (encL := encList encBits) []
+  have hbit := ComputableInPolyTime.listGetD (encA := encBool)
+    (encL := encBits) false
   polytime [zeroStep, zeroGate]
 
 /-- A label read at a wire number written in binary, capped by the number of labels. -/
@@ -359,6 +363,8 @@ private theorem labelAt_polyTime {γ : Type} {encIn : γ ↪ List Bool}
     (hu : ComputableInPolyTime u encIn encBits) :
     ComputableInPolyTime (fun x => (labels x).getD
       (BitString.boundedBinaryValue (labels x).length (u x).reverse - 1) []) encIn encBits := by
+  have hlookup := ComputableInPolyTime.listGetD (encA := encBits)
+    (encL := encList encBits) []
   polytime
 
 /-- The sum of two words, cut to `k + 2` bits. -/
@@ -428,6 +434,10 @@ private theorem gateRow_polyTime {γ : Type} {encIn : γ ↪ List Bool} {k g a b
     (hb : ComputableInPolyTime b encIn encUnary) (hi : ComputableInPolyTime i encIn encUnary) :
     ComputableInPolyTime (fun x => gateRow hash (k x) (Δ x) (labels x) (isAnd x) (g x) (a x)
       (b x) (i x)) encIn encBits := by
+  have hlookup := ComputableInPolyTime.listGetD (encA := encBits)
+    (encL := encList encBits) []
+  have hbit := ComputableInPolyTime.listGetD (encA := encBool)
+    (encL := encBits) false
   polytime [gateRow]
 
 /-! ### Evaluation -/
@@ -654,6 +664,10 @@ private theorem decInfoWord_polyTime :
   have hrange : ComputableInPolyTime (fun p : ℕ × ℕ × ℕ × List (List Bool) =>
       (List.range p.2.1).map fun o => colourWord p.1 (p.2.2.2.getD (p.2.2.1 + o) []))
       (encPair encUnary (encPair encUnary (encPair encUnary (encList encBits)))) encBits := by
+    have hlookup := ComputableInPolyTime.listGetD (encA := encBits)
+      (encL := encList encBits) []
+    have hbit := ComputableInPolyTime.listGetD (encA := encBool)
+      (encL := encBits) false
     polytime [colourWord]
   have hd := data_polyTime
   have hs : ComputableInPolyTime (fun x : ℕ × XorAndCircuit × List Bool =>

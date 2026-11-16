@@ -136,7 +136,8 @@ theorem isPolyTime_sampleEdge {Input : Type} {input : Input ↪ List Bool} {enc 
     ComputableInPolyTime (fun x => (graph x).sampleEdge (random x))
       input (encOption (Edge.encoding enc)) := by
   unfold sampleEdge
-  apply ComputableInPolyTime.getElem? (encA := Edge.encoding enc) (encL := encList (Edge.encoding enc))
+  apply ComputableInPolyTime.getElem? (encA := Edge.encoding enc) (encL := encList (Edge.encoding
+    enc))
   · fun_prop
   · apply ComputableInPolyTime.bitsBoundedBinaryValueWithInput <;> fun_prop
 

@@ -245,7 +245,8 @@ private theorem computableInPolyTime_liuPassCoreWithInput {Î± : Type} {input : Î
   have hrun := DescriptionMethod.computableInPolyTime_universalTMRunFor.comp
     ((computableInPolyTime_decodeProg hn hx).prod (ht.comp hn))
   have hsilent := ComputableInPolyTime.optionMapWithInput
-    (encB := encBits) (encC := encBits) (encOC := encSilentOption encBits)
+    (encB := encBits) (encC := encBits) (encO := encOption encBits)
+    (encOC := encSilentOption encBits)
     hrun (ComputableInPolyTime.snd _ _)
   exact ((computableInPolyTime_decodeLen hn hx).prod hsilent).of_enc_eq fun a => by
     simp only [liuPassCore, Function.comp_def, Option.map_id]

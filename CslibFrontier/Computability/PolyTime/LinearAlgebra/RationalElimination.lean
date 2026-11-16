@@ -307,7 +307,8 @@ end SizeBounds
 
 section PolyTimeImpl
 
-attribute [local semireducible] encNat
+-- Keep proof search from unfolding the shared binary representation.
+attribute [local irreducible] Cslib.Encoding.encNat ComputableInPolyTime
 
 attribute [local irreducible] encRat encIntBin IntTable.enc RatTable.enc
   BareissState.enc RationalElimResult.enc LinearSystemInput.enc LinearSolveResult.enc
@@ -692,6 +693,7 @@ private theorem buildKernelVec_poly {α : Type} {encIn : α ↪ List Bool}
     rw [heq]
     refine mapWithInput (unary_range' (by fun_prop)) ?_
     exact ComputableInPolyTime.optionElimWithInput (encB := encPair encUnary encUnary)
+        (encO := encOption (encPair encUnary encUnary))
       (findWithInput (by fun_prop) (by fun_prop)) (by fun_prop) (by fun_prop)
   exact hbase.comp (hst.prod hj)
 
@@ -797,6 +799,7 @@ theorem ratSolve_computableInPolyTime :
   have hsol : ComputableInPolyTime solOf LinearSystemInput.enc (encList encRat) :=
     mapWithInput (unary_range' (by fun_prop))
       (ComputableInPolyTime.optionElimWithInput (encB := encPair encUnary encUnary)
+        (encO := encOption (encPair encUnary encUnary))
         (findWithInput (by fun_prop) (by fun_prop)) (by fun_prop) (by fun_prop))
   have hyes : ComputableInPolyTime
       (fun sys => LinearSolveResult.mk (some (solOf sys))

@@ -763,7 +763,8 @@ abbrev encIOPTranscript (r : ℕ) {Stmt Chal : Type}
 theorem encList_oracleLeaves {Sym : Type} (encSym : Sym ↪ List Bool) (d : ℕ)
     (π : OracleTable d Sym) :
     encList encBits (oracleLeaves encSym d π) = encOracleTable d encSym π := by
-  simp [oracleLeaves, encOracleTable, encFinFn, encList, List.ofFn_eq_map, List.flatMap_map,
+  simp [oracleLeaves, encOracleTable, encFinFn, encList, Cslib.Encoding.encList, encBits_apply,
+    List.ofFn_eq_map, List.flatMap_map,
     Function.comp_def]
 
 /-- Encoding an oracle table into its Merkle leaf list `oracleLeaves` takes polynomial time. -/

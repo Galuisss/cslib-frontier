@@ -56,7 +56,19 @@ private theorem sessionAdvance_polyTime :
     (branch := fun op p => p.2.2.advance p.1 (op, p.2.1.2))
     (show ComputableInPolyTime _ _ (encFinite SenderOperation) by fun_prop) ?_
   intro op
-  cases op <;> simp only [Session.advance] <;> fun_prop
+  have hsome := ComputableInPolyTime.optionSome (encPair encBool encBits)
+    (encO := encSilentOption (encPair encBool encBits))
+  cases op with
+  | open bit =>
+    have hbit := ComputableInPolyTime.const
+      (encIn := encPair encUnary
+        (encPair (encPair (encFinite SenderOperation) encBits) encSession))
+      (encOut := encBool) bit
+    simp only [Session.advance]
+    fun_prop
+  | table values => simp only [Session.advance]; fun_prop
+  | seal => simp only [Session.advance]; fun_prop
+  | abort => simp only [Session.advance]; fun_prop
 
 private theorem sessionAdvance_length (k : ℕ) (request : SenderOperation × List Bool)
     (s : Session) :

@@ -238,8 +238,11 @@ theorem optionGetD (d : β) :
       of_take_one fun o => by cases o <;> rfl
     convert ite_subtype (f := fun o : Option β => o.getD d) (g := fun _ => d) tag
       (of_tail (encIn := (Function.Embedding.subtype _).trans (encOption encOut))
-        (encOut := encOut) (f := fun o : {o : Option β // o.isSome = true} => o.val.getD d) fun ⟨o, ho⟩
-        => by cases o <;> simp_all)
+        (encOut := encOut) (f := fun o : {o : Option β // o.isSome = true} => o.val.getD d) fun
+          ⟨o, ho⟩
+        => by cases o with
+          | none => simp only [Option.isSome_none, Bool.false_eq_true] at ho
+          | some b => rfl)
       ((const d).restrict _) using 1
     funext o
     cases o <;> rfl

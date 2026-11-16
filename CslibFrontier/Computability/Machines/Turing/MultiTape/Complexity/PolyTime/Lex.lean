@@ -76,7 +76,8 @@ theorem ComputableInPolyTime.bits_lex_le :
       (fun p : List Bool × List Bool => decide (p.1.length ≤ p.2.length))
       (encPair encBits encBits) encBool := by
     fun_prop
-  have h := ComputableInPolyTime.optionElimWithInput (encB := encPair encBool encBool) (body := fun _ q => !q.1) hfind hlen
+  have h := ComputableInPolyTime.optionElimWithInput (encB := encPair encBool encBool) (body :=
+    fun _ q => !q.1) hfind hlen
     ((ComputableInPolyTime.of_finite fun q : Bool × Bool => !q.1).comp (.snd _ _))
   convert h using 2 with p
   rw [← lexLe_eq_decide, lexLe]

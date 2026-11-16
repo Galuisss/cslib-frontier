@@ -858,7 +858,8 @@ private theorem isPPTOn_gmwViewReduction_aux {α γ : Type} {enc : α ↪ List B
     isPPTOn_sequenceTest (sample := encSilentOption encBits) (hone.preprocess hp_att)
       (hzero.preprocess hp_att) ((hn0.comp hp_att).unary_add' (.const 1))
       (hadv.preprocess
-        (input := encPair (encPair input (encSilentOption encBits)) (encList (encSilentOption encBits)))
+        (input := encPair (encPair input (encSilentOption encBits)) (encList (encSilentOption
+          encBits)))
         (prepare := fun p => ((p.1.1.1, p.1.1.2.1, z' p.1.1.2.2.2), firstSuccess [] p.2))
         (((hn0.comp hp_attCtx).prod ((ha0.comp hp_attCtx).prod (hz'0.comp hp_attCtx))).prod
           (computableInPolyTime_firstSuccess (.const [])
@@ -879,7 +880,8 @@ private theorem isPPTOn_gmwViewReduction_aux {α γ : Type} {enc : α ↪ List B
     hpad.bind_with (houter.preprocess
       (input := encPair (encPair input (encList encBits)) (encSilentOption encBits))
       (prepare := fun p => (p.1.1, p.2))
-      (((ComputableInPolyTime.fst (encPair input (encList encBits)) (encSilentOption encBits)).fst').prod
+      (((ComputableInPolyTime.fst (encPair input (encList encBits)) (encSilentOption
+        encBits)).fst').prod
         (.snd (encPair input (encList encBits)) (encSilentOption encBits))))
   have hp_out := ComputableInPolyTime.fst input encBits
   have hp_ctx1 := (ComputableInPolyTime.fst (encPair input encBits) (encList encBits)).fst'

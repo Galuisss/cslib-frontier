@@ -494,6 +494,7 @@ theorem isPPTOn_randomPrime : Probability.IsPPTOn encUnary (encSilentOption encN
   simp only [randomPrime, ProbComp.eval_map, ProbComp.eval_bind, ProbComp.eval_pure]
   rfl
 
+attribute [local irreducible] ComputableInPolyTime in
 /-- Combining two optional primes into an optional modulus takes polynomial time. -/
 private theorem computableInPolyTime_combine :
     ComputableInPolyTime

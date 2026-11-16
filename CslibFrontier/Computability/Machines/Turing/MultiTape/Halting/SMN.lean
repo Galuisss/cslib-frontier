@@ -136,7 +136,7 @@ theorem redirectEntry_hardwire (e : Key × Act) :
 
 /-! ### The transitions of `hardwire d p` -/
 
-attribute [local irreducible] eDesc eKey eAct eTable
+attribute [local irreducible] eDesc eKey eAct
 
 theorem computableInPolyTime_writeEntries :
     ComputableInPolyTime (fun dp : Desc × List Bool => writeEntries dp.2 dp.1.tapes)
@@ -158,7 +158,7 @@ theorem computableInPolyTime_writeEntries :
         (⟨2 * bi.2 + 6, r, none :: List.replicate dp.1.tapes none⟩,
           (⟨.zero, [(some (some (eBit bi.1)), .pos)], none, some (2 * bi.2 + 4)⟩ : Act)))
       (encPair eDesc encBits) eTable := by
-    refine flatMapWithInput (encB := encPair encBool encUnary) hz ?_
+    refine flatMapWithInput (encA := encPair encBool encUnary) (encB := encPair eKey eAct) hz ?_
     fun_prop
   exact listAppend' h1 h2
 
@@ -166,8 +166,11 @@ theorem computableInPolyTime_redirect :
     ComputableInPolyTime (fun d : Desc => redirect (fun q => 2 * q + 1) none [] 0 id d.table)
       eDesc eTable := by
   simp only [redirect, redirectEntry_hardwire, vlift_eq_elim, vmove]
-  refine flatMapWithInput (encB := encPair eKey eAct) computableInPolyTime_desc_table ?_
-  fun_prop
+  refine flatMapWithInput (encA := encPair eKey eAct) (encB := encPair eKey eAct)
+    computableInPolyTime_desc_table ?_
+  refine mapWithInput (encA := encOption encUnary) (encB := encPair eKey eAct) ?_ ?_
+  · fun_prop
+  · fun_prop
 
 end Hardwire
 

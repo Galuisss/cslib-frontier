@@ -181,7 +181,8 @@ private theorem computableInPolyTime_labelStep : ComputableInPolyTime
   have hpath : ComputableInPolyTime
       (fun p : Labelling × ℕ => (p.1.getD p.2 none).getD [])
       (encPair encLabelling encUnary) (encList encEdge) :=
-    ComputableInPolyTime.optionGetDWithInput (encB := encList encEdge) hlookup (const [])
+    ComputableInPolyTime.optionGetDWithInput (encB := encList encEdge) hlookup
+      (ComputableInPolyTime.const [])
   have hhead := ComputableInPolyTime.head? (encList encEdge)
     (encL := encList (encList encEdge)) (encO := encOption (encList encEdge))
   simp only [labelStep, labelCandidates, adj]

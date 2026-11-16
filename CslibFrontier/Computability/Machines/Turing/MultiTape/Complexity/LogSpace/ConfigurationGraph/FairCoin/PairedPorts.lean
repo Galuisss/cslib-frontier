@@ -347,7 +347,8 @@ private theorem pairSortedTargets_budget {a b : α → Option ℕ}
         (budget_cons hva hnil))
   refine (budget_ite (budget_optionIsSome (encB := encNat) ha)
     (budget_ite (budget_optionIsSome (encB := encNat) hb) hboth (budget_cons hva hnil))
-    (budget_ite (budget_optionIsSome (encB := encNat) hb) (budget_cons hvb hnil) hnil)).of_enc_eq fun x => ?_
+    (budget_ite (budget_optionIsSome (encB := encNat) hb) (budget_cons hvb hnil) hnil)).of_enc_eq
+      fun x => ?_
   rcases a x with _ | v₀ <;> rcases b x with _ | v₁ <;>
     simp [pairSortedTargets, decide_eq_true_eq]
 

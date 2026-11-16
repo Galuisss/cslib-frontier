@@ -166,7 +166,9 @@ theorem computableInPolyTime_collidingPairList? {γ : Type} {encIn : γ ↪ List
     (encO := encOption (encPair (encPair encBits encBits) (encPair encBits encBits)))
     (test := fun _ (p : (List Bool × List Bool) × (List Bool × List Bool)) =>
       decide (p.1.2 = p.2.2 ∧ p.1.1 ≠ p.2.1)) hprod (by fun_prop)
-  have helim := ComputableInPolyTime.optionElimWithInput hfind
+  have helim := ComputableInPolyTime.optionElimWithInput
+    (encB := encPair (encPair encBits encBits) (encPair encBits encBits))
+    (encC := encPair encBits encBits) hfind
     (ComputableInPolyTime.const ([], [])) (body := fun _ p => (p.1.1, p.2.1)) (by fun_prop)
   have hgetD : ∀ o : Option ((List Bool × List Bool) × (List Bool × List Bool)),
       (o.map fun p => (p.1.1, p.2.1)).getD ([], []) = o.elim ([], []) fun p => (p.1.1, p.2.1) := by

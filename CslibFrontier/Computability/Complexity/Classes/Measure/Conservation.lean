@@ -229,7 +229,7 @@ private theorem computableInPolyTime_memDiag
     ComputableInPolyTime (memDiag dhat z) (encPair encBits encUnary) encBool := by
   have h := computableInPolyTime_diagBits (z := z) hc
   unfold memDiag
-  apply ComputableInPolyTime.optionElimWithInput (encB := encUnary)
+  apply ComputableInPolyTime.optionElimWithInput (encB := encUnary) (encO := encOption encUnary)
   · apply ComputableInPolyTime.findWithInput (encA := encUnary) <;> fun_prop
   · fun_prop
   · fun_prop
