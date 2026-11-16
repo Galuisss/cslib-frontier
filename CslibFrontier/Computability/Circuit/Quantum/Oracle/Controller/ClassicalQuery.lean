@@ -262,37 +262,39 @@ request and hidden-bit coordinates selected by `serviceWire`. -/
     have heq := congrArg Fin.val heq
     by_cases hleftInput : left < layout.fullInputWidth
     · by_cases hrightInput : right < layout.fullInputWidth
-      · simp [serviceWire, hleftInput, hrightInput] at heq
+      · simp only [serviceWire, hleftInput, hrightInput, ↓reduceIte] at heq
         omega
       · by_cases hrightRequest :
             right - layout.fullInputWidth < layout.first.outputWidth + 1
-        · simp [serviceWire, hleftInput, hrightInput, hrightRequest] at heq
-          simp only [serviceBase, hiddenWire] at heq
+        · simp only [serviceWire, hleftInput, hrightInput, hrightRequest, ↓reduceIte,
+            serviceBase, hiddenWire] at heq
           omega
-        · simp [serviceWire, hleftInput, hrightInput, hrightRequest] at heq
+        · simp only [serviceWire, hleftInput, hrightInput, hrightRequest, ↓reduceIte] at heq
           omega
     · by_cases hleftRequest :
           left - layout.fullInputWidth < layout.first.outputWidth + 1
       · by_cases hrightInput : right < layout.fullInputWidth
-        · simp [serviceWire, hleftInput, hleftRequest, hrightInput] at heq
-          simp only [serviceBase, hiddenWire] at heq
+        · simp only [serviceWire, hleftInput, hleftRequest, hrightInput, ↓reduceIte,
+            serviceBase, hiddenWire] at heq
           omega
         · by_cases hrightRequest :
               right - layout.fullInputWidth < layout.first.outputWidth + 1
-          · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
+          · simp only [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest,
+              ↓reduceIte] at heq
             omega
-          · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
-            simp only [serviceBase, hiddenWire] at heq
+          · simp only [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest,
+              ↓reduceIte, serviceBase, hiddenWire] at heq
             omega
       · by_cases hrightInput : right < layout.fullInputWidth
-        · simp [serviceWire, hleftInput, hleftRequest, hrightInput] at heq
+        · simp only [serviceWire, hleftInput, hleftRequest, hrightInput, ↓reduceIte] at heq
           omega
         · by_cases hrightRequest :
               right - layout.fullInputWidth < layout.first.outputWidth + 1
-          · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
-            simp only [serviceBase, hiddenWire] at heq
+          · simp only [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest,
+              ↓reduceIte, serviceBase, hiddenWire] at heq
             omega
-          · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
+          · simp only [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest,
+              ↓reduceIte] at heq
             omega
 
 /-- Embed the second-stage register into the complete controller register, sharing the saved
@@ -304,29 +306,30 @@ first-stage state while keeping the retained reply record outside its image. -/
       · simp [secondWire, hinput, width]
       · by_cases hsaved : wire - layout.secondInputWidth < layout.first.width
         · have hrange := firstWire_lt_requestBase layout hsaved
-          simp [secondWire, hinput, hsaved]
-          simp only [width, secondBase, replyBase, serviceBase, hiddenWire]
+          simp only [secondWire, hinput, hsaved, ↓reduceIte, width, secondBase, replyBase,
+            serviceBase, hiddenWire]
           omega
-        · simp [secondWire, hinput, hsaved, width]
+        · simp only [secondWire, hinput, hsaved, ↓reduceIte, width]
+          exact Nat.add_lt_add_left wire.isLt layout.secondBase
           ⟩
     inj' := fun left right heq => Fin.ext <| by
       have heq := congrArg Fin.val heq
       by_cases hleftInput : left < layout.secondInputWidth
       · by_cases hrightInput : right < layout.secondInputWidth
-        · simp [secondWire, hleftInput, hrightInput] at heq
+        · simp only [secondWire, hleftInput, hrightInput, ↓reduceIte] at heq
           omega
         · by_cases hrightSaved : right - layout.secondInputWidth < layout.first.width
           · have hrightRange := firstWire_lt_requestBase layout hrightSaved
-            simp [secondWire, hleftInput, hrightInput, hrightSaved] at heq
-            simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
+            simp only [secondWire, hleftInput, hrightInput, hrightSaved, ↓reduceIte,
+              secondBase, replyBase, serviceBase, hiddenWire] at heq
             omega
-          · simp [secondWire, hleftInput, hrightInput, hrightSaved] at heq
+          · simp only [secondWire, hleftInput, hrightInput, hrightSaved, ↓reduceIte] at heq
             omega
       · by_cases hleftSaved : left - layout.secondInputWidth < layout.first.width
         · by_cases hrightInput : right < layout.secondInputWidth
           · have hleftRange := firstWire_lt_requestBase layout hleftSaved
-            simp [secondWire, hleftInput, hleftSaved, hrightInput] at heq
-            simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
+            simp only [secondWire, hleftInput, hleftSaved, hrightInput, ↓reduceIte,
+              secondBase, replyBase, serviceBase, hiddenWire] at heq
             omega
           · by_cases hrightSaved : right - layout.secondInputWidth < layout.first.width
             · have hfirstEq :
@@ -345,21 +348,19 @@ first-stage state while keeping the retained reply record outside its image. -/
                 exact congrArg Fin.val (layout.firstEmbedding.injective hembed)
               omega
             · have hleftRange := firstWire_lt_requestBase layout hleftSaved
-              simp [secondWire, hleftInput, hleftSaved, hrightInput,
-                hrightSaved] at heq
-              simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
+              simp only [secondWire, hleftInput, hleftSaved, hrightInput, hrightSaved,
+                ↓reduceIte, secondBase, replyBase, serviceBase, hiddenWire] at heq
               omega
         · by_cases hrightInput : right < layout.secondInputWidth
-          · simp [secondWire, hleftInput, hleftSaved, hrightInput] at heq
+          · simp only [secondWire, hleftInput, hleftSaved, hrightInput, ↓reduceIte] at heq
             omega
           · by_cases hrightSaved : right - layout.secondInputWidth < layout.first.width
             · have hrightRange := firstWire_lt_requestBase layout hrightSaved
-              simp [secondWire, hleftInput, hleftSaved, hrightInput,
-                hrightSaved] at heq
-              simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
+              simp only [secondWire, hleftInput, hleftSaved, hrightInput, hrightSaved,
+                ↓reduceIte, secondBase, replyBase, serviceBase, hiddenWire] at heq
               omega
-            · simp [secondWire, hleftInput, hleftSaved, hrightInput,
-                hrightSaved] at heq
+            · simp only [secondWire, hleftInput, hleftSaved, hrightInput, hrightSaved,
+                ↓reduceIte] at heq
               omega }
 
 /-- Component-shape contract for the concrete classical-query linker. It separates the actual
