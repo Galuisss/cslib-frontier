@@ -7,7 +7,7 @@ Authors: Samuel Schlesinger
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.StreamFold
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.List
 
 /-!
 # Resource bounds for retained streaming folds
@@ -23,6 +23,8 @@ Neither theorem selects a machine from an existential computability certificate.
   the retained stream table.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.streamFoldPairWorkspace_le`: a peak workspace bound
   for the same table.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.listFoldEmitCompiler_workspace_le`: a caller-facing
+  bound for the retained list-emission compiler from callback workspace and encoded lengths.
 
 ## References
 
@@ -135,5 +137,90 @@ theorem streamFoldPairWorkspace_le
     ofTransducer, inputFromWordWorkspace, encFramed_apply, length_frame]
     at hbulk hsub₁ hsub₂ hfinish ⊢
   omega
+
+
+/-- Bound the actual peak workspace of retained list emission. The state and element bounds
+control framing and tape movement; the two callback workspace bounds remain independent of their
+running times. `K` is the assembled stream's fixed tape count. -/
+theorem listFoldEmitCompiler_workspace_le
+    {Alpha Sigma Omega : Type*} {next : Sigma × Alpha → Sigma}
+    {emit : Sigma × Alpha → List Bool} {result : Sigma × List Alpha → Omega}
+    {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool} {encOut : Omega ↪ List Bool}
+    (nextCompiler : NativeCompiler next (encPair encS encA) encS)
+    (emitCompiler : NativeCompiler emit (encPair encS encA) encBits)
+    (hresult : ∀ input, encOut (result input) = streamEmit next emit input.1 input.2)
+    (input : Sigma × List Alpha) (emitSpace nextSpace lengthBound : ℕ)
+    (hstate : ∀ j, j ≤ input.2.length →
+      (encS (streamState input.1 next input.2 j)).length ≤ lengthBound)
+    (helem : ∀ j (hj : j < input.2.length),
+      (encA input.2[j]).length ≤ lengthBound)
+    (hemit : ∀ j (hj : j < input.2.length),
+      emitCompiler.workspace (streamState input.1 next input.2 j, input.2[j]) ≤ emitSpace)
+    (hnext : ∀ j (hj : j < input.2.length),
+      nextCompiler.workspace (streamState input.1 next input.2 j, input.2[j]) ≤ nextSpace) :
+    let K := streamFoldPairTapeCount nextCompiler emitCompiler (const encS encBits [])
+    (listFoldEmitCompiler encS encA encOut nextCompiler emitCompiler hresult).workspace input ≤
+      2 * K * (emitSpace + nextSpace + 48 * lengthBound + 20 * K + 90) +
+        13 * lengthBound + 5 * K + 43 := by
+  let finishCompiler := const encS encBits ([] : List Bool)
+  let K := streamFoldPairTapeCount nextCompiler emitCompiler finishCompiler
+  let sMax := fun input : Sigma × List Alpha =>
+    (Finset.range input.2.length).sup fun j =>
+      if hj : j < input.2.length then
+        let pair := (streamState input.1 next input.2 j, input.2[j])
+        inputFromWordWorkspace K emitCompiler pair +
+          onWordsWorkspace K (streamFramedNext nextCompiler) pair
+      else 0
+  let lMax := fun input : Sigma × List Alpha =>
+    max ((Finset.range (input.2.length + 1)).sup fun j =>
+      if hj : j ≤ input.2.length then
+        (encS (streamState input.1 next input.2 j)).length else 0)
+      ((Finset.range input.2.length).sup fun j =>
+        if hj : j < input.2.length then (encA input.2[j]).length else 0)
+  have hkn : nextCompiler.tapeCount ≤ K := by
+    simp only [K, streamFoldPairTapeCount, streamFramedNext, comp, encodeFrame,
+      Nat.max_zero]
+    omega
+  have hke : emitCompiler.tapeCount ≤ K := by
+    simp only [K, streamFoldPairTapeCount]
+    omega
+  have hsMax : sMax input ≤ emitSpace + nextSpace + 32 * lengthBound + 16 * K + 64 := by
+    apply Finset.sup_le
+    intro j hj
+    have hj' := Finset.mem_range.mp hj
+    have hs := hstate j hj'.le
+    have hs' := hstate (j + 1) (by omega)
+    rw [streamState_succ _ _ _ hj'] at hs'
+    have ha := helem j hj'
+    have he := hemit j hj'
+    have hn := hnext j hj'
+    simp only [hj', dite_true, inputFromWordWorkspace, onWordsWorkspace,
+      streamFramedNext, comp, encodeFrame, Nat.max_zero, length_encPair,
+      encBits_apply, length_frame]
+    omega
+  have hlMax : lMax input ≤ lengthBound := by
+    apply max_le
+    · apply Finset.sup_le
+      intro j hj
+      have hj' : j ≤ input.2.length := by
+        have := Finset.mem_range.mp hj
+        omega
+      simpa only [hj', dite_true] using hstate j hj'
+    · apply Finset.sup_le
+      intro j hj
+      have hj' := Finset.mem_range.mp hj
+      simpa only [hj', dite_true] using helem j hj'
+  have h := streamFoldPairWorkspace_le nextCompiler emitCompiler finishCompiler sMax lMax
+    input (emitSpace + nextSpace + 32 * lengthBound + 16 * K + 64) lengthBound 0
+    hsMax hlMax (by simpa only [streamState_zero] using hstate 0 (Nat.zero_le _))
+    (hstate input.2.length le_rfl) (by simp [finishCompiler, const])
+  change streamFoldPairWorkspace nextCompiler emitCompiler finishCompiler sMax lMax input ≤ _
+  change streamFoldPairWorkspace nextCompiler emitCompiler finishCompiler sMax lMax input ≤
+    2 * K * ((emitSpace + nextSpace + 32 * lengthBound + 16 * K + 64) +
+      16 * lengthBound + 4 * K + 26) + 0 + 13 * lengthBound + 8 * 0 + 5 * K + 43 at h
+  have hinner : (emitSpace + nextSpace + 32 * lengthBound + 16 * K + 64) +
+      16 * lengthBound + 4 * K + 26 =
+      emitSpace + nextSpace + 48 * lengthBound + 20 * K + 90 := by omega
+  simpa only [hinner, Nat.mul_zero, Nat.add_zero] using h
 
 end Turing.MultiTapeTM.Internal.NativeCompiler
