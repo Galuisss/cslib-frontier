@@ -127,6 +127,7 @@ The assumption has two parts. The premise `polyTime`, deterministic polynomial-t
 | `WeakPseudorandomFunction` | standard | [BonehShoup2023] Definition 4.3, p. 133 | `n`-bit keys, inputs and outputs; deterministic polynomial-time evaluation is part of the notion. | — |
 | `BlockCipher.PRP` | standard | [BonehShoup2023] Definition 4.1, p. 98 | Read asymptotically, as in Section 4.1.5. | — |
 | `BlockCipher.StrongPRP` | standard | [BonehShoup2023] Section 4.1.3, pp. 101–102, and Exercise 4.9, p. 169 | — | — |
+| `TrapdoorFunction.OneWay` | standard | [BonehShoup2023] Attack Game 10.2 and Definition 10.3, p. 401, with Definition 10.4, pp. 402–403 | For a family of schemes indexed by the security parameter, against the adversaries of a class `Admissible` that the caller supplies, where Definition 10.3 asks for every efficient adversary. The domain and range may depend on the public key, a generalization that the source names for RSA on pp. 404–405 and does not adopt; for sets that do not depend on the key the experiment is Attack Game 10.2 as printed. Efficiency of `G`, `F`, `I` and of the families of sets (Definition 10.4, items 1–5) is not part of the notion. Under a cited headline, review checks the class that a theorem supplies. For `rsaTrapdoor` and `RSAInverter.IsPPT` it is `RSAOneWay` for the law of the generator (`oneWay_rsaTrapdoor_iff`). | [TrapdoorFunction.lean](../../CslibFrontierTests/Crypto/TrapdoorFunction.lean) `not_oneWay_idScheme` |
 
 ## Hashing
 
