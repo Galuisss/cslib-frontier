@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Machine
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Output
 import CslibFrontier.Foundations.Data.List.Lookup
 import Mathlib.Data.List.GetD
 
@@ -541,22 +542,12 @@ private lemma getElem?_restore {r k : ℕ} {o i : Win} {W I : Tape} (hW : o.2[k]
 private def run (d : Desc) (x : List ℕ) (n : ℕ) (c : SCfg) : SCfg × List ℕ :=
   (stepOut d x)^[n] (c, [])
 
-private lemma iterate_stepOut (d : Desc) (x : List ℕ) (n : ℕ) (c : SCfg) (o : List ℕ) :
-    (stepOut d x)^[n] (c, o) = ((run d x n c).1, o ++ (run d x n c).2) := by
-  induction n generalizing c o with
-  | zero => simp [run]
-  | succ n ih =>
-    have h : run d x (n + 1) c = (stepOut d x)^[n] (stepOut d x (c, [])) :=
-      Function.iterate_succ_apply _ _ _
-    rw [h, Function.iterate_succ_apply, stepOut, stepOut, ih, ih]
-    simp
-
 private lemma run_add (d : Desc) (x : List ℕ) (m n : ℕ) (c : SCfg) :
     run d x (m + n) c = ((run d x n (run d x m c).1).1,
       (run d x m c).2 ++ (run d x n (run d x m c).1).2) := by
   change (stepOut d x)^[m + n] (c, []) = _
   rw [add_comm, Function.iterate_add_apply]
-  exact iterate_stepOut d x n _ _
+  exact stepOut_iterate_append d x n _ _
 
 private lemma length_workTapes_run (d : Desc) (x : List ℕ) (n : ℕ) (c : SCfg) :
     (run d x n c).1.workTapes.length = c.workTapes.length := by
