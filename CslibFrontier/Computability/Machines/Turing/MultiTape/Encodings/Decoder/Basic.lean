@@ -92,7 +92,9 @@ private theorem silent_option_decode_degree {decode : List Bool → α} {d e : �
       encBits (encSilentOption enc) (max 1 (max d e)) e := by
   have hc := (ComputableInDegree.of_finite (encIn := encBool) (encMid := encBool) Bool.not).comp
     Internal.DecoderWords.empty_degree
-  exact (option_decode_degree hc h).of_enc_eq fun w => by cases w.isEmpty <;> rfl
+  exact (option_decode_degree (encO := encSilentOption enc) hc h).of_enc_eq fun w => by
+    dsimp only [Function.comp_apply]
+    cases w.isEmpty <;> rfl
 
 /-- Options are decoded as `none` from the empty word, and otherwise from the tail. -/
 def silentOption (D : Decoder enc) : Decoder (encSilentOption enc) where
@@ -115,14 +117,16 @@ def option (D : Decoder enc) : Decoder (encOption enc) where
   decode_enc o := by cases o <;> simp [D.decode_enc]
   computable := by
     obtain ⟨d, e, hD⟩ := D.computable
-    exact ⟨max 1 (max d e), e, option_decode_degree Internal.DecoderWords.bool_degree hD⟩
+    exact ⟨max 1 (max d e), e, option_decode_degree
+      ⟨Internal.DecoderWords.bool_degree.1, ⟨1, fun _ => by simp⟩⟩ hD⟩
 
 /-- Option decoding preserves any supplied encoded-output degree, including zero. Its cost
 accounts for reading the input, running the decoder, and emitting the tagged decoded output. -/
 theorem option_computableInDegree (D : Decoder enc) {d e : ℕ}
     (hD : ComputableInDegree D.decode encBits enc d e) :
     ComputableInDegree (option D).decode encBits (encOption enc) (max 1 (max d e)) e :=
-  option_decode_degree Internal.DecoderWords.bool_degree hD
+  option_decode_degree
+    ⟨Internal.DecoderWords.bool_degree.1, ⟨1, fun _ => by simp⟩⟩ hD
 
 /-- Pairs are decoded from the framed first component and what follows it. -/
 def pair {β₁ β₂ : Type} {enc₁ : β₁ ↪ List Bool} {enc₂ : β₂ ↪ List Bool} (D₁ : Decoder enc₁)

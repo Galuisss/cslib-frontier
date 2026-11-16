@@ -116,7 +116,7 @@ theorem optionMapWithInput {γ : Type} {encC : γ ↪ List Bool}
     (hf : ComputableInPolyTime (fun p : α × β => f p.1 p.2) (encPair encA encB) encC) :
     ComputableInPolyTime (fun a => (value a).map (f a)) encA encOC := by
   have h := hvalue.optionElimWithInput (body := fun a b => some (f a b))
-    (ComputableInPolyTime.const none) ((optionSome encC).comp hf)
+    (ComputableInPolyTime.const none) ((optionSome encC (encO := encOC)).comp hf)
   convert h using 1
   funext a
   cases value a <;> rfl

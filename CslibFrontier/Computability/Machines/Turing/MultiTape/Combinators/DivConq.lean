@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Combinators.StackLoop
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.Cases
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.DegreeOptionPrimitives
 import CslibFrontier.Tactic.EncLen
 
 /-!
@@ -267,16 +268,16 @@ private lemma toList_inO {δ : Type} {enc : δ ↪ List Bool} :
   have hft : ComputableTidilyInO (fun w : List Bool => frame w.tail) encBits encBits
       (fun w => w.length) (fun w => w.length) :=
     (hframe.comp htail).mono 2 (fun w => by simp; omega) (fun w => by simp; omega)
-  have hw : ComputableTidilyInO (fun w : List Bool => if w.isEmpty then [] else frame w.tail)
-      encBits encBits (fun w => w.length) (fun w => w.length) :=
-    ((of_linear (.of_isEmpty (f := List.isEmpty) (encIn := encBits) fun _ => rfl)).ite
-      (const (encMid := encBits) []) hft).mono 2 (fun w => by split_ifs <;> simp <;>
-        omega) (fun w => by split_ifs <;> simp <;> omega)
-  refine (hw.comp (of_linear (.of_eq (f := fun o : Option δ => encOption enc o)
-    (encIn := encOption enc) (encMid := encBits) fun _ => rfl))).of_enc_eq (fun o => ?_) |>.mono
-      2 (fun o => ?_) (fun o => ?_)
+  have he : ComputableTidilyInO (fun o : Option δ => encOption enc o)
+      (encOption enc) encBits (fun o => (encOption enc o).length)
+      (fun o => (encOption enc o).length) :=
+    of_linear (.of_eq fun _ => rfl)
+  have hc := of_linear (ComputableInDegree.isSome enc (encO := encOption enc))
+  have hp := hft.comp_linear he
+  refine (hc.ite hp (const (encMid := encBits) [])).of_enc_eq (fun o => ?_) |>.mono
+    2 (fun o => ?_) (fun o => ?_)
   · cases o <;> simp [encBits_apply]
-  all_goals omega
+  all_goals split_ifs <;> omega
 
 /-- The sums of the costs of a run of `m + 1` rounds followed by a halting test, against a bound
 on the first `m` rounds. -/
