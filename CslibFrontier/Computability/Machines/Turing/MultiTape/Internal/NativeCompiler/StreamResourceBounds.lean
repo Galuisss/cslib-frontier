@@ -67,6 +67,8 @@ theorem streamFoldPairTime_le
   have hfinal := hstate input.2.length le_rfl
   have hlist : (encList encA input.2).length ≤ lengthBound :=
     (length_le_encPair_right encS (encList encA) input).trans hinput
+  have hcount : input.2.length ≤ lengthBound :=
+    (length_le_length_encList encA input.2).trans hlist
   have hround : ∀ j ∈ Finset.range input.2.length,
       streamFoldPairRoundCost nextCompiler emitCompiler input j ≤
         emitTime + nextTime + 46 * lengthBound + 60 := by
@@ -79,7 +81,7 @@ theorem streamFoldPairTime_le
     have hnextNow := hnext j hj'
     simp only [streamFoldPairRoundCost, hj', dite_true, inputFromWordTime, onWordsTime,
       streamFramedNext, comp, encodeFrame, ofTransducer, encBits_apply, length_frame]
-    rw [streamState_succ input.1 next input.2 hj']
+    rw [← streamState_succ input.1 next input.2 hj']
     omega
   have hsum :
       (∑ j ∈ Finset.range input.2.length,
@@ -122,6 +124,11 @@ theorem streamFoldPairWorkspace_le
   dsimp only
   let finalState := streamState input.1 next input.2 input.2.length
   let K := streamFoldPairTapeCount nextCompiler emitCompiler finishCompiler
+  have hinner :
+      sMax input + 16 * lMax input + 4 * K + 26 ≤
+        spaceBound + 16 * lengthBound + 4 * K + 26 := by
+    omega
+  have hbulk := Nat.mul_le_mul_left (2 * K) hinner
   have hsub₁ : K - ((streamUnframedFinish finishCompiler).tapeCount + 2) ≤ K :=
     Nat.sub_le _ _
   have hsub₂ : K - 1 ≤ K := Nat.sub_le _ _
