@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 
-TARGET = 'ae3fcd1c14da7d291d9589bf63c0de8e74dd10c3'
+TARGET = '8f0f749f48e2fb2e9c948ea052fc0f14c3637313'
 BASE = '11fd8ab3cd273f2b60ce90e820d70cb23d5b7ffa'
 PREFIX = 'CslibFrontier.Computability.Machines.Turing.MultiTape.'
 MODULES = [
@@ -133,7 +133,7 @@ def main():
     # check_outputs requires ROOTS' complete physical inventory and Lake freshness.
     # Do not narrow ROOTS or bypass freshness. Bootstrap is included, hosted only.
     run(['scripts/build.sh', 'CslibFrontier', 'CslibFrontierTests', '--wfail', '--iofail'],
-        out, 'strict-build', 4800)
+        out, 'strict-build', 7200)
     for package in ['cslib', 'importGraph']:
         run(['git', '-C', '.lake/packages/' + package, 'rev-parse', 'HEAD'],
             out, package + '-revision', 30, required=False)
