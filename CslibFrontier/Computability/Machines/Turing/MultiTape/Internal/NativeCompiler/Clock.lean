@@ -71,19 +71,15 @@ private def unaryMul :
 private def unarySucc : NativeCompiler (fun n : ℕ => n + 1) encUnary encUnary :=
   unaryAdd.comp ((identity encUnary).pair (const encUnary encUnary 1))
 
-private noncomputable def rawUnaryPolynomialClock (c : ℕ) :
-    (d : ℕ) → NativeCompiler (fun n : ℕ => c * (n + 1) ^ d) encUnary encUnary
-  | 0 => (const encUnary encUnary c).ofOutputEq fun _ => by simp
-  | d + 1 =>
-      (unaryMul.comp ((rawUnaryPolynomialClock c d).pair unarySucc)).ofOutputEq fun n => by
-        simp only [Nat.pow_succ]
-        ac_rfl
-
 /-- Retained generation of the unary polynomial clock `c * (n + 1) ^ d`. The literals `c` and
 `d` determine one finite transition table; the construction does not evaluate a proof-supplied
 function or select a machine from an existential certificate. -/
-noncomputable def unaryPolynomialClock (c d : ℕ) :
-    NativeCompiler (fun n : ℕ => c * (n + 1) ^ d) encUnary encUnary :=
-  rawUnaryPolynomialClock c d
+noncomputable def unaryPolynomialClock (c : ℕ) :
+    (d : ℕ) → NativeCompiler (fun n : ℕ => c * (n + 1) ^ d) encUnary encUnary
+  | 0 => (const encUnary encUnary c).ofOutputEq fun _ => by simp
+  | d + 1 =>
+      (unaryMul.comp ((unaryPolynomialClock c d).pair unarySucc)).ofOutputEq fun n => by
+        simp only [Nat.pow_succ]
+        ac_rfl
 
 end Turing.MultiTapeTM.Internal.NativeCompiler
