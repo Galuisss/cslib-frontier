@@ -1691,6 +1691,7 @@ public import CslibFrontier.Computability.Circuit.Quantum.AcceptOperator
 public import CslibFrontier.Computability.Circuit.Quantum.Approximation
 public import CslibFrontier.Computability.Circuit.Quantum.Basic
 public import CslibFrontier.Computability.Circuit.Quantum.Classical
+public import CslibFrontier.Computability.Circuit.Quantum.ClassicalDensity
 public import CslibFrontier.Computability.Circuit.Quantum.Code
 public import CslibFrontier.Computability.Circuit.Quantum.Controlled
 public import CslibFrontier.Computability.Circuit.Quantum.Counter
@@ -1732,6 +1733,7 @@ public import CslibFrontier.Computability.Circuit.Quantum.PhaseOracle
 public import CslibFrontier.Computability.Circuit.Quantum.RealEncoding
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Circuit
+public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Comparison
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Resources
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Sampling
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Sampling.Prefix

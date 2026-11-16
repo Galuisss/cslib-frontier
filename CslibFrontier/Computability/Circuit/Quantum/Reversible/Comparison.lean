@@ -124,13 +124,15 @@ theorem measureDensity_compareBits {hidden guess width : ℕ} (hne : hidden ≠ 
     (hρ : IsDensityMatrix ρ) :
     (POVM.basis.measureDensity
       (densityConj
-        (Matrix.toEuclideanLin.symm
-          (Circuit.eval (Circuit.ofCodes width (GateCode.compareBits hidden guess))).toLinearMap ⊗ₖ
+        ((Circuit.matrix (Circuit.ofCodes width (GateCode.compareBits hidden guess)) :
+          Matrix (Fin width → Bool) (Fin width → Bool) ℂ) ⊗ₖ
           (1 : Matrix κ κ ℂ)) ρ)
       (hρ.densityConj_kronecker
-        (matrix_isometry
-          (Circuit.eval (Circuit.ofCodes width
-            (GateCode.compareBits hidden guess))).toLinearIsometry))).map
+        (V := (Circuit.matrix (Circuit.ofCodes width (GateCode.compareBits hidden guess)) :
+          Matrix (Fin width → Bool) (Fin width → Bool) ℂ))
+        (by
+          exact UnitaryGroup.star_mul_self
+            (Circuit.matrix (Circuit.ofCodes width (GateCode.compareBits hidden guess)))))).map
         (fun p => readBit p.1 guess) =
       (POVM.basis.measureDensity ρ hρ).map
         (fun p => readBit p.1 guess == readBit p.1 hidden) := by

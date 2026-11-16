@@ -8,7 +8,9 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Circuit.Quantum.Classical
-public import CslibFrontier.Foundations.Quantum.Measurement.Classical
+public import CslibFrontier.Foundations.Quantum.DensityMatrix.Isometry
+public import CslibFrontier.Foundations.Quantum.POVM.Density
+import CslibFrontier.Computability.Circuit.Quantum.Parallel
 
 /-!
 # Classical reversible circuits on joint density matrices
@@ -37,17 +39,12 @@ open scoped Kronecker
 
 variable {m : ℕ} {codes : List GateCode}
 
-private theorem evalMatrix_ofCodes_apply (h : IsClassical m codes)
+private theorem matrix_ofCodes_apply (h : IsClassical m codes)
     (y x : Fin m → Bool) :
-    Matrix.toEuclideanLin.symm (eval (ofCodes m codes)).toLinearMap y x =
+    (matrix (ofCodes m codes) : Matrix _ _ ℂ) y x =
       if classicalUnrun codes y = x then 1 else 0 := by
-  have entry (M : Matrix (Fin m → Bool) (Fin m → Bool) ℂ) :
-      (M.toEuclideanLin (ket x)).ofLp y = M y x := by
-    simp [Matrix.toEuclideanLin, Matrix.toLpLin_apply, Matrix.mulVec, dotProduct, ket_apply]
-  rw [← entry (Matrix.toEuclideanLin.symm (eval (ofCodes m codes)).toLinearMap),
-    Matrix.toEuclideanLin.apply_symm_apply]
-  simpa only [LinearEquiv.coe_coe, LinearIsometryEquiv.coe_toLinearEquiv, ket_apply] using
-    eval_ofCodes_apply h (ket x) y
+  rw [← eval_ket_apply]
+  simpa only [ket_apply] using eval_ofCodes_apply h (ket x) y
 
 /-- A classical circuit permutes the active indices of every joint matrix and leaves both
 reference indices unchanged. In particular, it preserves reference entanglement. -/
@@ -56,11 +53,11 @@ theorem densityConj_ofCodes_kronecker_apply (h : IsClassical m codes)
     (ρ : Matrix ((Fin m → Bool) × κ) ((Fin m → Bool) × κ) ℂ)
     (p q : (Fin m → Bool) × κ) :
     densityConj
-        (Matrix.toEuclideanLin.symm (eval (ofCodes m codes)).toLinearMap ⊗ₖ
+        ((matrix (ofCodes m codes) : Matrix _ _ ℂ) ⊗ₖ
           (1 : Matrix κ κ ℂ)) ρ p q =
       ρ (classicalUnrun codes p.1, p.2) (classicalUnrun codes q.1, q.2) := by
   simp [densityConj_apply, Matrix.mul_apply, Matrix.conjTranspose_apply,
-    Matrix.one_apply, evalMatrix_ofCodes_apply h, Fintype.sum_prod_type,
+    Matrix.one_apply, matrix_ofCodes_apply h, Fintype.sum_prod_type,
     apply_ite (starRingEnd ℂ)]
 
 /-- Basis readout after a classical circuit is the pushforward by its basis permutation. The
@@ -71,9 +68,9 @@ theorem measureDensity_basis_ofCodes (h : IsClassical m codes)
     (hρ : IsDensityMatrix ρ) :
     POVM.basis.measureDensity
         (densityConj
-          (Matrix.toEuclideanLin.symm (eval (ofCodes m codes)).toLinearMap ⊗ₖ
+          ((matrix (ofCodes m codes) : Matrix _ _ ℂ) ⊗ₖ
             (1 : Matrix κ κ ℂ)) ρ)
-        (hρ.densityConj_kronecker (matrix_isometry (eval (ofCodes m codes)).toLinearIsometry)) =
+        (hρ.densityConj_kronecker (UnitaryGroup.star_mul_self (matrix (ofCodes m codes)))) =
       (POVM.basis.measureDensity ρ hρ).map
         (fun p => (classicalRun codes p.1, p.2)) := by
   ext p
