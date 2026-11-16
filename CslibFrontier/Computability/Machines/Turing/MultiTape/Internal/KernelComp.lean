@@ -337,24 +337,8 @@ theorem computesTidilyInTimeAndSpace_comp
   set buffer : Fin (tapeCount + 2) := Fin.natAdd tapeCount 0
   have hbuffer : Fin.append (fun _ : Fin tapeCount => ([] : List Symbol)) ![intermediate, []] =
       Function.update (fun _ => []) buffer intermediate := by
-    funext tape
-    cases tape using Fin.addCases with
-    | left source =>
-        simp [buffer, Function.update_of_ne (Fin.castAdd_ne_natAdd source 0)]
-    | right extra => match extra with | 0 | 1 => simp [buffer]
-  have hphase₁Shape (tapes' : Fin (tapeCount + 1 + 1) → List Symbol)
-      (hselected : (fun tape => tapes' (Fin.castSuccEmb tape)) =
-        Function.update (fun _ => []) (Fin.last tapeCount) intermediate)
-      (hextra : ∀ tape ∉ Set.range Fin.castSuccEmb, tapes' tape = []) :
-      tapes' = Function.update (fun _ => []) buffer intermediate := by
-    funext tape
-    induction tape using Fin.lastCases with
-    | last =>
-        rw [hextra _ fun ⟨source, hsource⟩ => Fin.castSucc_ne_last source hsource]
-        simp [buffer, Fin.ext_iff]
-    | cast source =>
-        rw [show tapes' source.castSucc = _ from congrFun hselected source]
-        simp [buffer, Function.update_apply, Fin.ext_iff]
+    simpa only [buffer] using
+      (MultiTapeTM.append_nil_eq_update (k := tapeCount) intermediate)
   have h₁Extended :
       (inner.extendTapes (Fin.castLEEmb (le_max_left k₁ k₂))).toTM
         |>.ComputesTidilyInTimeAndSpace input intermediate time₁
@@ -362,7 +346,18 @@ theorem computesTidilyInTimeAndSpace_comp
     rw [toTM_extendTapes]
     exact h₁.extendTapes _
   have hphase₁Raw :=
-    (computesTidilyInTimeAndSpace_outputToWord h₁Extended).extendTapes Fin.castSuccEmb
+    ((computesTidilyInTimeAndSpace_outputToWord h₁Extended).imp
+      (P' := fun word tapes => word = input ∧
+        tapes = Function.update (fun _ => []) (Fin.last tapeCount) [])
+      (Q' := fun _ tapes tapes' emitted =>
+        tapes' = Function.update tapes (Fin.last tapeCount) intermediate ∧ emitted = [])
+      (fun _ _ ⟨hinput, htapes⟩ =>
+        ⟨hinput, by rw [htapes, Function.update_eq_self]⟩)
+      (fun _ _ _ _ ⟨_, htapes⟩ ⟨htapes', hemitted⟩ =>
+        ⟨by rw [htapes', htapes, Function.update_idem], hemitted⟩)
+      le_rfl le_rfl).extendTapes_update Fin.castSuccEmb
+  rw [show Fin.castSuccEmb (Fin.last tapeCount) = buffer by
+    simp [buffer, Fin.ext_iff]] at hphase₁Raw
   have hphase₁Machine : MultiTapeTM.TransformsTapes
       (((inner.extendTapes (Fin.castLEEmb (le_max_left k₁ k₂))).outputToWord.extendTapes
         Fin.castSuccEmb).toTM)
@@ -376,10 +371,9 @@ theorem computesTidilyInTimeAndSpace_comp
     exact hphase₁Raw.imp (P' := fun word tapes => word = input ∧ tapes = fun _ => [])
       (Q' := fun _ _ tapes' emitted =>
         tapes' = Function.update (fun _ => []) buffer intermediate ∧ emitted = [])
-      (fun _ _ ⟨hinput, htapes⟩ => ⟨hinput, by simp [htapes]⟩)
-      (fun _ _ tapes' _ ⟨_, htapes⟩ ⟨⟨hselected, hemitted⟩, hextra⟩ =>
-        ⟨hphase₁Shape tapes' hselected fun tape htape =>
-          (hextra tape htape).trans (congrFun htapes tape), hemitted⟩)
+      (fun _ _ ⟨hinput, htapes⟩ => ⟨hinput, by rw [htapes]; simp⟩)
+      (fun _ _ _ _ ⟨_, htapes⟩ ⟨htapes', hemitted⟩ =>
+        ⟨by rw [htapes', htapes], hemitted⟩)
       le_rfl le_rfl
   have h₂Extended :
       (outer.extendTapes (Fin.castLEEmb (le_max_right k₁ k₂))).toTM
@@ -445,29 +439,22 @@ public theorem ComputesTidilyInTimeAndSpace.comp {tm₁ : MultiTapeTM k₁ Symbo
   set A : Fin (K + 2) := Fin.natAdd K 0
   have hA : Fin.append (fun _ : Fin K => ([] : List Symbol)) ![w, []] =
       Function.update (fun _ => []) A w := by
-    funext l
-    cases l using Fin.addCases with
-    | left j => simp [A, Function.update_of_ne (Fin.castAdd_ne_natAdd j 0)]
-    | right i => match i with | 0 | 1 => simp [A]
+    simpa only [A] using (append_nil_eq_update (k := K) w)
   -- phase 1: `tm₁` writes `w` to `A`
-  have hQ₁ (ws' : Fin (K + 1 + 1) → List Symbol)
-      (hv : (fun j => ws' (Fin.castSuccEmb j)) = Function.update (fun _ => []) (Fin.last K) w)
-      (hx : ∀ l ∉ Set.range Fin.castSuccEmb, ws' l = []) :
-      ws' = Function.update (fun _ => []) A w := by
-    funext l
-    induction l using Fin.lastCases with
-    | last =>
-      rw [hx _ fun ⟨j, hj⟩ => Fin.castSucc_ne_last j hj]
-      simp [A, Fin.ext_iff]
-    | cast j =>
-      rw [show ws' j.castSucc = _ from congrFun hv j]
-      simp [A, Function.update_apply, Fin.ext_iff]
-  have hp₁ := ((h₁.extendTapes (Fin.castLEEmb (le_max_left k₁ k₂))).outputToWord.extendTapes
-    Fin.castSuccEmb).imp (P' := fun inp ws => inp = x ∧ ws = fun _ => [])
+  have hp₁Raw :=
+    (((h₁.extendTapes (Fin.castLEEmb (le_max_left k₁ k₂))).outputToWord).imp
+      (P' := fun inp ws => inp = x ∧
+        ws = Function.update (fun _ => []) (Fin.last K) [])
+      (Q' := fun _ ws ws' e => ws' = Function.update ws (Fin.last K) w ∧ e = [])
+      (fun _ _ ⟨hin, hws⟩ => ⟨hin, by rw [hws, Function.update_eq_self]⟩)
+      (fun _ _ _ _ ⟨_, hws⟩ ⟨hws', he⟩ =>
+        ⟨by rw [hws', hws, Function.update_idem], he⟩)
+      le_rfl le_rfl).extendTapes_update Fin.castSuccEmb
+  rw [show Fin.castSuccEmb (Fin.last K) = A by simp [A, Fin.ext_iff]] at hp₁Raw
+  have hp₁ := hp₁Raw.imp (P' := fun inp ws => inp = x ∧ ws = fun _ => [])
     (Q' := fun _ _ ws' e => ws' = Function.update (fun _ => []) A w ∧ e = [])
-    (fun _ _ ⟨hin, hws⟩ => ⟨hin, by simp [hws]⟩)
-    (fun _ _ ws' _ ⟨_, hws⟩ ⟨⟨hv, he⟩, hx⟩ => ⟨hQ₁ ws' hv fun l hl => (hx l hl).trans
-      (congrFun hws l), he⟩) le_rfl le_rfl
+    (fun _ _ ⟨hin, hws⟩ => ⟨hin, by rw [hws]; simp⟩)
+    (fun _ _ _ _ ⟨_, hws⟩ ⟨hws', he⟩ => ⟨by rw [hws', hws], he⟩) le_rfl le_rfl
   -- phase 2: `tm₂` reads `w` from `A` and emits `y`
   have hp₂ := (transformsTapes_inputFromWord mark
       (computesTidily_iff.mp (h₂.extendTapes (Fin.castLEEmb (le_max_right k₁ k₂))))).imp
