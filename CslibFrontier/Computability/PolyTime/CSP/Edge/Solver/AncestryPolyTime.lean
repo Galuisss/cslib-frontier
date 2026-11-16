@@ -289,10 +289,12 @@ theorem computableInPolyTime_blossom : ComputableInPolyTime
     fun_prop
   have hgetL : ComputableInPolyTime (fun p => (left p).steps[k p]?) encMeetingArgs
       (encOption (encPair encNat encNat)) := by
-    exact .of_tidy (ComputableTidilyInPolyTime.getElem? (poly_steps.comp hl).tidy hk.tidy)
+    exact .of_tidy (ComputableTidilyInPolyTime.getElem? (encA := encPair encNat encNat)
+      (poly_steps.comp hl).tidy hk.tidy)
   have hgetR : ComputableInPolyTime (fun p => (right p).steps[k p]?) encMeetingArgs
       (encOption (encPair encNat encNat)) := by
-    exact .of_tidy (ComputableTidilyInPolyTime.getElem? (poly_steps.comp hr).tidy hk.tidy)
+    exact .of_tidy (ComputableTidilyInPolyTime.getElem? (encA := encPair encNat encNat)
+      (poly_steps.comp hr).tidy hk.tidy)
   have hrb : ComputableInPolyTime (fun p : (CSP Table ℕ × MeetingCode) × (ℕ × ℕ) => rb p.1 p.2)
       (encPair encMeetingArgs (encPair encUnary encUnary)) (encOption encBlossomCode) := by
     clear_value left right shared k
@@ -301,6 +303,7 @@ theorem computableInPolyTime_blossom : ComputableInPolyTime
       (hgetL.comp (ComputableInPolyTime.fst encMeetingArgs (encPair encUnary encUnary)))
       (ComputableInPolyTime.const none)
     apply ComputableInPolyTime.optionMapWithInput (encB := encPair encNat encNat)
+      (encC := encBlossomCode)
       (hgetR.comp ((ComputableInPolyTime.fst
         (encPair encMeetingArgs (encPair encUnary encUnary)) (encPair encNat encNat)).fst'))
     fun_prop
