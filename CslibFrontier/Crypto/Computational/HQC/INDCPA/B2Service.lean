@@ -10,7 +10,7 @@ module
 public import CslibFrontier.Computability.Circuit.Quantum.Input
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Uniform
 public import CslibFrontier.Computability.Circuit.Quantum.Parallel
-public import CslibFrontier.Computability.Circuit.Quantum.Reversible.BlockCopy
+public import CslibFrontier.Computability.Circuit.Quantum.Reversible.BlockCopy.NativeCompiler
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Sampling
 public import CslibFrontier.Crypto.Computational.HQC.DQCSD
 public import CslibFrontier.Crypto.Computational.HQC.INDCPA
@@ -39,6 +39,8 @@ from the retained Reed--Solomon, Reed--Muller and GF(256) prerequisites remains 
 
 * `Cslib.Crypto.HQC.b2ServiceDescription`: the query-free reversible service description.
 * `Cslib.Crypto.HQC.b2ServiceReadout`: its ciphertext-prefix interpretation.
+* `Cslib.Crypto.HQC.b2ServiceCompiler`: the retained description compiler for fixed parameters
+  and a fixed installed Boolean encoder.
 
 ## Main results
 
@@ -54,7 +56,8 @@ public section
 namespace Cslib.Crypto.HQC
 
 open Cslib.Quantum Cslib.Quantum.GateCode Cslib.Quantum.Reversible
-open Circuits Circuits.Boolean Turing.MultiTapeTM
+open Circuits Circuits.Boolean Turing.MultiTapeTM Turing.MultiTapeTM.Internal
+open Turing.MultiTapeTM.Internal.NativeCompiler
 
 private def b2HeaderWidth (securityParameter : ℕ) : ℕ :=
   2 * securityParameter + 1
@@ -88,6 +91,30 @@ private def b2ServiceWidth (P : PKEParams) (securityParameter : ℕ)
 private def b2ControlledBlockCodes (control source target count : ℕ) : List GateCode :=
   (List.range count).map fun offset =>
     (false, target + offset, [control, source + offset])
+
+private theorem isClassical_b2ControlledBlockCodes
+    {control source target count width : ℕ}
+    (hcontrolTarget : ∀ offset < count, control ≠ target + offset)
+    (hsourceTarget : source + count ≤ target ∨ target + count ≤ source)
+    (hcontrolSource : ∀ offset < count, control ≠ source + offset)
+    (hcontrol : control < width) (hsource : source + count ≤ width)
+    (htarget : target + count ≤ width) :
+    IsClassical width (b2ControlledBlockCodes control source target count) := by
+  intro gate hgate
+  obtain ⟨offset, hoffset, rfl⟩ := List.mem_map.mp hgate
+  have hoffset' := List.mem_range.mp hoffset
+  refine ⟨rfl, ?_⟩
+  simp only [GateCode.WellFormed, List.length_cons, List.length_nil, Nat.zero_add,
+    Nat.succ_le_succ_iff, Nat.zero_le, List.nodup_cons, List.mem_cons,
+    List.not_mem_nil, or_false, List.nodup_nil, not_false_eq_true, and_true,
+    true_and, forall_eq_or_imp, forall_eq]
+  refine ⟨⟨?_, hcontrolSource offset hoffset'⟩, ?_, ?_, ?_⟩
+  · simp only [not_or]
+    refine ⟨Ne.symm (hcontrolTarget offset hoffset'), ?_⟩
+    rcases hsourceTarget with hsourceTarget | hsourceTarget <;> omega
+  · omega
+  · omega
+  · omega
 
 private theorem readBit_classicalRun_blockCopyCodes_of_outside
     {source target count width wire : ℕ}
@@ -471,6 +498,146 @@ def b2ServiceCodes (P : PKEParams) (securityParameter : ℕ)
       (b2ServiceEncoderOutputBase P securityParameter encoder)
       P.n P.codeLen
 
+private theorem isClassical_b2ServiceCodes (P : PKEParams) (securityParameter : ℕ)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen) :
+    IsClassical (b2ServiceWidth P securityParameter encoder)
+      (b2ServiceCodes P securityParameter encoder) := by
+  let inputWidth := b2ServiceInputWidth P securityParameter
+  let ciphertextWidth := b2ServiceCiphertextWidth P
+  let savedInput := b2ServiceSavedInputBase P securityParameter
+  let encoderBase := b2ServiceEncoderBase P securityParameter
+  let encoderWidth := samplerWidth P.k encoder.code
+  let width := b2ServiceWidth P securityParameter encoder
+  have hsavedFit : savedInput + inputWidth ≤ width := by
+    dsimp only [savedInput, inputWidth, width, encoderBase]
+    unfold b2ServiceWidth b2ServiceEncoderBase
+    omega
+  have hencoderFit : encoderBase + encoderWidth ≤ width := by
+    dsimp only [encoderBase, encoderWidth, width]
+    unfold b2ServiceWidth
+    omega
+  have hciphertextInput : ciphertextWidth ≤ inputWidth := by
+    dsimp only [ciphertextWidth, inputWidth]
+    unfold b2ServiceCiphertextWidth b2ServiceInputWidth b2HeaderWidth b2SampleWidth
+    omega
+  have hinputSaved : inputWidth ≤ savedInput := by
+    dsimp only [inputWidth, savedInput]
+    unfold b2ServiceSavedInputBase
+    omega
+  have hciphertextSaved : ciphertextWidth ≤ savedInput :=
+    hciphertextInput.trans hinputSaved
+  have hinputFit : inputWidth ≤ width :=
+    (Nat.le_add_left inputWidth savedInput).trans hsavedFit
+  have hciphertextFit : ciphertextWidth ≤ width :=
+    hciphertextInput.trans hinputFit
+  have hencoderBaseFit : encoderBase ≤ width :=
+    (Nat.le_add_right encoderBase encoderWidth).trans hencoderFit
+  have hkEncoderWidth : P.k ≤ encoderWidth := by
+    dsimp only [encoderWidth]
+    unfold samplerWidth samplerOutputStart samplerZero
+    omega
+  have htargetFit : encoderBase + P.k ≤ width :=
+    (Nat.add_le_add_left hkEncoderWidth encoderBase).trans hencoderFit
+  have hrequestTarget : inputWidth + 2 * P.k + 1 ≤ encoderBase := by
+    dsimp only [inputWidth, encoderBase]
+    unfold b2ServiceEncoderBase b2ServiceSavedInputBase b2ServiceRequestWidth
+    omega
+  have hprepare : IsClassical width (b2PrepareCodes P securityParameter) := by
+    rw [b2PrepareCodes, IsClassical.append, IsClassical.append]
+    refine ⟨⟨?_, ?_⟩, ?_⟩
+    · apply isClassical_blockCopyCodes
+      · left
+        simpa only [Nat.zero_add] using hinputSaved
+      · simpa only [Nat.zero_add] using hinputFit
+      · exact hsavedFit
+    · apply isClassical_blockCopyCodes
+      · right
+        simpa only [Nat.zero_add] using hciphertextSaved
+      · exact (Nat.add_le_add_left hciphertextInput savedInput).trans hsavedFit
+      · simpa only [Nat.zero_add] using hciphertextFit
+    · apply isClassical_blockCopyCodes
+      · right
+        simp only [Nat.zero_add]
+        unfold b2ServiceCiphertextWidth b2ServiceSavedInputBase
+          b2ServiceInputWidth b2HeaderWidth b2SampleWidth b2ServiceRequestWidth
+        omega
+      · calc
+          savedInput + b2HeaderWidth securityParameter + 2 * P.n + ciphertextWidth =
+              savedInput + inputWidth := by
+            dsimp only [inputWidth, ciphertextWidth]
+            unfold b2ServiceInputWidth b2ServiceCiphertextWidth b2SampleWidth
+            omega
+          _ ≤ width := hsavedFit
+      · simpa only [Nat.zero_add] using hciphertextFit
+  have hselect : IsClassical width (b2SelectMessageCodes P securityParameter) := by
+    rw [b2SelectMessageCodes, IsClassical.append, IsClassical.append]
+    refine ⟨⟨?_, ?_⟩, ?_⟩
+    · apply isClassical_blockCopyCodes
+      · left
+        change inputWidth + P.k ≤ encoderBase
+        omega
+      · change inputWidth + P.k ≤ width
+        omega
+      · exact htargetFit
+    · apply isClassical_b2ControlledBlockCodes
+      · intro offset hoffset
+        change inputWidth + 2 * P.k ≠ encoderBase + offset
+        omega
+      · left
+        change inputWidth + P.k ≤ encoderBase
+        omega
+      · intro offset hoffset
+        change inputWidth + 2 * P.k ≠ inputWidth + offset
+        omega
+      · change inputWidth + 2 * P.k < width
+        omega
+      · change inputWidth + P.k ≤ width
+        omega
+      · exact htargetFit
+    · apply isClassical_b2ControlledBlockCodes
+      · intro offset hoffset
+        change inputWidth + 2 * P.k ≠ encoderBase + offset
+        omega
+      · left
+        change inputWidth + P.k + P.k ≤ encoderBase
+        omega
+      · intro offset hoffset
+        change inputWidth + 2 * P.k ≠ inputWidth + P.k + offset
+        omega
+      · change inputWidth + 2 * P.k < width
+        omega
+      · change inputWidth + P.k + P.k ≤ width
+        omega
+      · exact htargetFit
+  have hshift : IsClassical width
+      (b2ShiftCodes encoderBase (samplerClassicalCodes P.k encoder.code)) := by
+    intro gate hgate
+    obtain ⟨source, hsource, rfl⟩ := List.mem_map.mp hgate
+    have hsource' := isClassical_samplerClassicalCodes P.k encoder.code source hsource
+    refine ⟨by simpa [GateCode.shift] using hsource'.1, ?_⟩
+    exact hsource'.2.shift hencoderFit
+  have houtput : IsClassical width
+      (blockCopyCodes (b2ServiceEncoderOutputBase P securityParameter encoder)
+        P.n P.codeLen) := by
+    apply isClassical_blockCopyCodes
+    · right
+      unfold b2ServiceEncoderOutputBase b2ServiceEncoderBase b2ServiceSavedInputBase
+        b2ServiceInputWidth b2HeaderWidth b2SampleWidth b2ServiceRequestWidth
+        samplerOutputStart samplerZero
+      omega
+    · dsimp only [width]
+      unfold b2ServiceWidth b2ServiceEncoderOutputBase
+      simp only [samplerWidth, Circuit.code, List.length_ofFn]
+      omega
+    · dsimp only [width, encoderBase]
+      unfold b2ServiceWidth b2ServiceEncoderBase b2ServiceSavedInputBase
+        b2ServiceInputWidth b2HeaderWidth b2SampleWidth b2ServiceRequestWidth
+      simp only [samplerWidth, samplerOutputStart, samplerZero, Circuit.code,
+        List.length_ofFn]
+      omega
+  rw [b2ServiceCodes, IsClassical.append, IsClassical.append, IsClassical.append]
+  exact ⟨⟨⟨hprepare, hselect⟩, hshift⟩, houtput⟩
+
 private def b2ServiceInputWord (P : PKEParams) (securityParameter : ℕ)
     (sample : TruncatedSyndromeSample P.n P.codeLen)
     (messages : MessagePair (PKEMessage P)) (hidden : Bool) : List Bool :=
@@ -606,6 +773,30 @@ def b2ServiceDescription (P : PKEParams) (securityParameter : ℕ)
     instructions :=
       (b2ServiceCodes P securityParameter encoder).map fun code => .gate (false, code) }
 
+/-- The retained B2 service is structurally valid on the complete three-block truncated-syndrome
+sample. Its logical quantum input is exactly the two-message request and hidden bit. -/
+theorem wellFormed_b2ServiceDescription (P : PKEParams) (securityParameter : ℕ)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen) :
+    (b2ServiceDescription P securityParameter encoder).WellFormed
+      ⟨securityParameter, 3 * P.n + P.codeLen⟩ := by
+  have hcodes := isClassical_b2ServiceCodes P securityParameter encoder
+  constructor
+  · change b2ServiceInputWidth P securityParameter + b2ServiceRequestWidth P + 1 ≤
+      b2ServiceWidth P securityParameter encoder
+    unfold b2ServiceWidth b2ServiceEncoderBase b2ServiceSavedInputBase
+    omega
+  · simp [b2ServiceDescription]
+  · change b2ServiceCiphertextWidth P ≤ b2ServiceWidth P securityParameter encoder
+    unfold b2ServiceWidth b2ServiceEncoderBase b2ServiceSavedInputBase
+      b2ServiceInputWidth b2ServiceCiphertextWidth b2HeaderWidth b2SampleWidth
+      b2ServiceRequestWidth
+    omega
+  · intro instruction hinstruction
+    simp only [b2ServiceDescription, List.mem_map] at hinstruction
+    obtain ⟨code, hcode, rfl⟩ := hinstruction
+    change code.WellFormed (b2ServiceWidth P securityParameter encoder)
+    exact (hcodes code hcode).2
+
 /-- Exact elementary-gate count of the service. In particular, the cost includes the complete
 reversible encoder program rather than charging only its input/output dimensions. -/
 @[simp] theorem length_b2ServiceCodes (P : PKEParams) (securityParameter : ℕ)
@@ -625,6 +816,226 @@ reversible encoder program rather than charging only its input/output dimensions
     (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen) :
     (b2ServiceDescription P securityParameter encoder).instructions.queryCount = 0 := by
   simp [b2ServiceDescription, OracleCircuit.queryCount, OracleGateCode.isQuery]
+
+/-- Retained native compiler for the complete B2 service description at fixed scheme parameters
+and a fixed installed encoder circuit. The fixed gate list is part of the compiler's static
+description; every security-dependent copy, selector, shift and description field is emitted by
+the retained machine. This is a concrete component certificate, not the still-open compiler for
+an asymptotic parameter-dependent NIST encoder family. -/
+@[expose] def b2ServiceCompiler (P : PKEParams)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen) :
+    NativeCompiler
+      (fun input : OracleInputSize =>
+        b2ServiceDescription P input.securityParameter encoder)
+      encOracleInputSize encOracleCircuitDescription := by
+  let inputFields : NativeCompiler
+      (fun input : OracleInputSize =>
+        (input.securityParameter, input.classicalInputLength))
+      encOracleInputSize (encPair encUnary encUnary) :=
+    (identity encOracleInputSize).ofOutputEq fun input => by
+      simp [encOracleInputSize_apply, encOracleInputSizeFields]
+  let security : NativeCompiler OracleInputSize.securityParameter
+      encOracleInputSize encUnary :=
+    (first encUnary encUnary).comp inputFields
+  let zero := const encOracleInputSize encUnary 0
+  let one := const encOracleInputSize encUnary 1
+  let n := const encOracleInputSize encUnary P.n
+  let twoN := const encOracleInputSize encUnary (2 * P.n)
+  let k := const encOracleInputSize encUnary P.k
+  let twoK := const encOracleInputSize encUnary (2 * P.k)
+  let codeLen := const encOracleInputSize encUnary P.codeLen
+  let sampleWidth := const encOracleInputSize encUnary (3 * P.n + P.codeLen)
+  let requestWidth := const encOracleInputSize encUnary (2 * P.k)
+  let ciphertextWidth := const encOracleInputSize encUnary (P.n + P.codeLen)
+  let samplerStart := const encOracleInputSize encUnary
+    (samplerOutputStart P.k encoder.code)
+  let samplerRegisterWidth := const encOracleInputSize encUnary
+    (samplerWidth P.k encoder.code)
+  let twoSecurity : NativeCompiler (fun input : OracleInputSize =>
+      2 * input.securityParameter) encOracleInputSize encUnary :=
+    (unaryAdd.comp (security.pair security)).ofOutputEq fun _ => by
+      simp only [two_mul]
+  let headerWidth : NativeCompiler (fun input : OracleInputSize =>
+      2 * input.securityParameter + 1) encOracleInputSize encUnary :=
+    (unaryAdd.comp (twoSecurity.pair one)).ofOutputEq fun _ => by
+      rfl
+  let inputWidth : NativeCompiler (fun input : OracleInputSize =>
+      2 * input.securityParameter + 1 + (3 * P.n + P.codeLen))
+      encOracleInputSize encUnary :=
+    (unaryAdd.comp (headerWidth.pair sampleWidth)).ofOutputEq fun _ => by
+      rfl
+  let requestAndHidden : NativeCompiler (fun _ : OracleInputSize =>
+      2 * P.k + 1) encOracleInputSize encUnary :=
+    (unaryAdd.comp (requestWidth.pair one)).ofOutputEq fun _ => rfl
+  let inputAndRequest : NativeCompiler (fun input : OracleInputSize =>
+      (2 * input.securityParameter + 1 + (3 * P.n + P.codeLen)) + 2 * P.k)
+      encOracleInputSize encUnary :=
+    (unaryAdd.comp (inputWidth.pair requestWidth)).ofOutputEq fun _ => rfl
+  let savedInput : NativeCompiler (fun input : OracleInputSize =>
+      (2 * input.securityParameter + 1 + (3 * P.n + P.codeLen)) + 2 * P.k + 1)
+      encOracleInputSize encUnary :=
+    (unaryAdd.comp (inputAndRequest.pair one)).ofOutputEq fun _ => rfl
+  let encoderBase : NativeCompiler (fun input : OracleInputSize =>
+      ((2 * input.securityParameter + 1 + (3 * P.n + P.codeLen)) + 2 * P.k + 1) +
+        (2 * input.securityParameter + 1 + (3 * P.n + P.codeLen)))
+      encOracleInputSize encUnary :=
+    (unaryAdd.comp (savedInput.pair inputWidth)).ofOutputEq fun _ => rfl
+  let encoderOutputBase : NativeCompiler (fun input : OracleInputSize =>
+      (((2 * input.securityParameter + 1 + (3 * P.n + P.codeLen)) + 2 * P.k + 1) +
+          (2 * input.securityParameter + 1 + (3 * P.n + P.codeLen))) +
+        samplerOutputStart P.k encoder.code)
+      encOracleInputSize encUnary :=
+    (unaryAdd.comp (encoderBase.pair samplerStart)).ofOutputEq fun _ => rfl
+  let width : NativeCompiler (fun input : OracleInputSize =>
+      (((2 * input.securityParameter + 1 + (3 * P.n + P.codeLen)) + 2 * P.k + 1) +
+          (2 * input.securityParameter + 1 + (3 * P.n + P.codeLen))) +
+        samplerWidth P.k encoder.code) encOracleInputSize encUnary :=
+    (unaryAdd.comp (encoderBase.pair samplerRegisterWidth)).ofOutputEq fun _ => rfl
+  let hidden : NativeCompiler (fun input : OracleInputSize =>
+      (2 * input.securityParameter + 1 + (3 * P.n + P.codeLen)) + 2 * P.k)
+      encOracleInputSize encUnary :=
+    (unaryAdd.comp (inputWidth.pair twoK)).ofOutputEq fun _ => rfl
+  let messageOne : NativeCompiler (fun input : OracleInputSize =>
+      (2 * input.securityParameter + 1 + (3 * P.n + P.codeLen)) + P.k)
+      encOracleInputSize encUnary :=
+    (unaryAdd.comp (inputWidth.pair k)).ofOutputEq fun _ => rfl
+  let savedHeader : NativeCompiler (fun input : OracleInputSize =>
+      ((2 * input.securityParameter + 1 + (3 * P.n + P.codeLen)) + 2 * P.k + 1) +
+        (2 * input.securityParameter + 1)) encOracleInputSize encUnary :=
+    (unaryAdd.comp (savedInput.pair headerWidth)).ofOutputEq fun _ => rfl
+  let sampleValueBase : NativeCompiler (fun input : OracleInputSize =>
+      (((2 * input.securityParameter + 1 + (3 * P.n + P.codeLen)) + 2 * P.k + 1) +
+          (2 * input.securityParameter + 1)) + 2 * P.n)
+      encOracleInputSize encUnary :=
+    (unaryAdd.comp (savedHeader.pair twoN)).ofOutputEq fun _ => rfl
+  let appendGateCodesCompiler {left right : OracleInputSize → List GateCode}
+      (leftCompiler : NativeCompiler left encOracleInputSize (encList encGateCode))
+      (rightCompiler : NativeCompiler right encOracleInputSize (encList encGateCode)) :
+      NativeCompiler (fun input => left input ++ right input)
+        encOracleInputSize (encList encGateCode) :=
+    (listAppendCompiler encGateCode).comp (leftCompiler.pair rightCompiler)
+  let gateCodeShiftCompiler : NativeCompiler
+      (fun input : ℕ × GateCode => input.2.shift input.1)
+      (encPair encUnary encGateCode) encGateCode := by
+    let contextEncoding := encPair encUnary encGateCode
+    let base := first encUnary encGateCode
+    let code := second encUnary encGateCode
+    let phase := (first encBool (encPair encUnary (encList encUnary))).comp code
+    let targetAndControls :=
+      (second encBool (encPair encUnary (encList encUnary))).comp code
+    let target := (first encUnary (encList encUnary)).comp targetAndControls
+    let controls := (second encUnary (encList encUnary)).comp targetAndControls
+    let wireContext := encPair encUnary encUnary
+    let wireBase := first encUnary encUnary
+    let wire := second encUnary encUnary
+    let shiftedWire := unaryAdd.comp (wire.pair wireBase)
+    let shiftedTarget := shiftedWire.comp (base.pair target)
+    let shiftedControls :=
+      (listMapWithStateCompiler encUnary encUnary encUnary shiftedWire).comp
+        (base.pair controls)
+    exact (phase.pair (shiftedTarget.pair shiftedControls)).ofOutputEq fun input => by
+      rcases input with ⟨base, phase, target, controls⟩
+      rfl
+  let ControlledInput := ℕ × (ℕ × (ℕ × ℕ))
+  let encControlledInput : ControlledInput ↪ List Bool :=
+    encPair encUnary (encPair encUnary (encPair encUnary encUnary))
+  let controlledBlockCodesCompiler : NativeCompiler
+      (fun input : ControlledInput =>
+        (List.range input.2.2.2).map fun offset =>
+          (false, input.2.2.1 + offset, [input.1, input.2.1 + offset]))
+      encControlledInput (encList encGateCode) := by
+    let encState := encPair encUnary (encPair encUnary encUnary)
+    let control := first encUnary (encPair encUnary (encPair encUnary encUnary))
+    let rest := second encUnary (encPair encUnary (encPair encUnary encUnary))
+    let source := (first encUnary (encPair encUnary encUnary)).comp rest
+    let targetAndCount := (second encUnary (encPair encUnary encUnary)).comp rest
+    let target := (first encUnary encUnary).comp targetAndCount
+    let count := (second encUnary encUnary).comp targetAndCount
+    let state := control.pair (source.pair target)
+    let marshal : NativeCompiler
+        (fun input : ControlledInput =>
+          ((input.1, (input.2.1, input.2.2.1)), List.range input.2.2.2))
+        encControlledInput (encPair encState (encList encUnary)) :=
+      state.pair (rangeUnaryCompiler.comp count)
+    let callbackEncoding := encPair encState encUnary
+    let callbackState := first encState encUnary
+    let offset := second encState encUnary
+    let callbackControl :=
+      (first encUnary (encPair encUnary encUnary)).comp callbackState
+    let callbackRest :=
+      (second encUnary (encPair encUnary encUnary)).comp callbackState
+    let callbackSource := (first encUnary encUnary).comp callbackRest
+    let callbackTarget := (second encUnary encUnary).comp callbackRest
+    let sourceWire := unaryAdd.comp (callbackSource.pair offset)
+    let targetWire := unaryAdd.comp (callbackTarget.pair offset)
+    let sourceControl : NativeCompiler
+        (fun input : (ℕ × (ℕ × ℕ)) × ℕ =>
+          [input.1.2.1 + input.2])
+        callbackEncoding (encList encUnary) :=
+      ((framedValue encUnary).comp sourceWire).ofOutputEq fun _ => by
+        simp [encFramed_apply, encList_cons]
+    let controls := (listConsCompiler encUnary).comp
+      (callbackControl.pair sourceControl)
+    let flag := const callbackEncoding encBool false
+    let code : NativeCompiler
+        (fun input : ((ℕ × (ℕ × ℕ)) × ℕ) =>
+          (false, input.1.2.2 + input.2,
+            [input.1.1, input.1.2.1 + input.2]))
+        callbackEncoding encGateCode :=
+      flag.pair (targetWire.pair controls)
+    exact ((listMapWithStateCompiler encState encUnary encGateCode code).comp marshal).ofOutputEq
+      fun _ => rfl
+  let copiedInput := GateCode.blockCopyCodesCompiler.comp
+    (zero.pair (savedInput.pair inputWidth))
+  let clearedOutput := GateCode.blockCopyCodesCompiler.comp
+    (savedInput.pair (zero.pair ciphertextWidth))
+  let copiedSampleValue := GateCode.blockCopyCodesCompiler.comp
+    (sampleValueBase.pair (zero.pair ciphertextWidth))
+  let prepare := appendGateCodesCompiler
+    (appendGateCodesCompiler copiedInput clearedOutput) copiedSampleValue
+  let copiedMessageZero := GateCode.blockCopyCodesCompiler.comp
+    (inputWidth.pair (encoderBase.pair k))
+  let selectedMessageZero := controlledBlockCodesCompiler.comp
+    (hidden.pair (inputWidth.pair (encoderBase.pair k)))
+  let selectedMessageOne := controlledBlockCodesCompiler.comp
+    (hidden.pair (messageOne.pair (encoderBase.pair k)))
+  let select := appendGateCodesCompiler
+    (appendGateCodesCompiler copiedMessageZero selectedMessageZero) selectedMessageOne
+  let samplerCodes := const encOracleInputSize (encList encGateCode)
+    (samplerClassicalCodes P.k encoder.code)
+  let shiftedSampler :=
+    (listMapWithStateCompiler encUnary encGateCode encGateCode gateCodeShiftCompiler).comp
+      (encoderBase.pair samplerCodes)
+  let copiedEncoderOutput := GateCode.blockCopyCodesCompiler.comp
+    (encoderOutputBase.pair (n.pair codeLen))
+  let codes : NativeCompiler
+      (fun input : OracleInputSize =>
+        b2ServiceCodes P input.securityParameter encoder)
+      encOracleInputSize (encList encGateCode) := by
+    exact (appendGateCodesCompiler
+      (appendGateCodesCompiler (appendGateCodesCompiler prepare select) shiftedSampler)
+      copiedEncoderOutput).ofOutputEq fun input => by
+        simp [b2ServiceCodes, b2PrepareCodes, b2SelectMessageCodes,
+          b2ControlledBlockCodes, b2ShiftCodes, b2ServiceEncoderOutputBase,
+          b2ServiceEncoderBase, b2ServiceSavedInputBase, b2ServiceInputWidth,
+          b2ServiceRequestWidth, b2ServiceCiphertextWidth, b2HeaderWidth, b2SampleWidth,
+          encList_append, two_mul, Nat.add_assoc]
+  let phase : NativeCompiler (fun code : GateCode => (false, code))
+      encGateCode encPhaseGateCode :=
+    (const encGateCode encBool false).pair (identity encGateCode)
+  let instruction : NativeCompiler
+      (fun code : GateCode => OracleGateCode.gate (false, code))
+      encGateCode encOracleGateCode :=
+    ((optionSome encPhaseGateCode).comp phase).ofOutputEq fun _ => rfl
+  let instructions := (listMapCompiler encGateCode encOracleGateCode instruction).comp codes
+  let fields := width.pair (zero.pair (zero.pair
+    (requestAndHidden.pair (ciphertextWidth.pair instructions))))
+  exact fields.ofOutputEq fun input => by
+    simp [b2ServiceDescription, b2ServiceWidth, b2ServiceEncoderBase,
+      b2ServiceSavedInputBase, b2ServiceInputWidth, b2ServiceRequestWidth,
+      b2ServiceCiphertextWidth, b2HeaderWidth, b2SampleWidth,
+      encOracleCircuitDescription_apply, encOracleCircuitDescriptionFields,
+      two_mul, Nat.add_assoc]
 
 /-- The actual service circuit emits the HQC ciphertext determined by the sample, selected
 message and supplied Boolean encoder. This is a basis-state statement for the complete reversible
