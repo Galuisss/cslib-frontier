@@ -215,7 +215,10 @@ private theorem listGetNatOptionSMax_le (list : List ℕ) (index : ℕ) :
       ((encPair (encPair encNat (encOption encUnary)) encUnary) pair).length ≤
         10 * ((encPair (encList encUnary) encNat (list, index)).length + 1) := by
     dsimp only [pair, state]
-    rw [length_encPair]
+    change 2 * ((encPair encNat (encOption encUnary))
+        (streamState (index, none) listGetNatNext list j)).length + 1 +
+      (encUnary list[j]).length ≤
+        10 * ((encPair (encList encUnary) encNat (list, index)).length + 1)
     omega
   have hnext := listGetNatNextCompiler_workspace_le pair
   have hnextState := listGetNat_state_length_le list index (j + 1) (by omega)
