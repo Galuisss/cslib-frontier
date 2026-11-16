@@ -161,19 +161,10 @@ private def unaryMulFoldSMax (input : ℕ × List Bool) : ℕ :=
         onWordsWorkspace K (streamFramedNext unaryMulNext) pair
     else 0
 
-private def unaryMulFoldLMax (input : ℕ × List Bool) : ℕ :=
-  max
-    ((Finset.range (input.2.length + 1)).sup fun j =>
-      if hj : j ≤ input.2.length then
-        (encUnary (streamState input.1 Prod.fst input.2 j)).length
-      else 0)
-    ((Finset.range input.2.length).sup fun j =>
-      if hj : j < input.2.length then (encBool input.2[j]).length else 0)
-
 private theorem unaryMulFold_workspace_le (value : ℕ) (bits : List Bool) :
     unaryMulFold.workspace (value, bits) ≤ 10000 * (value + 1) := by
   change streamFoldPairWorkspace unaryMulNext unaryMulEmit (const encUnary encBits [])
-    unaryMulFoldSMax unaryMulFoldLMax (value, bits) ≤ _
+    unaryMulFoldSMax (replicateLMax encUnary) (value, bits) ≤ _
   have hsMax : unaryMulFoldSMax (value, bits) ≤ 100 * (value + 1) := by
     apply Finset.sup_le
     intro j hj
@@ -185,7 +176,7 @@ private theorem unaryMulFold_workspace_le (value : ℕ) (bits : List Bool) :
       List.length_replicate, encBool_apply, List.length_singleton, encBits_apply,
       encPair_apply, List.length_append, length_frame]
     omega
-  have hlMax : unaryMulFoldLMax (value, bits) ≤ value + 1 := by
+  have hlMax : replicateLMax encUnary (value, bits) ≤ value + 1 := by
     apply max_le
     · apply Finset.sup_le
       intro j hj
@@ -203,7 +194,7 @@ private theorem unaryMulFold_workspace_le (value : ℕ) (bits : List Bool) :
       simp only [hj', dite_true, encBool_apply, List.length_singleton]
       omega
   have h := streamFoldPairWorkspace_le unaryMulNext unaryMulEmit
-    (const encUnary encBits []) unaryMulFoldSMax unaryMulFoldLMax (value, bits)
+    (const encUnary encBits []) unaryMulFoldSMax (replicateLMax encUnary) (value, bits)
     (100 * (value + 1)) (value + 1) 0 hsMax hlMax
     (by simp only [encUnary_apply, List.length_replicate]; omega)
     (by simp only [streamState_unaryMul, encUnary_apply, List.length_replicate]; omega)
