@@ -41,6 +41,9 @@ original formalization infrastructure.
   discarding one copy retains the other as a classical branch label.
 * `Cslib.Quantum.partialTraceLeft_densityConj_controlled_coherentRecord_twice`: the retained
   full label controls a branch-dependent continuation and remains in the joint output.
+* `Cslib.Quantum.partialTraceLeft_densityConj_controlled_environmentRecord`: an orthogonal
+  discarded environment may replace the second label copy when it distinguishes exactly the
+  same full-label branches.
 -/
 
 public section
@@ -167,6 +170,75 @@ theorem partialTraceLeft_densityConj_controlled_coherentRecord_twice {ι' : Type
         densityConj (V y) (classicalDensityBranch f y ρ)) := by
   rw [densityConj_mul, partialTraceLeft_densityConj_one_kronecker,
     partialTraceLeft_densityConj_coherentRecord_twice, map_sum]
+  apply Finset.sum_congr rfl
+  intro y _
+  rw [densityConj_blockDiagonal_swap_kronecker]
+
+private theorem sum_ite_eq_pair {X : Type*} [Fintype X] [DecidableEq X]
+    (a b : X) (c : ℂ) :
+    (∑ x, if x = a ∧ x = b then c else 0) = if a = b then c else 0 := by
+  by_cases hab : a = b
+  · subst b
+    simp
+  · simp only [hab, ↓reduceIte]
+    apply Finset.sum_eq_zero
+    intro x _
+    split_ifs with hx
+    · exact (hab (hx.1.symm.trans hx.2)).elim
+    · rfl
+
+/-- **Deferred full-label readout with an equivalent discarded environment.** The discarded
+environment record `env` may differ from the retained label `f`, provided equality of environment
+states is equivalent to equality of complete labels. This preserves all coherence within a label
+branch and removes exactly the cross-label terms. The retained full label then controls the same
+branch-dependent continuation as in
+`partialTraceLeft_densityConj_controlled_coherentRecord_twice`.
+
+This form applies when a reversible service leaves an orthogonal garbage state while a separate
+record stores the service's complete classical reply. -/
+theorem partialTraceLeft_densityConj_controlled_environmentRecord
+    {S ι' : Type*} [Fintype A] [Fintype S] [DecidableEq S]
+    (f : ι → A) (env : ι → S) (henv : ∀ i j, env i = env j ↔ f i = f j)
+    (V : A → Matrix ι' ι ℂ) (ρ : Matrix ι ι ℂ) :
+    partialTraceLeft
+        (densityConj
+          (((1 : Matrix S S ℂ) ⊗ₖ
+              (Matrix.blockDiagonal V).submatrix Prod.swap Prod.swap) *
+            (coherentRecord (env ∘ Prod.snd) * coherentRecord f)) ρ) =
+      ∑ y, (pureState (ket y) ⊗ₖ
+        densityConj (V y) (classicalDensityBranch f y ρ)) := by
+  rw [densityConj_mul, partialTraceLeft_densityConj_one_kronecker]
+  have hrecord :
+      partialTraceLeft
+          (densityConj (coherentRecord (env ∘ Prod.snd) * coherentRecord f) ρ) =
+        partialTraceLeft
+          (densityConj
+            (coherentRecord (Prod.fst : A × ι → A) * coherentRecord f) ρ) := by
+    rw [densityConj_mul, densityConj_mul]
+    ext ⟨y, i⟩ ⟨z, j⟩
+    simp only [partialTraceLeft_apply, densityConj_coherentRecord_apply,
+      Function.comp_apply]
+    rw [sum_ite_eq_pair (X := S) (env i) (env j)
+      (if y = f i ∧ z = f j then ρ i j else 0)]
+    rw [sum_ite_eq_pair (X := A) y z
+      (if y = f i ∧ z = f j then ρ i j else 0)]
+    by_cases h : env i = env j
+    · have hf := (henv i j).mp h
+      simp only [h, ↓reduceIte]
+      by_cases hyz : y = z
+      · simp only [hyz, ↓reduceIte]
+      · have hc : ¬(y = f i ∧ z = f j) := fun hc =>
+          hyz (hc.1.trans (hf.trans hc.2.symm))
+        simp only [hyz, hc, ↓reduceIte]
+    · have hf : f i ≠ f j := fun hf => h ((henv i j).mpr hf)
+      simp only [h, ↓reduceIte]
+      by_cases hyz : y = z
+      · subst z
+        have hc : ¬(y = f i ∧ y = f j) := fun hc =>
+          hf (hc.1.symm.trans hc.2)
+        simp only [hc, ↓reduceIte]
+      · simp only [hyz, ↓reduceIte]
+  rw [hrecord, partialTraceLeft_densityConj_coherentRecord_twice, map_sum]
   apply Finset.sum_congr rfl
   intro y _
   rw [densityConj_blockDiagonal_swap_kronecker]
