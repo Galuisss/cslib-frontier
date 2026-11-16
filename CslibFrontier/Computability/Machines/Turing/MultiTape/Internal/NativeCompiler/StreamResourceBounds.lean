@@ -78,7 +78,7 @@ theorem streamFoldPairTime_le
     have hemitNow := hemit j hj'
     have hnextNow := hnext j hj'
     simp only [streamFoldPairRoundCost, hj', dite_true, inputFromWordTime, onWordsTime,
-      streamFramedNext, encBits_apply, length_frame]
+      streamFramedNext, comp, encodeFrame, ofTransducer, encBits_apply, length_frame]
     rw [streamState_succ input.1 next input.2 hj']
     omega
   have hsum :
@@ -91,8 +91,8 @@ theorem streamFoldPairTime_le
             exact Finset.sum_le_sum fun j hj => hround j hj
       _ = input.2.length * (emitTime + nextTime + 46 * lengthBound + 60) := by
             simp [Nat.mul_comm]
-  simp only [streamFoldPairTime, finalState, streamUnframedFinish, inputFromWordTime,
-    encFramed_apply, length_frame] at hfinish ⊢
+  simp only [streamFoldPairTime, finalState, streamUnframedFinish, comp, unframeValue,
+    ofTransducer, inputFromWordTime, encFramed_apply, length_frame] at hfinish ⊢
   omega
 
 /-- Bound the retained stream workspace from the actual peak callback workspace, peak encoded
@@ -125,8 +125,8 @@ theorem streamFoldPairWorkspace_le
   have hsub₁ : K - ((streamUnframedFinish finishCompiler).tapeCount + 2) ≤ K :=
     Nat.sub_le _ _
   have hsub₂ : K - 1 ≤ K := Nat.sub_le _ _
-  simp only [streamFoldPairWorkspace, finalState, K, streamUnframedFinish,
-    inputFromWordWorkspace, encFramed_apply, length_frame] at hsub₁ hfinish ⊢
+  simp only [streamFoldPairWorkspace, finalState, K, streamUnframedFinish, comp, unframeValue,
+    ofTransducer, inputFromWordWorkspace, encFramed_apply, length_frame] at hsub₁ hfinish ⊢
   omega
 
 end Turing.MultiTapeTM.Internal.NativeCompiler
