@@ -140,8 +140,9 @@ program, layout and supplied scalar instruction bounds. `S.runs_compile` also ha
 runs from any represented state, and `S.length_compile` gives the compiled program length.
 
 The caller proves `Fits` at every source instruction boundary and the scalar admissibility
-conditions for calls that execute. `Fits` bounds encoded scalar values and the next-free
-address; validity then bounds all pointer words and occupied field addresses. The compiler
+conditions for calls that execute. `Fits` records named bounds (`free`, `data`, `heapData`)
+for the next-free address, scalar registers and scalar heap fields; validity then bounds all
+pointer words and occupied field addresses. The compiler
 proofs discharge intermediate address bounds and new-record initialization internally.
 `bounded_encodeState` proves that the canonical target registers and memory contain fitting
 words. Input-list preparation and output decoding are outside this theorem: it is a simulation

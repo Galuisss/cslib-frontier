@@ -52,6 +52,24 @@ abbrev regCount (L : Layout) : ℕ := L.ptrRegs + L.dataRegs + 6
 @[expose] def valueReg (L : Layout) : Fin (regCount L) :=
   ⟨L.ptrRegs + L.dataRegs + 3, by unfold regCount; omega⟩
 
+@[simp] theorem ptrReg_val (L : Layout) (r : Fin L.ptrRegs) :
+    (ptrReg L r).val = r.val := rfl
+
+@[simp] theorem dataReg_val (L : Layout) (s : Fin L.dataRegs) :
+    (dataReg L s).val = L.ptrRegs + s.val := rfl
+
+@[simp] theorem freeReg_val (L : Layout) :
+    (freeReg L).val = L.ptrRegs + L.dataRegs := rfl
+
+@[simp] theorem zeroReg_val (L : Layout) :
+    (zeroReg L).val = L.ptrRegs + L.dataRegs + 1 := rfl
+
+@[simp] theorem addrReg_val (L : Layout) :
+    (addrReg L).val = L.ptrRegs + L.dataRegs + 2 := rfl
+
+@[simp] theorem valueReg_val (L : Layout) :
+    (valueReg L).val = L.ptrRegs + L.dataRegs + 3 := rfl
+
 /-- Each node occupies at least one cell, even when it has no fields. -/
 @[expose] def stride (L : Layout) : ℕ := max 1 (L.ptrFields + L.dataFields)
 
@@ -87,10 +105,21 @@ structure Repr (e : M.Value ↪ ℕ) (x : State M L) (y : Cslib.WordRAM.Data (re
 
 /-- The next-free address and every represented datum fit in a word. Validity separately
 ensures pointer words and occupied cell addresses are below the next-free address. -/
-@[expose] def Fits (e : M.Value ↪ ℕ) (w : ℕ) (x : State M L) : Prop :=
-  Cslib.WordRAM.Fits w (nodeAddr L x.heap.length) ∧
-  (∀ s, Cslib.WordRAM.Fits w (e (x.data s))) ∧
-  ∀ n ∈ x.heap, ∀ f, Cslib.WordRAM.Fits w (e (n.data f))
+structure Fits (e : M.Value ↪ ℕ) (w : ℕ) (x : State M L) : Prop where
+  /-- The first free address fits in a word. -/
+  free : Cslib.WordRAM.Fits w (nodeAddr L x.heap.length)
+  /-- Every scalar register fits in a word. -/
+  data : ∀ s, Cslib.WordRAM.Fits w (e (x.data s))
+  /-- Every allocated scalar field fits in a word. -/
+  heapData : ∀ n ∈ x.heap, ∀ f, Cslib.WordRAM.Fits w (e (n.data f))
+
+/-- Pointer fields lie within their node's block. -/
+theorem ptrField_lt_stride (f : Fin L.ptrFields) : f.val < stride L :=
+  lt_of_lt_of_le (Nat.lt_add_right L.dataFields f.isLt) (le_max_right _ _)
+
+/-- Data fields follow the pointer fields within their node's block. -/
+theorem dataField_lt_stride (f : Fin L.dataFields) : L.ptrFields + f.val < stride L :=
+  lt_of_lt_of_le (Nat.add_lt_add_left f.isLt _) (le_max_right _ _)
 
 /-- Different nodes and offsets designate different cells. -/
 theorem cellAddr_injective {a b i j : ℕ} (hi : i < stride L) (hj : j < stride L)
@@ -136,7 +165,7 @@ variable {e : M.Value ↪ ℕ} {w : ℕ} {x : State M L}
 /-- Occupied field addresses fit whenever the next-free address does. -/
 theorem cellAddr (h : Fits e w x) {a i : ℕ} (ha : a < x.heap.length)
     (hi : i < stride L) : Cslib.WordRAM.Fits w (cellAddr L a i) :=
-  lt_trans (cellAddr_lt ha hi) h.1
+  lt_trans (cellAddr_lt ha hi) h.free
 
 /-- Null or a pointer to an allocated record fits in the target word size. -/
 theorem ptrWord (h : Fits e w x) {p : Pointer}
@@ -185,19 +214,13 @@ theorem setPtr (r : Fin L.ptrRegs) (p : Pointer) :
       simp [State.setPtr, Cslib.WordRAM.Data.set, Function.update_of_ne hs,
         Function.update_of_ne hsr, h.ptr]
   data s := by
-    have hsr : dataReg L s ≠ ptrReg L r := by
-      intro he; have := congrArg Fin.val he; have := r.isLt
-      simp only [dataReg, ptrReg] at *; omega
+    have hsr : dataReg L s ≠ ptrReg L r := by simp [Fin.ext_iff]; omega
     simpa [State.setPtr, Cslib.WordRAM.Data.set, Function.update_of_ne hsr] using h.data s
   free := by
-    have hr : freeReg L ≠ ptrReg L r := by
-      intro he; have := congrArg Fin.val he; have := r.isLt
-      simp only [freeReg, ptrReg] at *; omega
+    have hr : freeReg L ≠ ptrReg L r := by simp [Fin.ext_iff]; omega
     simpa [State.setPtr, Cslib.WordRAM.Data.set, Function.update_of_ne hr] using h.free
   zero := by
-    have hr : zeroReg L ≠ ptrReg L r := by
-      intro he; have := congrArg Fin.val he; have := r.isLt
-      simp only [zeroReg, ptrReg] at *; omega
+    have hr : zeroReg L ≠ ptrReg L r := by simp [Fin.ext_iff]; omega
     simpa [State.setPtr, Cslib.WordRAM.Data.set, Function.update_of_ne hr] using h.zero
   heapPtr := h.heapPtr
   heapData := h.heapData
@@ -206,9 +229,7 @@ theorem setPtr (r : Fin L.ptrRegs) (p : Pointer) :
 theorem setData (s : Fin L.dataRegs) (v : M.Value) :
     Repr e (x.setData s v) (y.set (dataReg L s) (e v)) where
   ptr r := by
-    have hrs : ptrReg L r ≠ dataReg L s := by
-      intro he; have := congrArg Fin.val he; have := r.isLt
-      simp only [dataReg, ptrReg] at *; omega
+    have hrs : ptrReg L r ≠ dataReg L s := by simp [Fin.ext_iff]; omega
     simpa [State.setData, Cslib.WordRAM.Data.set, Function.update_of_ne hrs] using h.ptr r
   data t := by
     by_cases ht : t = s
@@ -217,14 +238,10 @@ theorem setData (s : Fin L.dataRegs) (v : M.Value) :
       simp [State.setData, Cslib.WordRAM.Data.set, Function.update_of_ne ht,
         Function.update_of_ne hts, h.data]
   free := by
-    have hs : freeReg L ≠ dataReg L s := by
-      intro he; have := congrArg Fin.val he; have := s.isLt
-      simp only [freeReg, dataReg] at *; omega
+    have hs : freeReg L ≠ dataReg L s := by simp [Fin.ext_iff]; omega
     simpa [State.setData, Cslib.WordRAM.Data.set, Function.update_of_ne hs] using h.free
   zero := by
-    have hs : zeroReg L ≠ dataReg L s := by
-      intro he; have := congrArg Fin.val he; have := s.isLt
-      simp only [zeroReg, dataReg] at *; omega
+    have hs : zeroReg L ≠ dataReg L s := by simp [Fin.ext_iff]; omega
     simpa [State.setData, Cslib.WordRAM.Data.set, Function.update_of_ne hs] using h.zero
   heapPtr := h.heapPtr
   heapData := h.heapData
@@ -269,8 +286,8 @@ theorem writePtr (a : ℕ) (f : Fin L.ptrFields) (p : Pointer) :
       (y.write (cellAddr L a f.val) (ptrWord L p)) := by
   refine h.modify (z := y.write (cellAddr L a f.val) (ptrWord L p)) a _ rfl ?_ ?_
   · intro b n hn t
-    have hf : f.val < stride L := by have := f.isLt; unfold stride; omega
-    have ht : t.val < stride L := by have := t.isLt; unfold stride; omega
+    have hf : f.val < stride L := ptrField_lt_stride f
+    have ht : t.val < stride L := ptrField_lt_stride t
     have he : cellAddr L b t.val = cellAddr L a f.val ↔ b = a ∧ t = f := by
       constructor
       · intro he
@@ -281,8 +298,8 @@ theorem writePtr (a : ℕ) (f : Fin L.ptrFields) (p : Pointer) :
     simp only [Cslib.WordRAM.Data.write, Function.update_apply, he]
     by_cases hb : b = a <;> by_cases ht : t = f <;> simp_all
   · intro b n hn t
-    have hf : f.val < stride L := by have := f.isLt; unfold stride; omega
-    have ht : L.ptrFields + t.val < stride L := by have := t.isLt; unfold stride; omega
+    have hf : f.val < stride L := ptrField_lt_stride f
+    have ht : L.ptrFields + t.val < stride L := dataField_lt_stride t
     have he : cellAddr L b (L.ptrFields + t.val) ≠ cellAddr L a f.val := by
       intro he
       have hh := (cellAddr_injective ht hf he).2
@@ -298,8 +315,8 @@ theorem writeData (a : ℕ) (f : Fin L.dataFields) (v : M.Value) :
       (y.write (cellAddr L a (L.ptrFields + f.val)) (e v)) := by
   refine h.modify (z := y.write (cellAddr L a (L.ptrFields + f.val)) (e v)) a _ rfl ?_ ?_
   · intro b n hn t
-    have hf : L.ptrFields + f.val < stride L := by have := f.isLt; unfold stride; omega
-    have ht : t.val < stride L := by have := t.isLt; unfold stride; omega
+    have hf : L.ptrFields + f.val < stride L := dataField_lt_stride f
+    have ht : t.val < stride L := ptrField_lt_stride t
     have he : cellAddr L b t.val ≠ cellAddr L a (L.ptrFields + f.val) := by
       intro he
       have hh := (cellAddr_injective ht hf he).2
@@ -308,8 +325,8 @@ theorem writeData (a : ℕ) (f : Fin L.dataFields) (v : M.Value) :
     simp only [Cslib.WordRAM.Data.write, Function.update_of_ne he]
     split_ifs <;> exact h.heapPtr b n hn t
   · intro b n hn t
-    have hf : L.ptrFields + f.val < stride L := by have := f.isLt; unfold stride; omega
-    have ht : L.ptrFields + t.val < stride L := by have := t.isLt; unfold stride; omega
+    have hf : L.ptrFields + f.val < stride L := dataField_lt_stride f
+    have ht : L.ptrFields + t.val < stride L := dataField_lt_stride t
     have he : cellAddr L b (L.ptrFields + t.val) = cellAddr L a (L.ptrFields + f.val) ↔
         b = a ∧ t = f := by
       constructor
@@ -342,22 +359,20 @@ theorem append (n : Record M L)
       exact Or.inr ⟨he, by simpa only [he, List.getElem?_concat_length,
         Option.some.injEq] using ha.symm⟩
   exact {
-    ptr r := (hr _ (by have := r.isLt; simp only [ptrReg]; omega) (by
-      intro he; have := congrArg Fin.val he; have := r.isLt
-      simp only [ptrReg, freeReg] at *; omega)).trans (h.ptr r)
-    data s := (hr _ (by have := s.isLt; simp only [dataReg]; omega) (by
-      intro he; have := congrArg Fin.val he; have := s.isLt
-      simp only [dataReg, freeReg] at *; omega)).trans (h.data s)
+    ptr r := (hr _ (by simp; omega)
+      (by simp [Fin.ext_iff]; omega)).trans (h.ptr r)
+    data s := (hr _ (by simp; omega)
+      (by simp [Fin.ext_iff]; omega)).trans (h.data s)
     free := by simpa using hf
     zero := (hr _ (by simp [zeroReg]) (by simp [zeroReg, freeReg, Fin.ext_iff])).trans h.zero
     heapPtr a m ha f := by
       rcases lookup ha with ⟨hl, hm'⟩ | ⟨rfl, rfl⟩
-      · rw [hm _ (cellAddr_lt hl (by have := f.isLt; unfold stride; omega))]
+      · rw [hm _ (cellAddr_lt hl (ptrField_lt_stride f))]
         exact h.heapPtr a m hm' f
       · exact hp f
     heapData a m ha f := by
       rcases lookup ha with ⟨hl, hm'⟩ | ⟨rfl, rfl⟩
-      · rw [hm _ (cellAddr_lt hl (by have := f.isLt; unfold stride; omega))]
+      · rw [hm _ (cellAddr_lt hl (dataField_lt_stride f))]
         exact h.heapData a m hm' f
       · exact hd f }
 
