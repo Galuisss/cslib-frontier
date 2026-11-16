@@ -57,10 +57,6 @@ treating encoded tuple access as a semantic callback.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.takeUnary`, `.dropUnary`: retain the direct linear
   encoded-list prefix and suffix machines through the existing tidy normal form.
 
-## Main results
-
-* `Turing.MultiTapeTM.Internal.NativeCompiler.machine_ofTransducer`: the retained machine is
-  definitionally the supplied transducer followed by input rewind.
 -/
 
 public section
@@ -73,7 +69,7 @@ universe u v
 
 /-- Retain a finite transducer followed by input rewind as a named tidy compiler. Every input bit
 is read by the transducer and by the rewind; emitted bits are included in the transducer clock. -/
-@[expose] noncomputable def ofTransducer {Alpha Beta : Type*} {State : Type} [Fintype State]
+@[expose] def ofTransducer {Alpha Beta : Type*} {State : Type} [Fintype State]
     {f : Alpha → Beta} {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
     (transducer : Transducer Bool State) (stateEncoding : State ↪ ℕ)
     (run_eq : ∀ input, transducer.run transducer.q₀ (encIn input) = encOut (f input)) :
@@ -81,23 +77,17 @@ is read by the transducer and by the rewind; emitted bits are included in the tr
   {
     tapeCount := 0
     State := (State × Option Bool × Bool) ⊕ RewindState
-    machine := transducer.toTM.seq (rewindInput Bool)
+    table := transducer.toMachine.seq (MultiTapeMachine.rewindInput Bool)
     stateEncoding := sumStateEncoding (transducerMachineStateEncoding stateEncoding)
       rewindStateEncoding
     time := fun input => 4 * (encIn input).length + 8
     workspace := fun _ => 0
     computes := fun input => by
-      simpa only [run_eq input] using transducer.computesTidily (encIn input)
+      rw [MultiTapeMachine.toTM_seq]
+      have h := (transducer.computesInTimeAndSpace_toTM (encIn input))
+        |>.computesTidily_seq_explicitRewind
+      simpa only [Transducer.toTM, run_eq input] using h.mono (by omega) le_rfl
   }
-
-/-- The transducer constructor retains its exact transducer-plus-rewind machine. -/
-theorem machine_ofTransducer {Alpha Beta : Type*} {State : Type} [Fintype State]
-    {f : Alpha → Beta} {encIn : Alpha ↪ List Bool} {encOut : Beta ↪ List Bool}
-    (transducer : Transducer Bool State) (stateEncoding : State ↪ ℕ)
-    (run_eq : ∀ input, transducer.run transducer.q₀ (encIn input) = encOut (f input)) :
-    (ofTransducer transducer stateEncoding run_eq).machine =
-      transducer.toTM.seq (rewindInput Bool) :=
-  rfl
 
 /-- Prefix a fixed tag bit, streaming the input unchanged after the first transition. -/
 def prefixBitT (tag : Bool) : Transducer Bool Bool where
@@ -374,15 +364,15 @@ machine, not the private proof-local predecessor transducer from the degree calc
     cases input <;> simp [encUnary_apply, List.replicate_succ]
 
 /-- Total first-frame decoder, including the existing incomplete-frame behavior. -/
-@[expose] noncomputable def unframeDecoder : NativeCompiler unframe encBits encBits := by
-  letI : Fintype FrameState := Fintype.ofFinite FrameState
+@[expose] def unframeDecoder : NativeCompiler unframe encBits encBits := by
+  letI : Fintype FrameState := inferInstance
   exact ofTransducer (readFrameT true) frameStateEncoding readFrameT_run_true
 
 /-- Remove the frame around a typed encoded value. This retains the same parser as
 `unframeDecoder`, with no semantic decoding step. -/
-@[expose] noncomputable def unframeValue {Alpha : Type*} (enc : Alpha ↪ List Bool) :
+@[expose] def unframeValue {Alpha : Type*} (enc : Alpha ↪ List Bool) :
     NativeCompiler id (encFramed enc) enc := by
-  letI : Fintype FrameState := Fintype.ofFinite FrameState
+  letI : Fintype FrameState := inferInstance
   exact ofTransducer (readFrameT true) frameStateEncoding fun input => by
     change (readFrameT true).run .marker (encFramed enc input) = enc input
     rw [readFrameT_run_true]
@@ -424,7 +414,7 @@ clock and workspace expose both the kernel bound and the exact normal-form overh
   exact {
     tapeCount := 1 + 1
     State := CompilerState
-    machine := tidy false true (TakeDropUnary.toTM keep)
+    table := (TakeDropUnary.toMachine keep).tidy false true
     stateEncoding := sumStateEncoding
       (sumStateEncoding (optionStateEncoding takeDropUnaryStateEncoding)
         (clearListStateEncoding clearCount))
@@ -437,8 +427,12 @@ clock and workspace expose both the kernel bound and the exact normal-form overh
     computes := fun input => by
       have h := TakeDropUnary.computesInTimeAndSpace_toTM keep
         (encList enc input.1) input.2
-      have htidy := h.computesTidily_tidy (m₀ := false) (m₁ := true) (by decide)
-      simpa only [encPair_apply, encUnary_apply, TakeDropUnary.stream_encList] using htidy
+      have htidy :=
+        MultiTapeMachine.ComputesInTimeAndSpace.computesTidily_tidy
+          (machine := TakeDropUnary.toMachine keep) (m₀ := false) (m₁ := true)
+          (by decide) h
+      simpa only [TakeDropUnary.toTM, encPair_apply, encUnary_apply,
+        TakeDropUnary.stream_encList] using htidy
   }
 
 /-- Retained linear-time prefix of an encoded list at a unary count. -/
@@ -452,10 +446,5 @@ clock and workspace expose both the kernel bound and the exact normal-form overh
     NativeCompiler (fun input : List Alpha × ℕ => input.1.drop input.2)
       (encPair (encList enc) encUnary) (encList enc) :=
   takeDropUnary false enc
-
-/-- Unary take/drop retains the direct kernel inside the direct tidy normal form. -/
-theorem machine_takeDropUnary {Alpha : Type*} (keep : Bool) (enc : Alpha ↪ List Bool) :
-    (takeDropUnary keep enc).machine = tidy false true (TakeDropUnary.toTM keep) :=
-  rfl
 
 end Turing.MultiTapeTM.Internal.NativeCompiler

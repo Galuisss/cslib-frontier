@@ -80,7 +80,7 @@ clock and workspace expose the kernel bound and every cleanup term. -/
   exact {
     tapeCount := 1 + 1
     State := CompilerState
-    machine := tidy false true transducer.toTM
+    table := transducer.toMachine.tidy false true
     stateEncoding := sumStateEncoding
       (sumStateEncoding (optionStateEncoding (zipStateEncoding stateEncoding))
         (clearListStateEncoding clearCount))
@@ -95,22 +95,11 @@ clock and workspace expose the kernel bound and every cleanup term. -/
     computes := fun input => by
       have h := transducer.computesInTimeAndSpace_toTM
         (encFirst input.1) (encSecond input.2)
-      have htidy := h.computesTidily_tidy (m₀ := false) (m₁ := true) (by decide)
-      simpa only [encPair_apply, run_eq input] using htidy
+      have htidy :=
+        MultiTapeMachine.ComputesInTimeAndSpace.computesTidily_tidy
+          (machine := transducer.toMachine) (m₀ := false) (m₁ := true) (by decide) h
+      simpa only [ZipTransducer.toTM, encPair_apply, run_eq input] using htidy
   }
-
-/-- The retained zip compiler uses the direct zip machine under the tidy wrapper. -/
-theorem machine_ofZipTransducer {Alpha : Type u} {Beta : Type v}
-    {Gamma : Type*} {State : Type}
-    [Fintype State]
-    {f : Alpha × Beta → Gamma} (encFirst : Alpha ↪ List Bool) (encSecond : Beta ↪ List Bool)
-    (encOut : Gamma ↪ List Bool) (transducer : ZipTransducer State)
-    (stateEncoding : State ↪ ℕ)
-    (run_eq : ∀ input, transducer.run transducer.q₀ (encFirst input.1) (encSecond input.2) =
-      encOut (f input)) :
-    (ofZipTransducer encFirst encSecond encOut transducer stateEncoding run_eq).machine =
-      tidy false true transducer.toTM :=
-  rfl
 
 /-- Compare two words, remembering whether their lengths and every symbol agree. -/
 def wordEqT : ZipTransducer Bool where

@@ -13,6 +13,8 @@ public import Cslib.Computability.Machines.Turing.MultiTape.Plumbing.RewindInput
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.Sequential
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.TransformsTapes
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.TransformsWords
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.Equivalence
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.ExtendTapes
 
 /-!
 # Tape transformations with the input head anywhere
@@ -194,6 +196,31 @@ head. -/
 noncomputable def freezeInput (tm : MultiTapeTM k Symbol State) : MultiTapeTM k Symbol State :=
   ofTr tm.q₀ fun q _ work => { tm.tr q none work with inputTape := 0 }
 
+end Turing.MultiTapeTM
+
+namespace Turing.MultiTapeMachine
+
+variable {k : ℕ} {Symbol State : Type*}
+
+/-- Run an explicit table as if its input were blank, keeping the physical input head fixed. -/
+public def freezeInput (machine : MultiTapeMachine k Symbol State Empty Id) :
+    MultiTapeMachine k Symbol State Empty Id :=
+  ofTr machine.initial fun state _ work =>
+    { Action.emptyOracleEquiv (machine.tr state none work Empty.elim) with inputTape := 0 }
+
+/-- Forgetting the explicit frozen-input table gives the established deterministic wrapper. -/
+public theorem toTM_freezeInput (machine : MultiTapeMachine k Symbol State Empty Id) :
+    machine.freezeInput.toTM = machine.toTM.freezeInput := by
+  rw [freezeInput, toTM_ofTr, MultiTapeTM.freezeInput]
+  congr 1 with state input work : 3
+  simp only [toTM, MultiTapeTM.tr_ofTr]
+
+end Turing.MultiTapeMachine
+
+namespace Turing.MultiTapeTM
+
+variable {k : ℕ} {Symbol State State₀ State₁ : Type*}
+
 namespace FreezeInput
 
 variable {tm : MultiTapeTM k Symbol State} {input : List Symbol}
@@ -260,6 +287,21 @@ theorem TransformsTapes.freezeInput_eq {tm : MultiTapeTM k Symbol State}
 noncomputable def rewindInputOn (k : ℕ) (Symbol : Type*) :
     MultiTapeTM k Symbol RewindState :=
   (rewindInput Symbol).extendTapes (noTapes k)
+
+end Turing.MultiTapeTM
+
+namespace Turing.MultiTapeMachine
+
+/-- The explicit input rewinder embedded in a machine with `k` work tapes. -/
+public def rewindInputOn (k : ℕ) (Symbol : Type) :
+    MultiTapeMachine k Symbol MultiTapeTM.RewindState Empty Id :=
+  (MultiTapeMachine.rewindInput Symbol).extendTapes (MultiTapeTM.noTapes k)
+
+end Turing.MultiTapeMachine
+
+namespace Turing.MultiTapeTM
+
+variable {k : ℕ} {Symbol State State₀ State₁ : Type*}
 
 /-- `rewindInputOn k Symbol` moves the input head from anywhere on the input `x` back to its start
 and changes nothing else. -/

@@ -268,3 +268,35 @@ theorem runFrom_clearShadowed (hm : m₀ ≠ m₁) {ip : Fin (input.length + 2)}
     · exact (hS y).2 (by rw [Finset.mem_Icc]; push_cast at h; omega)
 
 end Turing.MultiTapeTM
+
+namespace Turing.MultiTapeMachine
+
+variable {Symbol : Type*} [DecidableEq Symbol]
+
+/-- The choice-free transition table clearing a work tape together with its shadow. -/
+def clearShadowed (m₀ m₁ : Symbol) :
+    MultiTapeMachine 2 Symbol MultiTapeTM.ClearShadowedState Empty Id :=
+  ofTr .start fun state _ work =>
+    match state with
+    | .start => MultiTapeTM.ClearShadowed.action none
+        (if (work 1).isNone then some (some m₁) else none) (-1) (some .left)
+    | .left =>
+        if (work 1).isNone then MultiTapeTM.ClearShadowed.action none none 1 (some .sweep)
+        else MultiTapeTM.ClearShadowed.action none none (-1) (some .left)
+    | .sweep =>
+        match work 1 with
+        | none => MultiTapeTM.ClearShadowed.action none none (-1) (some .home)
+        | some mark =>
+          MultiTapeTM.ClearShadowed.action (some (if mark = m₀ then some m₁ else none))
+            (some none) 1 (some .sweep)
+    | .home =>
+        match work 0 with
+        | none => MultiTapeTM.ClearShadowed.action none none (-1) (some .home)
+        | some _ => MultiTapeTM.ClearShadowed.action (some none) none 0 none
+
+/-- Forgetting the explicit clearing table recovers the legacy deterministic machine. -/
+theorem toTM_clearShadowed (m₀ m₁ : Symbol) :
+    (clearShadowed m₀ m₁).toTM = MultiTapeTM.clearShadowed m₀ m₁ := by
+  simp only [clearShadowed, toTM_ofTr, MultiTapeTM.clearShadowed]
+
+end Turing.MultiTapeMachine

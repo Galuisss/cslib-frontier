@@ -52,14 +52,4 @@ namespace Turing.MultiTapeTM.Internal.NativeCompiler
     NativeCompiler (fun n : ℕ => decide (n = 0)) encNat encTest :=
   boolToTest.comp natIsZeroBool
 
-/-- The retained successor compiler uses the concrete carry transducer. -/
-theorem machine_natSucc : natSucc.machine =
-    NatSucc.succTransducer.toTM.seq (rewindInput Bool) :=
-  rfl
-
-/-- The retained predecessor compiler uses the concrete borrow transducer. -/
-theorem machine_natPred : natPred.machine =
-    NatPred.predTransducer.toTM.seq (rewindInput Bool) :=
-  rfl
-
 end Turing.MultiTapeTM.Internal.NativeCompiler

@@ -261,13 +261,6 @@ theorem streamEmit_firstMatch (encValue : Value ↪ List Bool) (query : Key) :
     (firstMatchMarshalCompiler encKey encValue)).ofOutputEq fun input => by
       simp [firstMatch]
 
-/-- First-match retains the direct composition of streaming scan after input marshalling. -/
-theorem machine_firstMatchCompiler (encKey : Key ↪ List Bool) (encValue : Value ↪ List Bool) :
-    (firstMatchCompiler encKey encValue).machine =
-      (firstMatchStreamCompiler encKey encValue).machine.comp
-        (firstMatchMarshalCompiler encKey encValue).machine true :=
-  rfl
-
 /-- The first-match clock exposes marshalling, streaming, intermediate copying and composition
 overhead separately. -/
 theorem time_firstMatchCompiler (encKey : Key ↪ List Bool) (encValue : Value ↪ List Bool)

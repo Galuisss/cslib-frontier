@@ -8,12 +8,13 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.StreamFold
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelStreamTable
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Codec
 
 /-!
 # Named native streaming folds
 
-This module retains the concrete `streamTM` assembled from named callback compilers. The framed
+This module retains an explicit stream table assembled from named callback compilers. The framed
 initial state is copied directly from the input prefix, list elements are decoded one frame at a
 time, and the input list is never copied to work tapes. The construction records the exact
 callback-lifting, loop, finalization, cleanup and rewind bounds from the stream kernel.
@@ -26,19 +27,13 @@ lengths along this particular fold. The per-round clock is the explicit construc
 
 * `Turing.MultiTapeTM.Internal.NativeCompiler.frameValueReader`: read the contents of one framed
   list element without retaining its framing.
-* `Turing.MultiTapeTM.Internal.NativeCompiler.streamFoldPairMachine`: the concrete stream
-  assembly from named callback machines.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.streamFoldPairTable`: the explicit stream assembly
+  from named callback tables.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.streamFoldPairRoundCost`, `.streamFoldPairTime`,
   `.streamFoldPairWorkspace`: the construction-derived resource formulas.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.streamFoldPair`: retain the concrete single-pass
-  stream machine for an initial state paired with an encoded list.
-
-## Main results
-
-* `Turing.MultiTapeTM.Internal.NativeCompiler.machine_streamFoldPair`: identify the retained
-  machine with the exposed concrete assembly.
-* `Turing.MultiTapeTM.Internal.NativeCompiler.time_streamFoldPair`, `.workspace_streamFoldPair`:
-  identify the recorded resource maps with the exposed construction formulas.
+  stream table and its exact semantic and resource certificate for an initial state paired with
+  an encoded list.
 -/
 
 public section
@@ -67,7 +62,7 @@ theorem read_frameValueReader (word rest : List Bool) :
     simp [frameValueReader, Nat.add_assoc]
 
 /-- The next-state callback followed by the retained framing transducer required by `streamTM`. -/
-@[expose] noncomputable def streamFramedNext {Alpha Sigma : Type*}
+@[expose] def streamFramedNext {Alpha Sigma : Type*}
     {next : Sigma × Alpha → Sigma} {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool}
     (compiler : NativeCompiler next (encPair encS encA) encS) :
     NativeCompiler (fun input => frame (encS (next input)))
@@ -76,7 +71,7 @@ theorem read_frameValueReader (word rest : List Bool) :
 
 /-- The final callback preceded by the retained typed unframing transducer required by
 `streamTM`. -/
-@[expose] noncomputable def streamUnframedFinish {Sigma Phi : Type*}
+@[expose] def streamUnframedFinish {Sigma Phi : Type*}
     {finish : Sigma → Phi} {encS : Sigma ↪ List Bool} {encF : Phi ↪ List Bool}
     (compiler : NativeCompiler finish encS encF) :
     NativeCompiler finish (encFramed encS) encF :=
@@ -111,7 +106,7 @@ selected work tapes in a `K`-tape stream machine. -/
     3 * compiler.tapeCount + 18 + (K - (compiler.tapeCount + 1 + 2))
 
 /-- The exact number of tapes in the retained pair-stream assembly. -/
-@[expose] noncomputable def streamFoldPairTapeCount {Alpha Sigma Epsilon Phi : Type*}
+@[expose] def streamFoldPairTapeCount {Alpha Sigma Epsilon Phi : Type*}
     {next : Sigma × Alpha → Sigma} {emit : Sigma × Alpha → Epsilon} {finish : Sigma → Phi}
     {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool}
     {encE : Epsilon ↪ List Bool} {encF : Phi ↪ List Bool}
@@ -199,7 +194,7 @@ structure StreamFoldPairLayout {Alpha Sigma Epsilon Phi : Type*}
 
 /-- A selected-tape layout exists with the three stream tapes placed after every callback's tape
 budget. These choices select tape positions, not erased callback machines. -/
-@[expose] noncomputable def streamFoldPairLayout {Alpha Sigma Epsilon Phi : Type*}
+@[expose] def streamFoldPairLayout {Alpha Sigma Epsilon Phi : Type*}
     {next : Sigma × Alpha → Sigma} {emit : Sigma × Alpha → Epsilon} {finish : Sigma → Phi}
     {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool}
     {encE : Epsilon ↪ List Bool} {encF : Phi ↪ List Bool}
@@ -257,8 +252,10 @@ budget. These choices select tape positions, not erased callback machines. -/
         embeddingAt_source hFinish finishSource V
   }
 
-/-- Concrete `streamTM` assembled from the three named callback machines. -/
-@[expose] noncomputable def streamFoldPairMachine {Alpha Sigma Epsilon Phi : Type*}
+/-! ### Explicit stream-machine assembly -/
+
+/-- The retained pair-stream program as one explicit, choice-free transition table. -/
+@[expose] def streamFoldPairTable {Alpha Sigma Epsilon Phi : Type*}
     {next : Sigma × Alpha → Sigma} {emit : Sigma × Alpha → Epsilon} {finish : Sigma → Phi}
     {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool}
     {encE : Epsilon ↪ List Bool} {encF : Phi ↪ List Bool}
@@ -268,15 +265,15 @@ budget. These choices select tape positions, not erased callback machines. -/
   let layout := streamFoldPairLayout nextCompiler emitCompiler finishCompiler
   let framedNext := streamFramedNext nextCompiler
   let unframedFinish := streamUnframedFinish finishCompiler
-  streamTM frameValueReader (appendRead rawFrameReader layout.V)
-    ((emitCompiler.machine.inputFromWord true).extendTapes layout.emitEmbedding)
-    ((framedNext.machine.onWords true).extendTapes layout.nextEmbedding)
-    ((unframedFinish.machine.inputFromWord true).extendTapes layout.finishEmbedding)
+  MultiTapeMachine.stream frameValueReader (rawFrameReader.appendReadTable layout.V)
+    ((emitCompiler.table.inputFromWord true).extendTapes layout.emitEmbedding)
+    ((MultiTapeMachine.onWords framedNext.table true).extendTapes layout.nextEmbedding)
+    ((unframedFinish.table.inputFromWord true).extendTapes layout.finishEmbedding)
     layout.V layout.N layout.F layout.hVN layout.hVF layout.hNF
 
 /-- Exact time charged to round `j`. Outside the list range it is zero; the stream machine uses
 this function only over `Finset.range input.2.length`. -/
-@[expose] noncomputable def streamFoldPairRoundCost {Alpha Sigma Epsilon : Type*}
+@[expose] def streamFoldPairRoundCost {Alpha Sigma Epsilon : Type*}
     {next : Sigma × Alpha → Sigma} {emit : Sigma × Alpha → Epsilon}
     {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool}
     {encE : Epsilon ↪ List Bool}
@@ -293,7 +290,7 @@ this function only over `Finset.range input.2.length`. -/
     0
 
 /-- Construction-derived clock of the retained pair-stream machine. -/
-@[expose] noncomputable def streamFoldPairTime {Alpha Sigma Epsilon Phi : Type*}
+@[expose] def streamFoldPairTime {Alpha Sigma Epsilon Phi : Type*}
     {next : Sigma × Alpha → Sigma} {emit : Sigma × Alpha → Epsilon} {finish : Sigma → Phi}
     {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool}
     {encE : Epsilon ↪ List Bool} {encF : Phi ↪ List Bool}
@@ -312,7 +309,7 @@ this function only over `Finset.range input.2.length`. -/
       ((encPair encS (encList encA) input).length + 2))
 
 /-- Construction-derived workspace bound of the retained pair-stream machine. -/
-@[expose] noncomputable def streamFoldPairWorkspace {Alpha Sigma Epsilon Phi : Type*}
+@[expose] def streamFoldPairWorkspace {Alpha Sigma Epsilon Phi : Type*}
     {next : Sigma × Alpha → Sigma} {emit : Sigma × Alpha → Epsilon} {finish : Sigma → Phi}
     {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool}
     {encE : Epsilon ↪ List Bool} {encF : Phi ↪ List Bool}
@@ -332,7 +329,7 @@ this function only over `Finset.range input.2.length`. -/
 
 /-- Retain the concrete pair-prefix streaming fold. `sMax` bounds the sum of the two lifted
 callback workspaces in each round; `lMax` bounds every encoded stream state and element. -/
-@[expose] noncomputable def streamFoldPair
+@[expose] def streamFoldPair
     {Alpha Sigma Epsilon Phi Omega : Type*}
     {next : Sigma × Alpha → Sigma} {emit : Sigma × Alpha → Epsilon}
     {finish : Sigma → Phi} {result : Sigma × List Alpha → Omega}
@@ -361,20 +358,46 @@ callback workspaces in each round; `lMax` bounds every encoded stream state and 
   let framedNext := streamFramedNext nextCompiler
   let unframedFinish := streamUnframedFinish finishCompiler
   let K := streamFoldPairTapeCount nextCompiler emitCompiler finishCompiler
+  let initializer := rawFrameReader.appendReadTable layout.V
   let emitter :=
-    (emitCompiler.machine.inputFromWord true).extendTapes layout.emitEmbedding
-  let nextMachine := (framedNext.machine.onWords true).extendTapes layout.nextEmbedding
+    (emitCompiler.table.inputFromWord true).extendTapes layout.emitEmbedding
+  let nextMachine :=
+    (MultiTapeMachine.onWords framedNext.table true).extendTapes layout.nextEmbedding
   let finalizer :=
-    (unframedFinish.machine.inputFromWord true).extendTapes layout.finishEmbedding
-  let machine := streamFoldPairMachine nextCompiler emitCompiler finishCompiler
+    (unframedFinish.table.inputFromWord true).extendTapes layout.finishEmbedding
+  let table := streamFoldPairTable nextCompiler emitCompiler finishCompiler
   letI := emitCompiler.stateFintype
   letI := framedNext.stateFintype
   letI := unframedFinish.stateFintype
+  let appendReadEncoding := sumStateEncoding unitStateEncoding
+    (sumStateEncoding Universal.eBit rewindWorkStateEncoding)
+  let clearEncoding := sumStateEncoding unitStateEncoding rewindWorkStateEncoding
+  let copyEncoding := sumStateEncoding markWorkStateEncoding
+    (sumStateEncoding
+      (sumStateEncoding (sumStateEncoding unitStateEncoding rewindStateEncoding)
+        rewindWorkStateEncoding)
+      markWorkStateEncoding)
+  let emitterEncoding := sumStateEncoding markWorkStateEncoding
+    (sumStateEncoding emitCompiler.stateEncoding markWorkStateEncoding)
+  let nextEncoding := sumStateEncoding markWorkStateEncoding
+    (sumStateEncoding
+      (sumStateEncoding framedNext.stateEncoding rewindWorkStateEncoding)
+      markWorkStateEncoding)
+  let finalizerEncoding := sumStateEncoding markWorkStateEncoding
+    (sumStateEncoding unframedFinish.stateEncoding markWorkStateEncoding)
+  let frozenRoundEncoding := sumStateEncoding emitterEncoding
+    (sumStateEncoding nextEncoding
+      (sumStateEncoding clearEncoding (sumStateEncoding copyEncoding clearEncoding)))
+  let roundEncoding := sumStateEncoding appendReadEncoding frozenRoundEncoding
+  let stateEncoding := sumStateEncoding appendReadEncoding
+    (sumStateEncoding (sumStateEncoding roundEncoding unitStateEncoding)
+      (sumStateEncoding (sumStateEncoding finalizerEncoding clearEncoding)
+        rewindStateEncoding))
   refine
     { tapeCount := K
       State := _
-      machine := machine
-      stateEncoding := fintypeStateEncoding _
+      table := table
+      stateEncoding := stateEncoding
       time := streamFoldPairTime nextCompiler emitCompiler finishCompiler
       workspace := streamFoldPairWorkspace nextCompiler emitCompiler finishCompiler sMax lMax
       computes := ?_ }
@@ -398,14 +421,19 @@ callback workspaces in each round; `lMax` bounds every encoded stream state and 
       rintro _ _ ws _ _ _ ⟨_, _, rfl⟩ ⟨hp, hws, hem⟩
       exact ⟨hp, hws, hem⟩)
     le_rfl le_rfl
-  have hE := fun pair => (emitCompiler.computes pair).inputFromWord_extendTapes true
-    layout.emitInput
-  have hN := fun pair => (framedNext.computes pair).onWords_extendTapes true
-    layout.nextInput layout.nextOutput
-  have hloop := transformsTapesAt_streamLoop_encoded_after frameValueReader
+  have hE := fun pair => MultiTapeMachine.transformsTapes_inputFromWord_extendTapes true
+    (emitCompiler.computes pair) layout.emitInput
+  have hN := fun pair => MultiTapeMachine.transformsTapes_onWords_extendTapes true
+    (framedNext.computes pair) layout.nextInput layout.nextOutput
+  have hloop := transformsTapesAt_streamLoop_encoded_after_of_round
+    (round := (MultiTapeMachine.streamRound frameValueReader emitter nextMachine
+      layout.V layout.N layout.F layout.hVN layout.hVF layout.hNF).toTM)
+    (roundSpec := MultiTapeMachine.transformsTapesAt_streamRound
+      (reader := frameValueReader) (emitter := emitter) (nextMachine := nextMachine)
+      layout.hVN layout.hVF layout.hNF)
+    frameValueReader
     (fun value => frame (encA value)) (fun value => frame_ne_nil (encA value))
     (fun value rest => read_frameValueReader (encA value) rest)
-    layout.hVN layout.hVF layout.hNF
     (frame (encS input.1)) input.1 input.2 next (fun pair => encE (emit pair)) hE hN
     (roundCost := streamFoldPairRoundCost nextCompiler emitCompiler input)
     (sMax := sMax input) (lMax := lMax input) (by
@@ -418,9 +446,15 @@ callback workspaces in each round; `lMax` bounds every encoded stream state and 
       simpa only [inputFromWordWorkspace, onWordsWorkspace, framedNext] using
         hspace input j hj)
     (hstate input) (helem input)
-  have hF := (unframedFinish.computes finalState).inputFromWord_extendTapes true
-    layout.finishInput
-  have h := computesTidily_streamTM_after (r := frameValueReader)
+  have hF := MultiTapeMachine.transformsTapes_inputFromWord_extendTapes true
+    (unframedFinish.computes finalState) layout.finishInput
+  rw [← rawFrameReader.toTM_appendReadTable layout.V] at hinit'
+  rw [← MultiTapeMachine.toTM_whileInput
+    (MultiTapeMachine.streamRound frameValueReader emitter nextMachine
+      layout.V layout.N layout.F layout.hVN layout.hVF layout.hNF)] at hloop
+  have h := MultiTapeMachine.computesTidily_stream_after
+    (reader := frameValueReader) (initializer := initializer) (emitter := emitter)
+    (nextMachine := nextMachine) (finalizer := finalizer)
     layout.hVN layout.hVF layout.hNF
     (encPair encS (encList encA) input) (frame (encS input.1))
     (frame (encS input.1)) (frame (encS finalState))
@@ -435,95 +469,5 @@ callback workspaces in each round; `lMax` bounds every encoded stream state and 
     omega
   · simp only [streamFoldPairWorkspace, inputFromWordWorkspace, finalState, unframedFinish]
     exact le_rfl
-
-/-- The retained pair-stream compiler contains the exposed concrete `streamTM` assembly. -/
-theorem machine_streamFoldPair
-    {Alpha Sigma Epsilon Phi Omega : Type*}
-    {next : Sigma × Alpha → Sigma} {emit : Sigma × Alpha → Epsilon}
-    {finish : Sigma → Phi} {result : Sigma × List Alpha → Omega}
-    {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool}
-    {encE : Epsilon ↪ List Bool} {encF : Phi ↪ List Bool}
-    {encOut : Omega ↪ List Bool}
-    (nextCompiler : NativeCompiler next (encPair encS encA) encS)
-    (emitCompiler : NativeCompiler emit (encPair encS encA) encE)
-    (finishCompiler : NativeCompiler finish encS encF)
-    (hresult : ∀ input, encOut (result input) =
-      streamEmit next (fun pair => encE (emit pair)) input.1 input.2 ++
-        encF (finish (streamState input.1 next input.2 input.2.length)))
-    (sMax lMax : Sigma × List Alpha → ℕ)
-    (hspace : ∀ input j (hj : j < input.2.length),
-      let pair := (streamState input.1 next input.2 j, input.2[j])
-      inputFromWordWorkspace (streamFoldPairTapeCount nextCompiler emitCompiler finishCompiler)
-          emitCompiler pair +
-        onWordsWorkspace (streamFoldPairTapeCount nextCompiler emitCompiler finishCompiler)
-          (streamFramedNext nextCompiler) pair ≤ sMax input)
-    (hstate : ∀ input j, j ≤ input.2.length →
-      (encS (streamState input.1 next input.2 j)).length ≤ lMax input)
-    (helem : ∀ input j (hj : j < input.2.length),
-      (encA input.2[j]).length ≤ lMax input) :
-    (streamFoldPair nextCompiler emitCompiler finishCompiler hresult sMax lMax
-      hspace hstate helem).machine =
-      streamFoldPairMachine nextCompiler emitCompiler finishCompiler :=
-  rfl
-
-/-- The retained pair-stream clock is the exposed construction formula. -/
-theorem time_streamFoldPair
-    {Alpha Sigma Epsilon Phi Omega : Type*}
-    {next : Sigma × Alpha → Sigma} {emit : Sigma × Alpha → Epsilon}
-    {finish : Sigma → Phi} {result : Sigma × List Alpha → Omega}
-    {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool}
-    {encE : Epsilon ↪ List Bool} {encF : Phi ↪ List Bool}
-    {encOut : Omega ↪ List Bool}
-    (nextCompiler : NativeCompiler next (encPair encS encA) encS)
-    (emitCompiler : NativeCompiler emit (encPair encS encA) encE)
-    (finishCompiler : NativeCompiler finish encS encF)
-    (hresult : ∀ input, encOut (result input) =
-      streamEmit next (fun pair => encE (emit pair)) input.1 input.2 ++
-        encF (finish (streamState input.1 next input.2 input.2.length)))
-    (sMax lMax : Sigma × List Alpha → ℕ)
-    (hspace : ∀ input j (hj : j < input.2.length),
-      let pair := (streamState input.1 next input.2 j, input.2[j])
-      inputFromWordWorkspace (streamFoldPairTapeCount nextCompiler emitCompiler finishCompiler)
-          emitCompiler pair +
-        onWordsWorkspace (streamFoldPairTapeCount nextCompiler emitCompiler finishCompiler)
-          (streamFramedNext nextCompiler) pair ≤ sMax input)
-    (hstate : ∀ input j, j ≤ input.2.length →
-      (encS (streamState input.1 next input.2 j)).length ≤ lMax input)
-    (helem : ∀ input j (hj : j < input.2.length),
-      (encA input.2[j]).length ≤ lMax input) (input : Sigma × List Alpha) :
-    (streamFoldPair nextCompiler emitCompiler finishCompiler hresult sMax lMax
-      hspace hstate helem).time input =
-      streamFoldPairTime nextCompiler emitCompiler finishCompiler input :=
-  rfl
-
-/-- The retained pair-stream workspace map is the exposed construction-derived bound. -/
-theorem workspace_streamFoldPair
-    {Alpha Sigma Epsilon Phi Omega : Type*}
-    {next : Sigma × Alpha → Sigma} {emit : Sigma × Alpha → Epsilon}
-    {finish : Sigma → Phi} {result : Sigma × List Alpha → Omega}
-    {encA : Alpha ↪ List Bool} {encS : Sigma ↪ List Bool}
-    {encE : Epsilon ↪ List Bool} {encF : Phi ↪ List Bool}
-    {encOut : Omega ↪ List Bool}
-    (nextCompiler : NativeCompiler next (encPair encS encA) encS)
-    (emitCompiler : NativeCompiler emit (encPair encS encA) encE)
-    (finishCompiler : NativeCompiler finish encS encF)
-    (hresult : ∀ input, encOut (result input) =
-      streamEmit next (fun pair => encE (emit pair)) input.1 input.2 ++
-        encF (finish (streamState input.1 next input.2 input.2.length)))
-    (sMax lMax : Sigma × List Alpha → ℕ)
-    (hspace : ∀ input j (hj : j < input.2.length),
-      let pair := (streamState input.1 next input.2 j, input.2[j])
-      inputFromWordWorkspace (streamFoldPairTapeCount nextCompiler emitCompiler finishCompiler)
-          emitCompiler pair +
-        onWordsWorkspace (streamFoldPairTapeCount nextCompiler emitCompiler finishCompiler)
-          (streamFramedNext nextCompiler) pair ≤ sMax input)
-    (hstate : ∀ input j, j ≤ input.2.length →
-      (encS (streamState input.1 next input.2 j)).length ≤ lMax input)
-    (helem : ∀ input j (hj : j < input.2.length),
-      (encA input.2[j]).length ≤ lMax input) (input : Sigma × List Alpha) :
-    (streamFoldPair nextCompiler emitCompiler finishCompiler hresult sMax lMax
-      hspace hstate helem).workspace input =
-      streamFoldPairWorkspace nextCompiler emitCompiler finishCompiler sMax lMax input :=
-  rfl
 
 end Turing.MultiTapeTM.Internal.NativeCompiler

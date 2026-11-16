@@ -38,10 +38,4 @@ example (input : ℕ) :
       condition.time input + trueBranch.time input + 10 :=
   rfl
 
-/-- The assembled compiler exposes the exact retained conditional machine. -/
-example :
-    (ite condition trueBranch falseBranch).machine =
-      iteTM condition.machine trueBranch.machine falseBranch.machine :=
-  machine_ite condition trueBranch falseBranch
-
 end CslibFrontierTests.Machines.Turing.MultiTape.Internal.NativeCompilerConditional

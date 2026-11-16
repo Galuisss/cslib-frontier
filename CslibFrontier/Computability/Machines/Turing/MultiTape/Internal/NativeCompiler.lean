@@ -100,8 +100,8 @@ structure NativeCompiler {α β : Type*} (f : α → β) (encIn : α ↪ List Bo
   State : Type
   /-- The control-state type is explicitly finite. -/
   [stateFintype : Fintype State]
-  /-- The actual deterministic machine term. -/
-  machine : MultiTapeTM tapeCount Bool State
+  /-- The actual explicit transition table. -/
+  table : MultiTapeMachine tapeCount Bool State Empty Id
   /-- State encoding used for the exact universal description. -/
   stateEncoding : State ↪ ℕ
   /-- Native time bound when this machine is executed, kept separate from workspace. -/
@@ -109,10 +109,16 @@ structure NativeCompiler {α β : Type*} (f : α → β) (encIn : α ↪ List Bo
   /-- Native workspace bound when this machine is executed, kept separate from time. -/
   workspace : α → ℕ
   /-- Direct tidy computation certificate for the named machine. -/
-  computes : ∀ a, machine.ComputesTidilyInTimeAndSpace (encIn a) (encOut (f a))
+  computes : ∀ a, table.toTM.ComputesTidilyInTimeAndSpace (encIn a) (encOut (f a))
     (time a) (workspace a)
 
 namespace NativeCompiler
+
+/-- Deterministic semantics of the retained explicit transition table. -/
+def machine {Alpha Beta : Type*} {f : Alpha → Beta} {encIn : Alpha ↪ List Bool}
+    {encOut : Beta ↪ List Bool} (compiler : NativeCompiler f encIn encOut) :
+    MultiTapeTM compiler.tapeCount Bool compiler.State :=
+  compiler.table.toTM
 
 /-- Constructive disjoint-union encoding used by the core constructors. -/
 @[expose] def sumStateEncoding {S₁ S₂ : Type} (left : S₁ ↪ ℕ) (right : S₂ ↪ ℕ) :
@@ -165,12 +171,20 @@ theorem fintypeStateEncoding_lt_card (State : Type*) [Fintype State] (state : St
   ⟨fun q => match q with | .start => 0 | .put => 1,
     by intro a b h; cases a <;> cases b <;> simp_all⟩
 
-/-- The exact universal description of the named machine. -/
+/-- The exact universal description obtained by enumerating the retained transition table. -/
 @[expose] noncomputable def description {α β : Type*} {f : α → β}
     {encIn : α ↪ List Bool}
-    {encOut : β ↪ List Bool} (compiler : NativeCompiler f encIn encOut) : Desc := by
+    {encOut : β ↪ List Bool} (compiler : NativeCompiler f encIn encOut) : Desc :=
   letI := compiler.stateFintype
-  exact desc compiler.stateEncoding eBit compiler.machine
+  ⟨compiler.tapeCount, compiler.stateEncoding compiler.table.initial,
+    (Finset.univ : Finset
+      (compiler.State × Option Bool × (Fin compiler.tapeCount → Option Bool))).toList.map
+      fun entry =>
+        let action := MultiTapeMachine.Action.emptyOracleEquiv
+          (compiler.table.tr entry.1 entry.2.1 entry.2.2 Empty.elim)
+        (key (compiler.stateEncoding entry.1) (entry.2.1.map eBit)
+          (Option.map eBit ∘ entry.2.2),
+          Act.ofAction (action.map compiler.stateEncoding eBit))⟩
 
 /-- The recorded description is the universal description of the packaged machine under its
 recorded state encoding. -/
@@ -179,7 +193,12 @@ theorem description_eq_desc {α β : Type*} {f : α → β} {encIn : α ↪ List
     compiler.description =
       @desc compiler.tapeCount Bool compiler.State compiler.stateFintype inferInstance
         compiler.stateEncoding eBit compiler.machine :=
-  rfl
+  by
+    simp only [description, machine, desc, MultiTapeMachine.toTM]
+    congr 1
+    apply List.map_congr_left
+    intro entry _
+    simp only [MultiTapeTM.tr_ofTr]
 
 /-- Exact length of the compiler input under its recorded encoding. This is a separate resource
 coordinate, not runtime charged merely for presenting an already encoded input. -/
@@ -249,7 +268,7 @@ same machine is retained and no runtime callback is introduced. -/
   { tapeCount := compiler.tapeCount
     State := compiler.State
     stateFintype := compiler.stateFintype
-    machine := compiler.machine
+    table := compiler.table
     stateEncoding := compiler.stateEncoding
     time := fun input => compiler.time (toInput input)
     workspace := fun input => compiler.workspace (toInput input)
@@ -267,29 +286,13 @@ same machine and resource maps are retained. -/
   { tapeCount := compiler.tapeCount
     State := compiler.State
     stateFintype := compiler.stateFintype
-    machine := compiler.machine
+    table := compiler.table
     stateEncoding := compiler.stateEncoding
     time := compiler.time
     workspace := compiler.workspace
     computes := fun input => by
       rw [henc input]
       exact compiler.computes input }
-
-/-- Input retyping preserves the actual named machine definitionally. -/
-theorem machine_ofInputEq {α β γ : Type*} {f : β → γ}
-    {encIn : α ↪ List Bool} {encMid : β ↪ List Bool} {encOut : γ ↪ List Bool}
-    (compiler : NativeCompiler f encMid encOut) (toInput : α → β)
-    (henc : ∀ input, encIn input = encMid (toInput input)) :
-    (compiler.ofInputEq toInput henc).machine = compiler.machine :=
-  rfl
-
-/-- Output retyping preserves the actual named machine definitionally. -/
-theorem machine_ofOutputEq {α β γ : Type*} {f : α → β} {g : α → γ}
-    {encIn : α ↪ List Bool} {encMid : β ↪ List Bool} {encOut : γ ↪ List Bool}
-    (compiler : NativeCompiler f encIn encMid)
-    (henc : ∀ input, encOut (g input) = encMid (f input)) :
-    (compiler.ofOutputEq henc).machine = compiler.machine :=
-  rfl
 
 /-- The named copy-and-rewind machine. -/
 @[expose] noncomputable def identity {α : Type*} (enc : α ↪ List Bool) :
@@ -298,17 +301,24 @@ theorem machine_ofOutputEq {α β γ : Type*} {f : α → β} {g : α → γ}
   exact {
     tapeCount := 0
     State := Unit ⊕ RewindState
-    machine := tidyCopy Bool
+    table := MultiTapeMachine.tidyCopy Bool
     stateEncoding := sumStateEncoding unitStateEncoding rewindStateEncoding
     time := fun a => 2 * (enc a).length + 4
     workspace := fun _ => 0
-    computes := fun a => computesTidily_tidyCopy (enc a)
+    computes := fun a => MultiTapeMachine.computesTidily_tidyCopy (enc a)
   }
 
-/-- The identity constructor retains the named copy-and-rewind machine definitionally. -/
-theorem machine_identity {α : Type*} (enc : α ↪ List Bool) :
-    (identity enc).machine = tidyCopy Bool :=
-  rfl
+/-- The constant-output transition table. -/
+@[expose] def constantOutputMachine (out : List Bool) :
+    MultiTapeMachine 0 Bool (Fin (out.length + 1)) Empty Id :=
+  MultiTapeMachine.ofTr ⟨0, by omega⟩ fun state _ _ =>
+    if h : state.val < out.length then
+      { inputTape := 0
+        workTapes := Fin.elim0
+        output := some out[state.val]
+        state := some ⟨state.val + 1, by omega⟩ }
+    else
+      { inputTape := 0, workTapes := Fin.elim0, output := none, state := none }
 
 /-- A zero-tape machine that ignores its input and emits `out`, one bit per state, then halts. -/
 @[expose] def constantOutputTM (out : List Bool) : MultiTapeTM 0 Bool (Fin (out.length + 1)) :=
@@ -320,6 +330,11 @@ theorem machine_identity {α : Type*} (enc : α ↪ List Bool) :
         state := some ⟨q.val + 1, by omega⟩ }
     else
       { inputTape := 0, workTapes := Fin.elim0, output := none, state := none }
+
+/-- Forgetting the retained constant-output table recovers its deterministic semantics. -/
+theorem toTM_constantOutputMachine (out : List Bool) :
+    (constantOutputMachine out).toTM = constantOutputTM out := by
+  rw [constantOutputMachine, MultiTapeMachine.toTM_ofTr, constantOutputTM]
 
 private def constantOutputCfg (input out : List Bool) (n : ℕ) (hn : n ≤ out.length) :
     Cfg 0 Bool (Fin (out.length + 1)) input :=
@@ -379,22 +394,18 @@ theorem computesTidily_constantOutputTM (input out : List Bool) :
   {
     tapeCount := 0
     State := Fin ((encOut b).length + 1)
-    machine := constantOutputTM (encOut b)
+    table := constantOutputMachine (encOut b)
     stateEncoding := Fin.valEmbedding
     time := fun _ => (encOut b).length + 1
     workspace := fun _ => 0
-    computes := fun a => computesTidily_constantOutputTM (encIn a) (encOut b)
+    computes := fun a => by
+      rw [toTM_constantOutputMachine]
+      exact computesTidily_constantOutputTM (encIn a) (encOut b)
   }
-
-/-- The constant constructor retains the named output transducer definitionally. -/
-theorem machine_const {α β : Type*} (encIn : α ↪ List Bool)
-    (encOut : β ↪ List Bool) (b : β) :
-    (const encIn encOut b).machine = constantOutputTM (encOut b) :=
-  rfl
 
 /-- Direct composition of two named machines. The result definitionally contains `MultiTapeTM.comp`
 and retains every constant from its exact time and workspace theorem. -/
-@[expose] noncomputable def comp {α β γ : Type*} {g : α → β} {f : β → γ}
+@[expose] def comp {α β γ : Type*} {g : α → β} {f : β → γ}
     {encIn : α ↪ List Bool} {encMid : β ↪ List Bool} {encOut : γ ↪ List Bool}
     (outer : NativeCompiler f encMid encOut) (inner : NativeCompiler g encIn encMid) :
     NativeCompiler (fun a => f (g a)) encIn encOut := by
@@ -404,12 +415,12 @@ and retains every constant from its exact time and workspace theorem. -/
   letI := inner.stateFintype
   letI := outer.stateFintype
   letI : Fintype CompilerState := inferInstance
-  let machine : MultiTapeTM (max inner.tapeCount outer.tapeCount + 2) Bool CompilerState :=
-    outer.machine.comp inner.machine true
+  let table : MultiTapeMachine (max inner.tapeCount outer.tapeCount + 2) Bool CompilerState
+      Empty Id := outer.table.comp inner.table true
   exact {
     tapeCount := max inner.tapeCount outer.tapeCount + 2
     State := CompilerState
-    machine := machine
+    table := table
     stateEncoding := sumStateEncoding
       (sumStateEncoding inner.stateEncoding rewindWorkStateEncoding)
       (sumStateEncoding
@@ -419,15 +430,9 @@ and retains every constant from its exact time and workspace theorem. -/
     time := fun a => inner.time a + outer.time (g a) + 4 * (encMid (g a)).length + 9
     workspace := fun a => inner.workspace a + outer.workspace (g a) +
       5 * (encMid (g a)).length + (6 * max inner.tapeCount outer.tapeCount + 20)
-    computes := fun a => (inner.computes a).comp (outer.computes (g a)) true
+    computes := fun a => MultiTapeMachine.computesTidilyInTimeAndSpace_comp
+      (inner.computes a) (outer.computes (g a)) true
   }
-
-/-- Composition retains the actual machine-combinator term. -/
-theorem machine_comp {α β γ : Type*} {g : α → β} {f : β → γ}
-    {encIn : α ↪ List Bool} {encMid : β ↪ List Bool} {encOut : γ ↪ List Bool}
-    (outer : NativeCompiler f encMid encOut) (inner : NativeCompiler g encIn encMid) :
-    (outer.comp inner).machine = outer.machine.comp inner.machine true :=
-  rfl
 
 /-- Concatenate the raw-word outputs of two named machines on the same input. -/
 @[expose] noncomputable def append {α : Type*} {left right : α → List Bool}
@@ -441,49 +446,44 @@ theorem machine_comp {α β γ : Type*} {g : α → β} {f : β → γ}
   exact {
     tapeCount := max leftCompiler.tapeCount rightCompiler.tapeCount
     State := leftCompiler.State ⊕ rightCompiler.State
-    machine := appendTM leftCompiler.machine rightCompiler.machine
+    table := leftCompiler.table.append rightCompiler.table
     stateEncoding := sumStateEncoding leftCompiler.stateEncoding rightCompiler.stateEncoding
     time := fun input => leftCompiler.time input + rightCompiler.time input
     workspace := fun input => leftCompiler.workspace input + rightCompiler.workspace input +
       2 * max leftCompiler.tapeCount rightCompiler.tapeCount
     computes := fun input => by
-      simpa only [encBits_apply] using
-        (leftCompiler.computes input).append (rightCompiler.computes input)
+      simpa only [encBits_apply] using MultiTapeMachine.computesTidilyInTimeAndSpace_append
+        (leftCompiler.computes input) (rightCompiler.computes input)
   }
 
-/-- Raw-word concatenation retains the actual append kernel. -/
-theorem machine_append {α : Type*} {left right : α → List Bool}
-    {encIn : α ↪ List Bool}
-    (leftCompiler : NativeCompiler left encIn encBits)
-    (rightCompiler : NativeCompiler right encIn encBits) :
-    (append leftCompiler rightCompiler).machine =
-      appendTM leftCompiler.machine rightCompiler.machine :=
-  rfl
-
 /-- The named finite-state transducer that frames an encoded value. -/
-@[expose] noncomputable def encodeFrame {β : Type*} (enc : β ↪ List Bool) :
+@[expose] def encodeFrame {β : Type*} (enc : β ↪ List Bool) :
     NativeCompiler (fun b => frame (enc b)) enc encBits := by
   let FrameState := (Unit × Option Bool × Bool) ⊕ RewindState
   letI : Fintype FrameState := inferInstance
-  let frameMachine : MultiTapeTM 0 Bool FrameState :=
-    Encodings.frameT.toTM.seq (rewindInput Bool)
+  let frameTable : MultiTapeMachine 0 Bool FrameState Empty Id :=
+    Encodings.frameT.toMachine.seq (MultiTapeMachine.rewindInput Bool)
   exact {
     tapeCount := 0
     State := FrameState
-    machine := frameMachine
+    table := frameTable
     stateEncoding := sumStateEncoding
       (transducerMachineStateEncoding unitStateEncoding)
       rewindStateEncoding
     time := fun b => 4 * (enc b).length + 8
     workspace := fun _ => 0
     computes := fun a => by
-      simpa [frameMachine, Encodings.frameT_run] using Encodings.frameT.computesTidily (enc a)
+      rw [MultiTapeMachine.toTM_seq]
+      have h := (Encodings.frameT.computesInTimeAndSpace_toTM (enc a))
+        |>.computesTidily_seq_explicitRewind
+      have hout : encBits (frame (enc a)) =
+          Encodings.frameT.run Encodings.frameT.q₀ (enc a) := by
+        simpa only [encBits_apply] using (Encodings.frameT_run (enc a)).symm
+      rw [hout]
+      convert h using 1
+      · simp only [Transducer.toTM]
+      · omega
   }
-
-/-- The framing constructor retains the named finite-state transducer definitionally. -/
-theorem machine_encodeFrame {β : Type*} (enc : β ↪ List Bool) :
-    (encodeFrame enc).machine = Encodings.frameT.toTM.seq (rewindInput Bool) :=
-  rfl
 
 universe u v w
 
@@ -501,24 +501,16 @@ output is framed by `encodeFrame`, then the right output is appended. -/
   exact {
     tapeCount := max framed.tapeCount right.tapeCount
     State := framed.State ⊕ right.State
-    machine := appendTM framed.machine right.machine
+    table := framed.table.append right.table
     stateEncoding := sumStateEncoding framed.stateEncoding right.stateEncoding
     time := fun a => framed.time a + right.time a
     workspace := fun a => framed.workspace a + right.workspace a +
       2 * max framed.tapeCount right.tapeCount
     computes := fun a => by
       simpa only [encPair_apply, encBits_apply] using
-        (framed.computes a).append (right.computes a)
+        MultiTapeMachine.computesTidilyInTimeAndSpace_append
+          (framed.computes a) (right.computes a)
   }
-
-/-- Pairing retains the actual framing, composition and append machine terms. -/
-theorem machine_pair {α : Type u} {β : Type v} {γ : Type w}
-    {f : α → β} {g : α → γ}
-    {encIn : α ↪ List Bool} {encLeft : β ↪ List Bool} {encRight : γ ↪ List Bool}
-    (left : NativeCompiler f encIn encLeft) (right : NativeCompiler g encIn encRight) :
-    (left.pair right).machine =
-      appendTM (((encodeFrame encLeft).comp left).machine) right.machine :=
-  rfl
 
 end NativeCompiler
 
