@@ -3625,6 +3625,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Nat
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Codec
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Comparison
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Conditional
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ControlResourceBounds
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Deterministic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Equality
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatch
