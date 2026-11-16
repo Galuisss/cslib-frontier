@@ -283,6 +283,78 @@ private theorem interpreterStreamCompiler_time_le (description : Desc) (word : L
       simpa only [input, Nat.add_assoc] using h
     _ ≤ _ := Nat.add_le_add (Nat.mul_le_mul_left tokens.length hround) htail
 
+private theorem interpreterStreamCompiler_workspace_le (description : Desc) (word : List ℕ)
+    (tokens : List Bool) (stepSpace : ℕ)
+    (hstep : ∀ j, j < tokens.length →
+      stepCompiler.workspace (description, word,
+        ((stepOut description word)^[j] (Universal.init description, [])).1) ≤ stepSpace) :
+    let L := ctxBound (descLen description) (encList encUnary word).length tokens.length
+    let K := streamFoldPairTapeCount interpreterNextCompiler interpreterEmitCompiler
+      (const eCtx encBits [])
+    let callbackSpace := stepSpace + 1024 * (L + descLen description + 1) +
+      256 * (contextStepCompiler.tapeCount + 1) + 6 * max 4 stepCompiler.tapeCount
+    interpreterStreamCompiler.workspace
+        (((description, word), Universal.init description), tokens) ≤
+      2 * K * (callbackSpace + callbackSpace + 48 * (L + 1) + 20 * K + 90) +
+        13 * (L + 1) + 5 * K + 43 := by
+  let L := ctxBound (descLen description) (encList encUnary word).length tokens.length
+  let input : Ctx × List Bool := (((description, word), Universal.init description), tokens)
+  let callbackSpace := stepSpace + 1024 * (L + descLen description + 1) +
+    256 * (contextStepCompiler.tapeCount + 1) + 6 * max 4 stepCompiler.tapeCount
+  have hstate : ∀ j, j ≤ input.2.length →
+      (eCtx (streamState input.1 interpreterNext input.2 j)).length ≤ L + 1 := by
+    intro j hj
+    exact (interpreter_state_length_le description word tokens j hj).trans (Nat.le_succ L)
+  have helem : ∀ j (hj : j < input.2.length), (encBool input.2[j]).length ≤ L + 1 := by
+    intro j hj
+    simp only [encBool_apply, List.length_singleton]
+    omega
+  have hcallbacks : ∀ j (hj : j < input.2.length),
+      interpreterNextCompiler.workspace (streamState input.1 interpreterNext input.2 j,
+        input.2[j]) ≤ callbackSpace ∧
+      interpreterEmitCompiler.workspace (streamState input.1 interpreterNext input.2 j,
+        input.2[j]) ≤ callbackSpace := by
+    intro j hj
+    let ctx : Ctx := streamState input.1 interpreterNext input.2 j
+    have hl := interpreter_state_length_le description word tokens j hj.le
+    have ho := interpreter_step_output_length_le description word tokens j hj
+    have hm := contextStepCompiler_workspace_le ctx
+    have hn := interpreterNextCompiler_workspace_le (ctx, input.2[j])
+    have he := interpreterEmitCompiler_workspace_le (ctx, input.2[j])
+    have hs : stepCompiler.workspace (ctx.desc, ctx.input, ctx.cfg) ≤ stepSpace := by
+      dsimp only [ctx, input]
+      rw [interpreter_state description word tokens j hj.le]
+      exact hstep j hj
+    change (eCtx ctx).length ≤ L at hl
+    change (encPair eCfg eSym (Universal.step ctx.desc ctx.input ctx.cfg)).length ≤
+      2 * L + descLen description + 2 at ho
+    change interpreterNextCompiler.workspace (ctx, input.2[j]) ≤ callbackSpace ∧
+      interpreterEmitCompiler.workspace (ctx, input.2[j]) ≤ callbackSpace
+    have hcontext : contextStepCompiler.workspace ctx ≤
+        stepSpace + 256 * (L + 1) + 6 * max 4 stepCompiler.tapeCount :=
+      hm.trans (Nat.add_le_add_right
+        (Nat.add_le_add hs (Nat.mul_le_mul_left 256 (Nat.add_le_add_right hl 1))) _)
+    have hlength : (eCtx ctx).length +
+        (encPair eCfg eSym (Universal.step ctx.desc ctx.input ctx.cfg)).length + 1 ≤
+          L + (2 * L + descLen description + 2) + 1 :=
+      Nat.add_le_add_right (Nat.add_le_add hl ho) 1
+    have hcommon : contextStepCompiler.workspace ctx +
+        256 * ((eCtx ctx).length +
+          (encPair eCfg eSym (Universal.step ctx.desc ctx.input ctx.cfg)).length + 1) +
+        256 * (contextStepCompiler.tapeCount + 1) ≤ callbackSpace := by
+      refine (Nat.add_le_add_right
+        (Nat.add_le_add hcontext (Nat.mul_le_mul_left 256 hlength)) _).trans ?_
+      have hscalar (a b : ℕ) :
+          stepSpace + 256 * (L + 1) + a +
+            256 * (L + (2 * L + descLen description + 2) + 1) + b ≤
+          stepSpace + 1024 * (L + descLen description + 1) + b + a := by omega
+      exact hscalar _ _
+    exact ⟨hn.trans hcommon, he.trans hcommon⟩
+  exact listFoldEmitCompiler_workspace_le interpreterNextCompiler interpreterEmitCompiler
+    (fun input => (interpreterEmit_eq input.1 input.2).symm) input
+    callbackSpace callbackSpace (L + 1) hstate helem
+    (fun j hj => (hcallbacks j hj).2) (fun j hj => (hcallbacks j hj).1)
+
 /-- Install a fixed deterministic description and execute the supplied number of simulated steps.
 The compiler's time and workspace fields charge its actual finite transition table, independently
 of the simulated clock. The output is valid even if the simulated program has not yet halted. -/
