@@ -110,17 +110,22 @@ private theorem listGetNat_element_length_le (list : List ℕ) (index j : ℕ)
     (length_le_encPair_left (encList encUnary) encNat (list, index))
   omega
 
+private theorem encNat_pred_length_le (n : ℕ) :
+    (encNat (n - 1)).length ≤ (encNat n).length := by
+  simpa only [encNat_apply, Nat.size_eq_bits_len] using Nat.size_le_size (Nat.sub_le n 1)
+
 private theorem listGetNatNextCompiler_time_le
     (input : (ListGetNatState ℕ) × ℕ) :
     (listGetNatNextCompiler encUnary).time input ≤
       10000 * (((encPair (encPair encNat (encOption encUnary)) encUnary) input).length + 1) := by
   rcases input with ⟨⟨remaining, selected⟩, element⟩
+  have hpred := encNat_pred_length_le remaining
   cases selected <;> cases remaining <;>
     simp [listGetNatNextCompiler, ofOutputEq, ofInputEq, ite, pair, comp,
       first, second,
       optionIsSomeTest, optionIsSomeBool, boolToTest, natIsZeroTest, natIsZeroBool,
       boolDecoder, natPred, optionSome, const, ofTransducer, encodeFrame, encPair_apply,
-      length_frame, encNat_apply, encUnary_apply, encTest_true, encTest_false]
+      length_frame, encNat_apply, encUnary_apply, encTest_true, encTest_false] at hpred ⊢
     <;> omega
 
 private theorem listGetNatNextCompiler_workspace_le
@@ -128,12 +133,13 @@ private theorem listGetNatNextCompiler_workspace_le
     (listGetNatNextCompiler encUnary).workspace input ≤
       10000 * (((encPair (encPair encNat (encOption encUnary)) encUnary) input).length + 1) := by
   rcases input with ⟨⟨remaining, selected⟩, element⟩
+  have hpred := encNat_pred_length_le remaining
   cases selected <;> cases remaining <;>
     simp [listGetNatNextCompiler, ofOutputEq, ofInputEq, ite, pair, comp,
       first, second,
       optionIsSomeTest, optionIsSomeBool, boolToTest, natIsZeroTest, natIsZeroBool,
       boolDecoder, natPred, optionSome, const, ofTransducer, encodeFrame, encPair_apply,
-      length_frame, encNat_apply, encUnary_apply, encTest_true, encTest_false]
+      length_frame, encNat_apply, encUnary_apply, encTest_true, encTest_false] at hpred ⊢
     <;> omega
 
 private theorem listGetNatNextCompiler_tapeCount_le :
@@ -159,14 +165,20 @@ private theorem listGetNatMarshalCompiler_tapeCount_le :
 private theorem listGetNatMarshalCompiler_time_le (input : List ℕ × ℕ) :
     (listGetNatMarshalCompiler encUnary).time input ≤
       1000 * ((encPair (encList encUnary) encNat input).length + 1) := by
-  simp [listGetNatMarshalCompiler, pair, first, second, const, ofTransducer, encodeFrame,
+  change ((((second (encList encUnary) encNat).pair
+    (const (encPair (encList encUnary) encNat) (encOption encUnary) none)).pair
+      (first (encList encUnary) encNat)).time input) ≤ _
+  simp [pair, comp, first, second, const, ofTransducer, encodeFrame,
     encPair_apply, length_frame]
   omega
 
 private theorem listGetNatMarshalCompiler_workspace_le (input : List ℕ × ℕ) :
     (listGetNatMarshalCompiler encUnary).workspace input ≤
       1000 * ((encPair (encList encUnary) encNat input).length + 1) := by
-  simp [listGetNatMarshalCompiler, pair, first, second, const, ofTransducer, encodeFrame,
+  change ((((second (encList encUnary) encNat).pair
+    (const (encPair (encList encUnary) encNat) (encOption encUnary) none)).pair
+      (first (encList encUnary) encNat)).workspace input) ≤ _
+  simp [pair, comp, first, second, const, ofTransducer, encodeFrame,
     encPair_apply, length_frame]
   omega
 
@@ -204,7 +216,6 @@ private theorem listGetNatOptionSMax_le (list : List ℕ) (index : ℕ) :
         10 * ((encPair (encList encUnary) encNat (list, index)).length + 1) := by
     dsimp only [pair, state]
     rw [length_encPair]
-    simp only [Prod.fst, Prod.snd]
     omega
   have hnext := listGetNatNextCompiler_workspace_le pair
   have hnextState := listGetNat_state_length_le list index (j + 1) (by omega)
@@ -297,6 +308,7 @@ private theorem listGetNatOptionStreamCompiler_time_le (list : List ℕ) (index 
       _ = 201000 * B ^ 2 := by ring
   have htail : 100 * B + 24 * (10 * B) + 40 ≤ 1000 * B ^ 2 := by
     nlinarith
+  dsimp only [B] at h hmain htail hB ⊢
   nlinarith
 
 private theorem listGetNatOptionStreamCompiler_workspace_le (list : List ℕ) (index : ℕ) :
