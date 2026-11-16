@@ -94,7 +94,7 @@ def run(args, out, label, timeout, required=True):
                     pass
                 proc.wait()
                 status = 124
-    (out / (label + '.json')).write_text(json.dumps(dict(
+    (out / (label + '-status.json')).write_text(json.dumps(dict(
         command=args, returncode=status, timeout_seconds=timeout, timed_out=timed_out,
         elapsed_seconds=time.monotonic() - start), indent=2))
     if status and required:
