@@ -116,7 +116,6 @@ public theorem findWith {t : π × α → Bool} {par : γ → π} {list : γ →
     convert h.mono (d' := max 1 dt) (e' := 1) using 1
     funext ⟨⟨p, acc⟩, a⟩
     simp only [findStep, Function.comp_apply]
-    cases acc <;> simp
   have hfold := foldlWith (encL := encList enc) (encB := encOption enc) hpar hlist
     (const none) hstep (B := fun x => (encList enc (list x)).length + 1) (hlist.2.add_const 1)
     (fun x i hi => ?_)

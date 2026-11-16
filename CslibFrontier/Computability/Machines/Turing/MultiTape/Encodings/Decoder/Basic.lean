@@ -94,7 +94,7 @@ private theorem silent_option_decode_degree {decode : List Bool → α} {d e : �
     Internal.DecoderWords.empty_degree
   exact (option_decode_degree (encO := encSilentOption enc) hc h).of_enc_eq fun w => by
     dsimp only [Function.comp_apply]
-    cases w.isEmpty <;> rfl
+    cases w <;> rfl
 
 /-- Options are decoded as `none` from the empty word, and otherwise from the tail. -/
 def silentOption (D : Decoder enc) : Decoder (encSilentOption enc) where
