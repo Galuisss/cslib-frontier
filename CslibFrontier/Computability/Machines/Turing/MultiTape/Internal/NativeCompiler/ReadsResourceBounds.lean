@@ -23,6 +23,7 @@ separate static coordinate.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.reads_time_le`: a concrete quadratic time majorant.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.reads_workspace_le`: an independent concrete
   quadratic workspace majorant.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.reads_tapeCount_le`: a static tape-count majorant.
 
 The construction and bounds are original formalization infrastructure.
 -/
@@ -61,6 +62,22 @@ private theorem readsMarshal_time_le (tapes : List Tape) :
   have h := time_pair_le (const (encList eTape) encUnit ())
     (identity (encList eTape)) tapes
   exact h.trans (by simp [const, identity]; omega)
+
+private theorem readsStream_tapeCount_le :
+    (listMapWithStateCompiler encUnit eTape eSym
+      (tapeRead.comp (second encUnit eTape))).tapeCount ≤ 1000 := by
+  let callback : NativeCompiler (fun input : Unit × Tape => input.2.read)
+      (encPair encUnit eTape) eSym := tapeRead.comp (second encUnit eTape)
+  let emitCompiler : NativeCompiler (fun input : Unit × Tape => frame (eSym input.2.read))
+      (encPair encUnit eTape) encBits :=
+    ((framedValue eSym).comp callback).ofOutputEq fun _ => rfl
+  change streamFoldPairTapeCount (first encUnit eTape) emitCompiler
+    (const encUnit encBits []) ≤ 1000
+  have hread := tapeRead_tapeCount_le
+  simp [streamFoldPairTapeCount, streamFramedNext, streamUnframedFinish,
+    emitCompiler, callback, first, second, framedValue, ofTransducer, comp, const,
+    encodeFrame, unframeValue, ofOutputEq]
+  omega
 
 /-- The actual retained work-head map has quadratic time in the complete encoded tape list. -/
 theorem reads_time_le (tapes : List Tape) :
@@ -149,6 +166,22 @@ theorem reads_time_le (tapes : List Tape) :
   simp only [marshal] at hmarshal hcomp ⊢
   omega
 
+/-- A construction-derived static tape-count bound for the retained work-head map. -/
+theorem reads_tapeCount_le : reads.tapeCount ≤ 1002 := by
+  let callback : NativeCompiler (fun input : Unit × Tape => input.2.read)
+      (encPair encUnit eTape) eSym := tapeRead.comp (second encUnit eTape)
+  let marshal : NativeCompiler (fun input : List Tape => ((), input))
+      (encList eTape) (encPair encUnit (encList eTape)) :=
+    (const (encList eTape) encUnit ()).pair (identity (encList eTape))
+  change ((listMapWithStateCompiler encUnit eTape eSym callback).comp marshal).tapeCount ≤ 1002
+  have hstream :
+      (listMapWithStateCompiler encUnit eTape eSym callback).tapeCount ≤ 1000 := by
+    simpa only [callback] using readsStream_tapeCount_le
+  have hmarshal : marshal.tapeCount ≤ 100 := by
+    simp [marshal, const, identity, pair, comp, encodeFrame]
+  simp only [comp]
+  omega
+
 /-- The actual retained work-head map has quadratic workspace in the complete encoded tape list,
 independently of its time coordinate. -/
 theorem reads_workspace_le (tapes : List Tape) :
@@ -229,11 +262,8 @@ theorem reads_workspace_le (tapes : List Tape) :
     hstate helem hemit hnext
   let K := streamFoldPairTapeCount nextCompiler emitCompiler (const encUnit encBits [])
   have hK : K ≤ 1000 := by
-    have hread := tapeRead_tapeCount_le
-    simp [K, streamFoldPairTapeCount, streamFramedNext, streamUnframedFinish,
-      nextCompiler, emitCompiler, callback, first, second, framedValue, ofTransducer,
-      comp, const, encodeFrame, unframeValue, ofOutputEq]
-    omega
+    change (listMapWithStateCompiler encUnit eTape eSym callback).tapeCount ≤ 1000
+    simpa only [callback] using readsStream_tapeCount_le
   have hstream :
       (listMapWithStateCompiler encUnit eTape eSym callback).workspace ((), tapes) ≤
         1000000000 * (L + 1) ^ 2 := by
@@ -257,8 +287,7 @@ theorem reads_workspace_le (tapes : List Tape) :
     simp [marshal, const, identity, pair, comp, encodeFrame]
   have hstreamTapes :
       (listMapWithStateCompiler encUnit eTape eSym callback).tapeCount ≤ 1000 := by
-    change streamFoldPairTapeCount nextCompiler emitCompiler (const encUnit encBits []) ≤ 1000
-    simpa only [K] using hK
+    simpa only [callback] using readsStream_tapeCount_le
   have hmax : max marshal.tapeCount
       (listMapWithStateCompiler encUnit eTape eSym callback).tapeCount ≤ 1000 :=
     max_le (hmarshalTapes.trans (by omega)) hstreamTapes

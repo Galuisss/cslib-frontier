@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatch
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Universal
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ListResourceBounds
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ReadsResourceBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ResourceBounds
 
 /-!
@@ -320,5 +321,131 @@ private theorem inputSymbol_workspace_le (input : List ℕ × ℕ) :
   change (ite atLeftBoundary blank lookup).workspace input ≤
     1000000000000 * (L + 1) ^ 2
   exact hite.trans (by nlinarith)
+
+private theorem stepWithKeyCompiler_time_le (input : StepWithInput) :
+    stepWithKeyCompiler.time input ≤
+      1000000000000000 * ((eStepWithInput input).length + 1) ^ 2 := by
+  let L := (eStepWithInput input).length
+  let tail := second eDesc (encPair eCfg eSym)
+  let cfg := (first eCfg eSym).comp tail
+  let symbol := (second eCfg eSym).comp tail
+  let state := (optionGetD 0 encUnary).comp (cfgState.comp cfg)
+  let workInput := cfgWorkTapes.comp cfg
+  let work := reads.comp workInput
+  have hworkBits : (encList eTape input.2.1.workTapes).length ≤ L := by
+    simp only [L, eCfg_apply, length_encPair]
+    omega
+  have hstateBits : ((encOption encUnary) input.2.1.state).length ≤ L := by
+    change (eSym input.2.1.state).length ≤ L
+    simp only [L, eCfg_apply, length_encPair]
+    omega
+  have hstate : state.time input ≤ 1000000000 * (L + 1) := by
+    cases hoption : input.2.1.state <;>
+      simp [state, cfg, tail, cfgState, first, second, optionGetD, optionPayload,
+      tailDecoder, optionIsSomeTest, optionIsSomeBool, boolDecoder, boolToTest,
+      ofTransducer, comp, ite, const, ofInputEq, ofOutputEq, encTest_false,
+      encTest_true, hoption, L] at hstateBits ⊢ <;>
+      omega
+  have hsymbol : symbol.time input ≤ 1000000 * (L + 1) := by
+    simp [symbol, tail, second, ofTransducer, comp, L]
+    omega
+  have hworkInput : workInput.time input ≤ 1000000000 * (L + 1) := by
+    simp [workInput, cfg, tail, cfgWorkTapes, cfgTail₂, first, second, ofTransducer,
+      comp, ofInputEq, L]
+    omega
+  have hreads := reads_time_le input.2.1.workTapes
+  have hworkRaw := time_comp_le reads workInput input
+  have hwork : work.time input ≤ 1000000000000 * (L + 1) ^ 2 := by
+    simp only [work]
+    exact hworkRaw.trans (by nlinarith)
+  have htailPair := time_pair_le symbol work input
+  have hfullPair := time_pair_le state (symbol.pair work) input
+  change (state.pair (symbol.pair work)).time input ≤
+    1000000000000000 * (L + 1) ^ 2
+  exact hfullPair.trans (by nlinarith)
+
+private theorem stepWithKeyCompiler_workspace_le (input : StepWithInput) :
+    stepWithKeyCompiler.workspace input ≤
+      1000000000000000 * ((eStepWithInput input).length + 1) ^ 2 := by
+  let L := (eStepWithInput input).length
+  let tail := second eDesc (encPair eCfg eSym)
+  let cfg := (first eCfg eSym).comp tail
+  let symbol := (second eCfg eSym).comp tail
+  let state := (optionGetD 0 encUnary).comp (cfgState.comp cfg)
+  let workInput := cfgWorkTapes.comp cfg
+  let work := reads.comp workInput
+  have hworkBits : (encList eTape input.2.1.workTapes).length ≤ L := by
+    simp only [L, eCfg_apply, length_encPair]
+    omega
+  have hstateBits : ((encOption encUnary) input.2.1.state).length ≤ L := by
+    change (eSym input.2.1.state).length ≤ L
+    simp only [L, eCfg_apply, length_encPair]
+    omega
+  have hstateTime : state.time input ≤ 1000000000 * (L + 1) := by
+    cases hoption : input.2.1.state <;>
+      simp [state, cfg, tail, cfgState, first, second, optionGetD, optionPayload,
+        tailDecoder, optionIsSomeTest, optionIsSomeBool, boolDecoder, boolToTest,
+        ofTransducer, comp, ite, const, ofInputEq, ofOutputEq, encTest_false,
+        encTest_true, hoption, L] at hstateBits ⊢ <;>
+      omega
+  have hstateSpace : state.workspace input ≤ 1000000000 * (L + 1) := by
+    cases hoption : input.2.1.state <;>
+      simp [state, cfg, tail, cfgState, first, second, optionGetD, optionPayload,
+        tailDecoder, optionIsSomeTest, optionIsSomeBool, boolDecoder, boolToTest,
+        ofTransducer, comp, ite, const, ofInputEq, ofOutputEq, encTest_false,
+        encTest_true, hoption, L] at hstateBits ⊢ <;>
+      omega
+  have hstateTapes : state.tapeCount ≤ 1000 := by
+    simp [state, cfg, tail, cfgState, first, second, optionGetD, optionPayload,
+      tailDecoder, optionIsSomeTest, optionIsSomeBool, boolDecoder, boolToTest,
+      ofTransducer, comp, ite, const, ofInputEq, ofOutputEq]
+  have hsymbolTime : symbol.time input ≤ 1000000 * (L + 1) := by
+    simp [symbol, tail, second, ofTransducer, comp, L]
+    omega
+  have hsymbolSpace : symbol.workspace input ≤ 1000000 * (L + 1) := by
+    simp [symbol, tail, second, ofTransducer, comp, L]
+    omega
+  have hsymbolTapes : symbol.tapeCount ≤ 100 := by
+    simp [symbol, tail, second, ofTransducer, comp]
+  have hworkInputTime : workInput.time input ≤ 1000000000 * (L + 1) := by
+    simp [workInput, cfg, tail, cfgWorkTapes, cfgTail₂, first, second, ofTransducer,
+      comp, ofInputEq, L]
+    omega
+  have hworkInputSpace : workInput.workspace input ≤ 1000000000 * (L + 1) := by
+    simp [workInput, cfg, tail, cfgWorkTapes, cfgTail₂, first, second, ofTransducer,
+      comp, ofInputEq, L]
+    omega
+  have hworkInputTapes : workInput.tapeCount ≤ 100 := by
+    simp [workInput, cfg, tail, cfgWorkTapes, cfgTail₂, first, second, ofTransducer,
+      comp, ofInputEq]
+  have hreadsSpace := reads_workspace_le input.2.1.workTapes
+  have hreadsTapes := reads_tapeCount_le
+  have hworkMax : max workInput.tapeCount reads.tapeCount ≤ 1002 :=
+    max_le (hworkInputTapes.trans (by omega)) hreadsTapes
+  have hworkRaw := workspace_comp_le reads workInput input
+  have hworkSpace : work.workspace input ≤ 10000000000000 * (L + 1) ^ 2 := by
+    simp only [work]
+    exact hworkRaw.trans (by nlinarith)
+  have hworkTapes : work.tapeCount ≤ 1004 := by
+    simp only [work, comp]
+    omega
+  have htailMax : max (symbol.tapeCount + 2) work.tapeCount ≤ 1004 :=
+    max_le (by omega) hworkTapes
+  have htailRaw := workspace_pair_le symbol work input
+  have htailSpace : (symbol.pair work).workspace input ≤
+      100000000000000 * (L + 1) ^ 2 :=
+    htailRaw.trans (by nlinarith)
+  have hframedSymbolTapes : ((encodeFrame eSym).comp symbol).tapeCount ≤ 102 := by
+    simp only [comp, encodeFrame]
+    omega
+  have htailTapes : (symbol.pair work).tapeCount ≤ 1006 := by
+    simp only [pair]
+    omega
+  have hfullMax : max (state.tapeCount + 2) (symbol.pair work).tapeCount ≤ 1006 :=
+    max_le (by omega) htailTapes
+  have hfullRaw := workspace_pair_le state (symbol.pair work) input
+  change (state.pair (symbol.pair work)).workspace input ≤
+    1000000000000000 * (L + 1) ^ 2
+  exact hfullRaw.trans (by nlinarith)
 
 end Turing.MultiTapeTM.Internal.NativeCompiler
