@@ -679,7 +679,7 @@ jobs:
       - name: Exact reviewed import-boundary target
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 6e3edd6028e299c6b60bab68b4513ff25d355596
+          ref: 08ca9c10bf6585385bf101bab2353e66df050a81
           fetch-depth: 0
           persist-credentials: false
       - name: Reviewed disposable harness
@@ -701,7 +701,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: imports-tidy-evidence-6e3edd602
+          name: imports-tidy-evidence-08ca9c10b
           path: ${{ runner.temp }}/imports-evidence
           if-no-files-found: error
           retention-days: 30
