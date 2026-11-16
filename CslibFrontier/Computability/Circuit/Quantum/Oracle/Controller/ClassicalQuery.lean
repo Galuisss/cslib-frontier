@@ -51,6 +51,8 @@ arbitrary-state zero-oracle theorem justifies that erasure when this constructio
   description coordinates used by the concrete linker.
 * `Cslib.Quantum.encClassicalQueryLayout`: their field-order encoding used by the retained
   compiler.
+* `Cslib.Quantum.ClassicalQueryLayout.firstEmbedding`, `serviceEmbedding`, `secondEmbedding`:
+  actual component-register placements used by relabelling and semantic composition.
 * `Cslib.Quantum.ClassicalQueryLayout.Compatible`: the one shape contract shared by
   well-formedness and the pending semantic theorem.
 * `Cslib.Quantum.compileClassicalQuery`: the complete query-free finite description.
@@ -218,154 +220,154 @@ theorem secondWire_ne_replyBase (layout : ClassicalQueryLayout) (wire : ℕ) :
       simp only [secondBase, replyBase, serviceBase, hiddenWire, requestBase]
       omega
 
-private theorem firstWire_injective (layout : ClassicalQueryLayout) :
-    Function.Injective layout.firstWire := by
-  intro left right heq
-  by_cases hleft : left < layout.firstInputWidth <;>
-    by_cases hright : right < layout.firstInputWidth <;>
-    simp [firstWire, hleft, hright] at heq <;> omega
-
-private theorem firstWire_lt_requestBase (layout : ClassicalQueryLayout) {wire : ℕ}
-    (hwire : wire < layout.first.width) : layout.firstWire wire < layout.requestBase := by
-  by_cases hprefix : wire < layout.firstInputWidth
-  · rw [firstWire, ite_eq_left hprefix]
-    simp only [requestBase, ciphertextWidth]
-    omega
-  · rw [firstWire, ite_eq_right hprefix]
-    simp only [requestBase]
-    omega
-
-private def firstEmbedding (layout : ClassicalQueryLayout) :
+/-- Embed the first-stage register into the complete controller register. This is the sparse
+placement used by the relabelled first-stage instruction block. -/
+@[expose] def firstEmbedding (layout : ClassicalQueryLayout) :
     Fin layout.first.width ↪ Fin layout.width where
   toFun wire := ⟨layout.firstWire wire, by
-    have hwire := firstWire_lt_requestBase layout wire.isLt
+    have hwire : layout.firstWire wire < layout.requestBase := by
+      by_cases hprefix : wire < layout.firstInputWidth
+      · rw [firstWire, ite_eq_left hprefix]
+        simp only [requestBase, ciphertextWidth]
+        omega
+      · rw [firstWire, ite_eq_right hprefix]
+        simp only [requestBase]
+        omega
     simp only [width, secondBase, replyBase, serviceBase, hiddenWire]
     omega⟩
-  inj' := fun left right heq => Fin.ext <|
-    firstWire_injective layout (congrArg Fin.val heq)
+  inj' := fun left right heq => Fin.ext <| by
+    have heq := congrArg Fin.val heq
+    by_cases hleft : left < layout.firstInputWidth <;>
+      by_cases hright : right < layout.firstInputWidth <;>
+      simp [firstWire, hleft, hright] at heq <;> omega
 
-private theorem serviceWire_injective (layout : ClassicalQueryLayout) :
-    Function.Injective layout.serviceWire := by
-  intro left right heq
-  by_cases hleftInput : left < layout.fullInputWidth
-  · by_cases hrightInput : right < layout.fullInputWidth
-    · simp [serviceWire, hleftInput, hrightInput] at heq
-      omega
-    · by_cases hrightRequest :
-          right - layout.fullInputWidth < layout.first.outputWidth + 1
-      · simp [serviceWire, hleftInput, hrightInput, hrightRequest] at heq
-        simp only [serviceBase, hiddenWire] at heq
-        omega
-      · simp [serviceWire, hleftInput, hrightInput, hrightRequest] at heq
-        omega
-  · by_cases hleftRequest :
-        left - layout.fullInputWidth < layout.first.outputWidth + 1
-    · by_cases hrightInput : right < layout.fullInputWidth
-      · simp [serviceWire, hleftInput, hleftRequest, hrightInput] at heq
-        simp only [serviceBase, hiddenWire] at heq
-        omega
-      · by_cases hrightRequest :
-            right - layout.fullInputWidth < layout.first.outputWidth + 1
-        · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
-          omega
-        · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
-          simp only [serviceBase, hiddenWire] at heq
-          omega
-    · by_cases hrightInput : right < layout.fullInputWidth
-      · simp [serviceWire, hleftInput, hleftRequest, hrightInput] at heq
-        omega
-      · by_cases hrightRequest :
-            right - layout.fullInputWidth < layout.first.outputWidth + 1
-        · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
-          simp only [serviceBase, hiddenWire] at heq
-          omega
-        · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
-          omega
-
-private theorem serviceWire_lt_replyBase (layout : ClassicalQueryLayout) {wire : ℕ}
-    (hwire : wire < layout.service.width) : layout.serviceWire wire < layout.replyBase := by
-  by_cases hinput : wire < layout.fullInputWidth
-  · simp [serviceWire, hinput, replyBase]
-    omega
-  · by_cases hrequest : wire - layout.fullInputWidth < layout.first.outputWidth + 1
-    · simp [serviceWire, hinput, hrequest, replyBase, serviceBase, hiddenWire]
-      omega
-    · simp [serviceWire, hinput, hrequest, replyBase]
-      omega
-
-private def serviceEmbedding (layout : ClassicalQueryLayout) :
+/-- Embed the service register into the complete controller register, sharing the saved sample,
+request and hidden-bit coordinates selected by `serviceWire`. -/
+@[expose] def serviceEmbedding (layout : ClassicalQueryLayout) :
     Fin layout.service.width ↪ Fin layout.width where
   toFun wire := ⟨layout.serviceWire wire, by
-    have hwire := serviceWire_lt_replyBase layout wire.isLt
+    have hwire : layout.serviceWire wire < layout.replyBase := by
+      by_cases hinput : wire < layout.fullInputWidth
+      · simp [serviceWire, hinput, replyBase]
+      · by_cases hrequest : wire - layout.fullInputWidth < layout.first.outputWidth + 1
+        · simp [serviceWire, hinput, hrequest, replyBase, serviceBase, hiddenWire]
+          omega
+        · simp [serviceWire, hinput, hrequest, replyBase]
     simp only [width, secondBase]
     omega⟩
-  inj' := fun left right heq => Fin.ext <|
-    serviceWire_injective layout (congrArg Fin.val heq)
+  inj' := fun left right heq => Fin.ext <| by
+    have heq := congrArg Fin.val heq
+    by_cases hleftInput : left < layout.fullInputWidth
+    · by_cases hrightInput : right < layout.fullInputWidth
+      · simp [serviceWire, hleftInput, hrightInput] at heq
+        omega
+      · by_cases hrightRequest :
+            right - layout.fullInputWidth < layout.first.outputWidth + 1
+        · simp [serviceWire, hleftInput, hrightInput, hrightRequest] at heq
+          simp only [serviceBase, hiddenWire] at heq
+          omega
+        · simp [serviceWire, hleftInput, hrightInput, hrightRequest] at heq
+          omega
+    · by_cases hleftRequest :
+          left - layout.fullInputWidth < layout.first.outputWidth + 1
+      · by_cases hrightInput : right < layout.fullInputWidth
+        · simp [serviceWire, hleftInput, hleftRequest, hrightInput] at heq
+          simp only [serviceBase, hiddenWire] at heq
+          omega
+        · by_cases hrightRequest :
+              right - layout.fullInputWidth < layout.first.outputWidth + 1
+          · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
+            omega
+          · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
+            simp only [serviceBase, hiddenWire] at heq
+            omega
+      · by_cases hrightInput : right < layout.fullInputWidth
+        · simp [serviceWire, hleftInput, hleftRequest, hrightInput] at heq
+          omega
+        · by_cases hrightRequest :
+              right - layout.fullInputWidth < layout.first.outputWidth + 1
+          · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
+            simp only [serviceBase, hiddenWire] at heq
+            omega
+          · simp [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest] at heq
+            omega
 
-private theorem secondWire_injective (layout : ClassicalQueryLayout) :
-    Function.Injective layout.secondWire := by
-  intro left right heq
-  by_cases hleftInput : left < layout.secondInputWidth
-  · by_cases hrightInput : right < layout.secondInputWidth
-    · simp [secondWire, hleftInput, hrightInput] at heq
+/-- Embed the second-stage register into the complete controller register, sharing the saved
+first-stage state while keeping the retained reply record outside its image. -/
+@[expose] def secondEmbedding (layout : ClassicalQueryLayout) :
+    Fin layout.second.width ↪ Fin layout.width :=
+  let firstRange : ∀ {wire : ℕ}, wire < layout.first.width →
+      layout.firstWire wire < layout.requestBase := by
+    intro wire hwire
+    by_cases hprefix : wire < layout.firstInputWidth
+    · rw [firstWire, ite_eq_left hprefix]
+      simp only [requestBase, ciphertextWidth]
       omega
-    · by_cases hrightSaved : right - layout.secondInputWidth < layout.first.width
-      · have hrightRange := firstWire_lt_requestBase layout hrightSaved
-        simp [secondWire, hleftInput, hrightInput, hrightSaved] at heq
-        simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
-        omega
-      · simp [secondWire, hleftInput, hrightInput, hrightSaved] at heq
-        omega
-  · by_cases hleftSaved : left - layout.secondInputWidth < layout.first.width
-    · by_cases hrightInput : right < layout.secondInputWidth
-      · have hleftRange := firstWire_lt_requestBase layout hleftSaved
-        simp [secondWire, hleftInput, hleftSaved, hrightInput] at heq
-        simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
-        omega
-      · by_cases hrightSaved : right - layout.secondInputWidth < layout.first.width
-        · have hfirstEq :
-              layout.firstWire (left - layout.secondInputWidth) =
-                layout.firstWire (right - layout.secondInputWidth) := by
-            simpa only [secondWire, hleftInput, hleftSaved, hrightInput, hrightSaved,
-              ↓reduceIte] using heq
-          have hoffset := firstWire_injective layout hfirstEq
-          omega
-        · have hleftRange := firstWire_lt_requestBase layout hleftSaved
-          simp [secondWire, hleftInput, hleftSaved, hrightInput,
-            hrightSaved] at heq
-          simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
-          omega
-    · by_cases hrightInput : right < layout.secondInputWidth
-      · simp [secondWire, hleftInput, hleftSaved, hrightInput] at heq
-        omega
-      · by_cases hrightSaved : right - layout.secondInputWidth < layout.first.width
-        · have hrightRange := firstWire_lt_requestBase layout hrightSaved
-          simp [secondWire, hleftInput, hleftSaved, hrightInput,
-            hrightSaved] at heq
-          simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
-          omega
-        · simp [secondWire, hleftInput, hleftSaved, hrightInput,
-            hrightSaved] at heq
-          omega
-
-private theorem secondWire_lt_width (layout : ClassicalQueryLayout) {wire : ℕ}
-    (hwire : wire < layout.second.width) : layout.secondWire wire < layout.width := by
-  by_cases hinput : wire < layout.secondInputWidth
-  · simp [secondWire, hinput, width]
-    omega
-  · by_cases hsaved : wire - layout.secondInputWidth < layout.first.width
-    · have hrange := firstWire_lt_requestBase layout hsaved
-      simp [secondWire, hinput, hsaved]
-      simp only [width, secondBase, replyBase, serviceBase, hiddenWire]
+    · rw [firstWire, ite_eq_right hprefix]
+      simp only [requestBase]
       omega
-    · simp [secondWire, hinput, hsaved, width]
-      omega
-
-private def secondEmbedding (layout : ClassicalQueryLayout) :
-    Fin layout.second.width ↪ Fin layout.width where
-  toFun wire := ⟨layout.secondWire wire, secondWire_lt_width layout wire.isLt⟩
-  inj' := fun _left _right heq => Fin.ext <|
-    secondWire_injective layout (congrArg Fin.val heq)
+  { toFun := fun wire => ⟨layout.secondWire wire, by
+      by_cases hinput : wire < layout.secondInputWidth
+      · simp [secondWire, hinput, width]
+      · by_cases hsaved : wire - layout.secondInputWidth < layout.first.width
+        · have hrange := firstRange hsaved
+          simp [secondWire, hinput, hsaved]
+          simp only [width, secondBase, replyBase, serviceBase, hiddenWire]
+          omega
+        · simp [secondWire, hinput, hsaved, width]
+          ⟩
+    inj' := fun left right heq => Fin.ext <| by
+      have heq := congrArg Fin.val heq
+      by_cases hleftInput : left < layout.secondInputWidth
+      · by_cases hrightInput : right < layout.secondInputWidth
+        · simp [secondWire, hleftInput, hrightInput] at heq
+          omega
+        · by_cases hrightSaved : right - layout.secondInputWidth < layout.first.width
+          · have hrightRange := firstRange hrightSaved
+            simp [secondWire, hleftInput, hrightInput, hrightSaved] at heq
+            simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
+            omega
+          · simp [secondWire, hleftInput, hrightInput, hrightSaved] at heq
+            omega
+      · by_cases hleftSaved : left - layout.secondInputWidth < layout.first.width
+        · by_cases hrightInput : right < layout.secondInputWidth
+          · have hleftRange := firstRange hleftSaved
+            simp [secondWire, hleftInput, hleftSaved, hrightInput] at heq
+            simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
+            omega
+          · by_cases hrightSaved : right - layout.secondInputWidth < layout.first.width
+            · have hfirstEq :
+                  layout.firstWire (left - layout.secondInputWidth) =
+                    layout.firstWire (right - layout.secondInputWidth) := by
+                simpa only [secondWire, hleftInput, hleftSaved, hrightInput, hrightSaved,
+                  ↓reduceIte] using heq
+              have hoffset : left - layout.secondInputWidth =
+                  right - layout.secondInputWidth := by
+                have hembed : layout.firstEmbedding
+                    ⟨left - layout.secondInputWidth, hleftSaved⟩ =
+                    layout.firstEmbedding
+                      ⟨right - layout.secondInputWidth, hrightSaved⟩ := by
+                  apply Fin.ext
+                  exact hfirstEq
+                exact congrArg Fin.val (layout.firstEmbedding.injective hembed)
+              omega
+            · have hleftRange := firstRange hleftSaved
+              simp [secondWire, hleftInput, hleftSaved, hrightInput,
+                hrightSaved] at heq
+              simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
+              omega
+        · by_cases hrightInput : right < layout.secondInputWidth
+          · simp [secondWire, hleftInput, hleftSaved, hrightInput] at heq
+            omega
+          · by_cases hrightSaved : right - layout.secondInputWidth < layout.first.width
+            · have hrightRange := firstRange hrightSaved
+              simp [secondWire, hleftInput, hleftSaved, hrightInput,
+                hrightSaved] at heq
+              simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
+              omega
+            · simp [secondWire, hleftInput, hleftSaved, hrightInput,
+                hrightSaved] at heq
+              omega }
 
 /-- Component-shape contract for the concrete classical-query linker. It separates the actual
 public-key width from the security header, checks each description at the auxiliary length it

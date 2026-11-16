@@ -28,6 +28,8 @@ reduction.  It does not restrict the input test to descriptions that were alread
 
 ## Main results
 
+* `Cslib.Quantum.OracleCircuit.wellFormed_zeroOraclePhaseCodes`: erasure preserves instruction
+  well-formedness.
 * `Cslib.Quantum.OracleCircuit.eval_toCircuit_zeroOracle_eq_ofPhaseCodes`: erasure preserves
   execution on every quantum state.
 -/
@@ -64,6 +66,21 @@ namespace OracleCircuit
 @[simp] theorem queryCount_map_gate_zeroOraclePhaseCodes (instructions : OracleCircuit) :
     queryCount (instructions.zeroOraclePhaseCodes.map OracleGateCode.gate) = 0 := by
   simp [queryCount, OracleGateCode.isQuery]
+
+/-- Every retained phase code is well formed when every source oracle instruction is well
+formed.  This is the structural bridge used before relabelling an erased component circuit. -/
+theorem wellFormed_zeroOraclePhaseCodes {a b m : ℕ} {instructions : OracleCircuit}
+    (h : ∀ instruction ∈ instructions, instruction.WellFormed a b m) :
+    ∀ code ∈ instructions.zeroOraclePhaseCodes, code.WellFormed m := by
+  intro code hcode
+  rw [zeroOraclePhaseCodes, List.mem_filterMap] at hcode
+  obtain ⟨instruction, hinstruction, hcode⟩ := hcode
+  cases instruction with
+  | gate sourceCode =>
+      simp only [Option.some.injEq] at hcode
+      subst code
+      exact h (.gate sourceCode) hinstruction
+  | query => simp at hcode
 
 private theorem xorQuery_zero_eval {a b m : ℕ} (A : Fin (a + b) ↪ Fin m)
     (ψ : Qubits m) :

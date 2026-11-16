@@ -24,6 +24,9 @@ final comparison measurement with the native success experiment remain separate 
 
 ## Main results
 
+* `Cslib.Quantum.ClassicalQueryLayout.Compatible.ofPhaseCodes_compileClassicalQuery`: the
+  erased compiled circuit is the exact sequence of its three embedded component circuits and
+  physical boundary blocks.
 * `Cslib.Quantum.ClassicalQueryLayout.matrix_copyHidden_zeroTarget_withReference`: the actual
   protected-hidden-bit copy is a coherent record while retaining every other wire and reference.
 * `Cslib.Quantum.ClassicalQueryLayout.partialTraceLeft_copyRequest_zeroTarget_withReference`:
@@ -42,6 +45,66 @@ namespace Cslib.Quantum.ClassicalQueryLayout
 
 open Matrix Circuit GateCode
 open scoped Kronecker
+
+/-- The erased compiled controller is exactly the sequence of its three component circuits,
+embedded at the physical register placements declared by the layout, and its concrete boundary
+blocks.  This factorization is the semantic entry point for the full reply/readout proof. -/
+theorem Compatible.ofPhaseCodes_compileClassicalQuery {layout : ClassicalQueryLayout}
+    (h : layout.Compatible) :
+    Circuit.ofPhaseCodes layout.width
+        (compileClassicalQuery layout).instructions.zeroOraclePhaseCodes =
+      Circuit.ofCodes layout.width
+          (blockCopyCodes 0 layout.serviceBase layout.fullInputWidth) ++
+      Circuit.ofCodes layout.width
+          (blockCopyCodes 0 layout.secondBase
+            (2 * layout.input.securityParameter + 1)) ++
+      (Circuit.ofPhaseCodes layout.first.width
+        layout.first.instructions.zeroOraclePhaseCodes).mapWires layout.firstEmbedding ++
+      Circuit.ofCodes layout.width
+          (blockCopyCodes 0 layout.requestBase layout.first.outputWidth) ++
+      Circuit.ofCodes layout.width (hadamardCodes layout.hiddenWire 1) ++
+      Circuit.ofCodes layout.width
+          (blockCopyCodes layout.hiddenWire layout.replyBase 1) ++
+      (Circuit.ofPhaseCodes layout.service.width
+        layout.service.instructions.zeroOraclePhaseCodes).mapWires layout.serviceEmbedding ++
+      Circuit.ofCodes layout.width
+          (blockCopyCodes layout.serviceBase (layout.replyBase + 1)
+            layout.ciphertextWidth) ++
+      Circuit.ofCodes layout.width
+          (blockCopyCodes (layout.replyBase + 1)
+            (layout.secondBase + (2 * layout.input.securityParameter + 1))
+            layout.ciphertextWidth) ++
+      (Circuit.ofPhaseCodes layout.second.width
+        layout.second.instructions.zeroOraclePhaseCodes).mapWires layout.secondEmbedding ++
+      Circuit.ofCodes layout.width (prefixSwapCodes layout.secondBase 1) ++
+      Circuit.ofCodes layout.width (compareBits layout.replyBase 0) := by
+  have hfirst := Circuit.ofPhaseCodes_map_relabel layout.firstEmbedding layout.firstWire
+    (fun _ => rfl)
+    (OracleCircuit.wellFormed_zeroOraclePhaseCodes h.first_wellFormed.instructions)
+  have hservice := Circuit.ofPhaseCodes_map_relabel layout.serviceEmbedding layout.serviceWire
+    (fun _ => rfl)
+    (OracleCircuit.wellFormed_zeroOraclePhaseCodes h.service_wellFormed.instructions)
+  have hsecond := Circuit.ofPhaseCodes_map_relabel layout.secondEmbedding layout.secondWire
+    (fun _ => rfl)
+    (OracleCircuit.wellFormed_zeroOraclePhaseCodes h.second_wellFormed.instructions)
+  have hfirst' := hfirst
+  have hservice' := hservice
+  have hsecond' := hsecond
+  simp only [OracleCircuit.zeroOraclePhaseCodes] at hfirst' hservice' hsecond'
+  have ofPhaseCodes_append (left right : List PhaseGateCode) :
+      Circuit.ofPhaseCodes layout.width (left ++ right) =
+        Circuit.ofPhaseCodes layout.width left ++ Circuit.ofPhaseCodes layout.width right :=
+    List.filterMap_append
+  have filterMap_some {α β : Type} (f : α → β) (xs : List α) :
+      xs.filterMap (fun x => some (f x)) = xs.map f := by
+    induction xs with
+    | nil => rfl
+    | cons x xs ih =>
+        change f x :: xs.filterMap (fun x => some (f x)) = f x :: xs.map f
+        rw [ih]
+  simp only [compileClassicalQuery, OracleCircuit.zeroOraclePhaseCodes,
+    List.filterMap_append, List.filterMap_map, Function.comp_apply, filterMap_some,
+    ofPhaseCodes_append, Circuit.ofPhaseCodes_map, hfirst', hservice', hsecond']
 
 /-- The controller's physical hidden-bit copy, restricted to a zero protected target, is exactly
 a coherent record.  Reassociation exposes the copied bit as the first factor while retaining all
