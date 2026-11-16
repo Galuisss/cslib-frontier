@@ -290,7 +290,7 @@ theorem transformsTapesAt_streamRound
         (emitterSpace + (nextSpace + (((word ++ read.1).length + 1 + K) +
           ((4 * nextWord.length + K + 15) + (nextWord.length + 1 + K)))))) := by
   intro read
-  have hread := (MultiTapeTM.transformsTapesAt_appendRead
+  have hread := (MultiTapeTM.transformsTapesAt_appendReadTable
     reader value input position hposition word).imp
     (P' := fun actualInput actualPosition tapes => actualInput = input ∧
       actualPosition.val = position.val ∧
@@ -298,7 +298,6 @@ theorem transformsTapesAt_streamRound
     (fun _ _ tapes ⟨hinput, hpos, htapes⟩ =>
       ⟨hinput, hpos, by simp [htapes]⟩)
     (fun _ _ _ _ _ _ _ h => h) le_rfl le_rfl
-  unfold Turing.MultiTapeTM.appendRead at hread
   have hfrozen := (transformsTapes_frozenRound hValueNext hValueFlag hNextFlag
     hEmitter hNext).freezeInput
   rw [streamRound, toTM_seq, toTM_freezeInput]

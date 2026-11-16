@@ -31,7 +31,7 @@ another pass follows. Like a streaming fold, it never copies the input.
 
 namespace Turing.MultiTapeTM
 
-variable {K : ℕ} {Q : Type} {SI SE SN SEe SNe SC SF SP : Type*} {r : InputReader Bool Q}
+variable {K : ℕ} {Q SI SE SN SEe SNe SC SF SP : Type*} {r : InputReader Bool Q}
   {I : MultiTapeTM K Bool SI} {E : MultiTapeTM K Bool SE} {Nm : MultiTapeTM K Bool SN}
   {Ee : MultiTapeTM K Bool SEe} {Ne : MultiTapeTM K Bool SNe} {Cm : MultiTapeTM K Bool SC}
   {Fm : MultiTapeTM K Bool SF} {V N F C : Fin K}

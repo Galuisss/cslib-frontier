@@ -118,7 +118,7 @@ end Frozen
 
 section Stream
 
-variable {Q : Type} {SI SE SN SF : Type*} {r : InputReader Bool Q} {I : MultiTapeTM K Bool SI}
+variable {Q SI SE SN SF : Type*} {r : InputReader Bool Q} {I : MultiTapeTM K Bool SI}
   {E : MultiTapeTM K Bool SE} {Nm : MultiTapeTM K Bool SN} {Fm : MultiTapeTM K Bool SF}
   {V N F : Fin K}
 

@@ -139,7 +139,7 @@ public theorem read_rawFrameReader (w rest : List Bool) :
 /-- A typed streaming phase starting after an input prefix `pre`, parameterized by a machine that
 satisfies the exact one-round specification. -/
 public theorem transformsTapesAt_streamLoop_encoded_after_of_round {α : Type u} {σ : Type v}
-    {Q : Type} {SE SN SR : Type*} {K : ℕ}
+    {Q SE SN SR : Type*} {K : ℕ}
     {encA : α ↪ List Bool} {encS : σ ↪ List Bool}
     {E : MultiTapeTM K Bool SE} {Nm : MultiTapeTM K Bool SN} {V N : Fin K}
     (r : InputReader Bool Q)
@@ -261,7 +261,7 @@ public theorem transformsTapesAt_streamLoop_encoded_after_of_round {α : Type u}
 -- upstream: candidate
 /-- A typed streaming phase starting after an input prefix `pre`. -/
 public theorem transformsTapesAt_streamLoop_encoded_after {α : Type u} {σ : Type v}
-    {Q : Type} {SE SN : Type*} {K : ℕ}
+    {Q SE SN : Type*} {K : ℕ}
     {encA : α ↪ List Bool} {encS : σ ↪ List Bool}
     {E : MultiTapeTM K Bool SE} {Nm : MultiTapeTM K Bool SN} {V N F : Fin K}
     (r : InputReader Bool Q) (tok : α → List Bool) (htok : ∀ a, tok a ≠ [])
@@ -305,7 +305,7 @@ and the callbacks receive the ordinary pair encoding. `roundCost` charges callba
 copying of the current state, next state and decoded element. The phase leaves its final state
 on tape `V` and the input cursor just past the last token, so another phase can consume them. -/
 public theorem transformsTapesAt_streamLoop_encoded {α : Type u} {σ : Type v}
-    {Q : Type} {SE SN : Type*} {K : ℕ}
+    {Q SE SN : Type*} {K : ℕ}
     {encA : α ↪ List Bool} {encS : σ ↪ List Bool}
     {E : MultiTapeTM K Bool SE} {Nm : MultiTapeTM K Bool SN} {V N F : Fin K}
     (r : InputReader Bool Q) (tok : α → List Bool) (htok : ∀ a, tok a ≠ [])

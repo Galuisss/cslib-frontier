@@ -337,7 +337,7 @@ callback workspaces in each round; `lMax` bounds every encoded stream state and 
       (frame (encS input.1), (frame (encS input.1)).length) := by
     rw [List.drop_zero, encPair_apply]
     exact read_rawFrameReader (encS input.1) (encList encA input.2)
-  have hinit := transformsTapesAt_appendRead rawFrameReader V
+  have hinit := transformsTapesAt_appendReadTable rawFrameReader V
     (encPair encS (encList encA) input) 1 (by simp) []
   simp only [Fin.val_one, Nat.sub_self, hreadInit, List.length_nil, List.nil_append] at hinit
   have hinit' := hinit.imp
@@ -377,7 +377,6 @@ callback workspaces in each round; `lMax` bounds every encoded stream state and 
     (hstate input) (helem input)
   have hF := MultiTapeMachine.transformsTapes_inputFromWord_extendTapes true
     (unframedFinish.computes finalState) finishInput
-  unfold Turing.MultiTapeTM.appendRead at hinit'
   rw [← MultiTapeMachine.toTM_whileInput
     (MultiTapeMachine.streamRound frameValueReader emitter nextMachine
       V N F hVN hVF hNF)] at hloop

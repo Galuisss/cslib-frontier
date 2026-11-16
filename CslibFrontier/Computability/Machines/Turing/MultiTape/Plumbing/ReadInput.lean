@@ -32,6 +32,8 @@ encoding is an instance.
 ## Main results
 
 * `Turing.MultiTapeTM.transformsTapesAt_appendRead`: its specification.
+* `Turing.MultiTapeTM.transformsTapesAt_appendReadTable`: the same specification for the retained
+  explicit table.
 -/
 
 namespace Turing.MultiTapeTM
@@ -198,6 +200,8 @@ end Turing.MultiTapeTM
 
 namespace Turing.MultiTapeTM
 
+section ExplicitTables
+
 variable {k : ℕ} {Symbol Q : Type} {input : List Symbol}
 
 /-- The explicit effect-free table that runs `r` on one work tape. -/
@@ -212,16 +216,20 @@ public def InputReader.appendReadTable (r : InputReader Symbol Q) (i : Fin k) :
     MultiTapeMachine k Symbol (Unit ⊕ Q ⊕ RewindWorkState) Empty Id :=
   r.appendOneTable.extendTapes (tapeEmb i)
 
+end ExplicitTables
+
+variable {k : ℕ} {Symbol Q : Type*} {input : List Symbol}
+
 /-- `r` run on one work tape: move the head to the end of the word, append what `r` emits while
 reading the input, and move the head back to the start. -/
-public def InputReader.appendOne (r : InputReader Symbol Q) :
+public noncomputable def InputReader.appendOne (r : InputReader Symbol Q) :
     MultiTapeTM 1 Symbol (Unit ⊕ Q ⊕ RewindWorkState) :=
-  r.appendOneTable.toTM
+  (forwardWork Symbol).seq (r.core.seq (rewindWork Symbol))
 
 /-- `r` run on work tape `i`, appending what it emits to the word there. -/
-@[expose] public def appendRead (r : InputReader Symbol Q) (i : Fin k) :
+public noncomputable def appendRead (r : InputReader Symbol Q) (i : Fin k) :
     MultiTapeTM k Symbol (Unit ⊕ Q ⊕ RewindWorkState) :=
-  (r.appendReadTable i).toTM
+  r.appendOne.extendTapes (tapeEmb i)
 
 namespace InputReader
 
@@ -234,27 +242,108 @@ lemma withState_eq_coreCfg (p : Fin (input.length + 2)) (hp : p.val ≠ 0) (v ou
         coreCfg (some r.q₀) (p.val - 1) (by have := p.isLt; omega) v out :=
   Cfg.ext rfl (Fin.ext (by simp [coreCfg]; omega)) rfl rfl rfl
 
+private lemma appendOne_runFrom_of (forward : MultiTapeTM 1 Symbol Unit)
+    (rewind : MultiTapeTM 1 Symbol RewindWorkState)
+    (p : Fin (input.length + 2)) (hp : p.val ≠ 0) (v out : List Symbol)
+    (rd : List Symbol × ℕ) (hrd : rd = r.read r.q₀ (input.drop (p.val - 1)))
+    (hforward : forward.runFrom
+      ⟨some forward.q₀, p, fun _ => tapeOfList v, fun _ => 0, out⟩ (v.length + 1) =
+        ⟨none, p, fun _ => tapeOfList v, fun _ => (v.length : ℤ), out⟩)
+    (hrewind : ∀ (ip : Fin (input.length + 2)) (w : List Symbol),
+      rewind.runFrom
+        ⟨some rewind.q₀, ip, fun _ => tapeOfList w, fun _ => (w.length : ℤ), out⟩
+        (w.length + 2) =
+      ⟨none, ip, fun _ => tapeOfList w, fun _ => 0, out⟩) :
+    ∃ p' : Fin (input.length + 2), p'.val = p.val + rd.2 ∧
+      (forward.seq (r.core.seq rewind)).runFrom
+          ⟨some (forward.seq (r.core.seq rewind)).q₀, p,
+            fun _ => tapeOfList v, fun _ => 0, out⟩
+          (v.length + 1 + ((rd.2 + 1) + ((v ++ rd.1).length + 2))) =
+        ⟨none, p', fun _ => tapeOfList (v ++ rd.1), fun _ => 0, out⟩ := by
+  have hp' : p.val - 1 ≤ input.length := by have := p.isLt; omega
+  have hmid := r.withState_eq_coreCfg p hp v out
+  obtain ⟨hn, hcore⟩ := r.core_runFrom _ r.q₀ (p.val - 1) hp' rfl v out
+  subst hrd
+  generalize r.read r.q₀ (input.drop (p.val - 1)) = rd at hn hcore ⊢
+  let p' : Fin (input.length + 2) := ⟨1 + (p.val - 1 + rd.2), by omega⟩
+  have hrewind' := hrewind p' (v ++ rd.1)
+  refine ⟨p', by simp only [p']; omega, ?_⟩
+  have hcoreRewind := runFrom_seq hcore rfl hrewind' rfl
+  rw [← hmid] at hcoreRewind
+  exact (runFrom_seq hforward rfl hcoreRewind rfl).trans rfl
+
+private lemma appendOne_space_le_of (forward : MultiTapeTM 1 Symbol Unit)
+    (rewind : MultiTapeTM 1 Symbol RewindWorkState)
+    (p : Fin (input.length + 2)) (hp : p.val ≠ 0) (v out : List Symbol) (t : ℕ)
+    (hforward : forward.runFrom
+      ⟨some forward.q₀, p, fun _ => tapeOfList v, fun _ => 0, out⟩ (v.length + 1) =
+        ⟨none, p, fun _ => tapeOfList v, fun _ => (v.length : ℤ), out⟩)
+    (hforwardPos : ∀ m,
+      (forward.runFrom
+        ⟨some forward.q₀, p, fun _ => tapeOfList v, fun _ => 0, out⟩ m).workTapePos 0 ∈
+          Set.Icc (0 : ℤ) v.length)
+    (hrewindPos : ∀ (ip : Fin (input.length + 2)) (w : List Symbol) (n : ℕ),
+      (rewind.runFrom
+        ⟨some rewind.q₀, ip, fun _ => tapeOfList w, fun _ => (w.length : ℤ), out⟩
+        n).workTapePos 0 ∈ Set.Icc (-1 : ℤ) w.length) :
+    (MultiTapeNTM.RunPath.ofDeterministic (forward.seq (r.core.seq rewind))
+        ⟨some (forward.seq (r.core.seq rewind)).q₀, p,
+          fun _ => tapeOfList v, fun _ => 0, out⟩ t).space ≤
+      (v ++ (r.read r.q₀ (input.drop (p.val - 1))).1).length + 2 := by
+  have hp' : p.val - 1 ≤ input.length := by have := p.isLt; omega
+  set L := (v ++ (r.read r.q₀ (input.drop (p.val - 1))).1).length
+  have hvL : v.length ≤ L := by simp [L]
+  have hmid := r.withState_eq_coreCfg p hp v out
+  obtain ⟨hn, hcore⟩ := r.core_runFrom _ r.q₀ (p.val - 1) hp' rfl v out
+  have hinv : ∀ m, ((forward.seq (r.core.seq rewind)).runFrom
+      ((⟨some forward.q₀, p, fun _ => tapeOfList v, fun _ => (0 : ℤ), out⟩ :
+        Cfg 1 Symbol Unit input).mapState (handOver (r.core.seq rewind).q₀))
+        m).workTapePos 0 ∈ Set.Icc (-1 : ℤ) L := by
+    refine withState_runFrom_seq (P := fun c => c.workTapePos 0 ∈ Set.Icc (-1 : ℤ) L)
+      hforward rfl (fun m _ => ?_) (fun n => ?_)
+    · have := hforwardPos m
+      simp only [Cfg.withState_workTapePos, Set.mem_Icc] at this ⊢
+      omega
+    · rw [show (⟨none, p, fun _ => tapeOfList v, fun _ => (v.length : ℤ), out⟩ :
+          Cfg 1 Symbol Unit input).withState (some (r.core.seq rewind).q₀) =
+          ((⟨none, p, fun _ => tapeOfList v, fun _ => (v.length : ℤ), out⟩ :
+            Cfg 1 Symbol Unit input).withState (some r.core.q₀)).mapState
+              (handOver rewind.q₀)
+          from rfl, hmid]
+      refine withState_runFrom_seq (P := fun c => c.workTapePos 0 ∈ Set.Icc (-1 : ℤ) L)
+        hcore rfl (fun m _ => ?_) (fun n => ?_) n
+      · have := r.core_workTapePos_mem r.q₀ (p.val - 1) hp' v out m
+        simp only [Cfg.withState_workTapePos, Set.mem_Icc] at this ⊢
+        omega
+      · let ip : Fin (input.length + 2) :=
+          ⟨1 + (p.val - 1 + (r.read r.q₀ (input.drop (p.val - 1))).2), by omega⟩
+        let w := v ++ (r.read r.q₀ (input.drop (p.val - 1))).1
+        have hstart :
+            (coreCfg (Q := Q) none (p.val - 1 + (r.read r.q₀ (input.drop (p.val - 1))).2)
+              hn w out).withState (some rewind.q₀) =
+            (⟨some rewind.q₀, ip, fun _ => tapeOfList w,
+              fun _ => (w.length : ℤ), out⟩ : Cfg 1 Symbol RewindWorkState input) :=
+          Cfg.ext rfl (Fin.ext (by simp [coreCfg, ip])) rfl rfl rfl
+        simp only [Cfg.withState_workTapePos]
+        rw [hstart]
+        have := hrewindPos ip (v ++ (r.read r.q₀ (input.drop (p.val - 1))).1) n
+        simpa only [L] using this
+  rw [MultiTapeNTM.RunPath.space, Fin.sum_univ_one]
+  refine (spaceUsedByTape_le_card _ (S := .Icc (-1) (L : ℤ)) fun m _ => ?_).trans ?_
+  · exact Finset.mem_Icc.mpr (hinv m)
+  · rw [Int.card_Icc]; omega
+
 lemma appendOne_runFrom (p : Fin (input.length + 2)) (hp : p.val ≠ 0) (v out : List Symbol)
     (rd : List Symbol × ℕ) (hrd : rd = r.read r.q₀ (input.drop (p.val - 1))) :
     ∃ p' : Fin (input.length + 2), p'.val = p.val + rd.2 ∧
       r.appendOne.runFrom ⟨some r.appendOne.q₀, p, fun _ => tapeOfList v, fun _ => 0, out⟩
           (v.length + 1 + ((rd.2 + 1) + ((v ++ rd.1).length + 2))) =
         ⟨none, p', fun _ => tapeOfList (v ++ rd.1), fun _ => 0, out⟩ := by
-  have hp' : p.val - 1 ≤ input.length := by have := p.isLt; omega
-  have h₀ := MultiTapeMachine.runFrom_forwardWork p v out
-    (p := 0) (n := v.length) (by simp)
-  have hmid := r.withState_eq_coreCfg p hp v out
-  obtain ⟨hn, h₁⟩ := r.core_runFrom _ r.q₀ (p.val - 1) hp' rfl v out
-  subst hrd
-  generalize r.read r.q₀ (input.drop (p.val - 1)) = rd at hn h₁ ⊢
-  have h₂ := MultiTapeMachine.runFrom_rewindWork_none (input := input)
-    ⟨1 + (p.val - 1 + rd.2), by omega⟩ (tapeOfList (v ++ rd.1)) out rfl le_rfl
-  refine ⟨⟨1 + (p.val - 1 + rd.2), by omega⟩, by change 1 + (p.val - 1 + rd.2) = _; omega, ?_⟩
-  have h₁₂ := runFrom_seq h₁ rfl h₂ rfl
-  rw [← hmid] at h₁₂
-  rw [InputReader.appendOne, InputReader.appendOneTable, MultiTapeMachine.toTM_seq,
-    MultiTapeMachine.toTM_seq]
-  exact (runFrom_seq h₀ rfl h₁₂ rfl).trans rfl
+  rw [InputReader.appendOne]
+  exact r.appendOne_runFrom_of (forwardWork Symbol) (rewindWork Symbol) p hp v out rd hrd
+    (runFrom_forwardWork p v out (p := 0) (n := v.length) (by simp))
+    (fun ip w => runFrom_rewindWork_none (input := input) ip
+      (tapeOfList w) out rfl le_rfl)
 
 /-- The head of `appendOne` stays within `[-1, |v ++ e|]`, so it uses at most `|v ++ e| + 2`
 cells. -/
@@ -263,45 +352,43 @@ lemma appendOne_space_le (p : Fin (input.length + 2)) (hp : p.val ≠ 0) (v out 
     (MultiTapeNTM.RunPath.ofDeterministic r.appendOne
         ⟨some r.appendOne.q₀, p, fun _ => tapeOfList v, fun _ => 0, out⟩ t).space ≤
       (v ++ (r.read r.q₀ (input.drop (p.val - 1))).1).length + 2 := by
-  have hp' : p.val - 1 ≤ input.length := by have := p.isLt; omega
-  set L := (v ++ (r.read r.q₀ (input.drop (p.val - 1))).1).length
-  have hvL : v.length ≤ L := by simp [L]
-  have h₀ := MultiTapeMachine.runFrom_forwardWork p v out
-    (p := 0) (n := v.length) (by simp)
-  have hmid := r.withState_eq_coreCfg p hp v out
-  obtain ⟨hn, h₁⟩ := r.core_runFrom _ r.q₀ (p.val - 1) hp' rfl v out
-  have hinv : ∀ m, (((MultiTapeMachine.forwardWork Symbol).toTM.seq
-      (r.coreTable.toTM.seq (MultiTapeMachine.rewindWork Symbol).toTM)).runFrom
-      ((⟨some (MultiTapeMachine.forwardWork Symbol).initial, p, fun _ => tapeOfList v,
-        fun _ => ((0 : ℕ) : ℤ), out⟩ : Cfg 1 Symbol Unit input).mapState
-          (handOver (r.coreTable.toTM.seq (MultiTapeMachine.rewindWork Symbol).toTM).q₀))
-        m).workTapePos 0 ∈ Set.Icc (-1 : ℤ) L := by
-    refine withState_runFrom_seq (P := fun c => c.workTapePos 0 ∈ Set.Icc (-1 : ℤ) L) h₀ rfl
-      (fun m _ => ?_) (fun n => ?_)
-    · have := MultiTapeMachine.workTapePos_runFrom_forwardWork p v out
-        (p := 0) (Nat.zero_le _) m
-      simp only [Cfg.withState_workTapePos, Set.mem_Icc] at this ⊢
-      omega
-    · rw [show (⟨none, p, fun _ => tapeOfList v, fun _ => (v.length : ℤ), out⟩ :
-          Cfg 1 Symbol Unit input).withState
-            (some (r.coreTable.toTM.seq (MultiTapeMachine.rewindWork Symbol).toTM).q₀) =
-          ((⟨none, p, fun _ => tapeOfList v, fun _ => (v.length : ℤ), out⟩ :
-            Cfg 1 Symbol Unit input).withState (some r.core.q₀)).mapState
-              (handOver (MultiTapeMachine.rewindWork Symbol).toTM.q₀)
-          from rfl, hmid]
-      refine withState_runFrom_seq (P := fun c => c.workTapePos 0 ∈ Set.Icc (-1 : ℤ) L) h₁ rfl
-        (fun m _ => ?_) (fun n => ?_) n
-      · have := r.core_workTapePos_mem r.q₀ (p.val - 1) hp' v out m
-        simp only [Cfg.withState_workTapePos, Set.mem_Icc] at this ⊢
-        omega
-      · exact MultiTapeMachine.workTapePos_runFrom_rewindWork (input := input) none
-          ⟨1 + (p.val - 1 + (r.read r.q₀ (input.drop (p.val - 1))).2), by omega⟩
-          (tapeOfList (v ++ (r.read r.q₀ (input.drop (p.val - 1))).1)) out rfl le_rfl n
-  rw [InputReader.appendOne, InputReader.appendOneTable, MultiTapeMachine.toTM_seq,
-    MultiTapeMachine.toTM_seq, MultiTapeNTM.RunPath.space, Fin.sum_univ_one]
-  refine (spaceUsedByTape_le_card _ (S := .Icc (-1) (L : ℤ)) fun m _ => ?_).trans ?_
-  · exact Finset.mem_Icc.mpr (hinv m)
-  · rw [Int.card_Icc]; omega
+  rw [InputReader.appendOne]
+  exact r.appendOne_space_le_of (forwardWork Symbol) (rewindWork Symbol) p hp v out t
+    (runFrom_forwardWork p v out (p := 0) (n := v.length) (by simp))
+    (fun m => workTapePos_runFrom_forwardWork p v out (p := 0) (Nat.zero_le _) m)
+    (fun ip w n => workTapePos_runFrom_rewindWork (input := input) none ip
+      (tapeOfList w) out rfl le_rfl n)
+
+private lemma appendOneTable_runFrom {Symbol Q : Type} {input : List Symbol}
+    (r : InputReader Symbol Q) (p : Fin (input.length + 2)) (hp : p.val ≠ 0)
+    (v out : List Symbol) (rd : List Symbol × ℕ)
+    (hrd : rd = r.read r.q₀ (input.drop (p.val - 1))) :
+    ∃ p' : Fin (input.length + 2), p'.val = p.val + rd.2 ∧
+      r.appendOneTable.toTM.runFrom
+          ⟨some r.appendOneTable.toTM.q₀, p, fun _ => tapeOfList v, fun _ => 0, out⟩
+          (v.length + 1 + ((rd.2 + 1) + ((v ++ rd.1).length + 2))) =
+        ⟨none, p', fun _ => tapeOfList (v ++ rd.1), fun _ => 0, out⟩ := by
+  rw [InputReader.appendOneTable, MultiTapeMachine.toTM_seq, MultiTapeMachine.toTM_seq]
+  exact r.appendOne_runFrom_of (MultiTapeMachine.forwardWork Symbol).toTM
+    (MultiTapeMachine.rewindWork Symbol).toTM p hp v out rd hrd
+    (MultiTapeMachine.runFrom_forwardWork p v out (p := 0) (n := v.length) (by simp))
+    (fun ip w => MultiTapeMachine.runFrom_rewindWork_none (input := input)
+      ip (tapeOfList w) out rfl le_rfl)
+
+private lemma appendOneTable_space_le {Symbol Q : Type} {input : List Symbol}
+    (r : InputReader Symbol Q) (p : Fin (input.length + 2)) (hp : p.val ≠ 0)
+    (v out : List Symbol) (t : ℕ) :
+    (MultiTapeNTM.RunPath.ofDeterministic r.appendOneTable.toTM
+        ⟨some r.appendOneTable.toTM.q₀, p, fun _ => tapeOfList v, fun _ => 0, out⟩ t).space ≤
+      (v ++ (r.read r.q₀ (input.drop (p.val - 1))).1).length + 2 := by
+  rw [InputReader.appendOneTable, MultiTapeMachine.toTM_seq, MultiTapeMachine.toTM_seq]
+  exact r.appendOne_space_le_of (MultiTapeMachine.forwardWork Symbol).toTM
+    (MultiTapeMachine.rewindWork Symbol).toTM p hp v out t
+    (MultiTapeMachine.runFrom_forwardWork p v out (p := 0) (n := v.length) (by simp))
+    (fun m => MultiTapeMachine.workTapePos_runFrom_forwardWork p v out
+      (p := 0) (Nat.zero_le _) m)
+    (fun ip w n => MultiTapeMachine.workTapePos_runFrom_rewindWork (input := input) none
+      ip (tapeOfList w) out rfl le_rfl n)
 
 end InputReader
 
@@ -320,20 +407,46 @@ public theorem transformsTapesAt_appendRead (r : InputReader Symbol Q) (i : Fin 
   rintro input p ws out ⟨rfl, hp, hv⟩
   obtain rfl : p = p₀ := Fin.ext hp
   obtain ⟨p', hp', hrun⟩ := r.appendOne_runFrom p hp₀ v out rd rfl
-  rw [InputReader.appendOne] at hrun
+  have hcfg : oneTapeCfg i (wordsCfgAt input p (some (appendRead r i).q₀) ws out) =
+      ⟨some r.appendOne.q₀, p, fun _ => tapeOfList v, fun _ => 0, out⟩ := by
+    refine Cfg.ext rfl rfl ?_ ?_ rfl <;> funext _ <;> simp [oneTapeCfg, wordsCfgAt, hv]
+  refine ⟨p', Function.update ws i (v ++ rd.1), [], ?_, ⟨hp', rfl, rfl⟩, ?_⟩
+  · rw [appendRead, runFrom_tapeEmb, ← appendRead, hcfg, hrun]
+    refine Cfg.ext rfl rfl ?_ ?_ (by simp [embed]) <;> funext l <;> by_cases hl : l = i <;>
+      simp [embed, hl, partialInv_tapeEmb, wordsCfgAt]
+  · refine (space_tapeEmb_le _ _ _ _).trans (Nat.add_le_add_right ?_ _)
+    rw [hcfg]
+    exact r.appendOne_space_le p hp₀ v out _
+
+/-- The explicit table `appendReadTable r i` has the same exact semantics and resource bounds as
+the universe-polymorphic legacy machine `appendRead r i`. -/
+public theorem transformsTapesAt_appendReadTable {k : ℕ} {Symbol Q : Type}
+    (r : InputReader Symbol Q) (i : Fin k)
+    (x : List Symbol) (p₀ : Fin (x.length + 2)) (hp₀ : p₀.val ≠ 0) (v : List Symbol) :
+    let rd := r.read r.q₀ (x.drop (p₀.val - 1))
+    TransformsTapesAt (r.appendReadTable i).toTM
+      (fun input p ws => input = x ∧ p.val = p₀.val ∧ ws i = v)
+      (fun _ _ ws p' ws' e => p'.val = p₀.val + rd.2 ∧ ws' = Function.update ws i (v ++ rd.1) ∧
+        e = [])
+      (v.length + 1 + ((rd.2 + 1) + ((v ++ rd.1).length + 2)))
+      ((v ++ rd.1).length + 2 + (k - 1)) := by
+  intro rd
+  rintro input p ws out ⟨rfl, hp, hv⟩
+  obtain rfl : p = p₀ := Fin.ext hp
+  obtain ⟨p', hp', hrun⟩ := r.appendOneTable_runFrom p hp₀ v out rd rfl
   have hcfg : oneTapeCfg i
       (wordsCfgAt input p
         (some (r.appendOneTable.toTM.extendTapes (tapeEmb i)).q₀) ws out) =
       ⟨some r.appendOneTable.toTM.q₀, p, fun _ => tapeOfList v, fun _ => 0, out⟩ := by
     refine Cfg.ext rfl rfl ?_ ?_ rfl <;> funext _ <;> simp [oneTapeCfg, wordsCfgAt, hv]
   refine ⟨p', Function.update ws i (v ++ rd.1), [], ?_, ⟨hp', rfl, rfl⟩, ?_⟩
-  · rw [appendRead, InputReader.appendReadTable, MultiTapeMachine.toTM_extendTapes,
+  · rw [InputReader.appendReadTable, MultiTapeMachine.toTM_extendTapes,
       runFrom_tapeEmb, hcfg, hrun]
     refine Cfg.ext rfl rfl ?_ ?_ (by simp [embed]) <;> funext l <;> by_cases hl : l = i <;>
       simp [embed, hl, partialInv_tapeEmb, wordsCfgAt]
-  · rw [appendRead, InputReader.appendReadTable, MultiTapeMachine.toTM_extendTapes]
+  · rw [InputReader.appendReadTable, MultiTapeMachine.toTM_extendTapes]
     refine (space_tapeEmb_le _ _ _ _).trans (Nat.add_le_add_right ?_ _)
     rw [hcfg]
-    exact r.appendOne_space_le p hp₀ v out _
+    exact r.appendOneTable_space_le p hp₀ v out _
 
 end Turing.MultiTapeTM

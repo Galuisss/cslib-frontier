@@ -87,7 +87,7 @@ abbrev CopyInputState := Unit ⊕ Unit ⊕ RewindWorkState
 
 /-- Phase 1 machine: copies the input tape onto work tape `0` and rewinds work tape `0` to cell `0`.
 -/
-noncomputable def copyInputToWork (Symbol : Type) : MultiTapeTM 1 Symbol CopyInputState :=
+noncomputable def copyInputToWork (Symbol : Type*) : MultiTapeTM 1 Symbol CopyInputState :=
   appendRead (copyReader Symbol) 0
 
 theorem runFrom_copyInputToWork (x : List Symbol) :
