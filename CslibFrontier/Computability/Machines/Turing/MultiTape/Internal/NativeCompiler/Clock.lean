@@ -11,30 +11,25 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Nat
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Replicate
 
 /-!
-# Retained unary polynomial clocks
+# Concrete retained unary polynomial clocks
 
 This module constructs the unary clock `c * (n + 1) ^ d` from retained compiler tables. The
 degree and coefficient are fixed when the table is assembled: no transition function is selected
 from an existential computability proof, and no proof-level clock is evaluated at runtime.
 
-The construction uses a private unary multiplier and exposes concrete polynomial upper bounds for
-the actual retained clock compiler's time and workspace. Its output length is available directly
-as `NativeCompiler.outputBits`; the coefficient is stored once in the generated table and the
-emitted unary clock is a separate output artifact.
+This concrete-only construction uses a private unary multiplier and retains the actual compiler's
+time and workspace maps. Polynomial majorants for those maps remain open under issue #5281.
+Its output length is available directly as `NativeCompiler.outputBits`; the coefficient is stored
+in the generated table and the emitted unary clock is a separate output artifact.
 
 ## Main definitions
 
 * `Turing.MultiTapeTM.Internal.NativeCompiler.unaryPolynomialClock`: retained generation of the
   unary word of length `c * (n + 1) ^ d`.
 
-## Main results
-
-* `Turing.MultiTapeTM.Internal.NativeCompiler.unaryPolynomialClock_time_le`: an explicit
-  polynomial upper bound for the retained table's actual running-time map.
-* `Turing.MultiTapeTM.Internal.NativeCompiler.unaryPolynomialClock_workspace_le`: an explicit
-  polynomial upper bound for the retained table's actual workspace map.
-
-The construction and bounds are original formalization infrastructure.
+The construction is original formalization infrastructure. Its computation certificate proves
+that the actual table emits the required unary clock; it does not yet prove polynomial bounds
+for that table's execution.
 -/
 
 public section
