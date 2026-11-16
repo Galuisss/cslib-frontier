@@ -45,6 +45,16 @@ namespace Turing.MultiTapeTM.Internal.NativeCompiler
   exact (ite (optionIsSomeTest enc) (optionPayload enc) fallback).ofOutputEq
     fun value => by cases value <;> rfl
 
+/-- Convert the empty-emission/halt protocol to canonical tagged options. The retained
+conditional charges its emptiness test, copy and fixed `[false]` fallback. -/
+@[expose] noncomputable def optionFromHalt {Alpha : Type*} (enc : Alpha ↪ List Bool) :
+    NativeCompiler (id : Option Alpha → Option Alpha) (encHaltOption enc) (encOption enc) := by
+  let empty := boolToTest.comp
+    (isEmpty.ofInputEq (fun value => encHaltOption enc value) fun _ => rfl)
+  let absent := const (encHaltOption enc) encBits [false]
+  let word := (identity encBits).ofInputEq (fun value => encHaltOption enc value) fun _ => rfl
+  exact (ite empty absent word).ofOutputEq fun value => by cases value <;> rfl
+
 /-- Test whether a standard encoded list is empty. -/
 @[expose] noncomputable def listIsEmpty {Alpha : Type*} (enc : Alpha ↪ List Bool) :
     NativeCompiler List.isEmpty (encList enc) encTest :=

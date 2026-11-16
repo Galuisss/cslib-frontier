@@ -849,7 +849,7 @@ theorem computableInPolyTime_bcsFindConflict {r d : ℕ} {Stmt Wit Sym Chal γ :
     ComputableInPolyTime
       (fun a => bcsFindConflict iop encSym hFS (x a) (oracles a) (prf a))
       encIn
-      (encOption (encPair (encIOPQuery r d) (encMerkleOpeningOf Sym encSym))) := by
+      (encSilentOption (encPair (encIOPQuery r d) (encMerkleOpeningOf Sym encSym))) := by
   have hroots : ComputableInPolyTime (fun a => (prf a).roots) encIn (encFinFn r encBits) :=
     encBCSProof_roots_polyTime r Sym encSym hprf
   have hopenings : ComputableInPolyTime (fun a => (prf a).openings) encIn

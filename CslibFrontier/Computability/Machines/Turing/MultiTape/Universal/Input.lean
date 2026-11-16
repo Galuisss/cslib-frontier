@@ -136,14 +136,14 @@ private theorem inputSymbol_pair_inO :
   have hW (x : List ℕ) (j : ℕ) (hj : j < x.length) : W x j = 2 * x[j] + 1 := by
     simp [W, hj, encUnary_apply]
   have hsum (x : List ℕ) : ∑ j ∈ Finset.range x.length, W x j = (encList encUnary x).length := by
-    simpa [W, List.flatMap_def, encList, Function.comp_def] using
+    simpa [W, List.flatMap_def, encList, Function.comp_def, List.sum_map_mul_left] using
       sum_length_getD (x.map fun a => frame (encUnary a))
   have hstate (q : ℕ × List ℕ) (j : ℕ) :
       (encNat (streamState q.1 inputNext q.2 j)).length ≤ B q := by
     rw [input_state]
     exact length_encNat_mono (Nat.sub_le _ _)
   have helem (q : ℕ × List ℕ) (j : ℕ) (hj : j < q.2.length) : q.2[j] ≤ N q := by
-    simpa [encUnary_apply] using length_le_encList_of_mem encUnary (List.getElem_mem hj)
+    simpa only [encUnary_apply, List.length_replicate, N] using length_le_encList_of_mem encUnary (List.getElem_mem hj)
   have hstream := ComputableTidilyInTimeAndSpace.streamFold_pair_sum
     (encIn := encPair encNat (encList encUnary)) (encOut := encOption encUnary)
     symbolReader (fun a => frame (encUnary a)) (fun a => frame_ne_nil _)

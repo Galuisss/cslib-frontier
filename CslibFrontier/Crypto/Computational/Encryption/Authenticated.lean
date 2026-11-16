@@ -47,7 +47,7 @@ Chapter 5 (Sections 5.3 and 5.10) and Chapter 9 (Sections 9.1 and 9.2.2–9.2.3)
    Definition 5.2, and Example 5.1, printed pp. 181–182; Exercise 5.10(a), printed p. 211):
    a uniform symmetric cipher on `n`-bit messages at security parameter `n` consists of strict PPT
    key generation `keyGen`, strict PPT encryption `encrypt`, and deterministic polynomial-time
-   decryption `decrypt` returning `Option (List Bool)` (encoded via `encOption encBits`). In
+   decryption `decrypt` returning `Option (List Bool)` (encoded via `encSilentOption encBits`). In
    `cpaGame`, an adaptive `OracleDistinguisher` submits left-or-right pairs `(m0, m1)` of `n`-bit
    messages and receives `encrypt n k (if bit then m1 else m0)`; `cpaOneTimeGame` and
    `OneTimeINDCPA` restrict the oracle to at most one valid encryption query. We also formalize
@@ -80,7 +80,7 @@ Chapter 5 (Sections 5.3 and 5.10) and Chapter 9 (Sections 9.1 and 9.2.2–9.2.3)
    `ccaOneTimeGame`), a two-channel `CCAAdversary` (`Operation = Bool`) may interleave
    left-or-right encryption queries (`false`, recording challenge ciphertexts) with decryption
    queries (`true`, rejecting recorded challenge ciphertexts and returning
-   `encOption encBits (decrypt n k ct)` on all other ciphertexts). Using the difference lemma
+   `encSilentOption encBits (decrypt n k ct)` on all other ciphertexts). Using the difference lemma
    (`OracleComp.IdenticalUntilBad.advantage_le`, [BonehShoup2023], Theorem 4.7) between `ccaGame`
    and `ccaRejectGame` (and between `ccaOneTimeGame` and `ccaOneTimeRejectGame`), we prove both
    `AE ⇒ CCA` (`AuthenticatedEncryption.indcca`) and `1AE ⇒ 1CCA`
@@ -103,7 +103,7 @@ Section 5.4.1, Example 5.2 and Theorem 5.2, printed pp. 183–187) are formalize
   the text stipulates that "The restriction we impose is that the adversary may not ask for the
   decryptions of any of these ciphertexts." In
   `ccaOracle`, decryption queries on previously returned challenge ciphertexts
-  (`queriedCiphertexts`) are instead answered with `[] = encOption encBits none` (rejection), which
+  (`queriedCiphertexts`) are instead answered with `[] = encSilentOption encBits none` (rejection), which
   is equivalent for adversaries respecting the restriction and makes `ccaOracle` a total function on
   all queries.
 * **Power-of-two index range in Theorem 9.1**: in equations (9.3) and (9.4) of [BonehShoup2023]
@@ -224,7 +224,7 @@ structure SymmetricCipher where
   /-- Decryption is computable in plain polynomial time on `(n, k, ct)`. -/
   decrypt_polyTime : ComputableInPolyTime
     (fun ⟨n, k, ct⟩ => decrypt n k ct)
-    (encPair encUnary (encPair encBits encBits)) (encOption encBits)
+    (encPair encUnary (encPair encBits encBits)) (encSilentOption encBits)
   /-- Every ciphertext produced by `encrypt` on an `n`-bit message under a supported secret key at
   security parameter `n` decrypts to `some msg`. -/
   decrypt_encrypt : ∀ n k, k ∈ (ProbComp.eval (keyGen n)).support →
@@ -262,7 +262,7 @@ theorem computableInPolyTime_decrypt_comp (E : SymmetricCipher)
     (hn : ComputableInPolyTime n encIn encUnary)
     (hk : ComputableInPolyTime k encIn encBits)
     (hct : ComputableInPolyTime ct encIn encBits) :
-    ComputableInPolyTime (fun a => E.decrypt (n a) (k a) (ct a)) encIn (encOption encBits) :=
+    ComputableInPolyTime (fun a => E.decrypt (n a) (k a) (ct a)) encIn (encSilentOption encBits) :=
   E.decrypt_polyTime.comp (hn.prod (hk.prod hct))
 
 /-! ### Adaptive Chosen-Plaintext Security (`cpaGame`, `INDCPA`) -/
@@ -342,7 +342,7 @@ theorem exists_decryption_length_bound (E : SymmetricCipher) :
       ComputableInPolyTime (fun p : ℕ × List Bool => decBound p.1 p.2)
         (encPair encUnary encBits) encUnary ∧
       ∀ n k, k ∈ (ProbComp.eval (E.keyGen n)).support →
-        ∀ ct, (encOption encBits (E.decrypt n k ct)).length ≤ decBound n ct := by
+        ∀ ct, (encSilentOption encBits (E.decrypt n k ct)).length ≤ decBound n ct := by
   obtain ⟨ck, dk, hlenKey⟩ := E.keyGen_ppt.length_le
   obtain ⟨cd, dd, hlenDec⟩ := E.decrypt_polyTime.polyBounded_length.exists_le
   let decBound : ℕ → List Bool → ℕ :=
@@ -1427,7 +1427,7 @@ theorem AuthenticatedEncryption.oneTimeAuthenticatedEncryption {E : SymmetricCip
   both have length `n`, encrypt `if bit then m1 else m0` under `k`, prepend the resulting
   ciphertext `ct` to `queriedCiphertexts`, and return `ct`; otherwise return `[]`.
 * On a decryption query `(true, ct)`: if `queriedCiphertexts.contains ct` is `true`, return `[]`
-  (prohibited challenge ciphertext); otherwise return `encOption encBits (E.decrypt n k ct)`. -/
+  (prohibited challenge ciphertext); otherwise return `encSilentOption encBits (E.decrypt n k ct)`. -/
 noncomputable def ccaOracle (E : SymmetricCipher) (n : ℕ) (k : List Bool) (bit : Bool)
     (request : Bool × List Bool) : StateT (List (List Bool)) ProbComp (List Bool) :=
   fun queriedCiphertexts =>
@@ -1435,7 +1435,7 @@ noncomputable def ccaOracle (E : SymmetricCipher) (n : ℕ) (k : List Bool) (bit
       if queriedCiphertexts.contains request.2 then
         return ([], queriedCiphertexts)
       else
-        return (encOption encBits (E.decrypt n k request.2), queriedCiphertexts)
+        return (encSilentOption encBits (E.decrypt n k request.2), queriedCiphertexts)
     else
       let m0 := unframe request.2
       let m1 := dropFrame request.2
@@ -1465,7 +1465,7 @@ private theorem isPPTOn_ccaDecryptBranch (E : SymmetricCipher) :
         if p.2.2.contains p.2.1.2 then
           pure ([], p.2.2)
         else
-          pure (encOption encBits (E.decrypt p.1.1 p.1.2 p.2.1.2), p.2.2)) := by
+          pure (encSilentOption encBits (E.decrypt p.1.1 p.1.2 p.2.1.2), p.2.2)) := by
   let EIn := encPair (encPair encUnary encBits)
     (encPair (encPair (encFinEnum Bool) encBits) (encList encBits))
   have hcontains : ComputableInPolyTime
@@ -1481,7 +1481,7 @@ private theorem isPPTOn_ccaDecryptBranch (E : SymmetricCipher) :
     dsimp only [EIn]; fun_prop
   have hdecWord : ComputableInPolyTime
       (fun p : (ℕ × List Bool) × ((Bool × List Bool) × List (List Bool)) =>
-        encOption encBits (E.decrypt p.1.1 p.1.2 p.2.1.2))
+        encSilentOption encBits (E.decrypt p.1.1 p.1.2 p.2.1.2))
       EIn encBits :=
     (E.decrypt_polyTime.comp hdecArg).encoding_comp
   have hnoReply : IsPPTOn EIn (encPair encBits (encList encBits))
@@ -1611,7 +1611,7 @@ theorem isPPTOn_run_ccaOracle (E : SymmetricCipher) {adversary : CCAAdversary}
       subst result
       have hdecLen := hlenDec (caller.1, caller.2, request.2)
       simp only [length_encPair, encUnary_apply, List.length_replicate, encBits_apply] at hdecLen
-      have hbound : (encOption encBits (E.decrypt caller.1 caller.2 request.2)).length ≤
+      have hbound : (encSilentOption encBits (E.decrypt caller.1 caller.2 request.2)).length ≤
           cd * (2 * caller.1 + 2 * caller.2.length + request.2.length + 4) ^ dd :=
         hdecLen.trans (Nat.mul_le_mul_left cd (Nat.pow_le_pow_left (by lia) dd))
       exact ⟨trivial, by lia, by lia⟩
@@ -1653,7 +1653,7 @@ def INDCCA (E : SymmetricCipher) : Prop :=
   have length `n`, encrypt `if bit then m1 else m0` under `k`, record `[ct]`, and return `ct`;
   otherwise return `[]`.
 * On a decryption query `(true, ct)`: if `queriedCiphertexts.contains ct` is `true`, return `[]`
-  (prohibited challenge ciphertext); otherwise return `encOption encBits (E.decrypt n k ct)`. -/
+  (prohibited challenge ciphertext); otherwise return `encSilentOption encBits (E.decrypt n k ct)`. -/
 noncomputable def oneTimeCCAOracle (E : SymmetricCipher) (n : ℕ) (k : List Bool) (bit : Bool)
     (request : Bool × List Bool) : StateT (List (List Bool)) ProbComp (List Bool) :=
   fun queriedCiphertexts =>
@@ -1661,7 +1661,7 @@ noncomputable def oneTimeCCAOracle (E : SymmetricCipher) (n : ℕ) (k : List Boo
       if queriedCiphertexts.contains request.2 then
         return ([], queriedCiphertexts)
       else
-        return (encOption encBits (E.decrypt n k request.2), queriedCiphertexts)
+        return (encSilentOption encBits (E.decrypt n k request.2), queriedCiphertexts)
     else
       let m0 := unframe request.2
       let m1 := dropFrame request.2
@@ -1808,7 +1808,7 @@ theorem isPPTOn_run_oneTimeCCAOracle (E : SymmetricCipher) {adversary : CCAAdver
       subst result
       have hdecLen := hlenDec (caller.1, caller.2, request.2)
       simp only [length_encPair, encUnary_apply, List.length_replicate, encBits_apply] at hdecLen
-      have hbound : (encOption encBits (E.decrypt caller.1 caller.2 request.2)).length ≤
+      have hbound : (encSilentOption encBits (E.decrypt caller.1 caller.2 request.2)).length ≤
           cd * (2 * caller.1 + 2 * caller.2.length + request.2.length + 4) ^ dd :=
         hdecLen.trans (Nat.mul_le_mul_left cd (Nat.pow_le_pow_left (by lia) dd))
       exact ⟨trivial, by lia, by lia⟩
@@ -1966,14 +1966,14 @@ theorem isOraclePPT_ccaLimitToOneEncryptionQuery {ctBound : ℕ → ℕ}
   simpa only [bind_pure_comp] using (hrun.map' (ComputableInPolyTime.fst _ _)).isOraclePPT
 
 /-- When `ctBound n` bounds all ciphertext lengths produced by `E.encrypt n k` on `n`-bit messages
-and `decBound n ct` bounds all encoded decryption replies `encOption encBits (E.decrypt n k ct)`,
+and `decBound n ct` bounds all encoded decryption replies `encSilentOption encBits (E.decrypt n k ct)`,
 running `ccaLimitToOneEncryptionQuery ctBound decBound adversary` in `ccaGame` has the exact same
 output distribution as `ccaOneTimeGame adversary`. -/
 theorem eval_ccaGame_ccaLimitToOneEncryptionQuery (E : SymmetricCipher) (ctBound : ℕ → ℕ)
     (decBound : ℕ → List Bool → ℕ) (adversary : CCAAdversary) (bit : Bool) (n : ℕ)
     (hctBound : E.CiphertextLengthLE n (ctBound n))
     (hdecBound : ∀ k ∈ (ProbComp.eval (E.keyGen n)).support,
-      ∀ ct, (encOption encBits (E.decrypt n k ct)).length ≤ decBound n ct) :
+      ∀ ct, (encSilentOption encBits (E.decrypt n k ct)).length ≤ decBound n ct) :
     ProbComp.eval (E.ccaGame (ccaLimitToOneEncryptionQuery ctBound decBound adversary) bit n) =
       ProbComp.eval (E.ccaOneTimeGame adversary bit n) := by
   simp only [ccaGame, ccaOneTimeGame, ccaLimitToOneEncryptionQuery, runWith_norm, pmf_norm]
@@ -2545,7 +2545,7 @@ private noncomputable def ccaWithBadOracle (E : SymmetricCipher) (n : ℕ) (k : 
         return ([], state)
       else
         let dec := E.decrypt n k request.2
-        return (encOption encBits dec, (state.1, state.2 || dec.isSome))
+        return (encSilentOption encBits dec, (state.1, state.2 || dec.isSome))
     else
       let m0 := unframe request.2
       let m1 := dropFrame request.2
@@ -2636,7 +2636,7 @@ private theorem identicalUntilBad_ccaRejectWithBad_ccaWithBad (E : SymmetricCiph
         · rfl
         · cases hdec : E.decrypt n k request.2 with
           | none =>
-            simp [Option.isSome, encOption]
+            simp [Option.isSome, encSilentOption]
           | some msg =>
             have hne : s' ≠ (s.1, true) := fun h => hs' (congrArg Prod.snd h)
             simp [Option.isSome, ProbComp.eval_pure, PMF.pure_apply, hne]
@@ -3552,7 +3552,7 @@ private noncomputable def oneTimeCCAWithBadOracle (E : SymmetricCipher) (n : ℕ
         return ([], state)
       else
         let dec := E.decrypt n k request.2
-        return (encOption encBits dec, (state.1, state.2 || dec.isSome))
+        return (encSilentOption encBits dec, (state.1, state.2 || dec.isSome))
     else
       let m0 := unframe request.2
       let m1 := dropFrame request.2
@@ -3644,7 +3644,7 @@ private theorem identicalUntilBad_oneTimeCCARejectWithBad_oneTimeCCAWithBad
         · rfl
         · cases hdec : E.decrypt n k request.2 with
           | none =>
-            simp [Option.isSome, encOption]
+            simp [Option.isSome, encSilentOption]
           | some msg =>
             have hne : s' ≠ (s.1, true) := fun h => hs' (congrArg Prod.snd h)
             simp [Option.isSome, ProbComp.eval_pure, PMF.pure_apply, hne]

@@ -5,7 +5,7 @@ Authors: Christian Reitwiessner
 -/
 
 module
--- upstream: submitted #1213 @7f7b3ea9e5727322cbbab14821eb42ec96024b55
+-- upstream: submitted #1213 @9f9d02ffd929cd830e9b2d030975f8a75afd9542
 -- vendored: public Frontier Init import and mirrored paths; explicit prefix reflexivity
 -- for pinned Lean; API unchanged.
 

@@ -1082,7 +1082,7 @@ private theorem reductionView_polyTime {γ : Type} {encIn : γ ↪ List Bool} {k
     (hk.prod (hm.prod (hs.prod ((encGateLoopState_labels_polyTime hst).prod hws)))))
 
 variable {σ : Type} {encσ : σ ↪ List Bool} {B : ℕ → PrvSimAdversary XorAndCircuit σ}
-  (hB : TwoStage.IsPPT encUnit (encQuery XorAndCircuit encXorAndCircuit) (encOption encPrvView)
+  (hB : TwoStage.IsPPT encUnit (encQuery XorAndCircuit encXorAndCircuit) (encSilentOption encPrvView)
     encBool encσ B)
 
 /-- The state after `B`'s choice: the caller's input `(k, aux)` and the query and state. -/
@@ -1195,7 +1195,7 @@ private theorem isOraclePPTOn_prvSimBranch :
         (ComputableInPolyTime.unary_mul.comp ((ComputableInPolyTime.const 2).prod hq)))
         (ComputableInPolyTime.binary_two_pow.comp hk))
   have hnone := (hB.guess.preprocess (hk.prod (hstate.prod
-    (ComputableInPolyTime.const (encIn := E) (encOut := encOption encPrvView) none)))).isOraclePPTOn
+    (ComputableInPolyTime.const (encIn := E) (encOut := encSilentOption encPrvView) none)))).isOraclePPTOn
     (Operation := Unit)
   have hlen : ComputableInPolyTime (fun p : (ℕ × List Bool) × (Query XorAndCircuit × σ) =>
       p.2.1.fn.circuit.n * (p.1.1 + 2)) E encUnary := by polytime

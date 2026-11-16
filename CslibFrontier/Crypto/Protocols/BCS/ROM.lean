@@ -2628,7 +2628,7 @@ theorem computableInPolyTime_bcsFindTraceConflict
     ComputableInPolyTime
       (fun a => bcsFindTraceConflict iop encSym hFS (tr_MT a) (x a) (prf a))
       encIn
-      (encOption (encPair (encIOPQuery r d) (encMerkleOpeningOf Sym encSym))) := by
+      (encSilentOption (encPair (encIOPQuery r d) (encMerkleOpeningOf Sym encSym))) := by
   have hroots : ComputableInPolyTime (fun a => (prf a).roots) encIn (encFinFn r encBits) :=
     encBCSProof_roots_polyTime r Sym encSym hprf
   have hopenings : ComputableInPolyTime (fun a => (prf a).openings) encIn

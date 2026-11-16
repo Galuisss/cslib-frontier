@@ -196,7 +196,7 @@ private theorem computableInPolyTime_encForgePost (E : SymmetricCipher) :
   have hdec : ComputableInPolyTime
       (fun pair : (ℕ × List Bool) × (List Bool × List (List Bool)) =>
         E.decrypt pair.1.1 pair.1.2 pair.2.1)
-      EOut (encOption encBits) :=
+      EOut (encSilentOption encBits) :=
     E.decrypt_polyTime.comp hdecArg
   have hisSome := hdec.optionIsSome
   have hgetD := ComputableInPolyTime.optionGetDWithInput hdec (ComputableInPolyTime.const [])

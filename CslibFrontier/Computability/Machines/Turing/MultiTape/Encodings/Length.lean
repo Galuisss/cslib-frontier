@@ -72,11 +72,12 @@ theorem length_encList_set_le (l : List α) (i : ℕ) (x : α) :
 `2 * (unframe v).length + (dropFrame v).length ≤ v.length`. -/
 theorem length_unframe_add_dropFrame_le :
     ∀ v : List Bool, 2 * (unframe v).length + (dropFrame v).length ≤ v.length
-  | [] | [true] => by simp [Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited]
-  | false :: v => by simp [Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited]
+  | [] => by decide
+  | [true] => by decide
+  | false :: v => by change v.length ≤ v.length + 1; omega
   | true :: b :: v => by
     have ih := length_unframe_add_dropFrame_le v
-    simp only [Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited, List.length_cons]
+    change 2 * ((unframe v).length + 1) + (dropFrame v).length ≤ v.length + 1 + 1
     omega
 
 end Turing.MultiTapeTM

@@ -67,7 +67,7 @@ structure LyubashevskyExtractRow where
 
 /-- The framed raw challenge bits, then the optional list of framed binary signed integers. -/
 enc_structure encLyubashevskyExtractRow : LyubashevskyExtractRow where
-  challenge : encBits, response : (encOption (encList encIntBin))
+  challenge : encBits, response : (encSilentOption (encList encIntBin))
 
 /-- The extractor input: runtime dimensions and two challenge/optional-response rows. -/
 structure LyubashevskyExtractInput where
@@ -141,8 +141,8 @@ theorem computableInPolyTime_lyubashevskyExtractList :
       (fun p : (ℕ × ℕ) × ((List Bool × Option (List ℤ)) × (List Bool × Option (List ℤ))) =>
         lyubashevskyExtractList ⟨⟨p.1.1, p.1.2⟩, ⟨p.2.1.1, p.2.1.2⟩, ⟨p.2.2.1, p.2.2.2⟩⟩)
       (encPair (encPair encUnary encUnary)
-        (encPair (encPair encBits (encOption (encList encIntBin)))
-          (encPair encBits (encOption (encList encIntBin)))))
+        (encPair (encPair encBits (encSilentOption (encList encIntBin)))
+          (encPair encBits (encSilentOption (encList encIntBin)))))
       (encList encIntBin) := by
     unfold lyubashevskyExtractList
     dsimp only
@@ -152,8 +152,8 @@ theorem computableInPolyTime_lyubashevskyExtractList :
         ((r.first.challenge, r.first.response), (r.second.challenge, r.second.response))))
       encLyubashevskyExtractInput
       (encPair (encPair encUnary encUnary)
-        (encPair (encPair encBits (encOption (encList encIntBin)))
-          (encPair encBits (encOption (encList encIntBin))))) :=
+        (encPair (encPair encBits (encSilentOption (encList encIntBin)))
+          (encPair encBits (encSilentOption (encList encIntBin))))) :=
     (.of_eq fun _ => rfl)
   -- Elaborating the composite first avoids a costly higher-order unification with the goal.
   exact (htuple.comp hfields :)

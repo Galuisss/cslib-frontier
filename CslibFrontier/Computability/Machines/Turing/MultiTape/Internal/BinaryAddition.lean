@@ -113,12 +113,12 @@ private lemma run_orZip (m n : ℕ) : orZip.run () m.bits n.bits = (m ||| n).bit
 public theorem computableInTimeAndSpace_natOr :
     ComputableInTimeAndSpace (fun p : ℕ × ℕ => p.1 ||| p.2) (encPair encNat encNat) encNat
       (fun p => 3 * (encPair encNat encNat p).length + 1) (fun p => (encNat p.1).length + 2) :=
-  orZip.computableInTimeAndSpace fun p => (run_orZip p.1 p.2).symm
+  orZip.computableInTimeAndSpace fun p => by simpa only [encNat_apply] using (run_orZip p.1 p.2).symm
 
 /-- Bitwise disjunction in linear time and work space, from `computableInTimeAndSpace_natOr`. -/
 public theorem ComputableInDegree.natOr :
     ComputableInDegree (fun p : ℕ × ℕ => p.1 ||| p.2) (encPair encNat encNat) encNat 1 1 :=
-  orZip.computableInDegree fun p => (run_orZip p.1 p.2).symm
+  orZip.computableInDegree fun p => by simpa only [encNat_apply] using (run_orZip p.1 p.2).symm
 
 end Turing.MultiTapeTM
 

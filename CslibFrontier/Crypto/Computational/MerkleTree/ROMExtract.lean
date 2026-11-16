@@ -868,7 +868,7 @@ theorem computableInPolyTime_findQueryInTrace
     (htr : ComputableInPolyTime tr encIn encMerkleTrace)
     (hdigest : ComputableInPolyTime digest encIn encBits) :
     ComputableInPolyTime (fun a => findQueryInTrace (tr a) (digest a)) encIn
-      (encOption encBits) := by
+      (encSilentOption encBits) := by
   have hfind := ComputableInPolyTime.findWithInput
     (test := fun a (p : List Bool × List Bool) => p.2 == digest a) htr
     (ComputableInPolyTime.beq
@@ -886,7 +886,7 @@ theorem computableInPolyTime_findPreimageInTrace
     (htr : ComputableInPolyTime tr encIn encMerkleTrace)
     (hdigest : ComputableInPolyTime digest encIn encBits) :
     ComputableInPolyTime (fun a => findPreimageInTrace (tr a) (digest a)) encIn
-      (encOption (encPair encBits encBits)) := by
+      (encSilentOption (encPair encBits encBits)) := by
   have hq := ComputableInPolyTime.snd encIn encBits
   exact (computableInPolyTime_findQueryInTrace htr hdigest).optionMapWithInput
     (f := fun _ q => (unframe q, dropFrame q))
@@ -900,7 +900,7 @@ theorem computableInPolyTime_extractNodeFromTrace (d : ℕ)
     (hrt : ComputableInPolyTime rt encIn encBits)
     (hi : ComputableInPolyTime i encIn encUnary) :
     ComputableInPolyTime (fun a => extractNodeFromTrace (tr a) d (rt a) (i a)) encIn
-      (encOption encBits) := by
+      (encSilentOption encBits) := by
   induction d generalizing γ rt i with
   | zero =>
     exact (ComputableInPolyTime.optionSome encBits).comp hrt
@@ -932,7 +932,7 @@ theorem computableInPolyTime_extractLeafFromTrace (d : ℕ)
     (hrt : ComputableInPolyTime rt encIn encBits)
     (hi : ComputableInPolyTime i encIn encUnary) :
     ComputableInPolyTime (fun a => extractLeafFromTrace (tr a) d (rt a) (i a)) encIn
-      (encOption encBits) := by
+      (encSilentOption encBits) := by
   have hnode := computableInPolyTime_extractNodeFromTrace d htr hrt hi
   have hstep := computableInPolyTime_findQueryInTrace
     (htr.comp (ComputableInPolyTime.fst encIn encBits))

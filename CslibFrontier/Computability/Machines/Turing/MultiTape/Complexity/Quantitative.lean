@@ -113,7 +113,7 @@ theorem foldl' {γ α β : Type} {encIn : γ ↪ List Bool}
   have haD : a ≤ D := Nat.le_mul_of_pos_left _ (lt_of_lt_of_le Nat.one_pos (le_max_left _ _))
   obtain ⟨c, k, Q, hfin, tm, htm⟩ := Internal.FoldCompiler.foldl (encA := encA) (encL := encL)
     (encBA := encPair encB encA) (encS := encPair encL encB)
-    (encO := encOption (encPair encL encB))
+    (encO := encHaltOption (encPair encL encB))
     (t := fun x => t₁ x + t₂ x) (s := fun x => s₁ x + s₂ x)
     (fun x => (h₁ x).mono (Nat.le_add_right _ _) (Nat.le_add_right _ _))
     (fun x => (h₂ x).mono (Nat.le_add_left _ _) (Nat.le_add_left _ _)) hS'

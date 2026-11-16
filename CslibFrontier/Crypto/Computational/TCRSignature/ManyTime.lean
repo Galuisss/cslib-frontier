@@ -525,7 +525,7 @@ private theorem computableInPolyTime_queryOf_comp {k : ℕ} {Control α : Type} 
     (hcfg : ComputableInPolyTime cfg input encFiniteConfig)
     (hcoin : ComputableInPolyTime coin input encBool) :
     ComputableInPolyTime (fun a => queryOf machine (cfg a) (coin a))
-      input (encOption encBits) :=
+      input (encSilentOption encBits) :=
   (computableInPolyTime_finiteConfig_cases machine hcfg hcoin (.const none)
     (fun _ _ _ => .const none)
     (fun _ =>

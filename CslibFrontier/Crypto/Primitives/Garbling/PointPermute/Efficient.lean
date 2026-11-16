@@ -128,7 +128,7 @@ attribute [local fun_prop] labelWord_polyTime tweak_polyTime wireWidth_polyTime 
 /-- `De` runs in polynomial time. -/
 theorem decodeWord_polyTime :
     ComputableInPolyTime (fun (d, Y) => decodeWord d Y) (encPair encBits encBits)
-      (encOption encBits) := by
+      (encSilentOption encBits) := by
   polytime [decodeWord]
 
 include hf in

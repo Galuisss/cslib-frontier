@@ -963,7 +963,7 @@ private theorem length_le_of_mem_support_replyStep {k : ℕ} {rs next : List (Li
   omega
 
 variable {σ : Type} {encσ : σ ↪ List Bool} {B : ℕ → PrvSimAdversary ValidCircuit σ}
-  (hB : TwoStage.IsPPT encUnit (encQuery ValidCircuit encValidCircuit) (encOption encPrvView)
+  (hB : TwoStage.IsPPT encUnit (encQuery ValidCircuit encValidCircuit) (encSilentOption encPrvView)
     encBool encσ B)
 
 /-- The state after `B`'s choice: the caller's input `(k, aux)` and the query and state. -/
@@ -1070,7 +1070,7 @@ private theorem isOraclePPTOn_prvSimBranch {P : ℕ → ℕ}
     (ComputableTidilyInPolyTime.decide_eq' (ComputableInPolyTime.length_bits_comp hx).tidy
       hn.tidy).computableInPolyTime
   have hnone := (hB.guess.preprocess (hk.prod (hstate.prod
-    (ComputableInPolyTime.const (encIn := E) (encOut := encOption encPrvView) none)))).isOraclePPTOn
+    (ComputableInPolyTime.const (encIn := E) (encOut := encSilentOption encPrvView) none)))).isOraclePPTOn
     (Operation := Unit)
   have hj := (isPPTOn_sampleDyadicIndex (hP.comp hk)).isOraclePPTOn (Operation := Unit)
   have hlen : ComputableInPolyTime (fun p : ((ℕ × List Bool) × (Query ValidCircuit × σ)) × ℕ =>

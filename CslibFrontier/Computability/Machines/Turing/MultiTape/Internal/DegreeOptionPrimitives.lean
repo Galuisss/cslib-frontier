@@ -32,14 +32,10 @@ theorem getD {enc : Option β ↪ List Bool} [OptionEncoding enc₁ enc] (d : β
     ComputableInDegree (fun o => o.getD d) enc enc₁ 1 1 := OptionEncoding.getD d
 
 /-- Whether a standard encoded option holds a value; the Boolean output has degree zero. -/
-theorem isSome (enc : β ↪ List Bool) :
-    ComputableInDegree (fun o : Option β => o.isSome) (encOption enc) encBool 1 0 :=
-  computableInDegree_of_nonemptyT fun o => by
-    cases o with
-    | none => rfl
-    | some b =>
-      change [true] = [true] ++ nonemptyT.run true (enc b)
-      rw [nonemptyT_run_true, List.append_nil]
+theorem isSome (enc : β ↪ List Bool) {encO : Option β ↪ List Bool}
+    [OptionEncoding enc encO] :
+    ComputableInDegree (fun o : Option β => o.isSome) encO encBool 1 0 :=
+  OptionEncoding.isSome
 
 /-- The option encoding determines the encoding used for the payload and fallback. -/
 @[fun_prop]

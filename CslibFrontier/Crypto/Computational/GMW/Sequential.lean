@@ -653,8 +653,8 @@ theorem spaceBound_of_encFiniteConfig {k : ℕ} {Control : Type} [Finite Control
       tape.spaceUsed ≤ (encBiTape encBool tape).length + 1 := by
     have hstack (t : Cslib.Turing.StackTape Bool) : t.length ≤ (encStackTape encBool t).length := by
       rw [encStackTape_apply]
-      exact SizedListEncoding.length_le (encA := encOption encBool)
-        (encL := encList (encOption encBool)) t.toList
+      exact SizedListEncoding.length_le (encA := encSilentOption encBool)
+        (encL := encList (encSilentOption encBool)) t.toList
     have hL := hstack tape.left
     have hR := hstack tape.right
     simp only [Cslib.Turing.BiTape.spaceUsed, encBiTape_apply, length_encPair]; omega

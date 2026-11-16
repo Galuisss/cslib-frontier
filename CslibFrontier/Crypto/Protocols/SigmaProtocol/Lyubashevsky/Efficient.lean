@@ -116,11 +116,11 @@ open scoped ENNReal _root_.Matrix
 variable {I : Type} {X Y T C Z : I → Type}
 
 /-- Output of a word program that may abort, such as a non-abort simulator or a signing attempt:
-`some (t, z)`, a commitment and a response as bit words, or `none` on an abort. `encOption`
+`some (t, z)`, a commitment and a response as bit words, or `none` on an abort. `encSilentOption`
 encodes `none` as the empty word and `some` by a `true` tag bit before the pair, whose commitment
 is framed. -/
 abbrev encCommitResponseOrAbort : Option (List Bool × List Bool) ↪ List Bool :=
-  encOption (encPair encBits encBits)
+  encSilentOption (encPair encBits encBits)
 
 variable (I Y T C Z) in
 /-- A family of non-abort special HVZK simulators: at index `i`, a probabilistic program from a
@@ -206,10 +206,10 @@ attribute [fun_prop] encLyubashevskyParams_n_polyTime encLyubashevskyParams_m_po
   encLyubashevskyParams_q_polyTime encLyubashevskyParams_γ_polyTime
   encLyubashevskyParams_β_polyTime encLyubashevskyParams_mk_polyTime
 
-/-- Encode an optional integer response `Option (Fin m → ℤ)` via `encOption (encList encIntBin)`. -/
+/-- Encode an optional integer response `Option (Fin m → ℤ)` via `encSilentOption (encList encIntBin)`. -/
 def encIntVecOption (m : ℕ) : Option (Fin m → ℤ) ↪ List Bool :=
-  ⟨fun oz => encOption (encList encIntBin) (oz.map List.ofFn),
-    (encOption (encList encIntBin)).injective.comp
+  ⟨fun oz => encSilentOption (encList encIntBin) (oz.map List.ofFn),
+    (encSilentOption (encList encIntBin)).injective.comp
       (Option.map_injective List.ofFn_injective)⟩
 
 /-- Encode an extracted SIS witness `Fin m ⊕ Fin k → ℤ` as a framed list of `m + k` binary
@@ -331,7 +331,7 @@ def intMatrixDecoder : Decoder (encList (encList encIntBin)) :=
   Decoder.list intListDecoder
 
 /-- Total polynomial-time decoder for optional framed integer lists. -/
-def responseListDecoder : Decoder (encOption (encList encIntBin)) :=
+def responseListDecoder : Decoder (encSilentOption (encList encIntBin)) :=
   Decoder.option intListDecoder
 
 @[local fun_prop]
@@ -346,7 +346,7 @@ private theorem computableInPolyTime_decodeIntMatrix :
 
 @[local fun_prop]
 private theorem computableInPolyTime_decodeResponseList :
-    ComputableInPolyTime responseListDecoder.decode encBits (encOption (encList encIntBin)) :=
+    ComputableInPolyTime responseListDecoder.decode encBits (encSilentOption (encList encIntBin)) :=
   responseListDecoder.computableInPolyTime
 
 /-- Reduce an integer `a` to its canonical `ZMod q` representative `ZMod.cast (a : ZMod q)`, for any
@@ -571,7 +571,7 @@ def lyubashevskySimulatePostprocess
           (intMatrixDecoder.decode (unframe yw))
           (intMatrixDecoder.decode (dropFrame yw))
           z cw),
-      encOption (encList encIntBin) (some z))
+      encSilentOption (encList encIntBin) (some z))
   else
     none
 
@@ -611,7 +611,7 @@ theorem computableInPolyTime_lyubashevskySimulatePostprocess :
     hw_list.encoding_comp
   have hz : ComputableInPolyTime
       (fun inp : (LyubashevskyParams × List Bool × List Bool) × List ℤ =>
-        encOption (encList encIntBin) (some inp.2))
+        encSilentOption (encList encIntBin) (some inp.2))
       encIn encBits :=
     ((ComputableInPolyTime.optionSome (encList encIntBin)).comp
       (ComputableInPolyTime.snd _ _)).encoding_comp
@@ -624,8 +624,8 @@ theorem computableInPolyTime_lyubashevskySimulatePostprocess :
               (intMatrixDecoder.decode (unframe yw))
               (intMatrixDecoder.decode (dropFrame yw))
               z cw),
-          encOption (encList encIntBin) (some z)))
-      encIn (encOption (encPair encBits encBits)) :=
+          encSilentOption (encList encIntBin) (some z)))
+      encIn (encSilentOption (encPair encBits encBits)) :=
     (ComputableInPolyTime.optionSome (encPair encBits encBits)).comp (hw.prod hz)
   exact hcond.ite' hsome (ComputableInPolyTime.const none)
 

@@ -233,8 +233,14 @@ theorem optionSome :
 /-- Unwrapping an option with a default value `d` in logarithmic space. -/
 theorem optionGetD (d : β) :
     ComputableInLogSpace (fun o : Option β => o.getD d) (encOption encOut) encOut :=
-  of_isEmpty_ite d (fun o ho => by cases o <;> simp_all)
-    (of_tail fun ⟨o, ho⟩ => by cases o <;> simp at ho ⊢)
+  by
+    have tag : ComputableInLogSpace Option.isSome (encOption encOut) encBool :=
+      of_take_one fun o => by cases o <;> rfl
+    convert ite_subtype tag
+      (of_tail (f := fun o => o.val.getD d) fun ⟨o, ho⟩ => by cases o <;> simp_all)
+      ((const d).restrict _) using 1
+    funext o
+    cases o <;> rfl
 
 /-- Forming a singleton framed list in logarithmic space. -/
 theorem listSingleton :
