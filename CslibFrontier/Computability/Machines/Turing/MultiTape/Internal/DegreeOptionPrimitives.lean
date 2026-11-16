@@ -35,7 +35,7 @@ theorem getD {enc : Option β ↪ List Bool} [OptionEncoding enc₁ enc] (d : β
 theorem isSome (enc : β ↪ List Bool) {encO : Option β ↪ List Bool}
     [OptionEncoding enc encO] :
     ComputableInDegree (fun o : Option β => o.isSome) encO encBool 1 0 :=
-  OptionEncoding.isSome
+  OptionEncoding.isSome enc
 
 /-- Translate between option representations using their native capabilities. This is a real
 classification and reconstruction machine, rather than a word-equality cast. -/
@@ -52,14 +52,18 @@ theorem optionTranslate (enc : β ↪ List Bool) {source target : Option β ↪ 
     have hs : ComputableInDegree (fun o : Option β => some (o.getD d)) source target 1 1 :=
       (optionSome (enc₁ := enc)).comp (getD (enc₁ := enc) d) |>.mono
     convert ite (isSome enc) (hs.restrict _) ((const none).restrict _) using 1
-    funext o
-    cases o <;> rfl
+    · funext o
+      cases o <;> rfl
+    all_goals decide
 
 /-- Convert the silent/halt representation to tagged options in linear resources. -/
 theorem optionFromHalt (enc : β ↪ List Bool) :
     ComputableInDegree (id : Option β → Option β) (encHaltOption enc) (encOption enc) 1 1 :=
   .of_isEmpty_ite none (fun o ho => by cases o <;> simp_all)
-    (.of_eq fun ⟨o, ho⟩ => by cases o <;> simp_all)
+    (.of_eq fun ⟨o, ho⟩ => by
+      cases o with
+      | none => simp only [encHaltOption_none, List.isEmpty_nil, Bool.true_eq_false] at ho
+      | some a => rfl)
 
 /-- The option encoding determines the encoding used for the payload and fallback. -/
 @[fun_prop]
