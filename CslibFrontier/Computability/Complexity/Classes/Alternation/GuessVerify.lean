@@ -52,7 +52,7 @@ that every problem with a polynomial-time game verifier is in `AP`
 * [S. Arora, B. Barak, *Computational Complexity: A Modern Approach*][AroraBarak09]
 -/
 
-@[expose] public section
+public section
 
 namespace Turing.MultiTapeATM
 
