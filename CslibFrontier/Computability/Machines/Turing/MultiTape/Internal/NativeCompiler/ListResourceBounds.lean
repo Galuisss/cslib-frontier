@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.List
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.BinarySizeFacts
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ResourceBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.StreamResourceBounds
 
@@ -87,8 +88,8 @@ private theorem listGetNat_state_length_le (list : List ℕ) (index j : ℕ)
   have hindex : (encNat index).length ≤
       (encPair (encList encUnary) encNat (list, index)).length :=
     length_le_encPair_right (encList encUnary) encNat (list, index)
-  have hremaining : (encNat state.1).length ≤ (encNat index).length := by
-    simpa only [encNat_apply, Nat.size_eq_bits_len] using Nat.size_le_size hinvariant.1
+  have hremaining : (encNat state.1).length ≤ (encNat index).length :=
+    length_encNat_mono hinvariant.1
   have hselected : ((encOption encUnary) state.2).length ≤
       (encPair (encList encUnary) encNat (list, index)).length + 1 := by
     cases hoption : state.2 with
@@ -110,16 +111,12 @@ private theorem listGetNat_element_length_le (list : List ℕ) (index j : ℕ)
     (length_le_encPair_left (encList encUnary) encNat (list, index))
   omega
 
-private theorem encNat_pred_length_le (n : ℕ) :
-    (encNat (n - 1)).length ≤ (encNat n).length := by
-  simpa only [encNat_apply, Nat.size_eq_bits_len] using Nat.size_le_size (Nat.sub_le n 1)
-
 private theorem listGetNatNextCompiler_time_le
     (input : (ListGetNatState ℕ) × ℕ) :
     (listGetNatNextCompiler encUnary).time input ≤
       10000 * (((encPair (encPair encNat (encOption encUnary)) encUnary) input).length + 1) := by
   rcases input with ⟨⟨remaining, selected⟩, element⟩
-  have hpred := encNat_pred_length_le remaining
+  have hpred := length_encNat_mono (Nat.sub_le remaining 1)
   cases selected <;> cases remaining <;>
     simp [listGetNatNextCompiler, ofOutputEq, ofInputEq, ite, pair, comp,
       first, second,
@@ -133,7 +130,7 @@ private theorem listGetNatNextCompiler_workspace_le
     (listGetNatNextCompiler encUnary).workspace input ≤
       10000 * (((encPair (encPair encNat (encOption encUnary)) encUnary) input).length + 1) := by
   rcases input with ⟨⟨remaining, selected⟩, element⟩
-  have hpred := encNat_pred_length_le remaining
+  have hpred := length_encNat_mono (Nat.sub_le remaining 1)
   cases selected <;> cases remaining <;>
     simp [listGetNatNextCompiler, ofOutputEq, ofInputEq, ite, pair, comp,
       first, second,
@@ -338,13 +335,10 @@ private theorem listGetNatOptionStreamCompiler_workspace_le (list : List ℕ) (i
     (by simpa only [B] using hfinal) hfinish
   let K := streamFoldPairTapeCount (listGetNatNextCompiler encUnary)
     (listGetNatEmitCompiler encUnary) (listGetNatOptionFinishCompiler encUnary)
-  have hK : K ≤ 200 := by
-    dsimp only [K]
-    have hnext := listGetNatNextCompiler_tapeCount_le
-    simp only [streamFoldPairTapeCount, streamFramedNext, streamUnframedFinish,
-      listGetNatEmitCompiler, listGetNatOptionFinishCompiler, const, comp, encodeFrame,
-      unframeValue, second, ofTransducer]
-    omega
+  have hK := listGetNatOptionStreamCompiler_tapeCount_le
+  change streamFoldPairTapeCount (listGetNatNextCompiler encUnary)
+    (listGetNatEmitCompiler encUnary) (listGetNatOptionFinishCompiler encUnary) ≤ 200 at hK
+  change K ≤ 200 at hK
   refine h.trans ?_
   change 2 * K * (1000000 * B + 16 * (4 * B) + 4 * K + 26) + 0 +
       13 * (4 * B) + 8 * (listGetNatOptionFinishCompiler encUnary).tapeCount +
