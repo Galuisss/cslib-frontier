@@ -45,7 +45,9 @@ A machine that never needs the input is run with its input head frozen (`freezeI
   emitted-word equalities.
 * `Turing.MultiTapeTM.TransformsTapes.freezeInput`: a specification of `tm` gives one of
   `tm.freezeInput` at any position of the input head, which it keeps.
-* `Turing.MultiTapeTM.transformsTapesAt_rewindInput`: rewinding the input head.
+* `Turing.MultiTapeTM.transformsTapesAt_rewindInput`,
+  `Turing.MultiTapeMachine.transformsTapesAt_rewindInputOn`: rewinding the input head while
+  preserving the work tapes and output, for the legacy and explicit-table machines.
 * `Turing.MultiTapeMachine.toTM_freezeInput`: forgetting the explicit frozen-input table recovers
   the legacy wrapper.
 -/
