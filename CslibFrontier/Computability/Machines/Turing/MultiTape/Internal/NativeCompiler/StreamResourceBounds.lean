@@ -132,7 +132,7 @@ theorem streamFoldPairWorkspace_le
     Nat.sub_le _ _
   have hsub₂ : K - 1 ≤ K := Nat.sub_le _ _
   simp only [streamFoldPairWorkspace, K, streamUnframedFinish, comp, unframeValue,
-    ofTransducer, inputFromWordWorkspace, encFramed_apply, length_frame, Nat.max_eq_right]
+    ofTransducer, inputFromWordWorkspace, encFramed_apply, length_frame]
     at hbulk hsub₁ hsub₂ hfinish ⊢
   omega
 
