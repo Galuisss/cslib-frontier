@@ -204,7 +204,7 @@ public lemma Inv.apply {d : Desc} {x : List ℕ} {j : ℕ} {c : SCfg}
 
 /-- Every step preserves the invariant, with one more step, and emits a number from the
 description. -/
-lemma Inv.step {x : List ℕ} {j : ℕ} {c : SCfg} (h : Inv (descLen d) x.length j c) :
+public lemma Inv.step {x : List ℕ} {j : ℕ} {c : SCfg} (h : Inv (descLen d) x.length j c) :
     Inv (descLen d) x.length (j + 1) (step d x c).1 ∧ (step d x c).2.getD 0 ≤ descLen d := by
   rcases hs : c.state with _ | q
   · rw [show Universal.step d x c = (c, none) by simp [Universal.step, hs]]
@@ -286,6 +286,12 @@ public theorem length_eCfg_iterate_le (x : List ℕ) (j : ℕ) :
 /-- The bound on the context of a step after `j` steps, for a description of length `D` and an
 input of encoded length `N`. -/
 public abbrev ctxBound (D N j : ℕ) : ℕ := 2 * (2 * D + 1 + N) + 1 + cfgBound D N j
+
+/-- The encoded-context bound is monotone in the number of simulated steps. -/
+public lemma ctxBound_mono {D N j j' : ℕ} (h : j ≤ j') :
+    ctxBound D N j ≤ ctxBound D N j' := by
+  unfold ctxBound cfgBound tapeBound
+  gcongr
 
 /-- The bound on the time of a step after `j` steps, for a description of length `D` and an input
 of encoded length `N`: `Turing.MultiTapeTM.Universal.stepTime` at the largest sizes the invariant

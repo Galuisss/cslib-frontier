@@ -47,8 +47,23 @@ private noncomputable def contextStepCompiler :
   let cfg := second (encPair eDesc (encList encUnary)) eCfg
   exact stepCompiler.comp (description.pair (word.pair cfg))
 
+private theorem contextStepCompiler_time_le (ctx : Ctx) :
+    contextStepCompiler.time ctx ≤
+      stepCompiler.time (ctx.desc, ctx.input, ctx.cfg) + 128 * ((eCtx ctx).length + 1) := by
+  simp only [contextStepCompiler, comp, pair, first, second, ofTransducer, encodeFrame,
+    eCtx, length_encPair, Ctx.desc, Ctx.input, Ctx.cfg]
+  omega
+
+private theorem contextStepCompiler_workspace_le (ctx : Ctx) :
+    contextStepCompiler.workspace ctx ≤
+      stepCompiler.workspace (ctx.desc, ctx.input, ctx.cfg) +
+        256 * ((eCtx ctx).length + 1) + 6 * max 4 stepCompiler.tapeCount := by
+  simp only [contextStepCompiler, comp, pair, first, second, ofTransducer, encodeFrame,
+    eCtx, length_encPair, Ctx.desc, Ctx.input, Ctx.cfg]
+  omega
+
 private def interpreterNext (input : Ctx × Bool) : Ctx :=
-  (input.1.1, (Universal.step input.1.desc input.1.input input.1.cfg).1)
+  ((input.1.desc, input.1.input), (Universal.step input.1.desc input.1.input input.1.cfg).1)
 
 private def interpreterEmit (input : Ctx × Bool) : List Bool :=
   encList encUnary (Universal.step input.1.desc input.1.input input.1.cfg).2.toList
@@ -66,6 +81,58 @@ private noncomputable def interpreterEmitCompiler :
   let emitted := (second eCfg eSym).comp (contextStepCompiler.comp ctx)
   exact ((optionToListCompiler encUnary).comp emitted).ofOutputEq fun _ => rfl
 
+private theorem interpreterNextCompiler_time_le (input : Ctx × Bool) :
+    interpreterNextCompiler.time input ≤ contextStepCompiler.time input.1 +
+      256 * ((eCtx input.1).length +
+        (encPair eCfg eSym (Universal.step input.1.desc input.1.input input.1.cfg)).length +
+        1) := by
+  simp only [interpreterNextCompiler, ofOutputEq, comp, pair, first, ofTransducer,
+    encodeFrame, eCtx, length_encPair, encBool_apply, List.length_singleton,
+    Ctx.desc, Ctx.input, Ctx.cfg]
+  omega
+
+private theorem interpreterNextCompiler_workspace_le (input : Ctx × Bool) :
+    interpreterNextCompiler.workspace input ≤ contextStepCompiler.workspace input.1 +
+      256 * ((eCtx input.1).length +
+        (encPair eCfg eSym (Universal.step input.1.desc input.1.input input.1.cfg)).length + 1) +
+      256 * (contextStepCompiler.tapeCount + 1) := by
+  simp only [interpreterNextCompiler, ofOutputEq, comp, pair, first, ofTransducer,
+    encodeFrame, eCtx, length_encPair, encBool_apply, List.length_singleton,
+    Ctx.desc, Ctx.input, Ctx.cfg]
+  omega
+
+private theorem interpreterEmitCompiler_time_le (input : Ctx × Bool) :
+    interpreterEmitCompiler.time input ≤ contextStepCompiler.time input.1 +
+      256 * ((eCtx input.1).length +
+        (encPair eCfg eSym (Universal.step input.1.desc input.1.input input.1.cfg)).length +
+        1) := by
+  cases hsymbol : (Universal.step input.1.desc input.1.input input.1.cfg).2 <;>
+    simp only [interpreterEmitCompiler, ofOutputEq, comp, optionToListCompiler,
+      optionIsSomeTest, boolToTest, optionIsSomeBool, boolDecoder, optionPayload, tailDecoder,
+      ofInputEq, ite, first, second, ofTransducer, encodeFrame, const, eCtx,
+      length_encPair, encBool_apply,
+      Ctx.desc, Ctx.input, Ctx.cfg, eSym, hsymbol, encOption_none, encOption_some,
+      Option.isSome_none, Option.isSome_some, Bool.false_eq_true, ↓reduceIte,
+      encBits_apply, encTest_false, encTest_true, List.length_nil, List.length_cons,
+      List.tail_cons]
+  all_goals omega
+
+private theorem interpreterEmitCompiler_workspace_le (input : Ctx × Bool) :
+    interpreterEmitCompiler.workspace input ≤ contextStepCompiler.workspace input.1 +
+      256 * ((eCtx input.1).length +
+        (encPair eCfg eSym (Universal.step input.1.desc input.1.input input.1.cfg)).length + 1) +
+      256 * (contextStepCompiler.tapeCount + 1) := by
+  cases hsymbol : (Universal.step input.1.desc input.1.input input.1.cfg).2 <;>
+    simp only [interpreterEmitCompiler, ofOutputEq, comp, optionToListCompiler,
+      optionIsSomeTest, boolToTest, optionIsSomeBool, boolDecoder, optionPayload, tailDecoder,
+      ofInputEq, ite, first, second, ofTransducer, encodeFrame, const, eCtx,
+      length_encPair, encBool_apply,
+      Ctx.desc, Ctx.input, Ctx.cfg, eSym, hsymbol, encOption_none, encOption_some,
+      Option.isSome_none, Option.isSome_some, Bool.false_eq_true, ↓reduceIte,
+      encBits_apply, encTest_false, encTest_true, List.length_nil, List.length_cons,
+      List.tail_cons]
+  all_goals omega
+
 private theorem interpreterEmit_eq (ctx : Ctx) (tokens : List Bool) :
     streamEmit interpreterNext interpreterEmit ctx tokens =
       encList encUnary ((stepOut ctx.desc ctx.input)^[tokens.length] (ctx.cfg, [])).2 := by
@@ -78,6 +145,42 @@ private theorem interpreterEmit_eq (ctx : Ctx) (tokens : List Bool) :
       rw [stepOut_iterate_append ctx.desc ctx.input tokens.length
         (Universal.step ctx.desc ctx.input ctx.cfg).1
         (Universal.step ctx.desc ctx.input ctx.cfg).2.toList, encList_append]
+
+private theorem interpreter_state (description : Desc) (word : List ℕ)
+    (tokens : List Bool) (j : ℕ) (hj : j ≤ tokens.length) :
+    streamState ((description, word), Universal.init description) interpreterNext tokens j =
+      ((description, word),
+        ((stepOut description word)^[j] (Universal.init description, [])).1) := by
+  induction j with
+  | zero => rfl
+  | succ j ih =>
+      rw [streamState_succ _ _ _ (by omega), ih (by omega),
+        Function.iterate_succ_apply']
+      rfl
+
+private theorem interpreter_state_length_le (description : Desc) (word : List ℕ)
+    (tokens : List Bool) (j : ℕ) (hj : j ≤ tokens.length) :
+    (eCtx (streamState ((description, word), Universal.init description)
+      interpreterNext tokens j)).length ≤
+        ctxBound (descLen description) (encList encUnary word).length tokens.length := by
+  rw [interpreter_state description word tokens j hj]
+  exact (length_eCtx_le description word (inv_iterate description word j).1).trans
+    (ctxBound_mono hj)
+
+private theorem interpreter_step_output_length_le (description : Desc) (word : List ℕ)
+    (tokens : List Bool) (j : ℕ) (hj : j < tokens.length) :
+    let ctx : Ctx := streamState ((description, word), Universal.init description)
+      interpreterNext tokens j
+    (encPair eCfg eSym (Universal.step ctx.desc ctx.input ctx.cfg)).length ≤
+      2 * ctxBound (descLen description) (encList encUnary word).length tokens.length +
+        descLen description + 2 := by
+  dsimp only
+  have hnext := interpreter_state_length_le description word tokens (j + 1) (by omega)
+  rw [streamState_succ _ _ _ hj] at hnext
+  rw [interpreter_state description word tokens j hj.le] at hnext ⊢
+  have hsymbol := length_eSym_le ((inv_iterate description word j).1.step description).2
+  simp only [interpreterNext, eCtx, length_encPair, Ctx.desc, Ctx.input, Ctx.cfg] at hnext ⊢
+  omega
 
 private noncomputable def interpreterStreamCompiler :
     NativeCompiler

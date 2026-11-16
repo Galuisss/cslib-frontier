@@ -151,10 +151,6 @@ public lemma init_inO : ComputableTidilyInO init eDesc eCfg (fun d => ((eDesc d)
 /-- The bound on the state of the simulation after `t` steps: the context and the output. -/
 public abbrev runBound (D N t : ℕ) : ℕ := 2 * ctxBound D N t + 1 + t * (2 * D + 1)
 
-lemma ctxBound_mono {D N j j' : ℕ} (h : j ≤ j') : ctxBound D N j ≤ ctxBound D N j' := by
-  unfold ctxBound cfgBound tapeBound
-  gcongr
-
 lemma length_eRun_le (d : Desc) (x : List ℕ) {k t : ℕ} (hk : k ≤ t) :
     (eRun (round^[k] (((d, x), init d), []))).length ≤
       runBound (descLen d) (encList encUnary x).length t := by
