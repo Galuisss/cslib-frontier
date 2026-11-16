@@ -25,6 +25,8 @@ composition bounds. They do not select a machine from an existential computabili
   time majorant for the retained first-match compiler.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.firstMatchCompiler_workspace_le`: an independent
   concrete quadratic workspace majorant for the same compiler.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.firstMatchCompiler_tapeCount_le`: a static
+  tape-count majorant for the retained construction.
 
 The construction and bounds are original formalization infrastructure.
 -/
@@ -246,6 +248,19 @@ theorem firstMatchCompiler_time_le {Key Value : Type*} [DecidableEq Key]
   change ((firstMatchStreamCompiler encKey encValue).comp
     (firstMatchMarshalCompiler encKey encValue)).time input ≤
       100000000 * (L + 1) ^ 2
+  omega
+
+/-- A construction-derived static tape-count bound for the retained first-match lookup. -/
+theorem firstMatchCompiler_tapeCount_le {Key Value : Type*} [DecidableEq Key]
+    (encKey : Key ↪ List Bool) (encValue : Value ↪ List Bool) :
+    (firstMatchCompiler encKey encValue).tapeCount ≤ 1002 := by
+  have hstream := firstMatchStreamCompiler_tapeCount_le encKey encValue
+  have hmarshal : (firstMatchMarshalCompiler encKey encValue).tapeCount ≤ 100 := by
+    simp [firstMatchMarshalCompiler, first, second, const, pair, ofTransducer, comp,
+      encodeFrame]
+  change ((firstMatchStreamCompiler encKey encValue).comp
+    (firstMatchMarshalCompiler encKey encValue)).tapeCount ≤ 1002
+  simp only [comp]
   omega
 
 /-- The actual retained first-match compiler has quadratic workspace in the complete encoded
