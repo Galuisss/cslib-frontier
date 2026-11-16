@@ -1,4 +1,4 @@
-"""Disposable targeted import-minimization evidence for #5821. DO NOT MERGE."""
+"""Disposable targeted import-minimization evidence for #5819. DO NOT MERGE."""
 import hashlib
 import json
 import os
@@ -8,72 +8,18 @@ import subprocess
 import sys
 import time
 
-TARGET = '08ca9c10bf6585385bf101bab2353e66df050a81'
-BASE = '896046d84e55749e3b19253d5d4ac98e1ad8b225'
-MODULES = [
-    'CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.PointerWalk',
-    'CslibFrontier.Computability.Complexity.Classes.Oracle.Exponential',
-    'CslibFrontier.Computability.Complexity.Classes.Oracle.Exponential.Basic',
-    'CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Oracle.Iteration',
-    'CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Oracle.Normalization',
-    'CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Oracle.Phase',
-    'CslibFrontier.Computability.Probabilistic.ExponentialIterate',
-    'CslibFrontier.Computability.Probabilistic.Internal.Oracle.AuxClock',
-    'CslibFrontier.Computability.Probabilistic.Internal.Oracle.BinaryIteration',
-    'CslibFrontier.Computability.Probabilistic.Internal.Oracle.Exponential',
-    'CslibFrontier.Computability.Probabilistic.Internal.Oracle.Time',
-    'CslibFrontier.Computability.Probabilistic.Oracle.Composition',
-    'CslibFrontier.Computability.Probabilistic.Oracle.Normalization',
-    'CslibFrontier.Computability.Probabilistic.Oracle.Time',
-    'CslibFrontier.Computability.Probabilistic.Oracle.Time.Basic',
-    'CslibFrontier.Computability.Probabilistic.PPT.AuxClock',
-    'CslibFrontier.Computability.Probabilistic.PPT.AuxClock.Basic',
-    'CslibFrontier.Computability.Probabilistic.RandomOracle.Programming',
-    'CslibFrontier.Computability.Probabilistic.Realization.OpenOracleSimulation',
-    'CslibFrontier.Crypto.Computational.Encryption.Authenticated',
-    'CslibFrontier.Crypto.Computational.Encryption.CCA',
-    'CslibFrontier.Crypto.Computational.Encryption.CompositionCounterexamples',
-    'CslibFrontier.Crypto.Computational.Encryption.HalfBlockPRP',
-    'CslibFrontier.Crypto.Computational.Encryption.IVStream.Reduction',
-    'CslibFrontier.Crypto.Computational.Encryption.MACThenEncrypt',
-    'CslibFrontier.Crypto.Computational.Encryption.PublicKeyCPA',
-    'CslibFrontier.Crypto.Computational.Encryption.RealIdealAE',
-    'CslibFrontier.Crypto.Computational.FuzzyExtractor.Reusable.Encrypt',
-    'CslibFrontier.Crypto.Computational.FuzzyExtractor.Reusable.Security',
-    'CslibFrontier.Crypto.Computational.GGM.Expansion',
-    'CslibFrontier.Crypto.Computational.GGM.Hybrid',
-    'CslibFrontier.Crypto.Computational.GGM.Reduction',
-    'CslibFrontier.Crypto.Computational.GMW.PolyTime',
-    'CslibFrontier.Crypto.Computational.HashAndSign',
-    'CslibFrontier.Crypto.Computational.IndexedSignature',
-    'CslibFrontier.Crypto.Computational.IndexedSignature.Counter',
-    'CslibFrontier.Crypto.Computational.IndexedSignature.Double',
-    'CslibFrontier.Crypto.Computational.LubyRackoff',
-    'CslibFrontier.Crypto.Computational.MAC',
-    'CslibFrontier.Crypto.Computational.MAC.Counter',
-    'CslibFrontier.Crypto.Computational.MerkleSignature',
-    'CslibFrontier.Crypto.Computational.MerkleSignature.Security',
-    'CslibFrontier.Crypto.Computational.NaorReingold.PRF',
-    'CslibFrontier.Crypto.Computational.NaorReingold.Security',
-    'CslibFrontier.Crypto.Computational.OneWayToSignature',
-    'CslibFrontier.Crypto.Computational.PseudorandomFunction.CircuitLowerBound',
-    'CslibFrontier.Crypto.Computational.PseudorandomFunction.Coins',
-    'CslibFrontier.Crypto.Computational.PseudorandomFunction.Label',
-    'CslibFrontier.Crypto.Computational.PseudorandomFunction.MultiKey',
-    'CslibFrontier.Crypto.Computational.PseudorandomFunction.RandomOracle',
-    'CslibFrontier.Crypto.Computational.PseudorandomPermutation',
-    'CslibFrontier.Crypto.Computational.Signature',
-    'CslibFrontier.Crypto.Computational.TreeSignature.CoinHybrid',
-    'CslibFrontier.Crypto.Computational.TreeSignature.Security',
-    'CslibFrontier.Crypto.Computational.WeakPRF',
-    'CslibFrontier.Crypto.Primitives.HQC.SupportCircuit.Family',
-    'CslibFrontier.Crypto.Protocols.MAC.CarterWegman',
-    'CslibFrontier.Crypto.Protocols.MAC.VariableLength',
-    'CslibFrontierTests.Crypto.FujisakiOkamotoWord',
-    'CslibFrontierTests.OraclePhaseFacade',
-    'CslibFrontierTests.OraclePlainSubstitution',
-    'CslibFrontierTests.PlainCleanPhase',
-]
+TARGET = 'aa30184e57888504d8031b991c50c1271f6b8859'
+BASE = 'a2cb84b6e29f2e852753f3b687235c55dff52ad5'
+PREFIX = 'CslibFrontier.Computability.Machines.Turing.MultiTape.'
+MODULES = [PREFIX + name for name in [
+    'Halting',
+    'Halting.Computable',
+    'Halting.Rice',
+    'Halting.Partrec',
+    'Internal.TotalComputability',
+    'Internal.RiceDispatch',
+    'Universal.DescriptionLookup',
+]] + ['CslibFrontierTests.HaltingComputablePlain']
 
 
 def run(args, out, label, timeout, required=True):
