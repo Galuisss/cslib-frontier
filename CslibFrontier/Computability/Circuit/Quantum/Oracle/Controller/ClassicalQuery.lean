@@ -96,8 +96,10 @@ structure ClassicalQueryLayout where
   /-- Second adversary-stage description, specialized to the ciphertext suffix. -/
   second : OracleCircuitDescription
 
-/-- Encoding of a classical-query layout, in field order: the oracle input sizes, public-key
-width, first-stage description, service description and second-stage description. -/
+/-- Standard nested-pair encoding of a classical-query layout, in field order: the oracle input
+sizes (security parameter and classical length in unary), the unary public-key width, then the
+first-stage, service and second-stage descriptions. Each structure-field boundary uses the
+standard outer framing supplied by `encPair`. -/
 enc_structure encClassicalQueryLayout : ClassicalQueryLayout where
   input : encOracleInputSize, publicKeyWidth : encUnary,
   first : encOracleCircuitDescription, service : encOracleCircuitDescription,
@@ -843,13 +845,12 @@ copies assembled above; callers do not supply a separate adapter program or effi
     let layoutFields (layout : ClassicalQueryLayout) :=
       (layout.input,
         (layout.publicKeyWidth, (layout.first, (layout.service, layout.second))))
-    let layoutFieldsCompiler : NativeCompiler layoutFields encClassicalQueryLayout
-        (encPair encOracleInputSize encRest) :=
-      (identity encClassicalQueryLayout).ofOutputEq fun layout => by
-        rw [encClassicalQueryLayout_apply]
-        rfl
-    let input := (first encOracleInputSize encRest).comp layoutFieldsCompiler
-    let rest := (second encOracleInputSize encRest).comp layoutFieldsCompiler
+    have enc_layoutFields (layout : ClassicalQueryLayout) :
+        encClassicalQueryLayout layout =
+          (encPair encOracleInputSize encRest) (layoutFields layout) := by
+      rw [encClassicalQueryLayout_apply]
+    let input := (first encOracleInputSize encRest).ofInputEq layoutFields enc_layoutFields
+    let rest := (second encOracleInputSize encRest).ofInputEq layoutFields enc_layoutFields
     let publicKeyWidth := (first encUnary encDescriptions).comp rest
     let descriptions := (second encUnary encDescriptions).comp rest
     let firstDescription :=

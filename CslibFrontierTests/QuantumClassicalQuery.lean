@@ -50,6 +50,17 @@ private def fixtureSecond : OracleCircuitDescription where
 private def fixtureLayout : ClassicalQueryLayout :=
   ⟨fixtureInput, 3, fixtureFirst, fixtureService, fixtureSecond⟩
 
+-- The structure migration preserves the former nested tuple words exactly.
+example (layout : ClassicalQueryLayout) :
+    encClassicalQueryLayout layout =
+      (encPair encOracleInputSize
+        (encPair encUnary
+          (encPair encOracleCircuitDescription
+            (encPair encOracleCircuitDescription encOracleCircuitDescription))))
+        (layout.input,
+          (layout.publicKeyWidth, (layout.first, (layout.service, layout.second)))) := by
+  rw [encClassicalQueryLayout_apply]
+
 private theorem wellFormed_fixtureDescription
     (securityParameter classicalInputLength width quantumInputWidth outputWidth target : ℕ)
     (hinput : 2 * securityParameter + 1 + classicalInputLength + quantumInputWidth ≤ width)
@@ -106,7 +117,7 @@ example : (compileClassicalQuery fixtureLayout).WellFormed fixtureInput ∧
   ⟨fixture_compatible.wellFormed_compileClassicalQuery,
     queryCount_compileClassicalQuery fixtureLayout⟩
 
--- The second stage's logical wire 15 is its eighth saved-F wire. It maps to physical wire 10,
+-- The second stage's logical wire 15 is saved-F wire 8 (zero-based). It maps to physical wire 10,
 -- after the hidden two-bit sample suffix, and cannot map to the protected hidden-bit record.
 example : fixtureLayout.secondWire 15 = 10 ∧
     fixtureLayout.secondWire 15 ≠ fixtureLayout.replyBase := by
