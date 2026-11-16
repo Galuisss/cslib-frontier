@@ -27,6 +27,8 @@ the existing `GateCode.shift` covers only contiguous blocks.
 
 * `Cslib.Quantum.PhaseGateCode.toPlacedGate?_relabel`: decoding one well-formed relabelled code
   maps its placed gate along the embedding.
+* `Cslib.Quantum.PhaseGateCode.WellFormed.relabel`: relabelling along an embedding preserves
+  well-formedness.
 * `Cslib.Quantum.Circuit.ofPhaseCodes_map_relabel`: decoding a well-formed relabelled code list
   maps the decoded circuit along the embedding.
 -/
@@ -129,6 +131,15 @@ theorem toPlacedGate?_relabel (e : Fin m ↪ Fin N) (ρ : ℕ → ℕ)
       · exact Fin.ext (hρ ⟨c, hcontrol⟩)
       · exact Fin.ext (hρ ⟨t, ht⟩)
   | (true, _, _, _ :: _ :: _), hc => exact absurd hc.1 (by simp)
+
+/-- Relabelling a well-formed phase-gate code along a register embedding preserves
+well-formedness. -/
+theorem WellFormed.relabel {c : PhaseGateCode} (hc : c.WellFormed m)
+    (e : Fin m ↪ Fin N) (ρ : ℕ → ℕ) (hρ : ∀ i : Fin m, ρ i = (e i : ℕ)) :
+    (c.relabel ρ).WellFormed N := by
+  rw [← isSome_toPlacedGate?_iff, toPlacedGate?_relabel e ρ hρ hc,
+    Option.isSome_map, isSome_toPlacedGate?_iff]
+  exact hc
 
 end PhaseGateCode
 
