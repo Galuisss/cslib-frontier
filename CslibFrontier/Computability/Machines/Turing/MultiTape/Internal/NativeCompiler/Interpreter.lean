@@ -409,29 +409,122 @@ private def inputSymbolsCompiler :
     ofTransducer symbolsT Universal.eBit fun word => symbolsT_run word
   exact symbols.comp doubled
 
+private theorem inputSymbolsCompiler_resources_le (word : List Bool) :
+    inputSymbolsCompiler.time word ≤ 100 * (word.length + 1) ∧
+      inputSymbolsCompiler.workspace word ≤ 100 * (word.length + 1) := by
+  have hd := (trueDoubleT.computesInTimeAndSpace_toTM word).length_output_le
+  change (trueDoubleT.run () word).length ≤ 2 * word.length + 3 at hd
+  rw [trueDoubleT_run] at hd
+  simp only [inputSymbolsCompiler, comp, ofTransducer, encBits_apply]
+  constructor <;> omega
+
 private def outputBitCompiler :
     NativeCompiler (fun symbol : ℕ => decide (symbol = 1)) encUnary encBool :=
   ((wordEqBool encUnary).comp
     ((identity encUnary).pair (const encUnary encUnary 1))).ofOutputEq fun symbol => by
       simp only [encUnary.injective.eq_iff, id_eq, Function.const_apply]
 
-private def outputBitsCompiler :
-    NativeCompiler (List.map fun symbol : ℕ => decide (symbol = 1))
-      (encList encUnary) encBits := by
-  let encInput := encPair encUnit encUnary
-  let emit : NativeCompiler
-      (fun input : Unit × ℕ => [decide (input.2 = 1)]) encInput encBits :=
-    (outputBitCompiler.comp (second encUnit encUnary)).ofOutputEq fun _ => rfl
-  let stream := listFoldEmitCompiler encUnit encUnary encBits
-    (first encUnit encUnary) emit
-    (result := fun input : Unit × List ℕ => input.2.map fun symbol => decide (symbol = 1))
-    (fun input => by
+private theorem outputBitCompiler_resources_le (symbol : ℕ) :
+    outputBitCompiler.time symbol ≤ 100 * (symbol + 1) ∧
+      outputBitCompiler.workspace symbol ≤ 100 * (symbol + 1) := by
+  simp only [outputBitCompiler, ofOutputEq, comp, wordEqBool, ofZipTransducer,
+    pair, identity, const, encodeFrame, length_encPair, encUnary_apply,
+    List.length_replicate, id_eq, Function.const_apply]
+  constructor <;> omega
+
+private def outputBitEmitCompiler :
+    NativeCompiler (fun input : Unit × ℕ => [decide (input.2 = 1)])
+      (encPair encUnit encUnary) encBits :=
+  (outputBitCompiler.comp (second encUnit encUnary)).ofOutputEq fun _ => rfl
+
+private def outputBitsStreamCompiler :
+    NativeCompiler (fun input : Unit × List ℕ => input.2.map fun symbol => decide (symbol = 1))
+      (encPair encUnit (encList encUnary)) encBits :=
+  listFoldEmitCompiler encUnit encUnary encBits
+    (first encUnit encUnary) outputBitEmitCompiler fun input => by
       induction input.2 with
       | nil => rfl
-      | cons symbol rest ih => simpa [streamEmit, encBits_apply] using ih)
-  exact (stream.comp
+      | cons symbol rest ih => simpa [streamEmit, encBits_apply] using ih
+
+private theorem outputBitsStreamCompiler_resources_le (symbols : List ℕ) :
+    outputBitsStreamCompiler.time ((), symbols) ≤
+        1000 * ((encList encUnary symbols).length + 1) ^ 2 ∧
+      outputBitsStreamCompiler.workspace ((), symbols) ≤
+        100000 * ((encList encUnary symbols).length + 1) := by
+  let N := (encList encUnary symbols).length
+  let input : Unit × List ℕ := ((), symbols)
+  have hcount : symbols.length ≤ N := length_le_length_encList encUnary symbols
+  have hstate : ∀ j, j ≤ input.2.length →
+      (encUnit (streamState input.1 Prod.fst input.2 j)).length ≤ N + 1 := by
+    simp [encUnit_apply]
+  have helem : ∀ j (hj : j < input.2.length), (encUnary input.2[j]).length ≤ N + 1 := by
+    intro j hj
+    exact (SizedListEncoding.length_elem_le (encA := encUnary) (encL := encList encUnary)
+      symbols symbols[j] (List.getElem_mem hj)).trans (Nat.le_succ N)
+  have hemit : ∀ j (hj : j < input.2.length),
+      outputBitEmitCompiler.time (streamState input.1 Prod.fst input.2 j, input.2[j]) ≤
+        200 * (N + 1) ∧
+      outputBitEmitCompiler.workspace (streamState input.1 Prod.fst input.2 j, input.2[j]) ≤
+        200 * (N + 1) := by
+    intro j hj
+    have hsymbol := SizedListEncoding.length_elem_le (encA := encUnary)
+      (encL := encList encUnary) symbols symbols[j] (List.getElem_mem hj)
+    have hb := outputBitCompiler_resources_le symbols[j]
+    have hk : outputBitCompiler.tapeCount = 4 := rfl
+    simp only [encUnary_apply, List.length_replicate] at hsymbol
+    simp only [outputBitEmitCompiler, ofOutputEq, comp, second, ofTransducer, hk,
+      length_encPair, encUnit_apply, List.length_nil, encUnary_apply, List.length_replicate]
+    change symbols[j] ≤ N at hsymbol
+    dsimp only [input]
+    constructor <;> omega
+  have hnext : ∀ j (hj : j < input.2.length),
+      (first encUnit encUnary).time
+        (streamState input.1 Prod.fst input.2 j, input.2[j]) ≤ 20 * (N + 1) := by
+    intro j hj
+    have h := helem j hj
+    simp only [first, ofTransducer, length_encPair, encUnit_apply, List.length_nil]
+    omega
+  have ht := streamFoldPairTime_le (first encUnit encUnary) outputBitEmitCompiler
+    (const encUnit encBits []) input (200 * (N + 1)) (20 * (N + 1)) 1 (N + 1)
+    (by simp [input, encUnit_apply, N]) hstate helem
+    (fun j hj => (hemit j hj).1) hnext (by simp [const, encBits_apply])
+  have hs : outputBitsStreamCompiler.workspace input ≤
+      2 * 21 * (200 * (N + 1) + 0 + 48 * (N + 1) + 20 * 21 + 90) +
+        13 * (N + 1) + 5 * 21 + 43 := by
+    apply listFoldEmitCompiler_workspace_le (first encUnit encUnary) outputBitEmitCompiler
+    · exact hstate
+    · exact helem
+    · exact fun j hj => (hemit j hj).2
+    · intro j hj
+      simp [first, ofTransducer]
+  change outputBitsStreamCompiler.time input ≤
+    input.2.length * (200 * (N + 1) + 20 * (N + 1) + 46 * (N + 1) + 60) +
+      1 + 24 * (N + 1) + 40 at ht
+  change outputBitsStreamCompiler.time input ≤ 1000 * (N + 1) ^ 2 ∧
+    outputBitsStreamCompiler.workspace input ≤ 100000 * (N + 1)
+  constructor
+  · refine ht.trans ?_
+    have hm := Nat.mul_le_mul_right (200 * (N + 1) + 20 * (N + 1) + 46 * (N + 1) + 60) hcount
+    change input.2.length * _ ≤ _ at hm
+    nlinarith
+  · omega
+
+private def outputBitsCompiler :
+    NativeCompiler (List.map fun symbol : ℕ => decide (symbol = 1))
+      (encList encUnary) encBits :=
+  (outputBitsStreamCompiler.comp
     ((const (encList encUnary) encUnit ()).pair (identity (encList encUnary)))).ofOutputEq
       fun _ => rfl
+
+private theorem outputBitsCompiler_resources_le (symbols : List ℕ) :
+    outputBitsCompiler.time symbols ≤ 2000 * ((encList encUnary symbols).length + 1) ^ 2 ∧
+      outputBitsCompiler.workspace symbols ≤
+        200000 * ((encList encUnary symbols).length + 1) := by
+  have hs := outputBitsStreamCompiler_resources_le symbols
+  have hk : outputBitsStreamCompiler.tapeCount = 21 := rfl
+  simp only [outputBitsCompiler, ofOutputEq, comp, pair, const, identity, encodeFrame, hk,
+    length_encPair, encUnit_apply, List.length_nil, Function.const_apply, id_eq]
+  constructor <;> norm_num [Nat.max_def] <;> nlinarith
 
 /-- Bounded interpretation with literal bit-symbol adapters. A simulated output symbol is read
 as `true` exactly when it is `1`; callers claiming bit-output semantics must establish that the
