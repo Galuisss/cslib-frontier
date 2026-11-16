@@ -3628,12 +3628,15 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Nat
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Deterministic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Equality
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatch
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatchResourceBounds
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.List
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ListResourceBounds
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Nat
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Range
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Replicate
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ResourceBounds
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.StreamFold
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.StreamResourceBounds
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Sum
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Universal
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NormalForm

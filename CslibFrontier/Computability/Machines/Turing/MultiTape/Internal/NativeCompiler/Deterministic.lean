@@ -8,10 +8,11 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatch
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ResourceBounds
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.StreamResourceBounds
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Universal
-import CslibFrontier.Tactic.EncLen
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatchResourceBounds
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ListResourceBounds
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ResourceBounds
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.StreamResourceBounds
 
 /-!
 # Retained deterministic universal steps
@@ -213,90 +214,114 @@ noncomputable def stepCompiler :
 
 /-! ### Actual resource bounds -/
 
-private theorem firstMatch_streamState_query {Key Value : Type*} [DecidableEq Key]
-    (query : Key) (found : Bool) (table : List (Key × Value)) (j : ℕ)
-    (hj : j ≤ table.length) :
-    (streamState (query, found) firstMatchNext table j).1 = query := by
-  induction j with
-  | zero => rfl
-  | succ j ih =>
-      rw [streamState_succ _ _ _ (by omega : j < table.length)]
-      generalize hstate : streamState (query, found) firstMatchNext table j = state
-      obtain ⟨stateQuery, stateFound⟩ :=
-        state
-      obtain ⟨entryKey, entryValue⟩ := table[j]
-      have hquery : stateQuery = query := by
-        simpa only [hstate] using ih (by omega)
-      subst stateQuery
-      rfl
-
-private theorem firstMatchNextCompiler_time_le {Key Value : Type*} [DecidableEq Key]
-    (encKey : Key ↪ List Bool) (encValue : Value ↪ List Bool)
-    (input : FirstMatchState Key × (Key × Value)) :
-    (firstMatchNextCompiler encKey encValue).time input ≤
-      10000 * ((encPair (encPair encKey encBool) (encPair encKey encValue) input).length + 1) := by
-  obtain ⟨⟨query, found⟩, entryKey, value⟩ := input
-  cases found <;>
-    simp [firstMatchNextCompiler, first, second, wordEqBool, ofZipTransducer, boolToTest,
-      ofTransducer, comp, pair, ite, const, encodeFrame, ofOutputEq, encTest_false,
-      encTest_true] <;>
+private theorem inputSymbol_time_le (input : List ℕ × ℕ) :
+    inputSymbol.time input ≤
+      1000000000000 *
+        ((encPair (encList encUnary) encNat input).length + 1) ^ 2 := by
+  let L := (encPair (encList encUnary) encNat input).length
+  let encInput := encPair (encList encUnary) encNat
+  let word := first (encList encUnary) encNat
+  let position := second (encList encUnary) encNat
+  let atLeftBoundary := natIsZeroTest.comp position
+  let blank := const encInput eSym none
+  let index := natPred.comp position
+  let lookupInput := word.pair index
+  let lookup := (listGet?NatCompiler encUnary).comp lookupInput
+  have hword : (encList encUnary input.1).length ≤ L := by
+    exact (length_le_encPair_left (encList encUnary) encNat input).trans le_rfl
+  have hposition : (encNat input.2).length ≤ L := by
+    exact (length_le_encPair_right (encList encUnary) encNat input).trans le_rfl
+  have hpred : (encNat (input.2 - 1)).length ≤ (encNat input.2).length :=
+    length_encNat_mono (Nat.sub_le input.2 1)
+  have hlookupInputSize :
+      (encPair (encList encUnary) encNat (input.1, input.2 - 1)).length ≤ L := by
+    simp only [L, length_encPair]
     omega
-
-private theorem firstMatchNextCompiler_workspace_le {Key Value : Type*} [DecidableEq Key]
-    (encKey : Key ↪ List Bool) (encValue : Value ↪ List Bool)
-    (input : FirstMatchState Key × (Key × Value)) :
-    (firstMatchNextCompiler encKey encValue).workspace input ≤
-      10000 * ((encPair (encPair encKey encBool) (encPair encKey encValue) input).length + 1) := by
-  obtain ⟨⟨query, found⟩, entryKey, value⟩ := input
-  cases found <;>
-    simp [firstMatchNextCompiler, first, second, wordEqBool, ofZipTransducer, boolToTest,
-      ofTransducer, comp, pair, ite, const, encodeFrame, ofOutputEq, encTest_false,
-      encTest_true] <;>
+  have hcondition : atLeftBoundary.time input ≤ 1000 * (L + 1) := by
+    simp [atLeftBoundary, position, natIsZeroTest, natIsZeroBool, boolToTest, second,
+      comp, ofTransducer, L]
     omega
-
-private theorem firstMatchEmitCompiler_time_le {Key Value : Type*} [DecidableEq Key]
-    (encKey : Key ↪ List Bool) (encValue : Value ↪ List Bool)
-    (input : FirstMatchState Key × (Key × Value)) :
-    (firstMatchEmitCompiler encKey encValue).time input ≤
-      20000 * ((encPair (encPair encKey encBool) (encPair encKey encValue) input).length + 1) := by
-  obtain ⟨⟨query, found⟩, entryKey, value⟩ := input
-  cases found <;> by_cases hkeys : entryKey = query <;>
-    simp [firstMatchEmitCompiler, first, second, wordEqBool, wordEqTest, ofZipTransducer,
-      boolToTest, optionSome, ofTransducer, comp, pair, ite, const, encodeFrame,
-      hkeys, encKey.injective.eq_iff, ofOutputEq, encTest_false, encTest_true] <;>
+  have hblank : blank.time input ≤ 1000 * (L + 1) := by
+    simp [blank, const, L]
     omega
-
-private theorem firstMatchEmitCompiler_workspace_le {Key Value : Type*} [DecidableEq Key]
-    (encKey : Key ↪ List Bool) (encValue : Value ↪ List Bool)
-    (input : FirstMatchState Key × (Key × Value)) :
-    (firstMatchEmitCompiler encKey encValue).workspace input ≤
-      20000 * ((encPair (encPair encKey encBool) (encPair encKey encValue) input).length + 1) := by
-  obtain ⟨⟨query, found⟩, entryKey, value⟩ := input
-  cases found <;> by_cases hkeys : entryKey = query <;>
-    simp [firstMatchEmitCompiler, first, second, wordEqBool, wordEqTest, ofZipTransducer,
-      boolToTest, optionSome, ofTransducer, comp, pair, ite, const, encodeFrame,
-      hkeys, encKey.injective.eq_iff, ofOutputEq, encTest_false, encTest_true] <;>
+  have hlookupInputTime : lookupInput.time input ≤ 100000 * (L + 1) := by
+    simp [lookupInput, word, index, position, first, second, natPred, pair, comp, ofTransducer,
+      encodeFrame, L]
     omega
+  have hlookupOuter := time_listGetNatOptionCompiler_le (input.1, input.2 - 1)
+  have hlookupComp := time_comp_le (listGet?NatCompiler encUnary) lookupInput input
+  have hlookup : lookup.time input ≤ 100000000 * (L + 1) ^ 2 := by
+    simp only [lookup]
+    exact hlookupComp.trans (by nlinarith)
+  have hite := time_ite_le atLeftBoundary blank lookup input
+  change (ite atLeftBoundary blank lookup).time input ≤
+    1000000000000 * (L + 1) ^ 2
+  exact hite.trans (by nlinarith)
 
-private theorem tapeRead_time_le (tape : Tape) :
-    tapeRead.time tape ≤ 1000 * ((eTape tape).length + 1) := by
-  obtain ⟨head, left, right⟩ := tape
-  cases right <;>
-    simp [tapeRead, tapeRight, tapeTail, listHeadD, listIsEmpty, listHeadPayload,
-      second, boolToTest, isEmpty, unframeDecoder, ofTransducer, comp, ite, const,
-      ofInputEq, ofOutputEq, encTest_false, encTest_true] <;>
+private theorem inputSymbol_workspace_le (input : List ℕ × ℕ) :
+    inputSymbol.workspace input ≤
+      1000000000000 *
+        ((encPair (encList encUnary) encNat input).length + 1) ^ 2 := by
+  let L := (encPair (encList encUnary) encNat input).length
+  let encInput := encPair (encList encUnary) encNat
+  let word := first (encList encUnary) encNat
+  let position := second (encList encUnary) encNat
+  let atLeftBoundary := natIsZeroTest.comp position
+  let blank := const encInput eSym none
+  let index := natPred.comp position
+  let lookupInput := word.pair index
+  let lookup := (listGet?NatCompiler encUnary).comp lookupInput
+  have hword : (encList encUnary input.1).length ≤ L := by
+    exact (length_le_encPair_left (encList encUnary) encNat input).trans le_rfl
+  have hposition : (encNat input.2).length ≤ L := by
+    exact (length_le_encPair_right (encList encUnary) encNat input).trans le_rfl
+  have hpred : (encNat (input.2 - 1)).length ≤ (encNat input.2).length :=
+    length_encNat_mono (Nat.sub_le input.2 1)
+  have hlookupInputSize :
+      (encPair (encList encUnary) encNat (input.1, input.2 - 1)).length ≤ L := by
+    simp only [L, length_encPair]
     omega
-
-private theorem tapeRead_workspace_le (tape : Tape) :
-    tapeRead.workspace tape ≤ 1000 * ((eTape tape).length + 1) := by
-  obtain ⟨head, left, right⟩ := tape
-  have hread := Universal.length_eSym_read_le ⟨head, left, right⟩
-  cases right <;>
-    simp [tapeRead, tapeRight, tapeTail, listHeadD, listIsEmpty, listHeadPayload,
-      boolToTest, isEmpty, unframeDecoder, ofTransducer, comp, ite, const, ofInputEq, ofOutputEq,
-      encTest_false, encTest_true] at hread ⊢ <;>
-    simp only [second, ofTransducer] <;>
+  have hcondition : atLeftBoundary.workspace input ≤ 1000 * (L + 1) := by
+    simp [atLeftBoundary, position, natIsZeroTest, natIsZeroBool, boolToTest, second,
+      comp, ofTransducer, L]
     omega
+  have hblank : blank.workspace input ≤ 1000 * (L + 1) := by
+    simp [blank, const, L]
+  have hlookupInputTime : lookupInput.time input ≤ 100000 * (L + 1) := by
+    simp [lookupInput, word, index, position, first, second, natPred, pair, comp, ofTransducer,
+      encodeFrame, L]
+    omega
+  have hlookupInputSpace : lookupInput.workspace input ≤ 100000 * (L + 1) := by
+    simp [lookupInput, word, index, position, first, second, natPred, pair, comp, ofTransducer,
+      encodeFrame, L]
+    omega
+  have hlookupInputTapes : lookupInput.tapeCount ≤ 20 := by
+    simp [lookupInput, word, index, position, first, second, natPred, pair, comp, ofTransducer,
+      encodeFrame]
+  have hlookupCompilerTapes := listGetNatOptionCompiler_tapeCount_le
+  have hlookupMax : max lookupInput.tapeCount
+      (listGet?NatCompiler encUnary).tapeCount ≤ 202 :=
+    max_le (hlookupInputTapes.trans (by omega)) hlookupCompilerTapes
+  have hlookupOuter := workspace_listGetNatOptionCompiler_le (input.1, input.2 - 1)
+  have hlookupComp := workspace_comp_le (listGet?NatCompiler encUnary) lookupInput input
+  have hlookup : lookup.workspace input ≤ 100000000000 * (L + 1) ^ 2 := by
+    simp only [lookup]
+    exact hlookupComp.trans (by nlinarith)
+  have hconditionTapes : atLeftBoundary.tapeCount ≤ 10 := by
+    simp [atLeftBoundary, position, natIsZeroTest, natIsZeroBool, boolToTest, second,
+      comp, ofTransducer]
+  have hblankTapes : blank.tapeCount ≤ 10 := by
+    simp [blank, const]
+  have hlookupTapes : lookup.tapeCount ≤ 204 := by
+    simp only [lookup, comp]
+    omega
+  have hstatic : max atLeftBoundary.tapeCount (max blank.tapeCount lookup.tapeCount) ≤ 204 :=
+    max_le (hconditionTapes.trans (by omega))
+      (max_le (hblankTapes.trans (by omega)) hlookupTapes)
+  have hite := workspace_ite_le atLeftBoundary blank lookup input
+  change (ite atLeftBoundary blank lookup).workspace input ≤
+    1000000000000 * (L + 1) ^ 2
+  exact hite.trans (by nlinarith)
 
 private theorem reads_time_le (tapes : List Tape) :
     reads.time tapes ≤ 1000000 * ((encList eTape tapes).length + 1) ^ 2 := by
@@ -398,116 +423,6 @@ private theorem reads_time_le (tapes : List Tape) :
   change ((listMapWithStateCompiler encUnit eTape eSym callback).comp marshal).time tapes ≤
     1000000 * (L + 1) ^ 2
   simp only [marshal] at hmarshal hcomp ⊢
-  omega
-
-private theorem firstMatchCompiler_time_le {Key Value : Type} [DecidableEq Key]
-    (encKey : Key ↪ List Bool) (encValue : Value ↪ List Bool)
-    (input : List (Key × Value) × Key) :
-    (firstMatchCompiler encKey encValue).time input ≤
-      100000000 *
-        ((encPair (encList (encPair encKey encValue)) encKey input).length + 1) ^ 2 := by
-  let L := (encPair (encList (encPair encKey encValue)) encKey input).length
-  let encState := encPair encKey encBool
-  let encEntry := encPair encKey encValue
-  let nextCompiler := firstMatchNextCompiler encKey encValue
-  let emitCompiler := firstMatchEmitCompiler encKey encValue
-  let finishCompiler := firstMatchFinishCompiler encKey encValue
-  let streamInput : FirstMatchState Key × List (Key × Value) :=
-    ((input.2, false), input.1)
-  have hquery : (encKey input.2).length ≤ L := by
-    exact (length_le_encPair_right (encList encEntry) encKey input).trans le_rfl
-  have htable : (encList encEntry input.1).length ≤ L := by
-    exact (length_le_encPair_left (encList encEntry) encKey input).trans le_rfl
-  have htable' : (encList (encPair encKey encValue) input.1).length ≤ L := by
-    simpa only [encEntry] using htable
-  have hinput : (encPair encState (encList encEntry) streamInput).length ≤ 10 * (L + 1) := by
-    simp only [streamInput, encState, encEntry]
-    enc_len at hquery htable' ⊢
-  have hstate : ∀ j, j ≤ input.1.length →
-      (encState (streamState streamInput.1 firstMatchNext streamInput.2 j)).length ≤
-        10 * (L + 1) := by
-    intro j hj
-    have hq := firstMatch_streamState_query input.2 false input.1 j hj
-    generalize hstateEq : streamState streamInput.1 firstMatchNext streamInput.2 j = state at hq ⊢
-    obtain ⟨stateQuery, stateFound⟩ := state
-    change stateQuery = input.2 at hq
-    subst stateQuery
-    cases stateFound <;>
-      simp only [encState, length_encPair, encBool_apply, List.length_singleton] <;>
-      omega
-  have helem : ∀ j (hj : j < input.1.length),
-      (encEntry input.1[j]).length ≤ 10 * (L + 1) := by
-    intro j hj
-    have hmem : input.1[j] ∈ input.1 := List.getElem_mem hj
-    have hmember := length_le_encList_of_mem (encPair encKey encValue) hmem
-    simpa only [encEntry] using (hmember.trans htable').trans (by omega)
-  have hpair : ∀ j (hj : j < input.1.length),
-      (encPair (encPair encKey encBool) (encPair encKey encValue)
-        (streamState streamInput.1 firstMatchNext streamInput.2 j, input.1[j])).length ≤
-          40 * (L + 1) := by
-    intro j hj
-    have hs := hstate j hj.le
-    have he := helem j hj
-    enc_len [encState, encEntry] at hs he ⊢
-  have hnext : ∀ j (hj : j < input.1.length),
-      nextCompiler.time
-        (streamState streamInput.1 firstMatchNext streamInput.2 j, input.1[j]) ≤
-          500000 * (L + 1) := by
-    intro j hj
-    have h := firstMatchNextCompiler_time_le encKey encValue
-      (streamState streamInput.1 firstMatchNext streamInput.2 j, input.1[j])
-    have hp := hpair j hj
-    simp only [nextCompiler] at h ⊢
-    omega
-  have hemit : ∀ j (hj : j < input.1.length),
-      emitCompiler.time
-        (streamState streamInput.1 firstMatchNext streamInput.2 j, input.1[j]) ≤
-          1000000 * (L + 1) := by
-    intro j hj
-    have h := firstMatchEmitCompiler_time_le encKey encValue
-      (streamState streamInput.1 firstMatchNext streamInput.2 j, input.1[j])
-    have hp := hpair j hj
-    simp only [emitCompiler] at h ⊢
-    omega
-  have hfinish : finishCompiler.time
-      (streamState streamInput.1 firstMatchNext streamInput.2 input.1.length) ≤ 1 := by
-    simp [finishCompiler, firstMatchFinishCompiler, const]
-  have hstream := streamFoldPairTime_le nextCompiler emitCompiler finishCompiler streamInput
-    (1000000 * (L + 1)) (500000 * (L + 1)) 1 (10 * (L + 1))
-    hinput hstate helem hemit hnext hfinish
-  have hstream' :
-      (firstMatchStreamCompiler encKey encValue).time streamInput ≤
-        input.1.length *
-          (1000000 * (L + 1) + 500000 * (L + 1) + 46 * (10 * (L + 1)) + 60) +
-          1 + 24 * (10 * (L + 1)) + 40 := by
-    change streamFoldPairTime nextCompiler emitCompiler finishCompiler streamInput ≤ _
-    exact hstream
-  simp only [streamInput] at hstream'
-  have hcount : input.1.length ≤ L :=
-    (length_le_length_encList encEntry input.1).trans htable
-  have hround :
-      1000000 * (L + 1) + 500000 * (L + 1) + 46 * (10 * (L + 1)) + 60 ≤
-        2000000 * (L + 1) := by omega
-  have hmul := Nat.mul_le_mul hcount hround
-  have hquad : L * (2000000 * (L + 1)) ≤ 2000000 * (L + 1) ^ 2 := by
-    nlinarith
-  have hrounds := hmul.trans hquad
-  have hlinear : L + 1 ≤ (L + 1) ^ 2 := by
-    nlinarith
-  have hstreamBound :
-      (firstMatchStreamCompiler encKey encValue).time ((input.2, false), input.1) ≤
-        3000000 * (L + 1) ^ 2 := by
-    omega
-  have hmarshal :
-      (firstMatchMarshalCompiler encKey encValue).time input ≤ 10000 * (L + 1) := by
-    simp [firstMatchMarshalCompiler, first, second, ofTransducer, pair, comp, encodeFrame,
-      const, L]
-    omega
-  have hcomp := time_comp_le (firstMatchStreamCompiler encKey encValue)
-    (firstMatchMarshalCompiler encKey encValue) input
-  change ((firstMatchStreamCompiler encKey encValue).comp
-    (firstMatchMarshalCompiler encKey encValue)).time input ≤
-      100000000 * (L + 1) ^ 2
   omega
 
 end Turing.MultiTapeTM.Internal.NativeCompiler

@@ -354,6 +354,17 @@ private theorem listGetNatOptionStreamCompiler_workspace_le (list : List ℕ) (i
   dsimp only [B]
   nlinarith
 
+/-- A construction-derived upper bound of 202 work tapes for the retained optional binary-indexed
+lookup. This static bound is used when the lookup is nested under composition or branching. -/
+theorem listGetNatOptionCompiler_tapeCount_le :
+    (listGet?NatCompiler encUnary).tapeCount ≤ 202 := by
+  simp only [listGet?NatCompiler, ofOutputEq, comp]
+  have hmax : max (listGetNatMarshalCompiler encUnary).tapeCount
+      (listGetNatOptionStreamCompiler encUnary).tapeCount ≤ 200 :=
+    max_le (listGetNatMarshalCompiler_tapeCount_le.trans (by omega))
+      listGetNatOptionStreamCompiler_tapeCount_le
+  omega
+
 /-- Concrete quadratic running-time majorant for the actual retained optional binary-indexed
 lookup. The bound concerns the generated program's per-input time map; its description size is
 accounted for separately by generator certificates. -/
