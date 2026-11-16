@@ -9,7 +9,6 @@ module
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatch
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Universal
-import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatchResourceBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ListResourceBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ResourceBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.StreamResourceBounds
@@ -322,107 +321,5 @@ private theorem inputSymbol_workspace_le (input : List ℕ × ℕ) :
   change (ite atLeftBoundary blank lookup).workspace input ≤
     1000000000000 * (L + 1) ^ 2
   exact hite.trans (by nlinarith)
-
-private theorem reads_time_le (tapes : List Tape) :
-    reads.time tapes ≤ 1000000 * ((encList eTape tapes).length + 1) ^ 2 := by
-  let L := (encList eTape tapes).length
-  let encInput := encPair encUnit eTape
-  let nextCompiler : NativeCompiler (fun input : Unit × Tape => input.1)
-      encInput encUnit := first encUnit eTape
-  let callback : NativeCompiler (fun input : Unit × Tape => input.2.read)
-      encInput eSym := tapeRead.comp (second encUnit eTape)
-  let emitCompiler : NativeCompiler (fun input : Unit × Tape => frame (eSym input.2.read))
-      encInput encBits :=
-    ((framedValue eSym).comp callback).ofOutputEq fun _ => rfl
-  let finishCompiler : NativeCompiler (Function.const Unit ([] : List Bool))
-      encUnit encBits := const encUnit encBits []
-  let marshal : NativeCompiler (fun input : List Tape => ((), input))
-      (encList eTape) (encPair encUnit (encList eTape)) :=
-    (const (encList eTape) encUnit ()).pair (identity (encList eTape))
-  have hstate : ∀ j, j ≤ tapes.length →
-      (encUnit (streamState () (fun input : Unit × Tape => input.1) tapes j)).length ≤ L + 4 := by
-    intro j hj
-    simp [encUnit_apply]
-  have helem : ∀ j (hj : j < tapes.length), (eTape tapes[j]).length ≤ L + 4 := by
-    intro j hj
-    exact (length_le_encList_of_mem eTape (List.getElem_mem hj)).trans (by omega)
-  have hnext : ∀ j (hj : j < tapes.length),
-      nextCompiler.time
-        (streamState () (fun input : Unit × Tape => input.1) tapes j, tapes[j]) ≤
-        100 * (L + 4) := by
-    intro j hj
-    have h := helem j hj
-    simp only [eTape_apply, length_encPair] at h
-    simp [nextCompiler, first, ofTransducer, L, encInput] at h ⊢
-    omega
-  have hemit : ∀ j (hj : j < tapes.length),
-      emitCompiler.time
-        (streamState () (fun input : Unit × Tape => input.1) tapes j, tapes[j]) ≤
-        50000 * (L + 4) := by
-    intro j hj
-    let pair := (streamState () (fun input : Unit × Tape => input.1) tapes j, tapes[j])
-    have hsecond := time_comp_le tapeRead (second encUnit eTape) pair
-    change (tapeRead.comp (second encUnit eTape)).time pair ≤
-      5 * (second encUnit eTape).time pair + tapeRead.time tapes[j] + 9 at hsecond
-    have hsecondTime : (second encUnit eTape).time pair ≤ 100 * (L + 4) := by
-      have h := helem j hj
-      simp only [eTape_apply, length_encPair] at h
-      simp [second, ofTransducer, pair] at h ⊢
-      omega
-    have htape : tapeRead.time tapes[j] ≤ 2000 * (L + 4) := by
-      have h := tapeRead_time_le tapes[j]
-      have he := helem j hj
-      omega
-    have hcallback : callback.time pair ≤ 6000 * (L + 4) := by
-      simp only [callback]
-      exact hsecond.trans (by omega)
-    have hframed := time_comp_le (framedValue eSym) callback pair
-    change ((framedValue eSym).comp callback).time pair ≤
-      5 * callback.time pair + (4 * (eSym pair.2.read).length + 8) + 9 at hframed
-    have hread : (eSym pair.2.read).length ≤ L + 4 := by
-      have h := Universal.length_eSym_read_le tapes[j]
-      have he := helem j hj
-      simpa only [pair, Prod.snd] using h.trans he
-    change emitCompiler.time pair ≤ 50000 * (L + 4)
-    simp only [emitCompiler, ofOutputEq]
-    exact hframed.trans (by omega)
-  have hfinish : finishCompiler.time
-      (streamState () (fun input : Unit × Tape => input.1) tapes tapes.length) ≤ 1 := by
-    simp [finishCompiler, const]
-  have hstream := streamFoldPairTime_le nextCompiler emitCompiler finishCompiler
-    ((), tapes) (50000 * (L + 4)) (100 * (L + 4)) 1 (L + 4)
-    (by simp [L]) hstate helem hemit hnext hfinish
-  have hstream' :
-      (listMapWithStateCompiler encUnit eTape eSym callback).time ((), tapes) ≤
-        tapes.length * (50000 * (L + 4) + 100 * (L + 4) + 46 * (L + 4) + 60) +
-          1 + 24 * (L + 4) + 40 := by
-    change streamFoldPairTime nextCompiler emitCompiler finishCompiler ((), tapes) ≤ _
-    exact hstream
-  have hcount : tapes.length ≤ L := length_le_length_encList eTape tapes
-  have hround :
-      50000 * (L + 4) + 100 * (L + 4) + 46 * (L + 4) + 60 ≤
-        50200 * (L + 4) := by omega
-  have hmul := Nat.mul_le_mul hcount hround
-  have hquad : L * (50200 * (L + 4)) ≤ 300000 * (L + 1) ^ 2 := by
-    nlinarith
-  have hrounds := hmul.trans hquad
-  have hlinear : L + 4 ≤ 4 * (L + 1) ^ 2 := by
-    nlinarith
-  have hstreamBound :
-      (listMapWithStateCompiler encUnit eTape eSym callback).time ((), tapes) ≤
-        400000 * (L + 1) ^ 2 := by
-    omega
-  have hmarshalRaw := time_pair_le (const (encList eTape) encUnit ())
-    (identity (encList eTape)) tapes
-  have hmarshal : marshal.time tapes ≤ 100 * (L + 1) := by
-    change ((const (encList eTape) encUnit ()).pair
-      (identity (encList eTape))).time tapes ≤ 100 * (L + 1)
-    exact hmarshalRaw.trans (by simp [const, identity]; omega)
-  have hcomp := time_comp_le (listMapWithStateCompiler encUnit eTape eSym callback)
-    marshal tapes
-  change ((listMapWithStateCompiler encUnit eTape eSym callback).comp marshal).time tapes ≤
-    1000000 * (L + 1) ^ 2
-  simp only [marshal] at hmarshal hcomp ⊢
-  omega
 
 end Turing.MultiTapeTM.Internal.NativeCompiler

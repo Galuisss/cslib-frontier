@@ -137,6 +137,14 @@ private theorem firstMatchStreamCompiler_tapeCount_le {Key Value : Type*} [Decid
     first, second, wordEqBool, wordEqTest, boolToTest, optionSome, ofZipTransducer,
     ofTransducer, comp, pair, ite, const, encodeFrame, unframeValue, ofOutputEq]
 
+private theorem firstMatchMarshalCompiler_time_le {Key Value : Type*}
+    (encKey : Key ↪ List Bool) (encValue : Value ↪ List Bool)
+    (input : List (Key × Value) × Key) :
+    (firstMatchMarshalCompiler encKey encValue).time input ≤
+      10000 * ((encPair (encList (encPair encKey encValue)) encKey input).length + 1) := by
+  simp [firstMatchMarshalCompiler, first, second, ofTransducer, pair, comp, encodeFrame, const]
+  omega
+
 /-- The actual retained first-match compiler has quadratic time in the complete encoded table and
 query. Its installed program description remains a separate static coordinate. -/
 theorem firstMatchCompiler_time_le {Key Value : Type*} [DecidableEq Key]
@@ -232,9 +240,7 @@ theorem firstMatchCompiler_time_le {Key Value : Type*} [DecidableEq Key]
     omega
   have hmarshal :
       (firstMatchMarshalCompiler encKey encValue).time input ≤ 10000 * (L + 1) := by
-    simp [firstMatchMarshalCompiler, first, second, ofTransducer, pair, comp, encodeFrame,
-      const, L]
-    omega
+    simpa only [L] using firstMatchMarshalCompiler_time_le encKey encValue input
   have hcomp := time_comp_le (firstMatchStreamCompiler encKey encValue)
     (firstMatchMarshalCompiler encKey encValue) input
   change ((firstMatchStreamCompiler encKey encValue).comp
@@ -374,9 +380,7 @@ theorem firstMatchCompiler_workspace_le {Key Value : Type*} [DecidableEq Key]
     exact hstream.trans (by nlinarith)
   have hmarshalTime :
       (firstMatchMarshalCompiler encKey encValue).time input ≤ 10000 * (L + 1) := by
-    simp [firstMatchMarshalCompiler, first, second, ofTransducer, pair, comp, encodeFrame,
-      const, L]
-    omega
+    simpa only [L] using firstMatchMarshalCompiler_time_le encKey encValue input
   have hmarshalSpace :
       (firstMatchMarshalCompiler encKey encValue).workspace input ≤ 10000 * (L + 1) := by
     simp [firstMatchMarshalCompiler, first, second, ofTransducer, pair, comp, encodeFrame,

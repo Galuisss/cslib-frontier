@@ -173,6 +173,12 @@ theorem tapeRead_workspace_le (tape : Tape) :
     simp only [second, ofTransducer] <;>
     omega
 
+/-- A construction-derived static tape-count bound for the retained work-head reader. -/
+theorem tapeRead_tapeCount_le : tapeRead.tapeCount ≤ 100 := by
+  simp [tapeRead, tapeRight, tapeTail, listHeadD, listIsEmpty, listHeadPayload,
+    second, boolToTest, isEmpty, unframeDecoder, ofTransducer, comp, ite, const,
+    ofInputEq, ofOutputEq]
+
 /-- Retained work-tape write, rebuilding the zipper from named field/list machines. -/
 @[expose] noncomputable def tapeWrite :
     NativeCompiler (fun input : Tape × Option ℕ => input.1.write input.2)
