@@ -80,6 +80,8 @@ existential computability proof can be extracted into a `NativeCompiler`.
 
 * `Turing.MultiTapeTM.Internal.NativeCompiler.description_holds`: the recorded description
   contains every transition of the packaged machine under its recorded encodings.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.description_header`: the recorded description has
+  exactly the packaged machine's tape count and encoded initial state.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.computableInTimeAndSpace`: forget the named
   construction into the existing plain existential calculus.
 -/
@@ -200,6 +202,15 @@ def description {α β : Type*} {f : α → β}
         (key (compiler.stateEncoding state) (input.map eBit)
           (Option.map eBit ∘ work),
           Act.ofAction (action.map compiler.stateEncoding eBit))⟩
+
+/-- The constructive description records the retained machine's tape count and encoded initial
+state exactly. -/
+theorem description_header {α β : Type*} {f : α → β}
+    {encIn : α ↪ List Bool} {encOut : β ↪ List Bool}
+    (compiler : NativeCompiler f encIn encOut) :
+    compiler.description.tapes = compiler.tapeCount ∧
+      compiler.description.q₀ = compiler.stateEncoding compiler.table.toTM.q₀ := by
+  simp [description, MultiTapeMachine.toTM]
 
 /-- The recorded description contains the packaged table's transition at every state and choice
 of symbols under the recorded state and symbol encodings. -/
