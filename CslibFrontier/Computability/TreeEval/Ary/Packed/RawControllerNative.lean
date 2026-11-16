@@ -257,7 +257,7 @@ private theorem beginRound_budget {α : Type} {encIn : α ↪ List Bool} {S : α
   have hreg := reg_budget hd ht hz
   exact (state_budget (scale_budget hp hr hreg (budget_natSucc hi) hb)
     (budget_cons (frame_budget hi hz (budget_const false hlen) hc ht) hs)
-    (budget_optionSome (encO := encOption encNeed) (budget_prod hone hreg))).of_enc_eq fun _ => rfl
+    (budget_optionSome (encO := encOption (encPair encNat encNat)) (budget_prod hone hreg))).of_enc_eq fun _ => rfl
 
 private def checkedCall (p d r : ℕ) (reply : Reply) (bank : List ℕ) (stack : List Frame)
     (ct : ℕ × ℕ) : State :=
@@ -350,7 +350,7 @@ private theorem return_budget {α : Type} {encIn : α ↪ List Bool} {S : α →
   have hneg := budget_natPred hp
   have hundoNext := state_budget hscaled
     (budget_cons (frame_budget hround hnext htrue hc ht) hs)
-    (budget_optionSome (encO := encOption encNeed) (budget_prod hneg hregNext))
+    (budget_optionSome (encO := encOption (encPair encNat encNat)) (budget_prod hneg hregNext))
   have hnextRound := beginRound_budget hp hd hr (budget_natSucc hround) hc ht hscaled hs hlen
   have hpop := state_budget hscaled hs hnone
   have hundoResult := budget_ite (budget_natLt hnext hd) hundoNext
@@ -358,10 +358,10 @@ private theorem return_budget {α : Type} {encIn : α ↪ List Bool} {S : α →
   have hforwardNext := state_budget
     (scale_budget hp hr hregNext (budget_natSucc hround) hb)
     (budget_cons (frame_budget hround hnext hfalse hc ht) hs)
-    (budget_optionSome (encO := encOption encNeed) (budget_prod hone hregNext))
+    (budget_optionSome (encO := encOption (encPair encNat encNat)) (budget_prod hone hregNext))
   have hforwardLast := state_budget (sub_budget hp hr ht hc hv hb)
     (budget_cons (frame_budget hround hz htrue hc ht) hs)
-    (budget_optionSome (encO := encOption encNeed) (budget_prod hneg hregZero))
+    (budget_optionSome (encO := encOption (encPair encNat encNat)) (budget_prod hneg hregZero))
   refine (budget_ite hundo hundoResult
     (budget_ite (budget_natLt hnext hd) hforwardNext hforwardLast)).of_enc_eq ?_
   intro a

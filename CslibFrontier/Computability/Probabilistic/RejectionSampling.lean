@@ -205,7 +205,7 @@ theorem isPPTOn_sampleBlockCapped {α β : Type} {input : α ↪ List Bool}
     IsPPTOn input output (fun a => sampleBlockCapped (spec a) (fallback a) (trials a)) := by
   have hget : ComputableInPolyTime (fun p : α × Option β => p.2.getD (fallback p.1))
       (encPair input (encOption output)) output :=
-    optionGetDWithInput (snd input (encOption output))
+    ComputableInPolyTime.optionGetDWithInput (snd input (encOption output))
       (hfallback.comp (fst input (encOption output)))
   have h := IsPPTOn.map_with (f := fun a (o : Option β) => o.getD (fallback a))
     (isPPTOn_sampleSeededTrials htrials hwidth hattempt) hget

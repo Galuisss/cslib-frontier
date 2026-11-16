@@ -236,8 +236,9 @@ theorem optionGetD (d : β) :
   by
     have tag : ComputableInLogSpace Option.isSome (encOption encOut) encBool :=
       of_take_one fun o => by cases o <;> rfl
-    convert ite_subtype tag
-      (of_tail (f := fun o : {o : Option β // o.isSome = true} => o.val.getD d) fun ⟨o, ho⟩
+    convert ite_subtype (f := fun o : Option β => o.getD d) (g := fun _ => d) tag
+      (of_tail (encIn := (Function.Embedding.subtype _).trans (encOption encOut))
+        (encOut := encOut) (f := fun o : {o : Option β // o.isSome = true} => o.val.getD d) fun ⟨o, ho⟩
         => by cases o <;> simp_all)
       ((const d).restrict _) using 1
     funext o

@@ -524,7 +524,7 @@ lemma fBranch_inO : ComputableTidilyInO (fun s : CSt =>
   · apply congrArg eCtl
     simp only [Function.comp_apply, emitScan_eq]
     by_cases hsome : (stepWith s.1.1.2.1 s.1.1.2.2 (xSym s)).2.isSome = true <;>
-      by_cases hk : s.1.2.1 = 1 <;> simp [hsome, hk]
+      by_cases hk : s.1.2.1 = 1 <;> simp only [hsome, hk, ↓reduceIte]
     all_goals exact Prod.ext hk rfl
   all_goals
     have hkL : (encNat s.1.2.1).length ≤ (eCSt s).length := by

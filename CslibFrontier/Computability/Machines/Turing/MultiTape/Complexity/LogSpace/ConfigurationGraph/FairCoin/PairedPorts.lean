@@ -345,9 +345,9 @@ private theorem pairSortedTargets_budget {a b : α → Option ℕ}
     budget_ite (budget_natLt hva hvb) (budget_cons hva (budget_cons hvb hnil))
       (budget_ite (budget_natLt hvb hva) (budget_cons hvb (budget_cons hva hnil))
         (budget_cons hva hnil))
-  refine (budget_ite (budget_optionIsSome ha)
-    (budget_ite (budget_optionIsSome hb) hboth (budget_cons hva hnil))
-    (budget_ite (budget_optionIsSome hb) (budget_cons hvb hnil) hnil)).of_enc_eq fun x => ?_
+  refine (budget_ite (budget_optionIsSome (encB := encNat) ha)
+    (budget_ite (budget_optionIsSome (encB := encNat) hb) hboth (budget_cons hva hnil))
+    (budget_ite (budget_optionIsSome (encB := encNat) hb) (budget_cons hvb hnil) hnil)).of_enc_eq fun x => ?_
   rcases a x with _ | v₀ <;> rcases b x with _ | v₁ <;>
     simp [pairSortedTargets, decide_eq_true_eq]
 
@@ -1396,7 +1396,7 @@ theorem clockedInPortWithSymbols_budget (machine : MultiTapePTM k Bool State)
   have haVal := budget_natAdd (budget_natMul (budget_natPred (budget_natDiv hb hN)) hN) huVal
   have hnone : ComputableInSpace (fun _ : α => (none : Option (ℕ × ℕ)))
       enc (encOption (encPair encNat encNat)) S := budget_const none hin
-  refine (budget_ite hcond (budget_ite (budget_optionIsSome huOpt)
+  refine (budget_ite hcond (budget_ite (budget_optionIsSome (encB := encNat) huOpt)
     (budget_optionSome (budget_prod haVal hpIdx)) hnone) hnone).of_enc_eq fun x => ?_
   clear * -
   simp only [clockedInPortWithSymbols, Bool.and_eq_true, decide_eq_true_eq]

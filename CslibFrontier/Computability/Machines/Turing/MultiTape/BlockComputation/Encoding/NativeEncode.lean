@@ -147,7 +147,7 @@ theorem word_inSpace : ComputableInSpace (fun q : ℕ × ℕ => word q.1 q.2)
     change i ≤ b.size at hi
     rw [← length_encNat_eq_size b] at hi
     have hout : (encList encBool ((List.range i).map (fun j => n.testBit j))).length = 3 * i := by
-      simp [List.map_map, Function.comp_def, Nat.mul_comm] <;> omega
+      simp [List.map_map, Function.comp_def, Nat.mul_comm]; omega
     simp only [encWordState, length_encPair, Nat.zero_add, List.nil_append]
     rw [hout]
     omega
@@ -184,7 +184,7 @@ private theorem cellWord_inSpace : ComputableInSpace cellWord encNat (encList en
 
 private theorem length_windowWord (cells : List ℕ) :
     (windowWord cells).length = 2 * cells.length := by
-  simp [windowWord, cellWord, List.length_flatMap, Nat.mul_comm] <;> omega
+  simp [windowWord, cellWord, List.length_flatMap, Nat.mul_comm]
 
 private theorem foldl_cells (cells : List ℕ) (out : List Bool) :
     cells.foldl (fun acc n => acc ++ cellWord n) out = out ++ windowWord cells := by
@@ -207,7 +207,7 @@ theorem windowWord_inSpace : ComputableInSpace windowWord (encList encNat) (encL
     have hl := length_le_length_encList encNat cells
     have hw := length_windowWord (cells.take i)
     have hbool (l : List Bool) : (encList encBool l).length = 3 * l.length := by
-      simp [Nat.mul_comm] <;> omega
+      simp [Nat.mul_comm]; omega
     rw [hbool, hw]
     nlinarith [List.length_take_le i cells]
   have hspace (cells : List ℕ) (i : ℕ) (hi : i < cells.length) :
