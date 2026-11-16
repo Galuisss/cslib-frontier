@@ -523,7 +523,7 @@ lemma fBranch_inO : ComputableTidilyInO (fun s : CSt =>
     fun s => ?_).mono 100 (fun s => ?_) fun s => ?_
   · apply congrArg eCtl
     simp only [Function.comp_apply, emitScan_eq]
-    split_ifs ; simp_all only [decide_eq_true_eq] ; contradiction
+    split_ifs <;> simp_all
   all_goals
     have hkL : (encNat s.1.2.1).length ≤ (eCSt s).length := by
       simp only [length_encPair]
