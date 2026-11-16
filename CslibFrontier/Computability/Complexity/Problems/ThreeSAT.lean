@@ -94,8 +94,8 @@ private theorem encNat_two_mul (n : ℕ) :
   rcases Nat.eq_zero_or_pos n with rfl | hn
   · rfl
   · have hne : n.bits ≠ [] := fun h =>
-      hn.ne' (encNat.injective (by simpa only [Cslib.Encoding.encNat_eq_bits] using h))
-    simp [Cslib.Encoding.encNat_eq_bits, hne, Nat.bit0_bits n hn.ne']
+      hn.ne' (encNat.injective (by simpa only [Cslib.Encoding.encNat_eq_bits, Nat.bits_zero] using h))
+    simp [hne, Nat.bit0_bits n hn.ne']
 
 private theorem encNat_two_mul_add_one (n : ℕ) :
     encNat (2 * n + 1) = true :: encNat n := by

@@ -178,11 +178,11 @@ theorem subdivide_polyTime :
       (encList (encOption (encList encNat))) :=
     orders_polyTime.comp (ComputableInPolyTime.fst _ _)
   exact ComputableInPolyTime.cons'
-    ((he.fst'.prod ha).prod (read_polyTime none ht he.fst').optionIsSome (encB := encList encNat))
+    ((he.fst'.prod ha).prod ((read_polyTime none ht he.fst').optionIsSome (encB := encList encNat)))
     (ComputableInPolyTime.cons'
       ((ha.prod hb).prod (ComputableInPolyTime.const false))
       (ComputableInPolyTime.cons'
-        ((hb.prod he.snd').prod (read_polyTime none ht he.snd').optionIsSome (encB := encList encNat))
+        ((hb.prod he.snd').prod ((read_polyTime none ht he.snd').optionIsSome (encB := encList encNat)))
         (ComputableInPolyTime.const [])))
 
 /-- The full reference order is built from bounded list scans, including malformed words. -/

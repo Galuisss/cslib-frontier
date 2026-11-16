@@ -198,7 +198,7 @@ private theorem poly_firstExit : ComputableInPolyTime
       (fun p : (EdgeForest.Input × WalkCode × WalkCode) × (ℕ × ℕ) =>
         ExitCode.mk (n p.1) p.2.1 p.2.2)
       (encPair encPrefixArgs (encPair encNat encNat)) encExitCode := by fun_prop
-  have hyes := ComputableInPolyTime.optionMapWithInput
+  have hyes := ComputableInPolyTime.optionMapWithInput (encB := encPair encNat encNat)
     (f := fun p pair => ExitCode.mk (n p) pair.1 pair.2) hhead hbody
   simpa only [firstExit, n, decide_eq_true_eq] using
     hg.ite' hyes (ComputableInPolyTime.const none)
@@ -303,7 +303,7 @@ theorem computableInPolyTime_liftWalk : ComputableInPolyTime
   unfold liftWalk
   have hb := EdgeForest.encInput_body_deg.computableInPolyTime
   have hl := EdgeForest.encInput_labels_deg.computableInPolyTime
-  apply ComputableInPolyTime.optionElimWithInput
+  apply ComputableInPolyTime.optionElimWithInput (encB := encPair encNat encNat)
     (show ComputableInPolyTime
       (fun p : EdgeForest.Input × WalkCode × WalkCode => p.2.1.steps.head?)
       encPrefixArgs (encOption (encPair encNat encNat)) from by fun_prop)

@@ -183,7 +183,7 @@ theorem computableInPolyTime_decideSAT : ComputableInPolyTime decideSAT
   have hbody : ComputableInPolyTime
       (fun p : CSP Table ℕ × List Bool => !p.1.vars.any (EdgeAugmenting.inconsistent p.1 p.2))
       (encPair (encCSP encTable encNat) (encList encBool)) encBool := by fun_prop
-  have h := ComputableInPolyTime.optionElimWithInput
+  have h := ComputableInPolyTime.optionElimWithInput (encB := encList encBool)
     (body := fun F bits => !F.vars.any (EdgeAugmenting.inconsistent F bits))
     ho (ComputableInPolyTime.const false) hbody
   apply h.of_enc_eq

@@ -318,7 +318,7 @@ theorem computableInPolyTime_codeEdge
       (ComputableInPolyTime.decide_eq'
         (ComputableInPolyTime.finiteCfg_output.comp hsnd) (.const [true])))
   · refine (computableInPolyTime_decodeView (hnext.comp hfst)).optionElimWithInput
-      (.const false) ?_
+      (encB := encFiniteCfg (k := k) (State := State)) (.const false) ?_
     exact ntm.computableInPolyTime_viewStepB.comp
       ((hsnd.comp (ComputableInPolyTime.fst _ _)).prod (ComputableInPolyTime.snd _ _))
 

@@ -247,7 +247,17 @@ private theorem poly_step : ComputableInPolyTime (fun p : Input × State => step
           · fun_prop
           · exact ComputableInPolyTime.prod (by fun_prop)
               (ComputableInPolyTime.const (encOut := encOption (encOption encEvent)) none)
-        · fun_prop
+        · apply ComputableInPolyTime.prod
+          · fun_prop
+          · apply ComputableInPolyTime.prod
+            · fun_prop
+            · apply (ComputableInPolyTime.optionSome (encOption encEvent)).comp
+              apply (ComputableInPolyTime.optionSome encEvent).comp
+              apply ComputableInPolyTime.prod
+              · fun_prop
+              · apply ComputableInPolyTime.prod
+                · fun_prop
+                · fun_prop
       · fun_prop
 
 
