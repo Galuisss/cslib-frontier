@@ -130,7 +130,13 @@ theorem decodeWord_polyTime :
     ComputableInPolyTime (fun (d, Y) => decodeWord d Y) (encPair encBits encBits)
       (encSilentOption encBits) := by
   dsimp only [decodeWord]
-  fun_prop
+  apply ComputableInPolyTime.of_tidy
+  apply ComputableTidilyInPolyTime.ite_decide
+  · fun_prop
+  · apply (ComputableTidilyInPolyTime.optionSome encBits
+      (encO := encSilentOption encBits)).comp
+    fun_prop
+  · exact ComputableTidilyInPolyTime.const none
 
 include hf in
 private theorem evalGate_step :

@@ -56,7 +56,7 @@ private theorem sessionAdvance_polyTime :
     (branch := fun op p => p.2.2.advance p.1 (op, p.2.1.2))
     (show ComputableInPolyTime _ _ (encFinite SenderOperation) by fun_prop) ?_
   intro op
-  cases op <;> unfold Session.advance <;> fun_prop
+  cases op <;> simp only [Session.advance] <;> fun_prop
 
 private theorem sessionAdvance_length (k : ℕ) (request : SenderOperation × List Bool)
     (s : Session) :
@@ -69,7 +69,8 @@ private theorem sessionAdvance_length (k : ℕ) (request : SenderOperation × Li
     | omega
     | (try split) <;>
         simp only [encSession_apply, length_encPair,
-          encBool_apply, List.length_cons, List.length_nil, encSilentOption_none, encSilentOption_some,
+          encBool_apply, List.length_cons, List.length_nil, encSilentOption_none,
+            encSilentOption_some,
           encBits_apply,
           encList_append, encList_cons, encList_nil, List.length_append, length_frame]
   all_goals try omega
@@ -122,7 +123,8 @@ private theorem sessionOpening_polyTime :
   have hlength := (ComputableInPolyTime.length_bits.comp hword).decide_eq'
     (ComputableInPolyTime.unary_mul.comp ((ComputableInPolyTime.const 2).prod hcount))
   have hbody := hlength.ite_decide
-    ((ComputableInPolyTime.optionSome (encPair encBool (encList (encPair encBool encBool)))).comp
+    ((ComputableInPolyTime.optionSome (encPair encBool (encList (encPair encBool encBool)))
+      (encO := encSilentOption (encPair encBool (encList (encPair encBool encBool)))) ).comp
       (hbit.prod hpairs)) (ComputableInPolyTime.const none)
   unfold Session.opening
   convert ComputableInPolyTime.optionElimWithInput

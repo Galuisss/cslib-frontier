@@ -708,9 +708,9 @@ theorem isOraclePPT_extendOneTimeCPAAdversary {ctBound : ℕ → ℕ}
       have htake : (List.take (ctBound caller.1) raw).length ≤ ctBound caller.1 :=
         List.length_take_le _ _
       exact ⟨trivial, by simp only [List.length_append, List.length_singleton]; lia,
-        by simp [encBool_apply]⟩
+        by simp⟩
     · cases OracleComp.eq_of_mem_supportWith_pure hresult
-      exact ⟨trivial, by simp, by simp [encBool_apply]⟩
+      exact ⟨trivial, by simp, by simp⟩
   unfold extendOneTimeCPAAdversary
   simpa only [bind_pure_comp] using
     (hrun.map' (ComputableInPolyTime.fst encBool encBool)).isOraclePPT

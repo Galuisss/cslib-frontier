@@ -303,7 +303,8 @@ private theorem computableTidilyInPolyTime_isChallenge {Msg : Type} (encMsg : Ms
   have h : ComputableTidilyInPolyTime
       (fun q : CCAQuery Msg (List Bool) => q.toOptionPair.1.isSome)
       (encCCAQuery encMsg) encBool :=
-    ((computableTidilyInPolyTime_toOptionPair encMsg).fst').optionIsSome
+    ComputableTidilyInPolyTime.optionIsSome (encB := encPair encMsg encMsg)
+      ((computableTidilyInPolyTime_toOptionPair encMsg).fst')
   refine h.of_enc_eq fun q => ?_
   cases q <;> rfl
 
@@ -1258,9 +1259,9 @@ private theorem length_interleavedOpenRoundStep_le_aux {Msg : Type} [Inhabited M
     rw [hqCase] at hbranch hqLen
     simp only [CCAQuery.isChallenge, ↓reduceIte, CCAQuery.challengePair] at hbranch
     have hmLen : (encMsg (if roundBit then m₁ else m₀)).length ≤ B := by
-      simp only [encCCAQuery_apply, CCAQuery.toOptionPair, length_encPair, encSilentOption,
-        Function.Embedding.coeFn_mk, Option.elim, List.length_cons, encBits_apply,
-        List.length_nil] at hqLen
+      simp only [encCCAQuery_apply, CCAQuery.toOptionPair, length_encPair,
+        encSilentOption_some, encSilentOption_none, List.length_cons, List.length_nil,
+        encBits_apply] at hqLen
       cases roundBit <;> simp only [↓reduceIte, Bool.false_eq_true] <;> omega
     by_cases hv : valid n pk m₀ m₁ = true
     · simp only [hv, ↓reduceIte] at hbranch
@@ -1281,7 +1282,8 @@ private theorem length_interleavedOpenRoundStep_le_aux {Msg : Type} [Inhabited M
     obtain ⟨rawReply, _, rfl⟩ := OracleComp.mem_supportWith_map_iff.mp hreply
     obtain rfl := OracleComp.eq_of_mem_supportWith_pure hret
     have hcLen : c.length ≤ B := by
-      enc_len [encCCAQuery_apply, CCAQuery.toOptionPair, encSilentOption, Function.Embedding.coeFn_mk,
+      enc_len [encCCAQuery_apply, CCAQuery.toOptionPair, encSilentOption,
+        Function.Embedding.coeFn_mk,
         Option.elim] at hqLen
     have hdecLen : (List.take (decBound n c) rawReply).length ≤ decMax :=
       (List.length_take_le _ _).trans (hlenDec c hcLen)

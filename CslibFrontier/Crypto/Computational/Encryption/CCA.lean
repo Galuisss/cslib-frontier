@@ -493,7 +493,8 @@ private theorem isPPTOn_run_cca2Phase1Oracle_of_choose {Choice Out : Type}
   exact hchoose.run_interpret_preprocess
     (prepare := fun caller : ℕ × List Bool × List Bool => (caller.1, caller.2.1))
     (initial := fun _ => ())
-    (resources := fun caller req => (encSilentOption encOut (decrypt caller.1 caller.2.2 req)).length)
+    (resources := fun caller req => (encSilentOption encOut (decrypt caller.1 caller.2.2
+      req)).length)
     (by fun_prop)
     hhandler
     (ComputableInPolyTime.const ())
@@ -501,7 +502,8 @@ private theorem isPPTOn_run_cca2Phase1Oracle_of_choose {Choice Out : Type}
     (fun _ => trivial)
     hres
     (fun caller request state _ result hresult => by
-      have hresEq : result = (encSilentOption encOut (decrypt caller.1 caller.2.2 request.2), state) := by
+      have hresEq : result = (encSilentOption encOut (decrypt caller.1 caller.2.2 request.2),
+        state) := by
         simpa [cca2Phase1Oracle] using hresult
       subst hresEq
       exact ⟨trivial, le_rfl, Nat.le_add_right _ _⟩)
@@ -597,7 +599,8 @@ private theorem isPPTOn_run_cca2Phase2Oracle_of_guess {Challenge Out : Type}
     (prepare := fun caller : ℕ × List Bool × List Bool × Challenge =>
       (caller.1, caller.2.2.1, caller.2.2.2))
     (initial := fun _ => ())
-    (resources := fun caller req => (encSilentOption encOut (decrypt caller.1 caller.2.1 req)).length)
+    (resources := fun caller req => (encSilentOption encOut (decrypt caller.1 caller.2.1
+      req)).length)
     hprep
     hhandler
     (ComputableInPolyTime.const ())

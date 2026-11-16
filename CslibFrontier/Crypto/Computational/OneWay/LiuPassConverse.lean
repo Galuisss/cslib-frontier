@@ -244,14 +244,19 @@ private theorem computableInPolyTime_liuPassCoreWithInput {α : Type} {input : �
     ComputableInPolyTime (fun a => liuPassCore t (n a) (x a)) input encBits := by
   have hrun := DescriptionMethod.computableInPolyTime_universalTMRunFor.comp
     ((computableInPolyTime_decodeProg hn hx).prod (ht.comp hn))
-  exact ((computableInPolyTime_decodeLen hn hx).prod hrun).of_enc_eq fun _ => rfl
+  have hsilent := ComputableInPolyTime.optionMapWithInput
+    (encB := encBits) (encC := encBits) (encOC := encSilentOption encBits)
+    hrun (ComputableInPolyTime.snd _ _)
+  exact ((computableInPolyTime_decodeLen hn hx).prod hsilent).of_enc_eq fun a => by
+    simp only [liuPassCore, Function.comp_def, Option.map_id]
 
 private theorem computableInPolyTime_targetImage {α : Type} {input : α ↪ List Bool}
     {i : α → ℕ} {y : α → List Bool}
     (hi : ComputableInPolyTime i input encUnary)
     (hy : ComputableInPolyTime y input encBits) :
     ComputableInPolyTime (fun a => targetImage (i a) (y a)) input encBits :=
-  (hi.prod ((ComputableInPolyTime.optionSome encBits).comp hy)).of_enc_eq fun _ => rfl
+  (hi.prod ((ComputableInPolyTime.optionSome encBits
+    (encO := encSilentOption encBits)).comp hy)).of_enc_eq fun _ => rfl
 
 theorem computableInPolyTime_liuPassCore {t : ℕ → ℕ}
     (ht : ComputableInPolyTime t encUnary encUnary) :

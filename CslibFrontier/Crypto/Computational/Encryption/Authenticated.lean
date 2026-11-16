@@ -613,11 +613,11 @@ theorem isPPTOn_run_oneTimeCPAEncryptionOracle (E : SymmetricCipher)
       hmbLen] at hctLen
     have hbound : ct.length ≤ c * (3 * caller.1 + 2 * caller.2.length + 4) ^ d :=
       hctLen.trans (Nat.mul_le_mul_left c (Nat.pow_le_pow_left (by lia) d))
-    exact ⟨trivial, by lia, by simp [encBool_apply]⟩
+    exact ⟨trivial, by lia, by simp⟩
   · simp only [hlenEq, Bool.false_eq_true, ↓reduceIte, ProbComp.eval_pure,
       PMF.mem_support_pure_iff] at hresult
     subst result
-    exact ⟨trivial, by simp, by simp [encBool_apply]⟩
+    exact ⟨trivial, by simp, by simp⟩
 
 /-- The one-time symmetric CPA experiment is uniformly strict PPT in the unary security
 parameter. -/
@@ -732,9 +732,9 @@ theorem isOraclePPT_cpaLimitToOneQuery {ctBound : ℕ → ℕ}
     split_ifs at hresult with hlenEq
     · obtain ⟨ct, hct, rfl⟩ := OracleComp.mem_supportWith_map_iff.mp hresult
       obtain ⟨rawCt, _, rfl⟩ := OracleComp.mem_supportWith_map_iff.mp hct
-      exact ⟨trivial, (List.length_take_le _ _).trans (by lia), by simp [encBool_apply]⟩
+      exact ⟨trivial, (List.length_take_le _ _).trans (by lia), by simp⟩
     · cases OracleComp.eq_of_mem_supportWith_pure hresult
-      exact ⟨trivial, by simp, by simp [encBool_apply]⟩
+      exact ⟨trivial, by simp, by simp⟩
   unfold cpaLimitToOneQuery
   simpa only [bind_pure_comp] using (hrun.map' (ComputableInPolyTime.fst _ _)).isOraclePPT
 
@@ -1347,9 +1347,9 @@ theorem isOraclePPT_ciLimitToOneQuery {ctBound : ℕ → ℕ}
     split_ifs at hresult with hlenEq
     · obtain ⟨ct, hct, rfl⟩ := OracleComp.mem_supportWith_map_iff.mp hresult
       obtain ⟨rawCt, _, rfl⟩ := OracleComp.mem_supportWith_map_iff.mp hct
-      exact ⟨trivial, (List.length_take_le _ _).trans (by lia), by simp [encBool_apply]⟩
+      exact ⟨trivial, (List.length_take_le _ _).trans (by lia), by simp⟩
     · cases OracleComp.eq_of_mem_supportWith_pure hresult
-      exact ⟨trivial, by simp, by simp [encBool_apply]⟩
+      exact ⟨trivial, by simp, by simp⟩
   unfold ciLimitToOneQuery
   simpa only [bind_pure_comp] using (hrun.map' (ComputableInPolyTime.fst _ _)).isOraclePPT
 
@@ -1955,13 +1955,13 @@ theorem isOraclePPT_ccaLimitToOneEncryptionQuery {ctBound : ℕ → ℕ}
       split_ifs at hresult with hlenEq
       · obtain ⟨ct, hct, rfl⟩ := OracleComp.mem_supportWith_map_iff.mp hresult
         obtain ⟨rawCt, _, rfl⟩ := OracleComp.mem_supportWith_map_iff.mp hct
-        exact ⟨trivial, (List.length_take_le _ _).trans (by lia), by simp [encBool_apply]⟩
+        exact ⟨trivial, (List.length_take_le _ _).trans (by lia), by simp⟩
       · cases OracleComp.eq_of_mem_supportWith_pure hresult
-        exact ⟨trivial, by simp, by simp [encBool_apply]⟩
+        exact ⟨trivial, by simp, by simp⟩
     · simp only [hreq, ↓reduceIte] at hresult
       obtain ⟨reply, hreply, rfl⟩ := OracleComp.mem_supportWith_map_iff.mp hresult
       obtain ⟨rawReply, _, rfl⟩ := OracleComp.mem_supportWith_map_iff.mp hreply
-      exact ⟨trivial, (List.length_take_le _ _).trans (by lia), by simp [encBool_apply]⟩
+      exact ⟨trivial, (List.length_take_le _ _).trans (by lia), by simp⟩
   unfold ccaLimitToOneEncryptionQuery
   simpa only [bind_pure_comp] using (hrun.map' (ComputableInPolyTime.fst _ _)).isOraclePPT
 

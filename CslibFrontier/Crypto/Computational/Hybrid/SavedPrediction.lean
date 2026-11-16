@@ -189,8 +189,8 @@ private theorem input_splice (encoding : α ↪ List Bool) (base : List Bool)
       (encList (encPair encoding encBool) back) coins).input (encoding observation) =
       encPair encBits (encList (encPair encoding encBool))
         (base, front ++ (observation, trial) :: back) := by
-  simp [Description.input, encPair, List.append_assoc, encBits_apply,
-    encList_append, encList_cons]
+  simp [Description.input, encPair, List.append_assoc,
+    ]
 
 private theorem coinBudget_ge (desc : Description) (observation : List Bool) (c d width : ℕ)
     (hwidth : observation.length ≤ width) :
@@ -227,7 +227,7 @@ theorem eval_splice (encoding : α ↪ List Bool) (base : List Bool)
   have hbudget := coinBudget_ge desc (encoding observation) c d width hwidth
   rw [input_splice] at hbudget
   rw [ProbComp.eval_map, hrealize _ _ hbudget]
-  simp [evaluate, Function.comp_def, desc, Description.input, encList_append, encList_cons,
+  simp [evaluate, Function.comp_def, desc, Description.input,
     List.append_assoc, PMF.map]
 
 /-- Sampling all predictor randomness once preserves every bounded observation's prediction

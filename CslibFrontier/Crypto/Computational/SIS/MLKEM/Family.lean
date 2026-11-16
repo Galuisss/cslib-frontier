@@ -213,7 +213,8 @@ theorem _root_.Turing.MultiTapeTM.ComputableInPolyTime.encDetWord {P : α → Pa
 theorem _root_.Turing.MultiTapeTM.ComputableInPolyTime.decWord {P : α → Params}
     {sk ct : α → List Bool} (hP : ComputableInPolyTime P input encParams)
     (hsk : ComputableInPolyTime sk input encBits) (hct : ComputableInPolyTime ct input encBits) :
-    ComputableInPolyTime (fun x => decWord (P x) (sk x) (ct x)) input (encSilentOption encBits) := by
+    ComputableInPolyTime (fun x => decWord (P x) (sk x) (ct x)) input (encSilentOption encBits)
+      := by
   unfold Cslib.Crypto.MLKEM.decWord
   dsimp only
   have hc := ciphertextDecoder.computableInPolyTime.comp hct

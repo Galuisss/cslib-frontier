@@ -140,7 +140,8 @@ theorem senderClosedProgram_isPPT {Output : Type}
       (encPair (encFinEnum (Fin 4 → Bool)) stateEncoding) (fun p => choose p.1 p.2))
     (hreceive : ComputableInPolyTime (fun st => receive st ()) stateEncoding stateEncoding)
     (hfinish : IsPPTOn (encPair encUnary stateEncoding)
-      (encPair (encSilentOption (encPair encBool (encList (encPair encBool encBool)))) outputEncoding)
+      (encPair (encSilentOption (encPair encBool (encList (encPair encBool encBool))))
+        outputEncoding)
       (fun p => finish p.1 p.2))
     (growth : ℕ)
     (hgrowth : ∀ k st t middle, (t, middle) ∈ (ProbComp.eval (choose k st)).support →

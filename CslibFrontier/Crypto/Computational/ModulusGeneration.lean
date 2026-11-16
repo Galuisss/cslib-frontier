@@ -481,7 +481,8 @@ theorem isPPTOn_primeAttempt :
   rfl
 
 /-- **The generator is a strict PPT program** in `n`, given in unary. -/
-theorem isPPTOn_randomPrime : Probability.IsPPTOn encUnary (encSilentOption encNat) randomPrime := by
+theorem isPPTOn_randomPrime : Probability.IsPPTOn encUnary (encSilentOption encNat) randomPrime
+  := by
   have hfst : ComputableInPolyTime (fun found : Option (ℕ × Bool) => found.map Prod.fst)
       (encOption (encPair encNat encBool)) (encSilentOption encNat) :=
     ComputableInPolyTime.optionMapWithInput (encB := encPair encNat encBool)
@@ -510,7 +511,8 @@ private theorem computableInPolyTime_combine :
       (fun r : (Option ℕ × Option ℕ) × ℕ => r.1.2.elim none fun q => some (r.2 * q, r.2, q))
       (encPair (encPair (encSilentOption encNat) (encSilentOption encNat)) encNat)
       (encSilentOption (encPair encNat (encPair encNat encNat))) := by
-    refine ComputableInPolyTime.optionElimWithInput (encB := encNat) ?_
+    refine ComputableInPolyTime.optionElimWithInput (encB := encNat)
+      (encO := encSilentOption encNat) ?_
       (ComputableInPolyTime.const _) ?_
     · exact ComputableInPolyTime.snd' (ComputableInPolyTime.fst _ _)
     · exact htriple.comp ((ComputableInPolyTime.snd' (ComputableInPolyTime.fst _ _)).prod
@@ -520,7 +522,8 @@ private theorem computableInPolyTime_combine :
         x.1.elim none fun p => x.2.elim none fun q => some (p * q, p, q))
       (encPair (encSilentOption encNat) (encSilentOption encNat))
       (encSilentOption (encPair encNat (encPair encNat encNat))) := by
-    refine ComputableInPolyTime.optionElimWithInput (encB := encNat) ?_
+    refine ComputableInPolyTime.optionElimWithInput (encB := encNat)
+      (encO := encSilentOption encNat) ?_
       (ComputableInPolyTime.const _) hinner
     exact ComputableInPolyTime.fst _ _
   have heq : (fun x : Option ℕ × Option ℕ => x.1.bind fun p => x.2.map fun q => (p * q, p, q)) =

@@ -733,11 +733,11 @@ theorem isOraclePPT_etmToOneTimeMACForger (E : SymmetricCipher) (M : MACScheme)
       obtain ⟨rawTag, _, rfl⟩ := OracleComp.mem_supportWith_map_iff.mp htag
       have htagTake : (List.take (tagBound caller.1.1) rawTag).length ≤ tagBound caller.1.1 :=
         List.length_take_le _ _
-      refine ⟨trivial, ?_, by simp [encBool_apply]⟩
+      refine ⟨trivial, ?_, by simp⟩
       enc_len
     · have hresEq := OracleComp.eq_of_mem_supportWith_pure hresult
       subst hresEq
-      exact ⟨trivial, by simp, by simp [encBool_apply]⟩
+      exact ⟨trivial, by simp, by simp⟩
   have hrunMap : IsOraclePPTOn (Operation := Unit) ECaller (encPair encBits encBits)
       (fun caller : (ℕ × List Bool) × List Bool =>
         (fun out : List Bool × Bool =>
@@ -1214,11 +1214,11 @@ theorem isOraclePPT_etmToOneTimeCPAAdversary (M : MACScheme) {adversary : Oracle
       simp only [length_encPair, encBits_apply] at htagLen
       have htagBound : tag.length ≤ cs * (2 * caller.2.length + M.msgLen caller.1.1 + 2) ^ ds :=
         htagLen.trans (Nat.mul_le_mul_left cs (Nat.pow_le_pow_left (by lia) ds))
-      refine ⟨trivial, ?_, by simp [encBool_apply]⟩
+      refine ⟨trivial, ?_, by simp⟩
       enc_len
     · have hresEq := OracleComp.eq_of_mem_supportWith_pure hresult
       subst hresEq
-      exact ⟨trivial, by simp, by simp [encBool_apply]⟩
+      exact ⟨trivial, by simp, by simp⟩
   have hrunMap : IsOraclePPTOn (Operation := Unit) ECaller encBool
       (fun caller : (ℕ × List Bool) × List Bool =>
         Prod.fst <$> (OracleComp.interpret

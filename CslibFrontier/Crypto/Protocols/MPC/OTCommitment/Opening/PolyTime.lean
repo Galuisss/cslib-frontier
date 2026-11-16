@@ -44,7 +44,8 @@ theorem openPairs_polyTime :
   have hchoices := (ComputableInPolyTime.fst encBits
     (encPair encBits (encSilentOption encSubmission))).comp hinput
   have hreceived := ((ComputableInPolyTime.fst encBits (encSilentOption encSubmission)).comp
-    (ComputableInPolyTime.snd encBits (encPair encBits (encSilentOption encSubmission)))).comp hinput
+    (ComputableInPolyTime.snd encBits (encPair encBits (encSilentOption encSubmission)))).comp
+      hinput
   have hbit := (ComputableInPolyTime.fst encBool encPairs).comp hvalue
   have hpairs := (ComputableInPolyTime.snd encBool encPairs).comp hvalue
   have hzip := (ComputableInPolyTime.zip encBool encBool).comp

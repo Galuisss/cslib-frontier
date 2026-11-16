@@ -588,7 +588,8 @@ theorem computableInPolyTime_firstSuccess {α β : Type} {input : α ↪ List Bo
     ComputableInPolyTime (fun a => firstSuccess (d a) (attempts a)) input enc :=
   let hfilt := (ComputableInPolyTime.headD (encA := encSilentOption enc) none).comp'
     (ha.filterWithInput
-      (ComputableTidilyInPolyTime.snd input (encSilentOption enc)).optionIsSome.computableInPolyTime)
+      (ComputableTidilyInPolyTime.optionIsSome (encB := enc)
+        (ComputableTidilyInPolyTime.snd input (encSilentOption enc))).computableInPolyTime)
   (hfilt.tidy.optionGetDWithInput hd.tidy).computableInPolyTime
 
 @[fun_prop]
@@ -596,7 +597,8 @@ theorem computableInPolyTime_acceptGuess {α β : Type} {input : α ↪ List Boo
     {encB : β ↪ List Bool} {ch_guess : α → List Bool} {result : α → β × TwoRoundState}
     (hch : ComputableInPolyTime ch_guess input encBits)
     (hres : ComputableInPolyTime result input (encPair encB encTwoRoundState)) :
-    ComputableInPolyTime (fun a => acceptGuess (ch_guess a) (result a)) input (encSilentOption encB) := by
+    ComputableInPolyTime (fun a => acceptGuess (ch_guess a) (result a)) input (encSilentOption
+      encB) := by
   unfold acceptGuess
   exact ((encTwoRoundState_challenge_polyTime hres.snd').beq hch).ite'
     ((ComputableInPolyTime.optionSome encB).comp hres.fst') (.const none)

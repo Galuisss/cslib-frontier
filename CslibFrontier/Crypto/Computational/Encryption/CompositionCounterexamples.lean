@@ -447,7 +447,7 @@ private theorem take_encSilentOption_some_replicate (n : ℕ) (b : Bool) :
     List.take (n + 1) (encSilentOption encBits (some (List.replicate n b))) =
       encSilentOption encBits (some (List.replicate n b)) := by
   apply List.take_of_length_le
-  simp [encSilentOption_some, encBits_apply]
+  simp
 
 private theorem encSilentOption_some_replicate_false_beq_true {n : ℕ} (hn : 1 ≤ n) :
     (encSilentOption encBits (some (List.replicate n false)) ==

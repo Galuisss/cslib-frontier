@@ -398,6 +398,7 @@ private noncomputable def guessWords (k : ℕ) (st : ReductionState G) (V : Opti
 /-- **The reduction is PPT** whenever the environment `Z` is PPT for `encoding G encFn`, the public
 parameters are drawn by a PPT sampler `samp`, and `G` reads input lengths (`hinLen`) and evaluates
 `ev` (`hev`) in polynomial time. -/
+attribute [local irreducible] ComputableInPolyTime in
 theorem isPPT_evaluatorToPrvSim {encFn : Fn ↪ List Bool} {samp : ℕ → ProbComp (Params G)}
     {Z : Environment (family G) {1}} (hinLen : ComputableInPolyTime G.inLen encFn encUnary)
     (hev : ComputableInPolyTime (fun (f, x) => G.ev f x) (encPair encFn encBits) encBits)
@@ -446,7 +447,8 @@ theorem isPPT_evaluatorToPrvSim {encFn : Fn ↪ List Bool} {samp : ℕ → ProbC
     rfl
   guess := by
     obtain ⟨W, hW, hWeq⟩ := hZ.guess.exists_bool_factor (encGuessInput_apply (encoding G encFn))
-    let E := encPair encUnary (encPair (encReductionState (G := G) encFn) (encSilentOption encPrvView))
+    let E := encPair encUnary (encPair (encReductionState (G := G) encFn) (encSilentOption
+      encPrvView))
     have hk : ComputableInPolyTime (fun p : ℕ × ReductionState G × Option PrvView => p.1) E
         encUnary := .fst _ _
     have hst : ComputableInPolyTime (fun p : ℕ × ReductionState G × Option PrvView => p.2.1) E
@@ -465,8 +467,9 @@ theorem isPPT_evaluatorToPrvSim {encFn : Fn ↪ List Bool} {samp : ℕ → ProbC
       simp only [Params.evaluatorLen]
       fun_prop
     have hview : ComputableInPolyTime (fun p : ℕ × ReductionState G × Option PrvView =>
-        p.2.2.getD ⟨[], [], []⟩) E encPrvView := by
-      fun_prop
+        p.2.2.getD ⟨[], [], []⟩) E encPrvView :=
+      ComputableInPolyTime.optionGetDWithInput (encB := encPrvView)
+        (encO := encSilentOption encPrvView) (by fun_prop) (.const _)
     have hwords : ComputableInPolyTime (fun p : ℕ × ReductionState G × Option PrvView =>
         guessWords p.1 p.2.1 p.2.2) E (encGuessInputFields (encoding G encFn)) :=
       hk.prod (hc.prod ((encReductionState_envState_polyTime encFn hst).prod
