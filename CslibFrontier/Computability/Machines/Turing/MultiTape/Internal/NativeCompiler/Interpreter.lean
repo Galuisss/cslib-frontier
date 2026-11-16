@@ -13,6 +13,7 @@ import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeComp
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ReplicateResourceBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.PolyTime
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Output
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.BitLength
 
 /-!
 # Concrete retained bounded interpretation
@@ -496,6 +497,22 @@ private theorem inputSymbolsCompiler_resources_le (word : List Bool) :
   simp only [inputSymbolsCompiler, comp, ofTransducer, encBits_apply]
   constructor <;> omega
 
+private def bitInterpreterInputCompiler :
+    NativeCompiler (fun input : List Bool × ℕ => (input.1.map Universal.eBit, input.2))
+      (encPair encBits encUnary) (encPair (encList encUnary) encUnary) :=
+  (inputSymbolsCompiler.comp (first encBits encUnary)).pair (second encBits encUnary)
+
+private theorem bitInterpreterInputCompiler_resources_le (word : List Bool) (count : ℕ) :
+    bitInterpreterInputCompiler.time (word, count) ≤ 2000 * (word.length + count + 1) ∧
+      bitInterpreterInputCompiler.workspace (word, count) ≤
+        2000 * (word.length + count + 1) := by
+  have hs := inputSymbolsCompiler_resources_le word
+  have hl := length_encList_map_eBit_le word
+  have hk : inputSymbolsCompiler.tapeCount = 2 := rfl
+  simp only [bitInterpreterInputCompiler, pair, comp, first, second, ofTransducer,
+    encodeFrame, hk, length_encPair, encBits_apply, encUnary_apply, List.length_replicate]
+  constructor <;> norm_num [Nat.max_def] <;> omega
+
 private def outputBitCompiler :
     NativeCompiler (fun symbol : ℕ => decide (symbol = 1)) encUnary encBool :=
   ((wordEqBool encUnary).comp
@@ -612,9 +629,77 @@ noncomputable def simulateBitOutputCompiler (description : Desc) :
       (fun input : List Bool × ℕ =>
         ((simulate description (input.1.map Universal.eBit) input.2).1).map
           fun symbol => decide (symbol = 1))
-      (encPair encBits encUnary) encBits := by
-  let word := inputSymbolsCompiler.comp (first encBits encUnary)
-  let clock := second encBits encUnary
-  exact outputBitsCompiler.comp ((simulateOutputCompiler description).comp (word.pair clock))
+      (encPair encBits encUnary) encBits :=
+  outputBitsCompiler.comp ((simulateOutputCompiler description).comp bitInterpreterInputCompiler)
+
+private theorem simulateBitOutputCompiler_resources_le (description : Desc)
+    (word : List Bool) (count simulationTime simulationSpace : ℕ)
+    (htime : (simulateOutputCompiler description).time (word.map Universal.eBit, count) ≤
+      simulationTime)
+    (hspace : (simulateOutputCompiler description).workspace (word.map Universal.eBit, count) ≤
+      simulationSpace) :
+    let A := word.length + count + 1
+    let O := count * (2 * descLen description + 1)
+    let K₁ := max bitInterpreterInputCompiler.tapeCount
+      (simulateOutputCompiler description).tapeCount
+    let K₂ := max ((simulateOutputCompiler description).comp bitInterpreterInputCompiler).tapeCount
+      outputBitsCompiler.tapeCount
+    (simulateBitOutputCompiler description).time (word, count) ≤
+        simulationTime + 10000 * A + 10000 * (O + 1) ^ 2 ∧
+      (simulateBitOutputCompiler description).workspace (word, count) ≤
+        simulationSpace + 10000 * A + 300000 * (O + 1) + 6 * K₁ + 6 * K₂ := by
+  let A := word.length + count + 1
+  let O := count * (2 * descLen description + 1)
+  let output := (simulate description (word.map Universal.eBit) count).1
+  have hi := bitInterpreterInputCompiler_resources_le word count
+  have hbits := length_encList_map_eBit_le word
+  have hm : (encPair (encList encUnary) encUnary (word.map Universal.eBit, count)).length ≤
+      7 * A := by
+    simp only [length_encPair, encUnary_apply, List.length_replicate]
+    dsimp only [A]
+    omega
+  have hinv := inv_iterate description (word.map Universal.eBit) count
+  have ho : (encList encUnary output).length ≤ O := by
+    have hsymbols : ∀ symbol ∈ output, (encUnary symbol).length ≤ descLen description := by
+      simpa only [output, simulate, encUnary_apply, List.length_replicate] using hinv.2.2
+    have hlength : output.length ≤ count := by
+      simpa only [output, simulate] using hinv.2.1
+    exact (length_encList_le encUnary output hsymbols).trans
+      (Nat.mul_le_mul_right (2 * descLen description + 1) hlength)
+  have hd := outputBitsCompiler_resources_le output
+  have hdTime : outputBitsCompiler.time output ≤ 2000 * (O + 1) ^ 2 :=
+    hd.1.trans (Nat.mul_le_mul_left 2000
+      (Nat.pow_le_pow_left (Nat.add_le_add_right ho 1) 2))
+  have hdSpace : outputBitsCompiler.workspace output ≤ 200000 * (O + 1) :=
+    hd.2.trans (Nat.mul_le_mul_left 200000 (Nat.add_le_add_right ho 1))
+  constructor
+  · have hscalar (i t d m o : ℕ) (hi : i ≤ 2000 * A) (ht : t ≤ simulationTime)
+        (hd : d ≤ 2000 * (O + 1) ^ 2) (hm : m ≤ 7 * A) (ho : o ≤ O) :
+        i + t + 4 * m + 9 + d + 4 * o + 9 ≤
+          simulationTime + 10000 * A + 10000 * (O + 1) ^ 2 := by
+      have hO : O ≤ (O + 1) ^ 2 := by nlinarith
+      dsimp only [A] at *
+      omega
+    change bitInterpreterInputCompiler.time (word, count) +
+      (simulateOutputCompiler description).time (word.map Universal.eBit, count) +
+      4 * (encPair (encList encUnary) encUnary (word.map Universal.eBit, count)).length + 9 +
+      outputBitsCompiler.time output + 4 * (encList encUnary output).length + 9 ≤ _
+    exact hscalar _ _ _ _ _ hi.1 htime hdTime hm ho
+  · have hscalar (i s d m o k₁ k₂ : ℕ) (hi : i ≤ 2000 * A)
+        (hs : s ≤ simulationSpace) (hd : d ≤ 200000 * (O + 1))
+        (hm : m ≤ 7 * A) (ho : o ≤ O) :
+        i + s + 5 * m + (6 * k₁ + 20) + d + 5 * o + (6 * k₂ + 20) ≤
+          simulationSpace + 10000 * A + 300000 * (O + 1) + 6 * k₁ + 6 * k₂ := by
+      dsimp only [A] at *
+      omega
+    change bitInterpreterInputCompiler.workspace (word, count) +
+      (simulateOutputCompiler description).workspace (word.map Universal.eBit, count) +
+      5 * (encPair (encList encUnary) encUnary (word.map Universal.eBit, count)).length +
+      (6 * max bitInterpreterInputCompiler.tapeCount
+        (simulateOutputCompiler description).tapeCount + 20) +
+      outputBitsCompiler.workspace output + 5 * (encList encUnary output).length +
+      (6 * max ((simulateOutputCompiler description).comp bitInterpreterInputCompiler).tapeCount
+        outputBitsCompiler.tapeCount + 20) ≤ _
+    exact hscalar _ _ _ _ _ _ _ hi.2 hspace hdSpace hm ho
 
 end Turing.MultiTapeTM.Internal.NativeCompiler
