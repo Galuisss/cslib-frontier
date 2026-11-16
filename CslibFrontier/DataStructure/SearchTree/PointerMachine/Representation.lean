@@ -14,11 +14,10 @@ public import Mathlib.Data.Tree.Get
 /-!
 # Linked representations of binary search trees
 
-Adapted from `RotationBST.Models.RealWorld.Linked` in Stefan Langerman's
-`lean-bst` at commit `ad5dcac07e8b842f7a629ab0d79c4b32a19be51e`: the
-left/right/parent record layout and the recursive heap representation. Mathematical trees use
-Frontier's existing `BinaryTree` rather than
-introducing another tree type. Addresses are ghost labels, inaccessible to scalar instructions.
+The left/right/parent record layout and recursive heap representation adapt Stefan Langerman's
+earlier `lean-bst` development. This is an adaptation of that design, not a verbatim port of a
+pinned source module. Mathematical trees use Frontier's existing `BinaryTree`.
+Addresses are ghost labels, inaccessible to scalar instructions.
 Extra data fields hold values and balancing metadata. Unrelated heap records are permitted.
 
 `Represents` describes the contents of a subtree, independently of ordering and of a cursor.

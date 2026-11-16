@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.PointerMachine.WordRAM.Memory
 public import CslibFrontier.Computability.WordRAM.Blocks
+public import CslibFrontier.Computability.WordRAM.Allocation
 
 /-!
 # Compiling pointer-machine instructions to word RAM
@@ -16,6 +17,13 @@ public import CslibFrontier.Computability.WordRAM.Blocks
 Nodes occupy fixed blocks of memory, with zero reserved for null. The compiler implements
 pointer access and allocation using ordinary word-RAM instructions. Scalar operations and tests
 come with their own word-RAM implementations and costs; no heap operation is assumed implemented.
+Field accesses reuse `Cslib.WordRAM.readAt` and `Cslib.WordRAM.writeAt`. Allocation uses a
+layout-specific initializer: `Cslib.WordRAM.alloc` zeroes every field, whereas scalar fields
+require `encode M.undefined`, which need not be zero. It also takes six distinct register
+parameters, whereas this initializer uses the base and two scratch registers, leaving the
+next-free and zero registers unchanged until the final frontier update.
+The fixed field list is unrolled, giving the stated layout-dependent constant cost.
+
 Source instructions compile into equally sized code blocks, with jumps directly relocated to
 the corresponding block. Padding is never executed by a simulated successful run.
 -/
@@ -105,16 +113,11 @@ by the source layout, not supplied by the running program. -/
   (List.range L.ptrFields).map (fun f => (f, 0)) ++
     (List.range L.dataFields).map (fun f => (L.ptrFields + f, S.encode M.undefined))
 
-/-- Compute a field address in the temporary address register. -/
-@[expose] def address (base : Fin (regCount L)) (offset : ℕ) : Code .standard (regCount L) :=
-  .seq (.op (.const (addrReg L) offset))
-    (.op (.bin .add (addrReg L) base (addrReg L)))
-
-/-- A null access does nothing; a nonnull access computes its address and executes `body`. -/
+/-- A null access does nothing; a nonnull access loads the fixed offset before `body`. -/
 @[expose] def access (base : Fin (regCount L)) (offset : ℕ)
     (body : Code .standard (regCount L)) : Code .standard (regCount L) :=
   .branch (.eq base (zeroReg L)) (.op (.copy (zeroReg L) (zeroReg L)))
-    (.seq (address base offset) body)
+    (.seq (.op (.const (addrReg L) offset)) body)
 
 /-- The register/memory part of one source instruction. A test also computes its Boolean
 answer in a temporary register for the terminal branch. -/
@@ -123,13 +126,17 @@ answer in a temporary register for the terminal branch. -/
   | .movePtr r s => .op (.copy (ptrReg L r) (ptrReg L s))
   | .moveData r s => .op (.copy (dataReg L r) (dataReg L s))
   | .loadPtr r f b =>
-    access (ptrReg L b) f.val (.op (.load (ptrReg L r) (addrReg L)))
+    access (ptrReg L b) f.val
+      (Cslib.WordRAM.readAt (addrReg L) (ptrReg L r) (ptrReg L b) (addrReg L))
   | .loadData r f b =>
-    access (ptrReg L b) (L.ptrFields + f.val) (.op (.load (dataReg L r) (addrReg L)))
+    access (ptrReg L b) (L.ptrFields + f.val)
+      (Cslib.WordRAM.readAt (addrReg L) (dataReg L r) (ptrReg L b) (addrReg L))
   | .storePtr f b r =>
-    access (ptrReg L b) f.val (.op (.store (addrReg L) (ptrReg L r)))
+    access (ptrReg L b) f.val
+      (Cslib.WordRAM.writeAt (addrReg L) (ptrReg L b) (addrReg L) (ptrReg L r))
   | .storeData f b r =>
-    access (ptrReg L b) (L.ptrFields + f.val) (.op (.store (addrReg L) (dataReg L r)))
+    access (ptrReg L b) (L.ptrFields + f.val)
+      (Cslib.WordRAM.writeAt (addrReg L) (ptrReg L b) (addrReg L) (dataReg L r))
   | .op o d a b => S.op o (dataReg L d) (dataReg L a) (dataReg L b)
   | .create r =>
     .seq (.op (.copy (ptrReg L r) (freeReg L))) <|

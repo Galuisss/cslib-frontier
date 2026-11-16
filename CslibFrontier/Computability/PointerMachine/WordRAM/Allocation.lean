@@ -48,9 +48,7 @@ private theorem initialize_spec (base : Fin (regCount L))
     obtain ⟨offset, value⟩ := field
     obtain ⟨haddr, hvalue, hval⟩ := hfields offset value (by simp)
     have hoff : Cslib.WordRAM.Fits w offset := haddr.of_le (by omega)
-    have hba : base ≠ addrReg L := by
-      intro he; have := congrArg Fin.val he
-      simp only [addrReg] at this; omega
+    have hba : base ≠ addrReg L := by simp [Fin.ext_iff]; omega
     have hab : addrReg L ≠ valueReg L := by simp [addrReg, valueReg, Fin.ext_iff]
     let y₁ := y.set (addrReg L) offset
     let y₂ := y₁.set (addrReg L) (b + offset)
@@ -58,12 +56,8 @@ private theorem initialize_spec (base : Fin (regCount L))
     let y₄ := y₃.write (b + offset) value
     have hframe (r : Fin (regCount L)) (hr : r.val < L.ptrRegs + L.dataRegs + 2) :
         y₄.regs r = y.regs r := by
-      have hra : r ≠ addrReg L := by
-        intro he; have := congrArg Fin.val he
-        simp only [addrReg] at this; omega
-      have hrv : r ≠ valueReg L := by
-        intro he; have := congrArg Fin.val he
-        simp only [valueReg] at this; omega
+      have hra : r ≠ addrReg L := by simp [Fin.ext_iff]; omega
+      have hrv : r ≠ valueReg L := by simp [Fin.ext_iff]; omega
       simp [y₄, y₃, y₂, y₁, Cslib.WordRAM.Data.set, Cslib.WordRAM.Data.write,
         Function.update_of_ne hra, Function.update_of_ne hrv]
     obtain ⟨z, hz, hzr, hzm, hzo⟩ := ih y₄ ((hframe base hbase).trans hb)
@@ -112,7 +106,7 @@ theorem create_spec (S : Scalars M L) (r : Fin L.ptrRegs)
     ∃ z, ExecWithin w (S.effect (.create r)) y z (S.effectTime (.create r)) ∧
       Repr S.encode ((Instr.create r).effect x) z := by
   have hnext : Cslib.WordRAM.Fits w (nodeAddr L (x.heap.length + 1)) := by
-    simpa [Instr.effect] using hfit.1
+    simpa [Instr.effect] using hfit.free
   let y₀ := y.set (ptrReg L r) (nodeAddr L x.heap.length)
   have h₀ : Repr S.encode (x.setPtr r (some x.heap.length)) y₀ := h.setPtr r _
   have hr : (ptrReg L r).val < L.ptrRegs + L.dataRegs + 2 := by
@@ -129,7 +123,7 @@ theorem create_spec (S : Scalars M L) (r : Fin L.ptrRegs)
         dsimp only at ho hv
         subst offset
         subst value
-        have hoff : f < stride L := by unfold stride; omega
+        have hoff := ptrField_lt_stride (L := L) ⟨f, hf⟩
         refine ⟨hnext.of_le (cellAddr_lt (Nat.lt_succ_self _) hoff).le,
           Cslib.WordRAM.fits_zero _, ?_⟩
         simp [hf]
@@ -138,9 +132,9 @@ theorem create_spec (S : Scalars M L) (r : Fin L.ptrRegs)
         dsimp only at ho hv
         subst offset
         subst value
-        have hoff : L.ptrFields + f < stride L := by unfold stride; omega
+        have hoff := dataField_lt_stride (L := L) ⟨f, hf⟩
         refine ⟨hnext.of_le (cellAddr_lt (Nat.lt_succ_self _) hoff).le, ?_, ?_⟩
-        · have hb := hfit.2.2 Record.blank (by simp [Instr.effect]) ⟨f, hf⟩
+        · have hb := hfit.heapData Record.blank (by simp [Instr.effect]) ⟨f, hf⟩
           simpa [Record.blank] using hb
         · simp)
   let z₁ := z.set (addrReg L) (stride L)
@@ -171,9 +165,7 @@ theorem create_spec (S : Scalars M L) (r : Fin L.ptrRegs)
     exact (hc.seq (hz.seq (hs.seq ha))).mono (by simp [effectTime, initialFields]; omega)
   · refine h₀.append Record.blank ?_ ?_ ?_ ?_ ?_
     · intro s hsl hsf
-      have hsa : s ≠ addrReg L := by
-        intro he; have := congrArg Fin.val he
-        simp only [addrReg] at this; omega
+      have hsa : s ≠ addrReg L := by simp [Fin.ext_iff]; omega
       simpa [z₂, z₁, Cslib.WordRAM.Data.set, Function.update_of_ne hsf,
         Function.update_of_ne hsa] using hzr s hsl
     · simp [z₂, Cslib.WordRAM.Data.set, State.setPtr]

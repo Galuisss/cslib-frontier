@@ -32,38 +32,15 @@ private theorem nop_spec {w : ℕ} (y : Cslib.WordRAM.Data (regCount L)) :
   simpa [Cslib.WordRAM.Data.set] using
     (ExecWithin.copy (B := .standard) (w := w) (x := y) (d := zeroReg L) (s := zeroReg L))
 
-private theorem address_spec {e : M.Value ↪ ℕ} {w : ℕ} {x : State M L}
-    {y : Cslib.WordRAM.Data (regCount L)} (h : Repr e x y) (hf : Fits e w x)
-    (b : Fin L.ptrRegs) (a offset : ℕ) (hp : x.ptr b = some a)
-    (ha : a < x.heap.length) (ho : offset < stride L) :
-    ∃ z, ExecWithin w (address (ptrReg L b) offset) y z 2 ∧ Repr e x z ∧
-      z.regs (addrReg L) = cellAddr L a offset := by
-  have hba : ptrReg L b ≠ addrReg L := by
-    intro he; have := congrArg Fin.val he; have := b.isLt
-    simp only [ptrReg, addrReg] at *; omega
-  have hoff : Cslib.WordRAM.Fits w offset := (hf.cellAddr ha ho).of_le (by
-    simp [cellAddr])
-  let y₁ := y.set (addrReg L) offset
-  have hcalc : Cslib.WordRAM.BinOp.add.eval
-      (y₁.regs (ptrReg L b)) (y₁.regs (addrReg L)) = cellAddr L a offset := by
-    simp [y₁, Cslib.WordRAM.Data.set, hba, h.ptr, hp, ptrWord, cellAddr,
-      Cslib.WordRAM.BinOp.eval]
-  have hb := ExecWithin.bin (x := y₁) (d := addrReg L) (i := ptrReg L b)
-    (j := addrReg L) (f := .add) (w := w) (by rw [hcalc]; exact hf.cellAddr ha ho)
-  rw [hcalc] at hb
-  refine ⟨y₁.set (addrReg L) (cellAddr L a offset),
-    (ExecWithin.const hoff).seq hb, ?_, by simp [Cslib.WordRAM.Data.set]⟩
-  exact (h.scratch (addrReg L) (by simp [addrReg]) offset).scratch
-    (addrReg L) (by simp [addrReg]) _
-
 private theorem access_spec {e : M.Value ↪ ℕ} {w : ℕ} {x target : State M L}
     {y : Cslib.WordRAM.Data (regCount L)} (h : Repr e x y) (hv : x.Valid)
     (hf : Fits e w x) (b : Fin L.ptrRegs) (offset : ℕ) (ho : offset < stride L)
     (body : Code .standard (regCount L))
     (hnull : x.ptr b = none → Repr e target y)
     (hbody : ∀ a n, x.ptr b = some a → x.heap[a]? = some n →
-      ∀ z, Repr e x z → z.regs (addrReg L) = cellAddr L a offset →
-        ∃ z', ExecWithin w body z z' 1 ∧ Repr e target z') :
+      ∀ z, Repr e x z → z.regs (ptrReg L b) + z.regs (addrReg L) = cellAddr L a offset →
+        Cslib.WordRAM.Fits w (cellAddr L a offset) →
+        ∃ z', ExecWithin w body z z' 2 ∧ Repr e target z') :
     ∃ z, ExecWithin w (access (ptrReg L b) offset body) y z 5 ∧ Repr e target z := by
   cases hp : x.ptr b with
   | none =>
@@ -72,8 +49,14 @@ private theorem access_spec {e : M.Value ↪ ℕ} {w : ℕ} {x target : State M 
   | some a =>
     have ha := hv.1 b a hp
     have hn : x.heap[a]? = some (x.heap[a]'ha) := List.getElem?_eq_getElem ha
-    obtain ⟨z, he, hz, hadr⟩ := address_spec h hf b a offset hp ha ho
-    obtain ⟨z', he', hz'⟩ := hbody a _ hp hn z hz hadr
+    have hoff := (hf.cellAddr ha ho).of_le (Nat.le_add_left offset (nodeAddr L a))
+    have he := ExecWithin.const (B := .standard) (d := addrReg L) (x := y) hoff
+    have hz := h.scratch (addrReg L) (by simp) offset
+    have haddr : (y.set (addrReg L) offset).regs (ptrReg L b) +
+        (y.set (addrReg L) offset).regs (addrReg L) = cellAddr L a offset := by
+      rw [hz.ptr]
+      simp [hp, ptrWord, cellAddr]
+    obtain ⟨z', he', hz'⟩ := hbody a _ hp hn _ hz haddr (hf.cellAddr ha ho)
     refine ⟨z', ExecWithin.branch_neg ?_ (he.seq he'), hz'⟩
     simp [Cslib.WordRAM.Cond.Holds, h.ptr, h.zero, hp, ptrWord, nodeAddr]
 
@@ -101,60 +84,68 @@ theorem effect_correct (S : Scalars M L) (i : Instr M L) {w : ℕ} {x : State M 
     simpa only [effect, effectTime, h.data] using
       (ExecWithin.copy (B := .standard) (w := w) (x := y) (d := dataReg L r) (s := dataReg L s))
   | loadPtr r f b =>
-    have ho : f.val < stride L := by have := f.isLt; unfold stride; omega
+    have ho : f.val < stride L := ptrField_lt_stride f
     obtain ⟨z, he, hz⟩ := access_spec h hv hf b f.val ho
-      (.op (.load (ptrReg L r) (addrReg L)))
+      (Cslib.WordRAM.readAt (addrReg L) (ptrReg L r) (ptrReg L b) (addrReg L))
       (target := (Instr.loadPtr r f b).effect x) (by
         intro hp; simpa [Instr.effect, State.deref, hp] using h) (by
-        intro a n hp hn z hz hadr
-        have he := ExecWithin.load (B := .standard) (w := w) (x := z)
-          (d := ptrReg L r) (a := addrReg L)
-        rw [hadr, hz.heapPtr a n hn f] at he
+        intro a n hp hn z hz haddr hfit
+        have hz' := hz.scratch (addrReg L) (by simp) (cellAddr L a f.val)
+        have he := (Cslib.WordRAM.readAt_exec (w := w) (x := z)
+          (tmp := addrReg L) (dst := ptrReg L r) (ptr := ptrReg L b) (idx := addrReg L)
+          (by rwa [haddr])).within
+        rw [haddr, hz.heapPtr a n hn f] at he
         refine ⟨_, he, ?_⟩
-        simpa [Instr.effect, State.deref, hp, hn] using hz.setPtr r (n.ptr f))
+        simpa [Instr.effect, State.deref, hp, hn] using hz'.setPtr r (n.ptr f))
     exact ⟨z, he, hz, trivial⟩
   | loadData r f b =>
-    have ho : L.ptrFields + f.val < stride L := by have := f.isLt; unfold stride; omega
+    have ho : L.ptrFields + f.val < stride L := dataField_lt_stride f
     obtain ⟨z, he, hz⟩ := access_spec h hv hf b (L.ptrFields + f.val) ho
-      (.op (.load (dataReg L r) (addrReg L)))
+      (Cslib.WordRAM.readAt (addrReg L) (dataReg L r) (ptrReg L b) (addrReg L))
       (target := (Instr.loadData r f b).effect x) (by
         intro hp; simpa [Instr.effect, State.deref, hp] using h) (by
-        intro a n hp hn z hz hadr
-        have he := ExecWithin.load (B := .standard) (w := w) (x := z)
-          (d := dataReg L r) (a := addrReg L)
-        rw [hadr, hz.heapData a n hn f] at he
+        intro a n hp hn z hz haddr hfit
+        have hz' := hz.scratch (addrReg L) (by simp) (cellAddr L a (L.ptrFields + f.val))
+        have he := (Cslib.WordRAM.readAt_exec (w := w) (x := z)
+          (tmp := addrReg L) (dst := dataReg L r) (ptr := ptrReg L b) (idx := addrReg L)
+          (by rwa [haddr])).within
+        rw [haddr, hz.heapData a n hn f] at he
         refine ⟨_, he, ?_⟩
-        simpa [Instr.effect, State.deref, hp, hn] using hz.setData r (n.data f))
+        simpa [Instr.effect, State.deref, hp, hn] using hz'.setData r (n.data f))
     exact ⟨z, he, hz, trivial⟩
   | storePtr f b r =>
-    have ho : f.val < stride L := by have := f.isLt; unfold stride; omega
+    have ho : f.val < stride L := ptrField_lt_stride f
     obtain ⟨z, he, hz⟩ := access_spec h hv hf b f.val ho
-      (.op (.store (addrReg L) (ptrReg L r)))
+      (Cslib.WordRAM.writeAt (addrReg L) (ptrReg L b) (addrReg L) (ptrReg L r))
       (target := (Instr.storePtr f b r).effect x) (by
         intro hp; simpa [Instr.effect, State.modify, hp] using h) (by
-        intro a n hp hn z hz hadr
-        have he := ExecWithin.store (B := .standard) (w := w) (x := z)
-          (a := addrReg L) (s := ptrReg L r)
-        rw [hadr, hz.ptr r] at he
+        intro a n hp hn z hz haddr hfit
+        have hz' := hz.scratch (addrReg L) (by simp) (cellAddr L a f.val)
+        have he := (Cslib.WordRAM.writeAt_exec (w := w) (x := z)
+          (tmp := addrReg L) (ptr := ptrReg L b) (idx := addrReg L) (src := ptrReg L r)
+          (by simp [Fin.ext_iff]; omega) (by rwa [haddr])).within
+        rw [haddr, hz.ptr r] at he
         refine ⟨_, he, ?_⟩
-        simpa [Instr.effect, State.modify, hp] using hz.writePtr a f (x.ptr r))
+        simpa [Instr.effect, State.modify, hp] using hz'.writePtr a f (x.ptr r))
     exact ⟨z, he, hz, trivial⟩
   | storeData f b r =>
-    have ho : L.ptrFields + f.val < stride L := by have := f.isLt; unfold stride; omega
+    have ho : L.ptrFields + f.val < stride L := dataField_lt_stride f
     obtain ⟨z, he, hz⟩ := access_spec h hv hf b (L.ptrFields + f.val) ho
-      (.op (.store (addrReg L) (dataReg L r)))
+      (Cslib.WordRAM.writeAt (addrReg L) (ptrReg L b) (addrReg L) (dataReg L r))
       (target := (Instr.storeData f b r).effect x) (by
         intro hp; simpa [Instr.effect, State.modify, hp] using h) (by
-        intro a n hp hn z hz hadr
-        have he := ExecWithin.store (B := .standard) (w := w) (x := z)
-          (a := addrReg L) (s := dataReg L r)
-        rw [hadr, hz.data r] at he
+        intro a n hp hn z hz haddr hfit
+        have hz' := hz.scratch (addrReg L) (by simp) (cellAddr L a (L.ptrFields + f.val))
+        have he := (Cslib.WordRAM.writeAt_exec (w := w) (x := z)
+          (tmp := addrReg L) (ptr := ptrReg L b) (idx := addrReg L) (src := dataReg L r)
+          (by simp [Fin.ext_iff]; omega) (by rwa [haddr])).within
+        rw [haddr, hz.data r] at he
         refine ⟨_, he, ?_⟩
-        simpa [Instr.effect, State.modify, hp] using hz.writeData a f (x.data r))
+        simpa [Instr.effect, State.modify, hp] using hz'.writeData a f (x.data r))
     exact ⟨z, he, hz, trivial⟩
   | op o d a b =>
     have hout : Cslib.WordRAM.Fits w (S.encode (M.evalOp o (x.data a) (x.data b))) := by
-      simpa [Instr.effect, State.setData] using hf'.2.1 d
+      simpa [Instr.effect, State.setData] using hf'.data d
     obtain ⟨z, he, hz⟩ := S.op_spec w o (dataReg L d) (dataReg L a) (dataReg L b)
       y (x.data a) (x.data b) (h.data a) (h.data b) hs hout
     exact ⟨z, he, h.setData_of_frame d _ hz.result hz.frame hz.memory, trivial⟩
@@ -162,11 +153,12 @@ theorem effect_correct (S : Scalars M L) (i : Instr M L) {w : ℕ} {x : State M 
     obtain ⟨z, he, hz⟩ := S.create_spec r h hf'
     exact ⟨z, he, hz, trivial⟩
   | ifTest p a b t =>
-    have hone : 1 < 2 ^ w := lt_of_le_of_lt (by simp [nodeAddr]) hf.1
+    have hone : 1 < 2 ^ w := lt_of_le_of_lt (by simp [nodeAddr]) hf.free
     obtain ⟨z, he, hz⟩ := S.test_spec w p (valueReg L) (dataReg L a) (dataReg L b)
       y (x.data a) (x.data b) (h.data a) (h.data b) hs hone
     refine ⟨z, he, h.of_frame (fun r hr => hz.frame r hr ?_) hz.memory, hz.result⟩
-    intro he; have := congrArg Fin.val he; simp only [valueReg] at this; omega
+    simp [Fin.ext_iff]
+    omega
   | goto t => exact ⟨y, nop_spec y, h, trivial⟩
   | ifPtrEq a b t => exact ⟨y, nop_spec y, h, trivial⟩
   | halt => exact ⟨y, nop_spec y, h, trivial⟩

@@ -13,8 +13,8 @@ public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Representati
 # Ancestors of a linked subtree
 
 These ghost frames describe ancestors and siblings, not an additional machine stack.
-They adapt the proof context in `RotationBST.RealWorld.Linked` and the labelled cursor
-of Stefan Langerman's `lean-bst` to Frontier's `BinaryTree`.
+They adapt the ancestor contexts and labelled cursors of Stefan Langerman's earlier
+`lean-bst` development to Frontier's `BinaryTree`.
 `represents_plug_iff` decomposes a whole-tree heap representation into the focused subtree
 and its surrounding context, and conversely reconstructs it. Parent pointers implement
 the corresponding machine navigation.
