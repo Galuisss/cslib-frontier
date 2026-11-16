@@ -62,8 +62,8 @@ directions and loops in the input lists do not change it. `⟨G, K⟩ ∈ Simple
 the edges between `S` and its complement. The weighted `MaxCut` has binary weights, and expanding
 them into unit edges is exponential, so this is a separate result. The hardness reduction
 `toSimpleMaxCut` starts from NAE EU3SAT. Each clause becomes a triangle on its literal vertices
-plus an edge `x`–`¬x` for each of its literals. At most `5` of these six edges cross a cut, so a
-cut of `5` edges per clause is a maximum one, and it encodes an NAE assignment. Every edge is then
+plus an edge between `x` and `¬x` for each of its literals. At most `5` of these six edges cross a
+cut, so a cut of `5` edges per clause is a maximum one, and it encodes an NAE assignment. Every edge is then
 replaced by a path of three edges, which gives a simple graph and adds exactly `2` per edge to the
 maximum cut. To count a cut of your own graph whose edge list has no loops or repeated edges, use
 `SimpleMaxCut.card_interedges_eq_crossCount`. The

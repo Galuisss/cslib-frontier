@@ -25,7 +25,7 @@ import Mathlib.Data.List.GetD
 
 `SimpleMaxCut` is the set of `SimpleMaxCutInstance` values `(G, K)` such that some set `S` of
 vertices of the simple graph `G.induced` has at least `K` edges between `S` and its complement
-[Arora and Barak, Exercise 2.15][AroraBarak09] [Garey and Johnson, comment on ND16]
+[Arora and Barak, Exercise 2.15][AroraBarak07] [Garey and Johnson, comment on ND16]
 [GareyJohnson1979]. The graph is a `Cslib.Complexity.Graph` in the usual binary encoding
 `encGraph`, read as the simple graph on its declared vertices, and `K` is in binary. The edges
 between `S` and its complement are counted by Mathlib's `SimpleGraph.interedges S Sᶜ`: an edge
@@ -77,7 +77,7 @@ The output graph has `18` edges per clause and the bound `17 * m`.
 
 ## References
 
-* [S. Arora, B. Barak, *Computational Complexity: A Modern Approach*, Exercise 2.15][AroraBarak09]
+* [S. Arora, B. Barak, *Computational Complexity: A Modern Approach*, Exercise 2.15][AroraBarak07]
 * [M. R. Garey and D. S. Johnson, *Computers and Intractability*][GareyJohnson1979]
 -/
 
@@ -102,7 +102,7 @@ enc_structure encSimpleMaxCut : SimpleMaxCutInstance where
 attribute [fun_prop] encSimpleMaxCut_graph_polyTime encSimpleMaxCut_bound_polyTime
   encSimpleMaxCut_mk_polyTime
 
-/-- **Unweighted maximum cut** [Arora and Barak, Exercise 2.15][AroraBarak09]: some set `S` of
+/-- **Unweighted maximum cut** [Arora and Barak, Exercise 2.15][AroraBarak07]: some set `S` of
 vertices of the simple graph `x.graph.induced` has at least `x.bound` edges between `S` and its
 complement. -/
 @[expose] def SimpleMaxCut : Set SimpleMaxCutInstance :=
@@ -155,21 +155,21 @@ theorem mem_SimpleMaxCut_iff {x : SimpleMaxCutInstance} :
 /-! ### Membership in NP -/
 
 /-- The ordered pairs `(u, v)` of adjacent distinct declared vertices with `u ∈ S` and `v ∉ S`. -/
-def crossingPairs (G : Graph) (S : List ℕ) : List (ℕ × ℕ) :=
+private def crossingPairs (G : Graph) (S : List ℕ) : List (ℕ × ℕ) :=
   (G.distinctVertices.flatMap fun u => G.distinctVertices.map fun v => (u, v)).filter
     fun p => G.adjBool p.1 p.2 && (decide (p.1 ∈ S) && !decide (p.2 ∈ S))
 
 /-- The check of a side `S` of a cut, given as a list: at least `x.bound` crossing pairs. -/
-def check (x : SimpleMaxCutInstance × List ℕ) : Bool :=
+private def check (x : SimpleMaxCutInstance × List ℕ) : Bool :=
   decide (x.1.bound ≤ (crossingPairs x.1.graph x.2).length)
 
 /-- The check of a side of a cut is polynomial-time. -/
-theorem computableInPolyTime_check :
+private theorem computableInPolyTime_check :
     ComputableInPolyTime check (encPair encSimpleMaxCut (encList encNat)) encBool := by
   unfold check crossingPairs
   fun_prop
 
-theorem check_eq_true_iff (x : SimpleMaxCutInstance) (l : List ℕ) :
+private theorem check_eq_true_iff (x : SimpleMaxCutInstance) (l : List ℕ) :
     check (x, l) = true ↔ x.bound ≤ (x.graph.induced.interedges
       (l.toFinset.subtype (· ∈ x.graph.vertices))
       (l.toFinset.subtype (· ∈ x.graph.vertices))ᶜ).card := by
@@ -256,11 +256,11 @@ theorem card_interedges_eq_crossCount (G : Graph) (S : Finset ℕ)
 /-! ### Subdivision -/
 
 /-- The path `2u – 4k+1 – 4k+3 – 2v` replacing the `k`-th edge `(u, v)` of a multigraph. -/
-def pathEdges (e : ℕ × ℕ) (k : ℕ) : List (ℕ × ℕ) :=
+private def pathEdges (e : ℕ × ℕ) (k : ℕ) : List (ℕ × ℕ) :=
   [(2 * e.1, 4 * k + 1), (4 * k + 1, 4 * k + 3), (4 * k + 3, 2 * e.2)]
 
 /-- The edges of the paths replacing the edges of `E`. -/
-def subdivisionEdges (E : List (ℕ × ℕ)) : List (ℕ × ℕ) :=
+private def subdivisionEdges (E : List (ℕ × ℕ)) : List (ℕ × ℕ) :=
   (List.range E.length).flatMap fun k => pathEdges (E.getD k (0, 0)) k
 
 /-- **Subdivision of a multigraph.** Each edge of `E` is replaced by a path of three edges through
@@ -287,13 +287,13 @@ theorem endpoints_mem_subdivide (E : List (ℕ × ℕ)) :
     ∀ e ∈ (subdivide E).edges, e.1 ∈ (subdivide E).vertices ∧ e.2 ∈ (subdivide E).vertices :=
   fun e he => ⟨List.mem_flatMap.2 ⟨e, he, by simp⟩, List.mem_flatMap.2 ⟨e, he, by simp⟩⟩
 
-theorem crossCount_subdivide (E : List (ℕ × ℕ)) (side : ℕ → Bool) :
+private theorem crossCount_subdivide (E : List (ℕ × ℕ)) (side : ℕ → Bool) :
     crossCount (subdivide E).edges side =
       ((List.range E.length).map fun k => crossCount (pathEdges (E.getD k (0, 0)) k) side).sum :=
   List.countP_flatMap ..
 
 /-- A path of three edges has at most `2 + [u, v separated]` crossing edges. -/
-theorem crossCount_pathEdges_le (e : ℕ × ℕ) (k : ℕ) (side : ℕ → Bool) :
+private theorem crossCount_pathEdges_le (e : ℕ × ℕ) (k : ℕ) (side : ℕ → Bool) :
     crossCount (pathEdges e k) side ≤ 2 + crossCount [(2 * e.1, 2 * e.2)] side := by
   simp only [crossCount, pathEdges, List.countP_cons, List.countP_nil]
   generalize side (2 * e.1) = a
@@ -353,14 +353,14 @@ theorem exists_subdivide_iff (E : List (ℕ × ℕ)) (K : ℕ) :
 /-! ### The multigraph of a formula -/
 
 /-- The vertex of the literal `(i, b)`: `2 * i` when `b` is true, `2 * i + 1` otherwise. -/
-def literalVertex (l : Literal ℕ) : ℕ := if l.2 then 2 * l.1 else 2 * l.1 + 1
+private def literalVertex (l : Literal ℕ) : ℕ := if l.2 then 2 * l.1 else 2 * l.1 + 1
 
 /-- The edge between the two literal vertices of the variable of `l`. -/
-def variableEdge (l : Literal ℕ) : ℕ × ℕ := (2 * l.1, 2 * l.1 + 1)
+private def variableEdge (l : Literal ℕ) : ℕ × ℕ := (2 * l.1, 2 * l.1 + 1)
 
 /-- The edges of a clause of three literals `a, b, c`: the triangle on their vertices and the
 edges of their variables. -/
-def clauseEdges (c : Clause ℕ) : List (ℕ × ℕ) :=
+private def clauseEdges (c : Clause ℕ) : List (ℕ × ℕ) :=
   let a := c.getD 0 (0, false)
   let b := c.getD 1 (0, false)
   let d := c.getD 2 (0, false)
@@ -389,7 +389,7 @@ private theorem triangle_count (a b d x y z x' y' z' : Bool) :
   decide
 
 /-- A clause has at most five crossing edges. -/
-theorem crossCount_clauseEdges_le (c : Clause ℕ) (side : ℕ → Bool) :
+private theorem crossCount_clauseEdges_le (c : Clause ℕ) (side : ℕ → Bool) :
     crossCount (clauseEdges c) side ≤ 5 := by
   simp only [crossCount, clauseEdges, variableEdge, List.countP_cons, List.countP_nil]
   have := triangle_count (side (literalVertex (c.getD 0 (0, false))))
@@ -400,7 +400,7 @@ theorem crossCount_clauseEdges_le (c : Clause ℕ) (side : ℕ → Bool) :
   omega
 
 /-- The side of a literal vertex, when the two vertices of its variable are separated. -/
-theorem side_literalVertex {side : ℕ → Bool} {l : Literal ℕ}
+private theorem side_literalVertex {side : ℕ → Bool} {l : Literal ℕ}
     (h : side (2 * l.1) ≠ side (2 * l.1 + 1)) :
     side (literalVertex l) = l.eval fun i => side (2 * i) := by
   obtain ⟨i, b⟩ := l
@@ -408,7 +408,7 @@ theorem side_literalVertex {side : ℕ → Bool} {l : Literal ℕ}
 
 /-- A clause of three literals has five crossing edges exactly when the vertices of its
 variables are separated and its literals are not all equal under the sides of `2 * i`. -/
-theorem crossCount_clauseEdges_eq_five_iff {c : Clause ℕ} (hc : c.length = 3)
+private theorem crossCount_clauseEdges_eq_five_iff {c : Clause ℕ} (hc : c.length = 3)
     (side : ℕ → Bool) :
     crossCount (clauseEdges c) side = 5 ↔ (∀ l ∈ c, side (2 * l.1) ≠ side (2 * l.1 + 1)) ∧
       ((Clause.eval (fun i => side (2 * i)) c &&
@@ -421,6 +421,13 @@ theorem crossCount_clauseEdges_eq_five_iff {c : Clause ℕ} (hc : c.length = 3)
       (side (literalVertex d)) (side (2 * a.1)) (side (2 * b.1)) (side (2 * d.1))
       (side (2 * a.1 + 1)) (side (2 * b.1 + 1)) (side (2 * d.1 + 1))
     simp only [List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp, forall_eq]
+    have hv (hx : side (2 * a.1) ≠ side (2 * a.1 + 1))
+        (hy : side (2 * b.1) ≠ side (2 * b.1 + 1))
+        (hz : side (2 * d.1) ≠ side (2 * d.1 + 1)) :
+        (if (side (2 * a.1) != side (2 * a.1 + 1)) = true then 1 else 0) +
+          (if (side (2 * b.1) != side (2 * b.1 + 1)) = true then 1 else 0) +
+          (if (side (2 * d.1) != side (2 * d.1 + 1)) = true then 1 else 0) = 3 := by
+      simp [hx, hy, hz]
     constructor
     · intro h
       have hx : side (2 * a.1) ≠ side (2 * a.1 + 1) := by
@@ -429,37 +436,17 @@ theorem crossCount_clauseEdges_eq_five_iff {c : Clause ℕ} (hc : c.length = 3)
         intro hy; simp only [hy, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte] at h ht; omega
       have hz : side (2 * d.1) ≠ side (2 * d.1 + 1) := by
         intro hz; simp only [hz, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte] at h ht; omega
-      have hv : (if (side (2 * a.1) != side (2 * a.1 + 1)) = true then 1 else 0) +
-          (if (side (2 * b.1) != side (2 * b.1 + 1)) = true then 1 else 0) +
-          (if (side (2 * d.1) != side (2 * d.1 + 1)) = true then 1 else 0) = 3 := by
-        simp [hx, hy, hz]
+      have hv := hv hx hy hz
       have h2 := ht.2.1.1 (by omega)
       refine ⟨⟨hx, hy, hz⟩, ?_⟩
       rw [side_literalVertex hx, side_literalVertex hy, side_literalVertex hz] at h2
       simpa [Clause.eval, Bool.or_assoc] using h2
     · rintro ⟨⟨hx, hy, hz⟩, h⟩
-      have hv : (if (side (2 * a.1) != side (2 * a.1 + 1)) = true then 1 else 0) +
-          (if (side (2 * b.1) != side (2 * b.1 + 1)) = true then 1 else 0) +
-          (if (side (2 * d.1) != side (2 * d.1 + 1)) = true then 1 else 0) = 3 := by
-        simp [hx, hy, hz]
       have h2 := ht.2.1.2 (by
         rw [side_literalVertex hx, side_literalVertex hy, side_literalVertex hz]
         simpa [Clause.eval, Bool.or_assoc] using h)
+      have hv := hv hx hy hz
       omega
-
-/-- Natural numbers at most `5` with sum at least `5 * l.length` are all `5`. -/
-private theorem eq_five_of_le_sum {α : Type*} (f : α → ℕ) (hf : ∀ a, f a ≤ 5) :
-    ∀ l : List α, 5 * l.length ≤ (l.map f).sum → ∀ a ∈ l, f a = 5
-  | [], _ => by simp
-  | b :: l, h => by
-    simp only [List.length_cons, List.map_cons, List.sum_cons] at h
-    have hl : (l.map f).sum ≤ 5 * l.length := by
-      simpa [mul_comm] using List.sum_le_sum (l := l) (f := f) (g := fun _ => 5) fun a _ => hf a
-    have hb := hf b
-    intro a ha
-    rcases List.mem_cons.1 ha with rfl | ha
-    · omega
-    · exact eq_five_of_le_sum f hf l (by omega) a ha
 
 /-- **Correctness of the formula multigraph.** For a formula of three-literal clauses, a cut of
 `5 * φ.length` edges exists exactly when the formula is NAE-satisfiable. -/
@@ -471,8 +458,14 @@ theorem exists_le_crossCount_formulaEdges_iff {φ : CNF ℕ} (hφ : ∀ c ∈ φ
   constructor
   · rintro ⟨side, h⟩
     rw [hsum] at h
-    have h5 := eq_five_of_le_sum (fun c => crossCount (clauseEdges c) side)
-      (crossCount_clauseEdges_le · side) φ h
+    have h5 (c : Clause ℕ) (hc : c ∈ φ) : crossCount (clauseEdges c) side = 5 := by
+      by_contra hne
+      have hlt := List.sum_lt_sum (l := φ)
+        (fun c => crossCount (clauseEdges c) side) (fun _ => 5)
+        (fun c _ => crossCount_clauseEdges_le c side)
+        ⟨c, hc, by have := crossCount_clauseEdges_le c side; omega⟩
+      simp only [List.map_const', List.sum_replicate, smul_eq_mul] at hlt
+      omega
     refine ⟨fun i => side (2 * i), ?_⟩
     rw [CNF.evalNAE, CNF.eval, CNF.eval, Bool.and_eq_true, List.all_eq_true, List.all_eq_true]
     have hc := fun c hc' => ((crossCount_clauseEdges_eq_five_iff (hφ c hc') side).1
@@ -502,17 +495,19 @@ theorem exists_le_crossCount_formulaEdges_iff {φ : CNF ℕ} (hφ : ∀ c ∈ φ
 /-- Multigraph edge lists, such as `formulaEdges φ`, as framed lists of binary pairs. -/
 abbrev encEdgeList : List (ℕ × ℕ) ↪ List Bool := encList (encPair encNat encNat)
 
-@[fun_prop]
-theorem computableInPolyTime_literalVertex :
+private theorem computableInPolyTime_literalVertex :
     ComputableInPolyTime literalVertex (encPair encNat encBool) encNat := by
   unfold literalVertex
   fun_prop
 
-@[fun_prop]
-theorem computableInPolyTime_variableEdge :
+attribute [local fun_prop] computableInPolyTime_literalVertex
+
+private theorem computableInPolyTime_variableEdge :
     ComputableInPolyTime variableEdge (encPair encNat encBool) (encPair encNat encNat) := by
   unfold variableEdge
   fun_prop
+
+attribute [local fun_prop] computableInPolyTime_variableEdge
 
 @[fun_prop]
 theorem computableInPolyTime_formulaEdges :
@@ -523,8 +518,7 @@ theorem computableInPolyTime_formulaEdges :
   unfold formulaEdges clauseEdges encCNF
   fun_prop
 
-@[fun_prop]
-theorem computableInPolyTime_subdivisionEdges :
+private theorem computableInPolyTime_subdivisionEdges :
     ComputableInPolyTime subdivisionEdges encEdgeList encEdgeList := by
   have hget : ComputableInPolyTime (fun p : List (ℕ × ℕ) × ℕ => p.1.getD p.2 (0, 0))
       (encPair encEdgeList encUnary) (encPair encNat encNat) :=
@@ -532,6 +526,8 @@ theorem computableInPolyTime_subdivisionEdges :
       (ComputableInPolyTime.snd _ _) (0, 0)
   unfold subdivisionEdges pathEdges
   fun_prop
+
+attribute [local fun_prop] computableInPolyTime_subdivisionEdges
 
 @[fun_prop]
 theorem computableInPolyTime_subdivide :
@@ -613,7 +609,7 @@ theorem polyTimeReducible_NAEEUThreeSAT_SimpleMaxCut :
 theorem SimpleMaxCut_npHard : NPHard encSimpleMaxCut SimpleMaxCut :=
   NAEEUThreeSAT_npHard.trans polyTimeReducible_NAEEUThreeSAT_SimpleMaxCut
 
-/-- **Unweighted maximum cut is NP-complete** [Arora and Barak, Exercise 2.15][AroraBarak09]: given
+/-- **Unweighted maximum cut is NP-complete** [Arora and Barak, Exercise 2.15][AroraBarak07]: given
 a simple graph `G` and a number `K` in binary, deciding whether some vertex set has at least `K`
 edges to its complement is `NP`-complete. -/
 theorem SimpleMaxCut_npComplete : NPComplete encSimpleMaxCut SimpleMaxCut :=
