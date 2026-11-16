@@ -42,6 +42,52 @@ namespace Cslib.Quantum.UniformOracleCircuitFamily.GeneratorCertificate
 
 open Turing MultiTapeTM Internal NativeCompiler
 
+private noncomputable def clockedInputCompiler (c d : ℕ) :
+    NativeCompiler
+      (fun input : OracleInputSize =>
+        (encOracleInputSize input, c * ((encOracleInputSize input).length + 1) ^ d))
+      encOracleInputSize (encPair encBits encUnary) := by
+  let inputWord : NativeCompiler (fun input : OracleInputSize => encOracleInputSize input)
+      encOracleInputSize encBits :=
+    (identity encOracleInputSize).ofOutputEq fun _ => rfl
+  let length := unaryDecoder.comp inputWord
+  let clock := (unaryPolynomialClock c d).comp length
+  exact inputWord.pair clock
+
+private theorem clockedInputCompiler_resources_le (c d : ℕ) (input : OracleInputSize) :
+    let n := (encOracleInputSize input).length
+    (clockedInputCompiler c d).time input ≤
+        100100 * (c + 1) * (d + 1) * (n + 1) ^ (d + 2) ∧
+      (clockedInputCompiler c d).workspace input ≤
+        1000100 * (c + 1) * (d + 1) ^ 2 * (n + 1) ^ (d + 2) +
+          100 * (unaryPolynomialClock c d).tapeCount := by
+  let n := (encOracleInputSize input).length
+  let K := (unaryPolynomialClock c d).tapeCount
+  have ht : (clockedInputCompiler c d).time input ≤
+      (unaryPolynomialClock c d).time n + 100 * (n + 1) := by
+    simp only [clockedInputCompiler, pair, NativeCompiler.comp, identity, ofOutputEq, unaryDecoder,
+      ofTransducer, encodeFrame, encBits_apply, encUnary_apply, List.length_replicate]
+    dsimp only [n]
+    omega
+  have hs : (clockedInputCompiler c d).workspace input ≤
+      (unaryPolynomialClock c d).workspace n + 100 * (n + K + 1) := by
+    simp only [clockedInputCompiler, pair, NativeCompiler.comp, identity, ofOutputEq, unaryDecoder,
+      ofTransducer, encodeFrame, encBits_apply, encUnary_apply, List.length_replicate]
+    dsimp only [n, K]
+    omega
+  have hpow : n + 1 ≤ (n + 1) ^ (d + 2) := Nat.le_self_pow (by omega) _
+  have htScale : n + 1 ≤ (c + 1) * (d + 1) * (n + 1) ^ (d + 2) :=
+    hpow.trans (Nat.le_mul_of_pos_left _ (Nat.mul_pos (by omega) (by omega)))
+  have hsScale : n + 1 ≤ (c + 1) * (d + 1) ^ 2 * (n + 1) ^ (d + 2) :=
+    hpow.trans (Nat.le_mul_of_pos_left _
+      (Nat.mul_pos (by omega) (Nat.pow_pos (by omega))))
+  have htClock := unaryPolynomialClock_time_le c d n
+  have hsClock := unaryPolynomialClock_workspace_le c d n
+  constructor
+  · nlinarith
+  · dsimp only [K] at hs
+    nlinarith
+
 /-- Retain an executable interpreter for a certified generator. The literal constants `c,d`
 determine the executed clock. The polynomial upper-bound hypothesis is discharged from
 `certificate.time_polynomiallyBounded` via `polynomiallyBounded_iff_le`; its proof does not enter
@@ -54,12 +100,8 @@ noncomputable def toNativeCompiler {F : UniformOracleCircuitFamily}
       (fun input : OracleInputSize =>
         F.description input.securityParameter input.classicalInputLength)
       encOracleInputSize encOracleCircuitDescription := by
-  let inputWord : NativeCompiler (fun input : OracleInputSize => encOracleInputSize input)
-      encOracleInputSize encBits :=
-    (identity encOracleInputSize).ofOutputEq fun _ => rfl
-  let length := unaryDecoder.comp inputWord
-  let clock := (unaryPolynomialClock c d).comp length
-  let interpreted := (simulateBitOutputCompiler certificate.code).comp (inputWord.pair clock)
+  let interpreted :=
+    (simulateBitOutputCompiler certificate.code).comp (clockedInputCompiler c d)
   refine interpreted.ofOutputEq ?_
   intro input
   have hrun := Universal.simulate_eq_of_halted
@@ -74,5 +116,63 @@ noncomputable def toNativeCompiler {F : UniformOracleCircuitFamily}
   change _ = List.map (fun bit : Bool => decide (bit.toNat = 1))
     (encOracleCircuitDescription (F.description input.securityParameter input.classicalInputLength))
   simp only [Bool.toNat_eq_one, Bool.decide_eq_true, List.map_id']
+
+private theorem toNativeCompiler_resources_le {F : UniformOracleCircuitFamily}
+    (certificate : F.GeneratorCertificate) (c d : ℕ)
+    (hclock : ∀ n, certificate.time n ≤ c * (n + 1) ^ d) (input : OracleInputSize) :
+    let word := encOracleInputSize input
+    let n := word.length
+    let count := c * (n + 1) ^ d
+    let interpreter := simulateBitOutputCompiler certificate.code
+    let K := max (clockedInputCompiler c d).tapeCount interpreter.tapeCount
+    (certificate.toNativeCompiler c d hclock).time input ≤
+        interpreter.time (word, count) +
+          100200 * (c + 1) * (d + 1) * (n + 1) ^ (d + 2) ∧
+      (certificate.toNativeCompiler c d hclock).workspace input ≤
+        interpreter.workspace (word, count) +
+          1000200 * (c + 1) * (d + 1) ^ 2 * (n + 1) ^ (d + 2) +
+          100 * (unaryPolynomialClock c d).tapeCount + 6 * K := by
+  let n := (encOracleInputSize input).length
+  let P := (c + 1) * (d + 1) * (n + 1) ^ (d + 2)
+  let Q := (c + 1) * (d + 1) ^ 2 * (n + 1) ^ (d + 2)
+  have hi := clockedInputCompiler_resources_le c d input
+  have hpow : n + 1 ≤ (n + 1) ^ (d + 2) := Nat.le_self_pow (by omega) _
+  have hnP : n + 1 ≤ P :=
+    hpow.trans (Nat.le_mul_of_pos_left _ (Nat.mul_pos (by omega) (by omega)))
+  have hPCount : c * (n + 1) ^ d ≤ P := by
+    apply Nat.mul_le_mul
+    · exact (Nat.le_succ c).trans (Nat.le_mul_of_pos_right _ (by omega))
+    · exact Nat.pow_le_pow_right (by omega) (by omega)
+  have hPQ : P ≤ Q := by
+    apply Nat.mul_le_mul_right
+    apply Nat.mul_le_mul_left
+    exact Nat.le_self_pow (by omega) _
+  have hm :
+      (encPair encBits encUnary
+        (encOracleInputSize input, c * (n + 1) ^ d)).length ≤ 3 * P := by
+    simp only [length_encPair, encBits_apply, encUnary_apply, List.length_replicate]
+    change 2 * n + 1 + c * (n + 1) ^ d ≤ 3 * P
+    omega
+  constructor
+  · change (clockedInputCompiler c d).time input +
+        (simulateBitOutputCompiler certificate.code).time
+          (encOracleInputSize input, c * (n + 1) ^ d) +
+        4 * (encPair encBits encUnary
+          (encOracleInputSize input, c * (n + 1) ^ d)).length + 9 ≤ _
+    have ht := hi.1
+    dsimp only [P] at hm hnP
+    nlinarith
+  · change (clockedInputCompiler c d).workspace input +
+        (simulateBitOutputCompiler certificate.code).workspace
+          (encOracleInputSize input, c * (n + 1) ^ d) +
+        5 * (encPair encBits encUnary
+          (encOracleInputSize input, c * (n + 1) ^ d)).length +
+        (6 * max (clockedInputCompiler c d).tapeCount
+          (simulateBitOutputCompiler certificate.code).tapeCount + 20) ≤ _
+    have hs := hi.2
+    have hmQ := hm.trans (Nat.mul_le_mul_left 3 hPQ)
+    have hnQ := hnP.trans hPQ
+    dsimp only [Q] at hmQ hnQ
+    nlinarith
 
 end Cslib.Quantum.UniformOracleCircuitFamily.GeneratorCertificate
