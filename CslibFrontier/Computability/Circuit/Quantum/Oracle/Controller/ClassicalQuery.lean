@@ -220,19 +220,22 @@ theorem secondWire_ne_replyBase (layout : ClassicalQueryLayout) (wire : ℕ) :
       simp only [secondBase, replyBase, serviceBase, hiddenWire, requestBase]
       omega
 
+private theorem firstWire_lt_requestBase (layout : ClassicalQueryLayout) {wire : ℕ}
+    (hwire : wire < layout.first.width) : layout.firstWire wire < layout.requestBase := by
+  by_cases hprefix : wire < layout.firstInputWidth
+  · rw [firstWire, ite_eq_left hprefix]
+    simp only [requestBase, ciphertextWidth]
+    omega
+  · rw [firstWire, ite_eq_right hprefix]
+    simp only [requestBase]
+    omega
+
 /-- Embed the first-stage register into the complete controller register. This is the sparse
 placement used by the relabelled first-stage instruction block. -/
 @[expose] def firstEmbedding (layout : ClassicalQueryLayout) :
     Fin layout.first.width ↪ Fin layout.width where
   toFun wire := ⟨layout.firstWire wire, by
-    have hwire : layout.firstWire wire < layout.requestBase := by
-      by_cases hprefix : wire < layout.firstInputWidth
-      · rw [firstWire, ite_eq_left hprefix]
-        simp only [requestBase, ciphertextWidth]
-        omega
-      · rw [firstWire, ite_eq_right hprefix]
-        simp only [requestBase]
-        omega
+    have hwire := firstWire_lt_requestBase layout wire.isLt
     simp only [width, secondBase, replyBase, serviceBase, hiddenWire]
     omega⟩
   inj' := fun left right heq => Fin.ext <| by
@@ -296,21 +299,11 @@ request and hidden-bit coordinates selected by `serviceWire`. -/
 first-stage state while keeping the retained reply record outside its image. -/
 @[expose] def secondEmbedding (layout : ClassicalQueryLayout) :
     Fin layout.second.width ↪ Fin layout.width :=
-  let firstRange : ∀ {wire : ℕ}, wire < layout.first.width →
-      layout.firstWire wire < layout.requestBase := by
-    intro wire hwire
-    by_cases hprefix : wire < layout.firstInputWidth
-    · rw [firstWire, ite_eq_left hprefix]
-      simp only [requestBase, ciphertextWidth]
-      omega
-    · rw [firstWire, ite_eq_right hprefix]
-      simp only [requestBase]
-      omega
   { toFun := fun wire => ⟨layout.secondWire wire, by
       by_cases hinput : wire < layout.secondInputWidth
       · simp [secondWire, hinput, width]
       · by_cases hsaved : wire - layout.secondInputWidth < layout.first.width
-        · have hrange := firstRange hsaved
+        · have hrange := firstWire_lt_requestBase layout hsaved
           simp [secondWire, hinput, hsaved]
           simp only [width, secondBase, replyBase, serviceBase, hiddenWire]
           omega
@@ -323,7 +316,7 @@ first-stage state while keeping the retained reply record outside its image. -/
         · simp [secondWire, hleftInput, hrightInput] at heq
           omega
         · by_cases hrightSaved : right - layout.secondInputWidth < layout.first.width
-          · have hrightRange := firstRange hrightSaved
+          · have hrightRange := firstWire_lt_requestBase layout hrightSaved
             simp [secondWire, hleftInput, hrightInput, hrightSaved] at heq
             simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
             omega
@@ -331,7 +324,7 @@ first-stage state while keeping the retained reply record outside its image. -/
             omega
       · by_cases hleftSaved : left - layout.secondInputWidth < layout.first.width
         · by_cases hrightInput : right < layout.secondInputWidth
-          · have hleftRange := firstRange hleftSaved
+          · have hleftRange := firstWire_lt_requestBase layout hleftSaved
             simp [secondWire, hleftInput, hleftSaved, hrightInput] at heq
             simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
             omega
@@ -351,7 +344,7 @@ first-stage state while keeping the retained reply record outside its image. -/
                   exact hfirstEq
                 exact congrArg Fin.val (layout.firstEmbedding.injective hembed)
               omega
-            · have hleftRange := firstRange hleftSaved
+            · have hleftRange := firstWire_lt_requestBase layout hleftSaved
               simp [secondWire, hleftInput, hleftSaved, hrightInput,
                 hrightSaved] at heq
               simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
@@ -360,7 +353,7 @@ first-stage state while keeping the retained reply record outside its image. -/
           · simp [secondWire, hleftInput, hleftSaved, hrightInput] at heq
             omega
           · by_cases hrightSaved : right - layout.secondInputWidth < layout.first.width
-            · have hrightRange := firstRange hrightSaved
+            · have hrightRange := firstWire_lt_requestBase layout hrightSaved
               simp [secondWire, hleftInput, hleftSaved, hrightInput,
                 hrightSaved] at heq
               simp only [secondBase, replyBase, serviceBase, hiddenWire] at heq
@@ -460,14 +453,7 @@ private theorem wellFormed_zeroOracleRelabel {input : OracleInputSize}
   intro instruction hinstruction
   obtain ⟨code, hcode, rfl⟩ := List.mem_map.mp hinstruction
   apply PhaseGateCode.WellFormed.relabel (e := embedding) (ρ := wireMap) (hρ := hwireMap)
-  rw [OracleCircuit.zeroOraclePhaseCodes, List.mem_filterMap] at hcode
-  obtain ⟨source, hsource, hcode⟩ := hcode
-  cases source with
-  | gate sourceCode =>
-      simp only [Option.some.injEq] at hcode
-      subst code
-      exact hdescription.instructions (.gate sourceCode) hsource
-  | query => simp at hcode
+  exact OracleCircuit.wellFormed_zeroOraclePhaseCodes hdescription.instructions code hcode
 
 /-- A compatible component triple produces a valid query-free controller description. This is
 the construction's first structural correctness property: every relabelled component gate and

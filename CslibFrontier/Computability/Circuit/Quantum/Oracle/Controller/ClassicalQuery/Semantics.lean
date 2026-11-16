@@ -87,24 +87,14 @@ theorem Compatible.ofPhaseCodes_compileClassicalQuery {layout : ClassicalQueryLa
   have hsecond := Circuit.ofPhaseCodes_map_relabel layout.secondEmbedding layout.secondWire
     (fun _ => rfl)
     (OracleCircuit.wellFormed_zeroOraclePhaseCodes h.second_wellFormed.instructions)
-  have hfirst' := hfirst
-  have hservice' := hservice
-  have hsecond' := hsecond
-  simp only [OracleCircuit.zeroOraclePhaseCodes] at hfirst' hservice' hsecond'
+  simp only [OracleCircuit.zeroOraclePhaseCodes] at hfirst hservice hsecond
   have ofPhaseCodes_append (left right : List PhaseGateCode) :
       Circuit.ofPhaseCodes layout.width (left ++ right) =
         Circuit.ofPhaseCodes layout.width left ++ Circuit.ofPhaseCodes layout.width right :=
     List.filterMap_append
-  have filterMap_some {α β : Type} (f : α → β) (xs : List α) :
-      xs.filterMap (fun x => some (f x)) = xs.map f := by
-    induction xs with
-    | nil => rfl
-    | cons x xs ih =>
-        change f x :: xs.filterMap (fun x => some (f x)) = f x :: xs.map f
-        rw [ih]
   simp only [compileClassicalQuery, OracleCircuit.zeroOraclePhaseCodes,
-    List.filterMap_append, List.filterMap_map, Function.comp_apply, filterMap_some,
-    ofPhaseCodes_append, Circuit.ofPhaseCodes_map, hfirst', hservice', hsecond']
+    List.filterMap_append, List.filterMap_map, Function.comp_apply, List.filterMap_eq_map',
+    ofPhaseCodes_append, Circuit.ofPhaseCodes_map, hfirst, hservice, hsecond]
 
 /-- The controller's physical hidden-bit copy, restricted to a zero protected target, is exactly
 a coherent record.  Reassociation exposes the copied bit as the first factor while retaining all
