@@ -37,14 +37,6 @@ namespace Turing.MultiTapeTM.Internal.NativeCompiler
       (encOption enc) encBits :=
   tailDecoder.ofInputEq (fun value => encOption enc value) fun _ => rfl
 
-/-- Extract an optional payload, using the explicit default on `none`. -/
-@[expose] noncomputable def optionGetD {Alpha : Type*} (default : Alpha)
-    (enc : Alpha ↪ List Bool) :
-    NativeCompiler (fun value : Option Alpha => value.getD default) (encOption enc) enc := by
-  let fallback := const (encOption enc) encBits (enc default)
-  exact (ite (optionIsSomeTest enc) (optionPayload enc) fallback).ofOutputEq
-    fun value => by cases value <;> rfl
-
 /-- Convert the empty-emission/halt protocol to canonical tagged options. The retained
 conditional charges its emptiness test, copy and fixed `[false]` fallback. -/
 @[expose] noncomputable def optionFromHalt {Alpha : Type*} (enc : Alpha ↪ List Bool) :
@@ -106,5 +98,14 @@ frame parser's total empty-word result, which is replaced by `listHeadD`. -/
   let payload := sumPayload encLeft encRight
   let fallback := const (encSum encLeft encRight) encBits (encRight default)
   exact (ite tag payload fallback).ofOutputEq fun value => by cases value <;> rfl
+
+/-- Extract an optional payload through the identical `Unit ⊕ Alpha` representation.
+Input/output retyping retains the sum destructor's machine, clock and workspace maps. -/
+@[expose] noncomputable def optionGetD {Alpha : Type*} (default : Alpha)
+    (enc : Alpha ↪ List Bool) :
+    NativeCompiler (fun value : Option Alpha => value.getD default) (encOption enc) enc :=
+  ((sumRightD default (Cslib.Encoding.encSubsingleton Unit) enc).ofInputEq
+    ((Equiv.optionEquivSumPUnit.{0} Alpha).trans (Equiv.sumComm Alpha Unit))
+    (fun _ => rfl)).ofOutputEq fun value => by cases value <;> rfl
 
 end Turing.MultiTapeTM.Internal.NativeCompiler

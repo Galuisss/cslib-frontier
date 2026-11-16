@@ -96,6 +96,12 @@ keep the empty halt format and their independent bounds.
 The [machine regressions](../../CslibFrontierTests/SharedEncodingMachine.lean) cover the distinct
 formats, classification, translations and first-match result boundary.
 
+Canonical option capabilities reuse the generic sum constructor, tag classifier and right-default
+extractor through the word-preserving `Option α ≃ Unit ⊕ α` equivalence. This retyping retains
+both independent degree bounds, including constant output growth for classification. The native
+`optionGetD` similarly retains `sumRightD`'s machine, clock and workspace maps; the equivalence
+adds no runtime conversion.
+
 The [circuit encoding](../../CslibFrontier/Computability/Circuit/Boolean/Encoding.lean) uses
 `encSigma encUnary` with the circuit-code embedding selected by its input arity.
 Generic dependent-pair injectivity replaces recovery of the arity by hand, while its old

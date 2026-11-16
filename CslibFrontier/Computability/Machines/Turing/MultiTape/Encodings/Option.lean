@@ -9,7 +9,7 @@ module
 
 public import CslibFrontier.Computability.Encoding.Basic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.WordPredicates
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Words
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Sum
 
 -- vendored: canonical tagged options follow #1213; the kernel halt protocol stays explicit.
 
@@ -73,18 +73,15 @@ public abbrev encSilentOption (enc : α ↪ List Bool) : Option α ↪ List Bool
 
 public instance : OptionEncoding enc (encOption enc) where
   isSome := by
-    have h : ComputableInDegree Option.isSome (encOption enc) encBool 1 1 :=
-      .of_take_one fun o => by cases o <;> rfl
-    exact ⟨h.1, 1, fun _ => by simp⟩
-  some := .of_cons_true fun _ => rfl
+    let e := (Equiv.optionEquivSumPUnit.{0} α).trans (Equiv.sumComm α Unit)
+    exact ((ComputableInDegree.sumIsRight (Cslib.Encoding.encSubsingleton Unit) enc).of_encIn_eq
+      e (fun _ => rfl)).of_enc_eq fun o => by cases o <;> rfl
+  some := by
+    exact (ComputableInDegree.inr (Cslib.Encoding.encSubsingleton Unit) enc).of_enc_eq
+      fun _ => rfl
   getD d := by
-    have tag : ComputableInDegree Option.isSome (encOption enc) encBool 1 1 :=
-      .of_take_one fun o => by cases o <;> rfl
-    convert ComputableInDegree.ite tag
-      (ComputableInDegree.of_tail (f := fun o => o.val.getD d) fun ⟨o, ho⟩ => by
-        cases o <;> simp_all)
-      ((ComputableInDegree.const d).restrict _) using 1
-    funext o
-    cases o <;> rfl
+    let e := (Equiv.optionEquivSumPUnit.{0} α).trans (Equiv.sumComm α Unit)
+    exact ((ComputableInDegree.sumRightD (Cslib.Encoding.encSubsingleton Unit) enc d).of_encIn_eq
+      e (fun _ => rfl)).of_enc_eq fun o => by cases o <;> rfl
 
 end Turing.MultiTapeTM

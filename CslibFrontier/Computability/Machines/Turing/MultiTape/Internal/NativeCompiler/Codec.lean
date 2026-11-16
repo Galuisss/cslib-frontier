@@ -323,8 +323,9 @@ theorem unaryListT_run (word : List Bool) :
 /-- Read the standard option constructor tag with one-bit Boolean output. -/
 @[expose] noncomputable def optionIsSomeBool {Alpha : Type*} (enc : Alpha ↪ List Bool) :
     NativeCompiler Option.isSome (encOption enc) encBool :=
-  (boolDecoder.ofInputEq (fun value => encOption enc value) fun _ => rfl).ofOutputEq
-    fun value => by cases value <;> rfl
+  ((sumTag (Cslib.Encoding.encSubsingleton Unit) enc).ofInputEq
+    ((Equiv.optionEquivSumPUnit.{0} Alpha).trans (Equiv.sumComm Alpha Unit))
+    (fun _ => rfl)).ofOutputEq fun value => by cases value <;> rfl
 
 /-- Test whether a raw word is empty. The machine scans the whole input, emits the standard
 Boolean encoding and rewinds; malformedness is irrelevant because every raw word is accepted. -/
