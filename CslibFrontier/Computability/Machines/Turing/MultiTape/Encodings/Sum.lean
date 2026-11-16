@@ -68,11 +68,17 @@ theorem inr (left : α ↪ List Bool) (right : β ↪ List Bool) :
 theorem sumRightD (left : α ↪ List Bool) (right : β ↪ List Bool) (default : β) :
     ComputableInDegree (Sum.elim (Function.const α default) id)
       (encSum left right) right 1 1 := by
-  convert ComputableInDegree.ite (sumIsRight left right)
-    (ComputableInDegree.of_tail
-      (f := fun value => value.val.elim (Function.const α default) id)
-      fun ⟨value, h⟩ => by cases value <;> simp_all)
-    ((ComputableInDegree.const default).restrict _) using 1
+  have payload : ComputableInDegree
+      (fun value : {value : α ⊕ β // value.isRight = true} =>
+        value.val.elim (Function.const α default) id)
+      ((Function.Embedding.subtype fun value : α ⊕ β => value.isRight = true).trans
+        (encSum left right)) right 1 1 :=
+    ComputableInDegree.of_tail fun ⟨value, h⟩ => by cases value <;> simp_all
+  convert ComputableInDegree.ite
+    (f := Sum.elim (Function.const α default) id) (g := fun _ => default)
+    (sumIsRight left right) payload
+    ((ComputableInDegree.const (encIn := encSum left right) (encMid := right) default).restrict
+      (fun value : α ⊕ β => value.isRight = false)) using 1
   funext value
   cases value <;> rfl
 
