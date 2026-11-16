@@ -19,6 +19,8 @@ they do not extract a witness from the existential complexity certificates.
 
 ## Main definitions
 
+* `Turing.MultiTapeTM.Internal.NativeCompiler.unaryAdd`: retained unary addition by direct
+  concatenation.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.natSucc`: retained binary successor.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.natPred`: retained saturating binary predecessor.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.natIsZeroBool`, `.natIsZeroTest`: retained binary
@@ -28,6 +30,20 @@ they do not extract a witness from the existential complexity certificates.
 public section
 
 namespace Turing.MultiTapeTM.Internal.NativeCompiler
+
+/-- Unary addition by emitting the two unary words consecutively. -/
+@[expose] def unaryAdd :
+    NativeCompiler (fun input : ℕ × ℕ => input.1 + input.2)
+      (encPair encUnary encUnary) encUnary := by
+  let inputEncoding := encPair encUnary encUnary
+  let left : NativeCompiler (fun input : ℕ × ℕ => encUnary input.1)
+      inputEncoding encBits :=
+    (first encUnary encUnary).ofOutputEq fun _ => rfl
+  let right : NativeCompiler (fun input : ℕ × ℕ => encUnary input.2)
+      inputEncoding encBits :=
+    (second encUnary encUnary).ofOutputEq fun _ => rfl
+  exact (left.append right).ofOutputEq fun input => by
+    simp only [encUnary_apply, encBits_apply, List.replicate_add]
 
 /-- Binary successor through the public carry transducer. -/
 @[expose] def natSucc :
