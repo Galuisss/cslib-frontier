@@ -62,7 +62,6 @@ theorem streamFoldPairTime_le
     streamFoldPairTime nextCompiler emitCompiler finishCompiler input ≤
       input.2.length * (emitTime + nextTime + 46 * lengthBound + 60) +
         finishTime + 24 * lengthBound + 40 := by
-  let finalState := streamState input.1 next input.2 input.2.length
   have hinitial := hstate 0 (Nat.zero_le _)
   have hfinal := hstate input.2.length le_rfl
   have hlist : (encList encA input.2).length ≤ lengthBound :=
@@ -80,7 +79,7 @@ theorem streamFoldPairTime_le
     have hemitNow := hemit j hj'
     have hnextNow := hnext j hj'
     simp only [streamFoldPairRoundCost, hj', dite_true, inputFromWordTime, onWordsTime,
-      streamFramedNext, comp, encodeFrame, ofTransducer, encBits_apply, length_frame]
+      streamFramedNext, comp, encodeFrame, encBits_apply, length_frame]
     rw [← streamState_succ input.1 next input.2 hj']
     omega
   have hsum :
@@ -93,7 +92,7 @@ theorem streamFoldPairTime_le
             exact Finset.sum_le_sum fun j hj => hround j hj
       _ = input.2.length * (emitTime + nextTime + 46 * lengthBound + 60) := by
             simp [Nat.mul_comm]
-  simp only [streamFoldPairTime, finalState, streamUnframedFinish, comp, unframeValue,
+  simp only [streamFoldPairTime, streamUnframedFinish, comp, unframeValue,
     ofTransducer, inputFromWordTime, encFramed_apply, length_frame] at hfinish ⊢
   omega
 
@@ -122,7 +121,6 @@ theorem streamFoldPairWorkspace_le
       2 * K * (spaceBound + 16 * lengthBound + 4 * K + 26) + finishWorkspace +
         13 * lengthBound + 8 * finishCompiler.tapeCount + 5 * K + 43 := by
   dsimp only
-  let finalState := streamState input.1 next input.2 input.2.length
   let K := streamFoldPairTapeCount nextCompiler emitCompiler finishCompiler
   have hinner :
       sMax input + 16 * lMax input + 4 * K + 26 ≤
@@ -132,8 +130,9 @@ theorem streamFoldPairWorkspace_le
   have hsub₁ : K - ((streamUnframedFinish finishCompiler).tapeCount + 2) ≤ K :=
     Nat.sub_le _ _
   have hsub₂ : K - 1 ≤ K := Nat.sub_le _ _
-  simp only [streamFoldPairWorkspace, finalState, K, streamUnframedFinish, comp, unframeValue,
-    ofTransducer, inputFromWordWorkspace, encFramed_apply, length_frame] at hsub₁ hfinish ⊢
+  simp only [streamFoldPairWorkspace, K, streamUnframedFinish, comp, unframeValue,
+    ofTransducer, inputFromWordWorkspace, encFramed_apply, length_frame]
+    at hsub₁ hsub₂ hfinish ⊢
   omega
 
 end Turing.MultiTapeTM.Internal.NativeCompiler
