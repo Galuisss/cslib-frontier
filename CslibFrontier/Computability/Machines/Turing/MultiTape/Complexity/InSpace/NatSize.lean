@@ -29,7 +29,8 @@ theorem natSize :
   have hlen := (of_inO ComputableInO.lengthNat).weaken
     (show (fun w : List Bool => w.length) ≼ fun w => (encBits w).length from
       .of_le_linear 1 1 fun w => by simp [encBits_apply])
-  refine (hlen.of_encIn_eq Nat.bits (fun _ => rfl)).of_enc_eq ?_
+  refine (hlen.of_encIn_eq Nat.bits (fun _ => by
+    simp only [encBits_apply, encNat_apply])).of_enc_eq ?_
   intro n
   rw [Nat.size_eq_bits_len]
 
