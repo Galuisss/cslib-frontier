@@ -71,9 +71,8 @@ noncomputable def toNativeCompiler {F : UniformOracleCircuitFamily}
         (c * ((encOracleInputSize input).length + 1) ^ d)).1).map
       (fun symbol => decide (symbol = 1))
   rw [hrun, List.map_map]
-  have hbit : (fun bit : Bool => decide (Universal.eBit bit = 1)) = id := by
-    funext bit
-    cases bit <;> rfl
-  simp only [Function.comp_def, hbit, List.map_id]
+  change _ = List.map (fun bit : Bool => decide (bit.toNat = 1))
+    (encOracleCircuitDescription (F.description input.securityParameter input.classicalInputLength))
+  simp only [Bool.toNat_eq_one, Bool.decide_eq_true, List.map_id']
 
 end Cslib.Quantum.UniformOracleCircuitFamily.GeneratorCertificate
