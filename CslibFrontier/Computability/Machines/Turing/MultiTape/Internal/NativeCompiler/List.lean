@@ -46,6 +46,8 @@ occurrence, and returns an explicit default when the index is out of range.
   scan, intermediate-copy and composition costs.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.listBits_le_time_listGetDNatCompiler`: every framed
   list occurrence is charged by the complete lookup clock.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.encList_map_eq_streamEmit`: a contextual list map's
+  standard encoding is exactly its fixed-state stream emission.
 -/
 
 public section
@@ -475,6 +477,19 @@ the semantic output. -/
 
 variable {mapWithState : State × Input → Output}
 
+/-- Encoding a contextual list map is the same as streaming each framed mapped value while
+retaining the context as fixed fold state. -/
+theorem encList_map_eq_streamEmit (encOutput : Output ↪ List Bool)
+    (mapWithState : State × Input → Output) (input : State × List Input) :
+    encList encOutput (input.2.map fun value => mapWithState (input.1, value)) =
+      streamEmit Prod.fst
+        (fun pair : State × Input => frame (encOutput (mapWithState pair)))
+        input.1 input.2 := by
+  induction input.2 with
+  | nil => rfl
+  | cons element list ih =>
+      simpa [streamEmit, encList_cons] using ih
+
 /-- Map a standard encoded list while retaining one shared encoded context for every element.
 The context is streamed as fold state and is not duplicated into the semantic output. -/
 @[expose] def listMapWithStateCompiler (encState : State ↪ List Bool)
@@ -490,11 +505,7 @@ The context is streamed as fold state and is not duplicated into the semantic ou
     ((framedValue encOutput).comp compiler).ofOutputEq fun _ => rfl
   apply listFoldEmitCompiler encState encInput (encList encOutput)
     (first encState encInput) emitCompiler
-  intro input
-  induction input.2 with
-  | nil => rfl
-  | cons element list ih =>
-      simpa [streamEmit, encList_cons] using ih
+  exact encList_map_eq_streamEmit encOutput mapWithState
 
 /-- Filter and map a standard encoded list while retaining one shared encoded context for every
 element. `default` is consulted only inside the total option decoder on a branch whose output is

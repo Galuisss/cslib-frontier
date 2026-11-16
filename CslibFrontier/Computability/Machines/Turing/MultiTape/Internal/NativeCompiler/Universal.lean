@@ -27,6 +27,8 @@ arithmetic machines and conditionals; no semantic function is installed as an op
   `.actState`: retained ordinary-action projections.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.tapeRead`, `.tapeApply`, `.reads`, `.applyTapes`:
   retained work-tape reads and updates.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.tapeRead_time_le`, `.tapeRead_workspace_le`:
+  concrete bounds for the actual retained head-read compiler.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.intUnaryPayload`, `.intUnaryNonnegativeTest`:
   retained signed-unary tag and payload access.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.intSucc`, `.intPred`, `.intMove`: retained
@@ -147,6 +149,35 @@ noncomputable def tapeRight :
 @[expose] noncomputable def tapeRead : NativeCompiler Tape.read eTape eSym :=
   ((listHeadD none eSym).comp tapeRight).ofOutputEq fun tape => by
     rfl
+
+/-- The actual retained work-head reader runs in time linear in the encoded zipper. -/
+theorem tapeRead_time_le (tape : Tape) :
+    tapeRead.time tape ≤ 1000 * ((eTape tape).length + 1) := by
+  obtain ⟨head, left, right⟩ := tape
+  cases right <;>
+    simp [tapeRead, tapeRight, tapeTail, listHeadD, listIsEmpty, listHeadPayload,
+      second, boolToTest, isEmpty, unframeDecoder, ofTransducer, comp, ite, const,
+      ofInputEq, ofOutputEq, encTest_false, encTest_true] <;>
+    omega
+
+/-- The actual retained work-head reader uses workspace linear in the encoded zipper,
+independently of its time coordinate. -/
+theorem tapeRead_workspace_le (tape : Tape) :
+    tapeRead.workspace tape ≤ 1000 * ((eTape tape).length + 1) := by
+  obtain ⟨head, left, right⟩ := tape
+  have hread := length_eSym_read_le ⟨head, left, right⟩
+  cases right <;>
+    simp [tapeRead, tapeRight, tapeTail, listHeadD, listIsEmpty, listHeadPayload,
+      boolToTest, isEmpty, unframeDecoder, ofTransducer, comp, ite, const, ofInputEq, ofOutputEq,
+      encTest_false, encTest_true] at hread ⊢ <;>
+    simp only [second, ofTransducer] <;>
+    omega
+
+/-- A construction-derived static tape-count bound for the retained work-head reader. -/
+theorem tapeRead_tapeCount_le : tapeRead.tapeCount ≤ 100 := by
+  simp [tapeRead, tapeRight, tapeTail, listHeadD, listIsEmpty, listHeadPayload,
+    second, boolToTest, isEmpty, unframeDecoder, ofTransducer, comp, ite, const,
+    ofInputEq, ofOutputEq]
 
 /-- Retained work-tape write, rebuilding the zipper from named field/list machines. -/
 @[expose] noncomputable def tapeWrite :

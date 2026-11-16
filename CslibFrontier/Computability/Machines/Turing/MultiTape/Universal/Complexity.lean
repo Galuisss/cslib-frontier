@@ -211,7 +211,7 @@ public lemma length_eSym_read_le (t : Tape) : (eSym t.read).length ≤ (eTape t)
   omega
 
 /-- The symbols under the heads are no longer than the work tapes. -/
-lemma length_encList_map_read_le (ts : List Tape) :
+public lemma length_encList_map_read_le (ts : List Tape) :
     (encList eSym (ts.map Tape.read)).length ≤ (encList eTape ts).length := by
   induction ts with
   | nil => simp
