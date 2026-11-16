@@ -118,7 +118,7 @@ theorem exists_unaryLengthLanguage_notMem_PWithOracle :
   obtain ⟨n, hn⟩ := hB ⟨k, m, machine, c, d⟩
   apply hn
   have hlength : (encBits (List.replicate n true)).length = n := by
-    simp [encBits_apply]
+    simp
   have hverdict := hrun (List.replicate n true) (languageOracle B)
   rw [hprogram, encBool_apply, hlength] at hverdict
   simp only [encBits_apply] at hverdict

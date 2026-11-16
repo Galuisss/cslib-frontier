@@ -92,7 +92,8 @@ theorem isPolyTime_clauseHolds :
   apply finite_cases (branch := fun (i : Fin 3) (p : (Clause ℕ × (Fin 3 → Bool)) × Fin 3) =>
     p.1.1[i.val]?.elim false (fun l => p.1.2 i == l.2)) (snd _ _)
   intro i
-  apply optionElimWithInput (encB := encPair encUnary encBool) <;> fun_prop
+  apply optionElimWithInput (encB := encPair encUnary encBool)
+    (encO := encOption (encPair encUnary encBool)) <;> fun_prop
 
 /-- The per-edge program charges clause lookup, endpoints, and all 64 entries of its relation. -/
 @[fun_prop]
@@ -108,6 +109,7 @@ theorem isPolyTime_cnfEdge :
         (encPair encUnary (encFinEnum (Fin 3)))) (encList (encPair encUnary encBool)) := by
     fun_prop
   have hliteral := ComputableInPolyTime.getElem? (encA := encPair encUnary encBool)
+    (encO := encOption (encPair encUnary encBool))
     hclause (hindex.comp ((snd _ _).snd'))
   unfold cnfEdge
   refine Edge.isPolyTime_mk (by fun_prop) (by fun_prop) ?_

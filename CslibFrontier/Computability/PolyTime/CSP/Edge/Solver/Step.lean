@@ -188,7 +188,8 @@ private theorem poly_next : ComputableInPolyTime next encState encState := by
     unfold stopped
     fun_prop
   unfold next
-  apply ComputableInPolyTime.optionElimWithInput (encB := encOption (encList encBool)) poly_status hrun
+  apply ComputableInPolyTime.optionElimWithInput (encB := encOption
+    (encList encBool)) poly_status hrun
   apply ComputableInPolyTime.optionElimWithInput (encB := encList encBool)
     (ComputableInPolyTime.snd encState (encOption (encList encBool)))
     (show ComputableInPolyTime

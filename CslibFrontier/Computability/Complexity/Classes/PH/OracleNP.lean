@@ -305,7 +305,7 @@ theorem PWithOracle_subset_SigmaP_two (hA : A ∈ NP encBits) :
       (encPair enc encBits) encBool := by fun_prop
   convert hf.encoded_mem_SigmaP_two hA hP using 1
   ext a
-  simp [hL a, encBool_apply]
+  simp [hL a]
 
 /-- **`P^A ⊆ Π₂` for `A ∈ NP`**: `P^A` is closed under complement. -/
 theorem PWithOracle_subset_PiP_two (hA : A ∈ NP encBits) :

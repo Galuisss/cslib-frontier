@@ -30,6 +30,7 @@ import Mathlib.Data.Nat.Size
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.NatLength
 import CslibFrontier.Tactic.EncLen
 import CslibFrontier.Computability.Machines.Turing.MultiTape.ResourceBounds.Polynomial.Automation
+import CslibFrontier.Computability.Encoding.NatBits
 
 /-!
 # Contracting an explicit tensor network by direct summation
@@ -280,7 +281,10 @@ theorem weightMod_polyTime :
         ((ComputableInPolyTime.binary_mul' hacc hentry).prod hstepMod))
     refine ComputableInPolyTime.of_enc_eq h fun p => ?_
     simp only [Function.comp_def, entry, lsbValue_eq_binaryValue_reverse]
-  have hfold := ComputableInPolyTime.foldlWithInput_of_bounded_growth
+  -- Fix the fold's external certificate before elaborating its nested callback arguments.
+  have hfold : ComputableInPolyTime
+      (fun q : (ℕ × ExplicitTensorNetwork ℕ) × List Bool => weightMod q.1.1 q.1.2 q.2)
+      encWeightInput encNat := ComputableInPolyTime.foldlWithInput_of_bounded_growth
     (encA := encPair (encList encNat) (encList encNat)) (encL := encVertices)
     (step := fun q acc v => acc * entry v.2 (v.1.map fun i => q.2.getD i false) % 2 ^ q.1.1)
     hinit ⟨hverts, hstep, inferInstance, inferInstance⟩
@@ -453,7 +457,7 @@ private theorem sum_lt_two_pow_length (t : List ℕ) : t.sum < 2 ^ (encList encN
   | nil => simp
   | cons e t ih =>
     have he : e < 2 ^ (encNat e).length := by
-      change e < 2 ^ e.bits.length
+      rw [Cslib.Encoding.encNat_eq_bits]
       rw [Nat.size_eq_bits_len]
       exact Nat.lt_size_self e
     have h1 : 2 ^ (encNat e).length ≤ 2 ^ (2 * (encNat e).length + (encList encNat t).length) :=

@@ -158,7 +158,7 @@ private theorem poly_edge_constraint (L : ℕ) :
 private lemma optBound_spec (L : ℕ) (o : Option (Fin L → Fin L)) :
     (encOption (encUGFn L) o).length ≤ L * (2 * L + 1) + 1 := by
   cases o with
-  | none => simp [encOption_none]
+  | none => simp
   | some f =>
     have hpi : (encUGFn L f).length ≤ Fintype.card (Fin L) * (2 * L + 1) :=
       length_encPi_le (encFinEnum (Fin L)) f fun i =>
@@ -170,7 +170,7 @@ private lemma optBound_spec (L : ℕ) (o : Option (Fin L → Fin L)) :
 private lemma candBound_spec (L : ℕ) (c : Fin L → Bool) :
     (encUGCand L c).length ≤ 3 * L := by
   have hpi : (encUGCand L c).length ≤ Fintype.card (Fin L) * (2 * 1 + 1) :=
-    length_encPi_le encBool c fun i => by simp [encBool_apply]
+    length_encPi_le encBool c fun i => by simp
   simp only [Fintype.card_fin, encUGCand] at hpi ⊢
   omega
 
@@ -179,8 +179,9 @@ private lemma length_encList_replicate_none {α : Type} (n : ℕ) (enc : α ↪ 
   induction n with
   | zero => simp
   | succ n ih =>
-    simp only [List.replicate_succ, encList_cons, encOption_none, List.length_append,
-      length_frame, List.length_nil, ih]
+    simp only [List.replicate_succ, encList_cons, encOption_none, List.length_singleton,
+      List.length_append,
+      length_frame, ih]
     omega
 
 private lemma length_encUGState_eq (L : ℕ) (S : State (Fin L)) :
@@ -536,7 +537,7 @@ private lemma length_encUGState_push_le (L : ℕ) (S : State (Fin L)) (w : ℕ) 
     length_encList_set_le (encOption (encUGFn L)) S.table w (some f)
   have hopt := optBound_spec L (some f)
   have hst : (encUGVerts (w :: S.stack)).length = 2 * w + 1 + (encUGVerts S.stack).length := by
-    simp [encUGVerts, encList_cons, length_frame, encUnary_apply]
+    simp [encUGVerts, encUnary_apply]
   rw [length_encUGState_eq, length_encUGState_eq]
   simp only [push]
   omega
@@ -761,10 +762,10 @@ private lemma length_encUGState_scan_le (L : ℕ) (labels : List (Fin L))
     have hS₀ : (encUGState L S₀).length ≤ (encUGState L S).length := by
       have hst : (encUGVerts (u :: rest)).length =
           (frame (encUnary u)).length + (encUGVerts rest).length := by
-        simp [encUGVerts, encList_cons]
+        simp [encUGVerts]
       have hco : (encUGVerts (u :: S.comp)).length =
           (frame (encUnary u)).length + (encUGVerts S.comp).length := by
-        simp [encUGVerts, encList_cons]
+        simp [encUGVerts]
       rw [length_encUGState_eq, length_encUGState_eq]
       dsimp only [S₀]
       rw [hs, hst, hco]
@@ -1029,7 +1030,7 @@ private theorem poly_run (L : ℕ) [NeZero L] :
         rw [hstartLen] at htab
         have hcand := candBound_spec L (fun _ : Fin L => true)
         have hst : (encUGVerts [e.src]).length = 2 * e.src + 1 := by
-          simp [encUGVerts, encList_cons, encList_nil, length_frame, encUnary_apply]
+          simp [encUGVerts, encUnary_apply]
         rw [length_encUGState_eq]
         dsimp only [start] at htab ⊢
         rw [hst]

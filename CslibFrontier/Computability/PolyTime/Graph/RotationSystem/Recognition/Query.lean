@@ -182,7 +182,8 @@ theorem subdivide_polyTime :
     (ComputableInPolyTime.cons'
       ((ha.prod hb).prod (ComputableInPolyTime.const false))
       (ComputableInPolyTime.cons'
-        ((hb.prod he.snd').prod ((read_polyTime none ht he.snd').optionIsSome (encB := encList encNat)))
+        ((hb.prod he.snd').prod ((read_polyTime none ht he.snd').optionIsSome
+          (encB := encList encNat)))
         (ComputableInPolyTime.const [])))
 
 /-- The full reference order is built from bounded list scans, including malformed words. -/

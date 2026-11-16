@@ -118,7 +118,7 @@ theorem computableInPolyTime_modBits :
         omega
       · exact h.2)
     (size := fun p => 3 * p.1.length + 1) (.of_forall_le 3 1 fun p => by simp; omega)
-    (fun p consumed state _ h => by simp [encPair_apply]; omega)).1
+    (fun p consumed state _ h => by simp; omega)).1
   exact (snd encBits encBits).comp h
 
 /-- The binary digits of a unary natural. -/
@@ -142,7 +142,9 @@ theorem computableInPolyTime_leastIrreducibleCode :
     ComputableInPolyTime (fun q : ℕ × ℕ => leastIrreducibleCode q.1 q.2)
       (encPair encUnary encUnary) encUnary := by
   unfold leastIrreducibleCode
-  fun_prop
+  apply optionGetDWithInput (encB := encUnary) (encO := encOption encUnary)
+  · apply findWithInput (encA := encUnary) <;> fun_prop
+  · exact const 0
 
 /-- The remainders of the powers of `X`. -/
 @[fun_prop]
@@ -320,7 +322,7 @@ private theorem computableInPolyTime_mixedDigit_degreePrimes :
     fun_prop
   have hprod := computableInPolyTime_prod_of_le htake
     (fun q p hp => (prime_of_mem_degreePrimes (List.mem_of_mem_take hp)).2.2.pos)
-    (B := fun q => q.1.1 + 1) (.of_forall_le 1 1 fun q => by simp [encPair_apply]; omega)
+    (B := fun q => q.1.1 + 1) (.of_forall_le 1 1 fun q => by simp; omega)
     (fun q => by
       refine le_trans ?_ (prod_degreePrimes_le q.1.1)
       rw [← List.prod_take_mul_prod_drop (degreePrimes q.1.1) q.2]

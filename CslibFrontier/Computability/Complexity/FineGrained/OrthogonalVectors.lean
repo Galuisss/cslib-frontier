@@ -23,6 +23,7 @@ import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime
 import Mathlib.Data.Nat.Size
 import CslibFrontier.Computability.Machines.Turing.MultiTape.ResourceBounds.Polynomial.Automation
 import CslibFrontier.Tactic.EncLen
+import CslibFrontier.Computability.Encoding.NatBits
 
 /-!
 # The strong exponential time hypothesis implies the orthogonal vectors hypothesis
@@ -248,7 +249,7 @@ theorem computableInPolyTime_clauseVector :
       (fun p : (StreamState × Clause ℕ) × Literal ℕ => p.1.1.2.bits)
       (encPair (encPair encStreamState encC) encL) encBits :=
     (of_eq (encIn := encNat) (encOut := encBits) fun _ => by
-      simp only [encBits_apply, encNat_apply]).comp
+      simp only [encBits_apply, Cslib.Encoding.encNat_eq_bits]).comp
       (by unfold encStreamState; fun_prop)
   have hidx : ComputableInPolyTime
       (fun p : (StreamState × Clause ℕ) × Literal ℕ => p.1.1.1.2.idxOf p.2.1)
@@ -499,7 +500,7 @@ theorem exists_computableInO_toOV : ∃ e, ComputableInO toOV encCNF encOV
   have h := h₁.append h₂ (g := toOV) (encOut := encOV) fun φ => by
     rw [encOV, encPair_apply, hencList, hencList]
     simp only [toOV, encBits_apply, List.append_nil]
-    rw [Turing.MultiTapeTM.frame, hfm, List.map_map]
+    rw [Turing.MultiTapeTM.frame, Cslib.Encoding.delimit, hfm, List.map_map]
     rfl
   refine ⟨e₁ + e₂, h.mono 2 (fun φ => ?_) fun φ => ?_⟩ <;>
   · simp only [OV.length_firstVars, OV.length_secondVars]

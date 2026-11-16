@@ -635,7 +635,7 @@ theorem parseRun_frame_snd (i k : ℕ) (v : List Bool) (rest : List Bool) :
     parseRun f g ((((true, false), false), i), k) (frame v ++ rest) =
       bitsOut (f k) i v ++ g true k ++ parseRun f g ((((true, false), false), 0), k + 1) rest := by
   induction v generalizing i with
-  | nil => simp [frame_nil, parseRun, parseEmit, parseStep, bitsOut]
+  | nil => simp [parseRun, parseEmit, parseStep, bitsOut]
   | cons b v ih =>
     simp only [frame_cons, List.cons_append, parseRun, parseEmit, parseStep, bitsOut]
     simp [ih, List.append_assoc]
