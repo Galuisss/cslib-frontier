@@ -237,7 +237,7 @@ theorem completeVertex_polyTime : ComputableInPolyTime
   apply ComputableInPolyTime.ite' (encC := encBool)
   · exact (ComputableInPolyTime.listGetD_binary (encA := encOption (encList encNat)) none
       (ho.comp (ComputableInPolyTime.snd _ _))
-      (by fun_prop)).optionIsSome
+      (by fun_prop)).optionIsSome (encB := encList encNat)
   · fun_prop
   · apply ComputableInPolyTime.optionElimWithInput (encB := encList encNat)
       (recoverWord_polyTime.comp
@@ -369,7 +369,8 @@ theorem recover_polyTime : ComputableInPolyTime recover encFixedRotationInput
   have hg := encFixedRotationInput_graph_deg.computableInPolyTime
   unfold recover
   apply ComputableInPolyTime.ite' (encC := encBool) query_polyTime
-  · apply ComputableInPolyTime.optionElimWithInput (encB := encFixedRotationInput) recoverOrders_polyTime
+  · apply ComputableInPolyTime.optionElimWithInput (encB := encFixedRotationInput)
+      recoverOrders_polyTime
       (ComputableInPolyTime.const none)
     have hc := certificate_polyTime.comp
       (ComputableInPolyTime.snd encFixedRotationInput encFixedRotationInput)

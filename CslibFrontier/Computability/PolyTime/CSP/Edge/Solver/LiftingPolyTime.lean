@@ -108,6 +108,7 @@ private theorem poly_restore : ComputableInPolyTime
   simp only [List.contains_eq_mem]
   apply ComputableInPolyTime.optionGetDWithInput (encO := encOption encNat)
   · apply ComputableInPolyTime.optionMapWithInput (encB := encRecord) (encC := encNat)
+      (encO := encOption encRecord) (encOC := encOption encNat)
     · apply ComputableInPolyTime.findWithInput (encA := encRecord)
       · fun_prop
       · fun_prop
