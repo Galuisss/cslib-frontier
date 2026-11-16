@@ -2339,6 +2339,31 @@ fresh-nonce cipher (`nonceCipher`), a generic `CiphertextIndist` client, and bit
 alongside counterexamples when equal-length admissibility, uniform key sampling, or equal
 ciphertext laws fail. Run `scripts/build.sh CslibFrontierTests.Crypto.CipherPerfect`.
 
+For deterministic nonce-based symmetric encryption and authenticated encryption with associated
+data ([bs23][bs23], Sections 5.5 and 9.5, pp. 201–202 and 377–379), import
+[`Encryption/NonceBased.lean`](../../CslibFrontier/Crypto/Computational/Encryption/NonceBased.lean).
+`NonceCipher K M D C N` bundles deterministic `encrypt : K → M → D → N → C` and
+`decrypt : K → C → D → N → Option M`, with `NonceCipher.Correct` requiring decryption to
+recover `some m` under matching keys, associated data, and nonces; setting `D := Unit`
+specializes the interface to a nonce-based cipher without associated data (Section 5.5, p. 201).
+`NonceCipher.cpaExperiment` logs encryption queries under a drawn key `k ← sampleKey` and
+outputs `false` for both challenge bits if any queried pair violates `valid` or repeats a nonce
+(Attack Game 5.3, pp. 201–202), while `NonceCipher.ciExperiment` accepts a candidate
+`(c, d, n)` when `E.decrypt k c d n` is `some _`, `(c, d, n)` was not logged by an encryption
+query, and queried nonces are distinct (the candidate nonce may reuse a queried nonce; Attack
+Game 9.3, p. 378, omits `N` in its printed steps, while the accompanying text on p. 378 specifies
+the triple condition). `NonceCipher.INDCPA` (Definitions 5.3 and 9.7, pp. 202 and 377–378),
+`NonceCipher.CiphertextIntegrity` (Definition 9.8, p. 378), and `NonceCipher.AEAD` (Definition
+9.9, p. 379) lift these experiments to uniform `IsOraclePPT` adversaries through
+`OracleCodec.adapt`. These scheme and security definitions carry no machine-efficiency
+certificates, leaving algorithm efficiency to concrete constructions, and existing
+`SymmetricCipher` and `NonceMACScheme` interfaces are unchanged. The
+[checked clients](../../CslibFrontierTests/Crypto/NonceCipher.lean) exercise correctness
+fixtures, single-query `cpaExperiment` and `ciExperiment` games, `false` forcing on inadmissible
+pairs and repeated nonces, replayed vs. associated-data-swapped candidates, word-level
+`OracleCodec.adapt` adversaries, and nonvacuity of `INDCPA`, `CiphertextIntegrity`, and `AEAD`
+(including `D := Unit`). Run `scripts/build.sh CslibFrontierTests.Crypto.NonceCipher`.
+
 Starting with the imports and local context in [`CslibFrontierTests/Crypto/HybridEncryption.lean`](../../CslibFrontierTests/Crypto/HybridEncryption.lean), `indcpaOf_hybridEncrypt_doubleKey_otp` shows the doubled-key composition; adjacent examples check native sampling, supported key lengths, correct decryption and the zero-width boundary. The unconditional security fixture discards its key and is explicitly not decryptable; decryption correctness is checked separately on a leaking KEM. Security does not bundle correctness, and the zero-width pad recovers only the empty message. For an actual cryptographic client, [`DDH.wordINDCPA_hybrid_hashedElGamal`](../../CslibFrontier/Crypto/Computational/ElGamal/ProbComp.lean) now accepts a `SecureKDF` and a standalone DEM at arbitrary `keyLen`; [`CslibFrontierTests/Crypto/DiffieHellman.lean`](../../CslibFrontierTests/Crypto/DiffieHellman.lean) instantiates the bridge with doubled key length. The security parameter controlling its modular-sampling error remains `n`, independently of the key length.
 
 [`encryptKeyEncaps keyLen encrypt`](../../CslibFrontier/Crypto/Computational/Encryption/KEMFromPKE.lean) constructs a KEM from word public-key encryption by sampling a key and encrypting it (Boneh–Shoup v0.6, Exercise 11.9(e), p. 461 [bs23][bs23]). Apply `WordINDCPA.kemINDCPA_encryptKeyEncaps` with a native unary polynomial-time certificate for `keyLen`; the reduction chooses two equal-length keys, saves the public key and the first key, and preserves advantage exactly. The separate `isPPTOn_encryptKeyEncaps` certificate also needs native encryption, while `decrypt_encryptKeyEncaps` reuses the original total decryptor and its supported-ciphertext correctness. [`CslibFrontierTests/Crypto/KEMFromPKE.lean`](../../CslibFrontierTests/Crypto/KEMFromPKE.lean) provides complete checked clients, including composition of this constructor with the existing doubled-width one-time pad DEM, exact zero-width sampling, and a correctly decryptable but insecure key-revealing encryptor. No new failure/rejection behavior is added.
