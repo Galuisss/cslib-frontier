@@ -19,6 +19,22 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.Whi
 This module assembles the streaming-fold kernel entirely from retained effect-free transition
 tables. Its correctness theorems use the established tape-transformation specifications; no
 transition function is recovered from a relation or from the legacy noncomputable assembly.
+
+## Main definitions
+
+* `Turing.MultiTapeMachine.onWords`: run an explicit tidy table between virtual input and output
+  work tapes.
+* `Turing.MultiTapeMachine.streamRound`: one explicit read/emit/update stream round.
+* `Turing.MultiTapeMachine.stream`: the complete explicit streaming-fold table.
+
+## Main results
+
+* `Turing.MultiTapeMachine.transformsTapes_onWords_extendTapes`: selected-tape semantics and
+  exact resources for a lifted callback.
+* `Turing.MultiTapeMachine.transformsTapesAt_streamRound`: exact semantics and resources of one
+  stream round.
+* `Turing.MultiTapeMachine.computesTidily_stream_after`: the assembled stream table computes the
+  accumulated stream and final output with the stated clock and workspace bounds.
 -/
 
 public section

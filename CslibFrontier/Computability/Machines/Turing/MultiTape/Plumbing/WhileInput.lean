@@ -26,11 +26,14 @@ what it read (`Turing.MultiTapeTM.TransformsTapesAt`), is thus run until the inp
 * `Turing.MultiTapeTM.inputSymbolAt`: the symbol at a position of the input.
 * `Turing.MultiTapeTM.WhileInput.inputTest`: the test of the input head.
 * `Turing.MultiTapeTM.whileInput`: the loop, `tm` combined with the test.
+* `Turing.MultiTapeMachine.whileInput`: the corresponding choice-free explicit transition table.
 
 ## Main results
 
 * `Turing.MultiTapeTM.transformsTapesAt_whileInput`: a loop invariant preserved by every round
   gives a specification of `whileInput tm`, with the times of the rounds adding up.
+* `Turing.MultiTapeMachine.toTM_whileInput`: forgetting the explicit table recovers the legacy
+  loop.
 -/
 
 namespace Turing.MultiTapeTM

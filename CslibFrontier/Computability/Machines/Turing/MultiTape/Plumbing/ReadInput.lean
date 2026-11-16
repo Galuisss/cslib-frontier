@@ -26,6 +26,8 @@ encoding is an instance.
 * `Turing.MultiTapeTM.InputReader.read`: the word a reader emits and the number of symbols it
   reads.
 * `Turing.MultiTapeTM.appendRead`: the machine that runs a reader, appending to a work tape.
+* `Turing.MultiTapeTM.InputReader.coreTable`, `.appendOneTable`, `.appendReadTable`: the retained
+  explicit transition tables implementing the reader on one or a selected work tape.
 
 ## Main results
 

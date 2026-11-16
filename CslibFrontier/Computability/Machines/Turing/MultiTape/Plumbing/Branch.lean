@@ -22,11 +22,14 @@ is empty.
 ## Main definitions
 
 * `Turing.MultiTapeTM.branch`: the branching machine.
+* `Turing.MultiTapeMachine.branch`: its choice-free explicit transition table.
 
 ## Main results
 
 * `Turing.MultiTapeTM.transformsTapes_branch`: a specification of `branch i tm₁ tm₂` from
   specifications of `tm₁` for a non-empty word on tape `i` and of `tm₂` for an empty one.
+* `Turing.MultiTapeMachine.toTM_branch`: forgetting the explicit table recovers the legacy
+  branching machine.
 -/
 
 namespace Turing.MultiTapeTM

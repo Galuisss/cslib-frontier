@@ -32,12 +32,15 @@ by step (`Shadow.runFrom_cfg`), and if `tm` first halts at step `u` it has halte
 
 * `Turing.MultiTapeTM.shadowTape`: the marks of a set of cells.
 * `Turing.MultiTapeTM.shadow`: the shadowing machine.
+* `Turing.MultiTapeMachine.shadow`: its choice-free explicit transition table.
 
 ## Main results
 
 * `Turing.MultiTapeTM.runFrom_shadow`: the configuration of `shadow m₀ m₁ tm` when `tm` has
   halted.
 * `Turing.MultiTapeTM.space_shadow`: `shadow m₀ m₁ tm` uses twice the space of `tm`.
+* `Turing.MultiTapeMachine.toTM_shadow`: forgetting the explicit table recovers the legacy
+  shadowing machine.
 -/
 
 @[expose] public section

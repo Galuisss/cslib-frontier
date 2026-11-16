@@ -52,10 +52,11 @@ compiler. That uniformity theorem currently uses the existential plain computabi
 it does not itself retain the compiler machine or its description.
 
 [NativeCompiler](../../CslibFrontier/Computability/Machines/Turing/MultiTape/Internal/NativeCompiler.lean)
-is the internal construction-level prerequisite: it carries an actual finite-control machine, a
-constructive state encoding, exact description length and separate time/workspace maps through
+is the internal construction-level prerequisite: it carries an actual explicit transition table
+in `.table`, a constructive state encoding, exact description length and separate time/workspace maps through
 identity, constant output, composition and pairing, and forgets forward into the existing plain
-predicate. It does not extract witnesses from arbitrary existential proofs or yet construct the
+predicate. Its ordinary deterministic semantics are `compiler.table.toTM`; there is no separate
+machine wrapper. It does not extract witnesses from arbitrary existential proofs or yet construct the
 hardwire/specialization compiler. Its [checked nonconstant client](../../CslibFrontierTests/Machines/Turing/MultiTape/Internal/NativeCompiler.lean)
 compiles `b ↦ (b, true)`, checks state encodings and resource constants definitionally, and checks
 that every encoded transition occurs in the retained description. The numeric interpreter theorem

@@ -34,6 +34,9 @@ A machine that never needs the input is run with its input head frozen (`freezeI
 * `Turing.MultiTapeTM.wordsCfgAt`: `Turing.wordsCfg` with the input head anywhere.
 * `Turing.MultiTapeTM.TransformsTapesAt`: the specification format.
 * `Turing.MultiTapeTM.freezeInput`: a machine run on a blank input, with its input head fixed.
+* `Turing.MultiTapeMachine.freezeInput`: the corresponding choice-free explicit table.
+* `Turing.MultiTapeMachine.rewindInputOn`: the explicit input rewinder embedded below `k` work
+  tapes.
 
 ## Main results
 
@@ -43,6 +46,8 @@ A machine that never needs the input is run with its input head frozen (`freezeI
 * `Turing.MultiTapeTM.TransformsTapes.freezeInput`: a specification of `tm` gives one of
   `tm.freezeInput` at any position of the input head, which it keeps.
 * `Turing.MultiTapeTM.transformsTapesAt_rewindInput`: rewinding the input head.
+* `Turing.MultiTapeMachine.toTM_freezeInput`: forgetting the explicit frozen-input table recovers
+  the legacy wrapper.
 -/
 
 @[expose] public section

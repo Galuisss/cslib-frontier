@@ -29,11 +29,14 @@ machine blanks both tapes and parks both heads on the start cell (`runFrom_clear
 ## Main definitions
 
 * `Turing.MultiTapeTM.clearShadowed`: the clearing machine.
+* `Turing.MultiTapeMachine.clearShadowed`: its choice-free explicit transition table.
 
 ## Main results
 
 * `Turing.MultiTapeTM.runFrom_clearShadowed`: its run, in `a + 2 b + c + 5` steps for
   `[L, R] = [-a, b]` and the heads at `c - a`.
+* `Turing.MultiTapeMachine.toTM_clearShadowed`: forgetting the explicit table recovers the legacy
+  clearing machine.
 -/
 
 @[expose] public section
