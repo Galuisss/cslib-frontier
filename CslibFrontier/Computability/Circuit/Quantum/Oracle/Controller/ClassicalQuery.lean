@@ -15,6 +15,7 @@ public import CslibFrontier.Computability.Circuit.Quantum.Reversible.BlockCopy
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Comparison
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Sampling.Prefix
 public import CslibFrontier.Computability.Circuit.Quantum.HadamardLayer.NativeCompiler
+public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Code.NativeCompiler
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.ZeroQuery.NativeCompiler
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.BlockCopy.NativeCompiler
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Sampling.Prefix.NativeCompiler
@@ -824,19 +825,7 @@ copies assembled above; callers do not supply a separate adapter program or effi
         encClassicalQueryLayout encBits := rightCompiler.ofOutputEq fun _ => rfl
     exact (leftRaw.append rightRaw).ofOutputEq fun input => by
       simp only [encList_append, encBits_apply]
-  let classicalQueryGates (codes : List GateCode) : OracleCircuit :=
-    codes.map fun code => .gate (false, code)
-  
-  let gateInstructionsCompiler :
-      NativeCompiler classicalQueryGates (encList encGateCode) (encList encOracleGateCode) := by
-    let phase : NativeCompiler (fun code : GateCode => (false, code)) encGateCode
-        encPhaseGateCode :=
-      (const encGateCode encBool false).pair (identity encGateCode)
-    let instruction : NativeCompiler
-        (fun code : GateCode => OracleGateCode.gate (false, code)) encGateCode
-        encOracleGateCode :=
-      ((optionSome encPhaseGateCode).comp phase).ofOutputEq fun _ => rfl
-    exact (listMapCompiler encGateCode encOracleGateCode instruction).ofOutputEq fun _ => rfl
+  let gateInstructionsCompiler := oracleGateCodeList
   let linker : NativeCompiler compileClassicalQuery encClassicalQueryLayout
       encOracleCircuitDescription := by
     let encDescriptions := encPair encOracleCircuitDescription
@@ -1016,7 +1005,7 @@ copies assembled above; callers do not supply a separate adapter program or effi
         ClassicalQueryLayout.hiddenWire, ClassicalQueryLayout.serviceBase,
         ClassicalQueryLayout.replyBase, ClassicalQueryLayout.secondBase,
         ClassicalQueryLayout.fullInputWidth, ClassicalQueryLayout.ciphertextWidth,
-        classicalQueryGates, List.append_assoc, two_mul]
+        List.append_assoc, two_mul]
   let layoutFields :=
     (identity encOracleInputSize).pair
       (publicKeyWidthCompiler.pair
