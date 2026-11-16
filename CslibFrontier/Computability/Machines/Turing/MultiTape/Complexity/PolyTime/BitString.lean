@@ -83,7 +83,7 @@ theorem length_encList_enumList (count : ℕ) :
     (encList encBits (Cslib.BitString.enumList count)).length =
       2 ^ count * (2 * count + 1) := by
   simp [encList, Cslib.BitString.enumList, List.map_map,
-    Function.comp_def] <;> ring
+    Function.comp_def] ; ring
 
 namespace ComputableTidilyInPolyTime
 

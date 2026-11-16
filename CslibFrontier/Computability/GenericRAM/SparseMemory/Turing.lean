@@ -302,8 +302,8 @@ private theorem readResult_inO :
     8 (fun q => ?_) fun q => ?_
   all_goals
     rcases q with ⟨_ | e, d⟩ <;>
-      simp only [Function.comp_apply, Option.elim_none, Option.elim_some, length_encPair,
-        encOption_none, encOption_some, List.length_singleton, List.length_cons] <;> omega
+      simp only [Option.elim_none, Option.elim_some, length_encPair,
+        encOption_none, encOption_some, List.length_cons] <;> omega
 
 /-- A read input supplies both the queried store and its default value. -/
 def readEncoding : ((Address × SparseMemory Address Value) × Value) ↪ List Bool :=

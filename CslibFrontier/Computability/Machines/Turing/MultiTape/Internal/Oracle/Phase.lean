@@ -135,7 +135,7 @@ theorem query_take [Finite Operation] (op : Operation) :
     fun request => ?_⟩
   have hlength : (encPair encBits encUnary request).length =
       2 * request.1.length + 1 + request.2 := by
-    simp [encPair_apply, encBits_apply, encUnary_apply]
+    simp [encUnary_apply]
   refine ((computesTidily_queryTakePTM op request.1 request.2).mono ?_).congr ?_
   · rw [hlength]
     lia

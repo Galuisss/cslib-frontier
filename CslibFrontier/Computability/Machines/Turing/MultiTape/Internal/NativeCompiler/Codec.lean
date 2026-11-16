@@ -262,7 +262,7 @@ theorem unaryListT_run_symbol : ∀ word : List Bool,
   | [true] => rfl
   | false :: word => by
       rw [Transducer.run_cons, unaryListT_step_symbol_false]
-      simp [Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited, Cslib.Encoding.delimit]
+      simp
   | true :: bit :: word => by
     rw [Transducer.run_cons, unaryListT_step_symbol_true, Transducer.run_cons,
       unaryListT_step_marker, unaryListT_run_symbol word]
@@ -281,7 +281,7 @@ theorem unaryListT_run (word : List Bool) :
     rcases word with _ | ⟨_ | _, rest⟩
     · exact absurd rfl hword
     · rw [Transducer.run_cons, unaryListT_step_between_false]
-      simp [Cslib.Encoding.undelimit, Cslib.Encoding.dropDelimited, Cslib.Encoding.delimit,
+      simp [
         encUnary_apply]
     · rcases rest with _ | ⟨bit, rest⟩
       · rfl

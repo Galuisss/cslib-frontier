@@ -46,7 +46,8 @@ conditional charges its emptiness test, copy and fixed `[false]` fallback. -/
     (isEmpty.ofInputEq (fun value => encHaltOption enc value) fun _ => rfl)
   let absent := const (encHaltOption enc) encBits [false]
   let word : NativeCompiler (fun o : Option Alpha => encHaltOption enc o)
-      (encHaltOption enc) encBits := (identity encBits).ofInputEq (fun value => encHaltOption enc value) fun _ => rfl
+      (encHaltOption enc) encBits := (identity encBits).ofInputEq (fun value => encHaltOption
+        enc value) fun _ => rfl
   exact (ite empty absent word).ofOutputEq fun value => by cases value <;> rfl
 
 /-- Test whether a standard encoded list is empty. -/
@@ -54,7 +55,7 @@ conditional charges its emptiness test, copy and fixed `[false]` fallback. -/
     NativeCompiler List.isEmpty (encList enc) encTest :=
   (boolToTest.comp
     (isEmpty.ofInputEq (fun list => encList enc list) fun _ => rfl)).ofOutputEq fun list => by
-      cases list <;> simp [encList_cons]
+      cases list <;> simp
 
 /-- Emit the first framed list element as a raw payload word. On the empty list this emits the
 frame parser's total empty-word result, which is replaced by `listHeadD`. -/
@@ -69,7 +70,7 @@ frame parser's total empty-word result, which is replaced by `listHeadD`. -/
     NativeCompiler (fun list : List Alpha => list.headD default) (encList enc) enc := by
   let fallback := const (encList enc) encBits (enc default)
   exact (ite (listIsEmpty enc) fallback (listHeadPayload enc)).ofOutputEq fun list => by
-    cases list <;> simp [encList_cons, unframe_frame_append]
+    cases list <;> simp
 
 /-- Unary-indexed list access, including the direct suffix scan and total head default. -/
 @[expose] noncomputable def listGetDUnary {Alpha : Type*} (default : Alpha)

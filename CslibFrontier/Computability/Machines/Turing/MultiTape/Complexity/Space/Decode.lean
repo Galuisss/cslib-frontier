@@ -313,7 +313,8 @@ private theorem decodeCell :
     ComputableInPolyTime MultiTapeTM.decodeCell encBits (encOption encBool) := by
   unfold Turing.MultiTapeTM.decodeCell
   exact ite' (headD (encA := encBool) false)
-    ((optionSome encBool).comp ((headD (encA := encBool) false).comp (tail (encA := encBool)))) (const none)
+    ((optionSome encBool).comp ((headD (encA := encBool) false).comp (tail (encA :=
+      encBool)))) (const none)
 
 /-- **Decoding a two-sided tape is polynomial-time.** -/
 theorem decodeBiTape :

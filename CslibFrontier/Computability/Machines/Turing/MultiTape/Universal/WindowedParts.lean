@@ -333,9 +333,9 @@ private lemma wFin_inO : ComputableInO wFin
 /-! #### Sizes -/
 
 private lemma length_read_headD_le (l : List Tape) :
-    (eSym (l.headD default).read).length ≤ (encList eTape l).length := by
+    (eSym (l.headD default).read).length ≤ (encList eTape l).length + 1 := by
   cases l with
-  | nil => exact le_of_eq rfl
+  | nil => simp [eSym, encList_nil]
   | cons t l =>
     have := length_eSym_read_le t
     simp only [List.headD_cons, encList_cons, List.length_append, length_frame]

@@ -69,6 +69,7 @@ theorem ComputableInPolyTime.bits_lex_le :
       ((ComputableInPolyTime.bitsToList.comp (.fst _ _)).prod
         (ComputableInPolyTime.bitsToList.comp (.snd _ _)))
   have hfind := ComputableInPolyTime.findWithInput
+    (encO := encOption (encPair encBool encBool))
     (test := fun (_ : List Bool × List Bool) (q : Bool × Bool) => q.1 != q.2) hzip
     ((ComputableInPolyTime.of_finite fun q : Bool × Bool => q.1 != q.2).comp (.snd _ _))
   have hlen : ComputableInPolyTime

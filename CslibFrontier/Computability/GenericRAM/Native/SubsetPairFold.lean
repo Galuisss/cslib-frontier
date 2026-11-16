@@ -745,7 +745,8 @@ private theorem computableInPolyTime_bucketStep :
   have hs := snd (encPair (encList encNat) encSt) encUnary; have hrem := hst.fst'
   have hcap := binary_mul' (binary_two_pow.comp hs)
     ((listGetD (encA := encNat) 0).comp (hrow.prod hs))
-  have hsome := hrem.prod ((optionSome (encPair encUnary encNat)).comp (hs.prod hrem))
+  have hsome := hrem.prod ((optionSome (encO := encOpt) (encPair encUnary encNat)).comp
+    (hs.prod hrem))
   have hnone := (binary_sub' hrem hcap).prod
     (const (encIn := encQ) (encOut := encOpt) (none : Option (ℕ × ℕ)))
   have hinner : ComputableInPolyTime

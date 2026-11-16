@@ -245,7 +245,8 @@ private theorem runtimeNext_budget (ntm : MultiTapeNTM k Bool State)
     (runtime_budget (budget_natSucc hn) hB hchk (budget_const none hin))
     (runtime_budget hn hstart (budget_const false hin)
       (budget_optionSome (install_budget ntm hstart hin)))
-  exact (budget_ite (budget_optionIsSome (encB := encState) (runtimeCounting_budget hs)) hcounting hscan).of_enc_eq
+  exact (budget_ite (budget_optionIsSome (encB := encState) (runtimeCounting_budget hs))
+    hcounting hscan).of_enc_eq
     fun a => by
       cases h : (s a).counting <;> simp [runtimeNext, h, vertexWidth, startRadix]
 

@@ -406,7 +406,8 @@ private lemma next_inSpace :
 private lemma halted_inSpace :
     ComputableInSpace budgetedNUniversal.halted eNU encBool fun s => (eNU s).length :=
   (budget_finite (encC := encBool) Bool.not
-    (budget_optionIsSome (eCfg_state_budget (eNU_cfg_budget nu_id)))).of_enc_eq fun _ => rfl
+    (budget_optionIsSome (encB := encUnary) (eCfg_state_budget (eNU_cfg_budget
+      nu_id)))).of_enc_eq fun _ => rfl
 
 private lemma accept_inSpace :
     ComputableInSpace budgetedNUniversal.accept eNU encBool fun s => (eNU s).length := by

@@ -74,7 +74,7 @@ private theorem untilStep_inSpace {step : β → β} {done : β → Bool} {Ss Sd
   have hl : (fun o => (encHaltOption encB o).length) ≼
       fun o => (encHaltOption encB o).length + Ss (o.getD default) + Sd (o.getD default) :=
     .of_le fun _ => by omega
-  have hget := budget_optionGetD default (budget_id hl)
+  have hget := budget_optionGetD (encB := encB) default (budget_id hl)
   have hd := budget_comp hdone hget (.of_le fun _ => by omega)
   have hs := budget_optionSome (budget_comp hstep hget (.of_le fun _ => by omega))
   have hc := budget_finite (encC := encBool) (fun p : Bool × Bool => p.1 && !p.2)
@@ -198,7 +198,7 @@ theorem iterateUntil {init : α → β} {step : β → β} {done : β → Bool} 
       have := hstate x j hj
       simp only [encHaltOption_some, List.length_cons]
       omega)
-  refine ((budget_optionGetD default h).of_enc_eq (g := fun x => step^[n x] (init x))
+  refine ((budget_optionGetD (encB := encB) default h).of_enc_eq (g := fun x => step^[n x] (init x))
     fun x => ?_).weaken ⟨2, fun x => ?_⟩
   · rw [hit x le_rfl]; rfl
   · dsimp only; omega
