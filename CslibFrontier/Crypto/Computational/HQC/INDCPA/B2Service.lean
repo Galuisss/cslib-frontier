@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Circuit.Quantum.Input
+public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Code.NativeCompiler
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Uniform
 public import CslibFrontier.Computability.Circuit.Quantum.Parallel
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.BlockCopy.NativeCompiler
@@ -773,6 +774,19 @@ def b2ServiceDescription (P : PKEParams) (securityParameter : ℕ)
     instructions :=
       (b2ServiceCodes P securityParameter encoder).map fun code => .gate (false, code) }
 
+/-- The service consumes exactly the two `P.k`-bit messages followed by the hidden bit. -/
+@[simp] theorem b2ServiceDescription_quantumInputWidth (P : PKEParams)
+    (securityParameter : ℕ)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen) :
+    (b2ServiceDescription P securityParameter encoder).quantumInputWidth = 2 * P.k + 1 := by
+  simp [b2ServiceDescription, b2ServiceRequestWidth]
+
+/-- The service emits exactly the first and second HQC ciphertext components. -/
+@[simp] theorem b2ServiceDescription_outputWidth (P : PKEParams) (securityParameter : ℕ)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen) :
+    (b2ServiceDescription P securityParameter encoder).outputWidth = P.n + P.codeLen := by
+  simp [b2ServiceDescription, b2ServiceCiphertextWidth]
+
 /-- The retained B2 service is structurally valid on the complete three-block truncated-syndrome
 sample. Its logical quantum input is exactly the two-message request and hidden bit. -/
 theorem wellFormed_b2ServiceDescription (P : PKEParams) (securityParameter : ℕ)
@@ -1020,14 +1034,7 @@ an asymptotic parameter-dependent NIST encoder family. -/
           b2ServiceEncoderBase, b2ServiceSavedInputBase, b2ServiceInputWidth,
           b2ServiceRequestWidth, b2ServiceCiphertextWidth, b2HeaderWidth, b2SampleWidth,
           encList_append, two_mul, Nat.add_assoc]
-  let phase : NativeCompiler (fun code : GateCode => (false, code))
-      encGateCode encPhaseGateCode :=
-    (const encGateCode encBool false).pair (identity encGateCode)
-  let instruction : NativeCompiler
-      (fun code : GateCode => OracleGateCode.gate (false, code))
-      encGateCode encOracleGateCode :=
-    ((optionSome encPhaseGateCode).comp phase).ofOutputEq fun _ => rfl
-  let instructions := (listMapCompiler encGateCode encOracleGateCode instruction).comp codes
+  let instructions := oracleGateCodeList.comp codes
   let fields := width.pair (zero.pair (zero.pair
     (requestAndHidden.pair (ciphertextWidth.pair instructions))))
   exact fields.ofOutputEq fun input => by
