@@ -33,6 +33,8 @@ remain in the joint output. These are original bridges between existing represen
 * `Cslib.Quantum.matrix_isometry`: the matrix of a linear isometry has orthonormal columns.
 * `Cslib.Quantum.densityConj_pureState`: conjugation agrees with pure-state evolution.
 * `Cslib.Quantum.partialTraceLeft_densityConj_kronecker`: a local isometry preserves the reference.
+* `Cslib.Quantum.partialTraceLeft_densityConj_one_kronecker`: evolution on the retained factor
+  commutes with discarding the other factor.
 -/
 
 public section
@@ -121,6 +123,43 @@ theorem densityConj_kronecker_pureState [Fintype κ] [DecidableEq ι] [Decidable
     funext (prodState_apply ψ φ)]
   simpa only [Matrix.one_mulVec] using
     congrFun (kronecker_mulVec_mul V (1 : Matrix κ κ ℂ) ψ.ofLp φ.ofLp) p
+
+/-- Applying an arbitrary rectangular map to the retained second factor commutes with tracing
+out the first factor.  No positivity, normalization or isometry hypothesis is needed. -/
+theorem partialTraceLeft_densityConj_one_kronecker {A : Type*} [Fintype A]
+    [DecidableEq A] (V : Matrix ι' ι ℂ)
+    (ρ : Matrix (A × ι) (A × ι) ℂ) :
+    partialTraceLeft
+        (densityConj ((1 : Matrix A A ℂ) ⊗ₖ V) ρ) =
+      densityConj V (partialTraceLeft ρ) := by
+  classical
+  ext i j
+  simp only [partialTraceLeft_apply, densityConj_apply, Matrix.mul_apply,
+    conjTranspose_kronecker, conjTranspose_one, Fintype.sum_prod_type, kroneckerMap_apply,
+    Matrix.one_apply, mul_ite, ite_mul, one_mul, mul_zero, zero_mul,
+    Finset.sum_ite_irrel, Finset.sum_const_zero, Fintype.sum_ite_eq,
+    Finset.mul_sum, Finset.sum_mul]
+  calc
+    _ = ∑ a : A, ∑ l : ι, ∑ k : ι,
+        V i k * ρ (a, k) (a, l) * Vᴴ l j := by
+      apply Finset.sum_congr rfl
+      intro a _
+      rw [Fintype.sum_ite_eq']
+    _ = ∑ a : A, ∑ k : ι, ∑ l : ι,
+        V i k * ρ (a, k) (a, l) * Vᴴ l j := by
+      apply Finset.sum_congr rfl
+      intro a _
+      rw [Finset.sum_comm]
+    _ = ∑ k : ι, ∑ a : A, ∑ l : ι,
+        V i k * ρ (a, k) (a, l) * Vᴴ l j := by
+      rw [Finset.sum_comm]
+    _ = ∑ k : ι, ∑ l : ι, ∑ a : A,
+        V i k * ρ (a, k) (a, l) * Vᴴ l j := by
+      apply Finset.sum_congr rfl
+      intro k _
+      rw [Finset.sum_comm]
+    _ = _ := by
+      rw [Finset.sum_comm]
 
 /-- Applying a rectangular isometry to the first system leaves the reference marginal unchanged.
 The input may be mixed or entangled, and need not even be normalized for this identity. -/

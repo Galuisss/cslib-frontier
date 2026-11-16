@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Foundations.Quantum.Measurement.Classical
+public import Mathlib.Data.Matrix.Block
 
 /-!
 # Deferred computational-basis readout
@@ -19,6 +20,8 @@ arbitrary reference register, so the identity applies without a product-state as
 
 To keep a classical copy of the readout, record the label twice and discard one copy.  The second
 main identity gives the resulting block-diagonal joint state of the retained label and input.
+A controlled continuation may then use the retained full label while leaving it available for a
+later observation; its exact branchwise evolution is the final identity below.
 
 This is the finite-dimensional deferred-measurement identity for a classical readout.  It is
 original formalization infrastructure.
@@ -34,6 +37,8 @@ original formalization infrastructure.
   exactly the sum of the corresponding classical density branches.
 * `Cslib.Quantum.partialTraceLeft_densityConj_coherentRecord_twice`: recording twice and
   discarding one copy retains the other as a classical branch label.
+* `Cslib.Quantum.partialTraceLeft_densityConj_controlled_coherentRecord_twice`: the retained
+  full label controls a branch-dependent continuation and remains in the joint output.
 -/
 
 public section
@@ -110,5 +115,42 @@ theorem partialTraceLeft_densityConj_coherentRecord_twice [Fintype A] (f : ι �
       ∑ y, (pureState (ket y) ⊗ₖ classicalDensityBranch f y ρ) := by
   rw [densityConj_mul, partialTraceLeft_densityConj_coherentRecord]
   simp_rw [classicalDensityBranch_coherentRecord]
+
+omit [DecidableEq ι] in
+/-- A block-diagonal continuation selected by a retained classical label evolves exactly that
+label's matrix block.  `Matrix.blockDiagonal` uses the active-register-first convention, so the
+two `Prod.swap` reindexings expose the label as the first factor. -/
+theorem densityConj_blockDiagonal_swap_kronecker {ι' : Type*} [Fintype A]
+    (V : A → Matrix ι' ι ℂ) (y : A) (ρ : Matrix ι ι ℂ) :
+    densityConj
+        ((Matrix.blockDiagonal V).submatrix Prod.swap Prod.swap)
+        (pureState (ket y) ⊗ₖ ρ) =
+      pureState (ket y) ⊗ₖ densityConj (V y) ρ := by
+  classical
+  ext ⟨z, i⟩ ⟨w, j⟩
+  simp [densityConj_apply, Matrix.mul_apply, Fintype.sum_prod_type,
+    Matrix.blockDiagonal_apply, pureState_apply, ket_apply, kroneckerMap_apply]
+  split_ifs <;> simp_all
+
+/-- **Deferred full-label readout followed by a controlled continuation.** Record the complete
+label twice, discard one orthogonal copy, and apply the label-selected rectangular map to the
+retained input.  The retained label remains classical and correlated with the complete evolved
+branch.  An arbitrary inaccessible reference may be included in the input and output indices of
+each `V y`; no product-state or normalization hypothesis is used. -/
+theorem partialTraceLeft_densityConj_controlled_coherentRecord_twice {ι' : Type*}
+    [Fintype A] (f : ι → A) (V : A → Matrix ι' ι ℂ)
+    (ρ : Matrix ι ι ℂ) :
+    partialTraceLeft
+        (densityConj
+          (((1 : Matrix A A ℂ) ⊗ₖ
+              (Matrix.blockDiagonal V).submatrix Prod.swap Prod.swap) *
+            (coherentRecord (Prod.fst : A × ι → A) * coherentRecord f)) ρ) =
+      ∑ y, (pureState (ket y) ⊗ₖ
+        densityConj (V y) (classicalDensityBranch f y ρ)) := by
+  rw [densityConj_mul, partialTraceLeft_densityConj_one_kronecker,
+    partialTraceLeft_densityConj_coherentRecord_twice, map_sum]
+  apply Finset.sum_congr rfl
+  intro y _
+  rw [densityConj_blockDiagonal_swap_kronecker]
 
 end Cslib.Quantum
