@@ -65,6 +65,20 @@ example : oddCycleInstance triangle ∈ USTCON :=
 example : oddCycleInstance edge ∉ USTCON :=
   fun h => (oddCycleInstance_mem_iff edge).1 h edge_mem
 
+/-- USTCON keeps its former header and matrix words for every instance. -/
+example (I : USTCONInstance) : encUSTCON I = encSTCON ⟨I.n, I.adj, I.s, I.t⟩ := rfl
+
+/-- Forgetting terminals preserves adjacency, through the shared matrix graph. -/
+example (I : USTCONInstance) (a b : Fin I.n) :
+    I.graph.Adj a b ↔ I.toUGraphInstance.graph.Adj a b := Iff.rfl
+
+/-- The edge in a numbered copy agrees with Mathlib's double cover. -/
+example : (oddCycleInstance edge).graph.Adj
+    (cv edge (x := 0) (v := 0) (by decide) (by decide) false)
+    (cv edge (x := 0) (v := 1) (by decide) (by decide) true) :=
+  adj_cv edge (x := 0) (by decide) (u := ⟨0, by decide⟩) (v := ⟨1, by decide⟩)
+    (by change decide ((0 : Fin 2) ≠ 1) = true; decide) false
+
 /-- The headline: bipartiteness is in `L`, and non-bipartiteness and undirected connectivity
 reduce to each other in logarithmic space. -/
 example : Bipartite ∈ L encUGraph := mem_L

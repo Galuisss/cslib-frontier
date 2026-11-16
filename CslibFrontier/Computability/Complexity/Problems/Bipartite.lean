@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.Complexity.Problems.StronglyConnected
 public import CslibFrontier.Computability.Complexity.Problems.USTCON
+public import CslibFrontier.Foundations.Combinatorics.SimpleGraph.Matrix
 public import Mathlib.Combinatorics.SimpleGraph.Bipartite
 public import Mathlib.Combinatorics.SimpleGraph.Coloring.Constructions
 
@@ -37,7 +38,8 @@ is `0`, the target `1`, and the vertex `(v, b)` of copy `x` is
 
 ## Main definitions
 
-* `Cslib.Complexity.UGraphInstance`: undirected graphs given by adjacency matrices.
+* `Cslib.Complexity.UGraphInstance`: shared terminal-free matrix graphs, imported from
+  `Foundations/Combinatorics/SimpleGraph/Matrix`.
 * `Cslib.Complexity.UGraphInstance.graph`: the simple graph of an instance.
 * `Cslib.Complexity.encUGraph`: the encoding of instances.
 * `Cslib.Complexity.Bipartite`: the bipartite instances.
@@ -59,31 +61,9 @@ is `0`, the target `1`, and the vertex `(v, b)` of copy `x` is
 
 namespace Cslib.Complexity
 
-/-- An **undirected graph** on `Fin n`, given by its adjacency matrix, symmetric and with zero
-diagonal. -/
-structure UGraphInstance where
-  /-- The number of vertices. -/
-  n : ℕ
-  /-- The adjacency matrix. -/
-  adj : Fin n → Fin n → Bool
-  /-- The matrix is symmetric. -/
-  symm : ∀ a b, adj a b = adj b a
-  /-- The diagonal is zero. -/
-  loopless : ∀ a, adj a a = false
-
 namespace UGraphInstance
 
 variable (G : UGraphInstance)
-
-/-- The simple graph of an instance. -/
-def graph : SimpleGraph (Fin G.n) where
-  Adj a b := G.adj a b = true
-  symm.symm a b h := (G.symm b a).trans h
-  loopless.irrefl a h := by simp [G.loopless] at h
-
-@[simp]
-theorem graph_adj {a b : Fin G.n} : G.graph.Adj a b ↔ G.adj a b = true :=
-  Iff.rfl
 
 /-- The digraph of an instance, with an arc in each direction for every edge. -/
 def toDigraph : DigraphInstance := ⟨G.n, G.adj⟩
@@ -103,17 +83,6 @@ def encode : List Bool := G.toDigraph.encode
 /-- **The encoding is injective.** -/
 theorem encode_injective : Function.Injective encode :=
   DigraphInstance.encode_injective.comp toDigraph_injective
-
-/-- The entries of an instance on natural numbers, `false` outside the vertices. -/
-def adjN (u v : ℕ) : Bool :=
-  if h : u < G.n ∧ v < G.n then G.adj ⟨u, h.1⟩ ⟨v, h.2⟩ else false
-
-theorem adjN_comm (u v : ℕ) : G.adjN u v = G.adjN v u := by
-  unfold adjN
-  by_cases h : u < G.n ∧ v < G.n
-  · rw [dite_eq_left h, dite_eq_left ⟨h.2, h.1⟩]
-    exact G.symm _ _
-  · rw [dite_eq_right h, dite_eq_right fun h' => h ⟨h'.2, h'.1⟩]
 
 end UGraphInstance
 
@@ -263,17 +232,29 @@ def oddCycleInstance : USTCONInstance where
 def cv {x v : ℕ} (hx : x < G.n) (hv : v < G.n) (b : Bool) : Fin (oddCycleInstance G).n :=
   ⟨copyVertex G.n x v b, copyVertex_lt b hx hv⟩
 
+/-- Translate a vertex and its side to Mathlib's sum representation of the double cover. -/
+def coverVertex (v : Fin G.n) (b : Bool) : Fin G.n ⊕ Fin G.n :=
+  if b then Sum.inr v else Sum.inl v
+
+/-- Within a numbered copy, adjacency is exactly Mathlib's bipartite double cover.
+The arithmetic representation is retained for the counter-program writer. -/
+theorem adj_cv_iff {x : ℕ} (hx : x < G.n) (u v : Fin G.n) (b c : Bool) :
+    (oddCycleInstance G).graph.Adj (cv G hx u.isLt b) (cv G hx v.isLt c) ↔
+      G.graph.bipartiteDoubleCover.Adj (coverVertex G u b) (coverVertex G v c) := by
+  have hu := two_le_copyVertex (n := G.n) x u b
+  have hv := two_le_copyVertex (n := G.n) x v c
+  change entry G (copyVertex G.n x u b) (copyVertex G.n x v c) = true ↔ _
+  simp only [entry, hu, hv, copy_copyVertex b u.isLt, copy_copyVertex c v.isLt,
+    side_copyVertex, vert_copyVertex x b u.isLt, vert_copyVertex x c v.isLt,
+    UGraphInstance.adjN]
+  cases b <;> cases c <;>
+    simp [coverVertex, SimpleGraph.bipartiteDoubleCover, u.isLt, v.isLt] <;> omega
+
 /-- An edge `{u, v}` of the graph joins `(u, b)` and `(v, !b)` in every copy. -/
 theorem adj_cv {x : ℕ} (hx : x < G.n) {u v : Fin G.n} (h : G.graph.Adj u v) (b : Bool) :
     (oddCycleInstance G).graph.Adj (cv G hx u.isLt b) (cv G hx v.isLt (!b)) := by
-  have key : entry G (copyVertex G.n x u b) (copyVertex G.n x v (!b)) = G.adj u v := by
-    unfold entry
-    rw [ite_eq_left ⟨by unfold copyVertex; omega, by unfold copyVertex; omega,
-      by rw [copy_copyVertex _ u.isLt, copy_copyVertex _ v.isLt],
-      by rw [side_copyVertex, side_copyVertex]; cases b <;> simp⟩,
-      vert_copyVertex _ _ u.isLt, vert_copyVertex _ _ v.isLt, UGraphInstance.adjN,
-      dite_eq_left ⟨u.isLt, v.isLt⟩]
-  simpa [oddCycleInstance, cv, key] using h
+  apply (adj_cv_iff G hx u v b (!b)).2
+  cases b <;> simpa [coverVertex, SimpleGraph.bipartiteDoubleCover] using h
 
 /-- A walk of length `ℓ` from `v` to `w` gives a path from `(v, b)` to `(w, b xor parity ℓ)` in
 every copy. -/
