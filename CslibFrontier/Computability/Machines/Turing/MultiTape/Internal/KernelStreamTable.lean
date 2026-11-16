@@ -309,39 +309,6 @@ theorem transformsTapesAt_streamRound
       ⟨rfl, htapes, rfl⟩, rfl⟩
     exact ⟨hpos, htapes, rfl⟩
 
-private theorem transformsTapesAt_rewindInputOn (input : List Bool) :
-    MultiTapeTM.TransformsTapesAt (rewindInputOn K Bool).toTM
-      (fun actualInput _ _ => actualInput = input)
-      (fun _ _ tapes finalPosition finalTapes output =>
-        finalPosition = 1 ∧ finalTapes = tapes ∧ output = [])
-      (input.length + 2) K := by
-  rintro actualInput position tapes out rfl
-  have hrun : (rewindInputOn K Bool).toTM.runFrom
-      (MultiTapeTM.wordsCfgAt actualInput position
-        (some (rewindInputOn K Bool).toTM.q₀) tapes out) (position.val - 1 + 2) =
-        MultiTapeTM.wordsCfgAt actualInput 1 none tapes (out ++ []) := by
-    have hcfg : MultiTapeTM.noTapesCfg
-        (MultiTapeTM.wordsCfgAt actualInput position
-          (some (rewindInputOn K Bool).toTM.q₀) tapes out) =
-        ⟨some (MultiTapeMachine.rewindInput Bool).initial, position,
-          Fin.elim0, Fin.elim0, out⟩ :=
-      Cfg.ext rfl rfl (Subsingleton.elim _ _) (Subsingleton.elim _ _) rfl
-    rw [rewindInputOn, toTM_extendTapes] at hcfg ⊢
-    rw [MultiTapeTM.runFrom_noTapes, hcfg,
-      MultiTapeMachine.runFrom_rewindInput, List.append_nil]
-    rfl
-  have hhalt : ((rewindInputOn K Bool).toTM.runFrom
-      (MultiTapeTM.wordsCfgAt actualInput position
-        (some (rewindInputOn K Bool).toTM.q₀) tapes out)
-      (position.val - 1 + 2)).Halted := by
-    rw [hrun]
-    rfl
-  refine ⟨1, tapes, [], ?_, ⟨rfl, rfl, rfl⟩, ?_⟩
-  · rw [(rewindInputOn K Bool).toTM.runFrom_eq_of_halt _
-      (by have := position.isLt; omega) hhalt, hrun]
-  · rw [rewindInputOn, toTM_extendTapes]
-    exact MultiTapeTM.space_noTapes_le _ _ _
-
 /-- The complete explicit streaming fold: initialize, iterate, finalize, clean, and rewind input. -/
 def stream (reader : MultiTapeTM.InputReader Bool Q)
     (initializer : MultiTapeMachine K Bool InitState Empty Id)
@@ -418,7 +385,7 @@ theorem computesTidily_stream_after
         ⟨by rw [hextra, hvalue, htapes, Function.update_idem]; simp, he⟩)
       le_rfl (by have := value.pos; omega)
   have hfin := (hFinal'.seq_eq hclear).freezeInput_eq input (1 + input.length)
-  have hrewind := (transformsTapesAt_rewindInputOn (K := K) input).imp
+  have hrewind := (MultiTapeMachine.transformsTapesAt_rewindInputOn (k := K) input).imp
     (P' := fun actualInput position tapes => actualInput = input ∧
       position.val = 1 + input.length ∧ tapes = (fun _ => []))
     (Q' := fun actualInput _ _ position' tapes' output => actualInput = input ∧

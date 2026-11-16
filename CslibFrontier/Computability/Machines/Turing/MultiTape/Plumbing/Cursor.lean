@@ -308,26 +308,56 @@ namespace Turing.MultiTapeTM
 
 variable {k : ℕ} {Symbol State State₀ State₁ : Type*}
 
+private theorem transformsTapesAt_rewindInput_of_run
+    (tm : MultiTapeTM 0 Symbol State)
+    (hrewind : ∀ {input : List Symbol} (p : Fin (input.length + 2)) (out : List Symbol),
+      tm.runFrom ⟨some tm.q₀, p, nofun, nofun, out⟩ (p.val - 1 + 2) =
+        ⟨none, 1, nofun, nofun, out⟩)
+    (x : List Symbol) :
+    TransformsTapesAt (tm.extendTapes (noTapes k)) (fun input _ _ => input = x)
+      (fun _ _ ws p' ws' e => p' = 1 ∧ ws' = ws ∧ e = []) (x.length + 2) k := by
+  rintro input p ws out rfl
+  have hrun : (tm.extendTapes (noTapes k)).runFrom
+      (wordsCfgAt input p (some tm.q₀) ws out) (p.val - 1 + 2) =
+        wordsCfgAt input 1 none ws (out ++ []) := by
+    have hcfg : noTapesCfg (wordsCfgAt input p (some tm.q₀) ws out) =
+        ⟨some tm.q₀, p, nofun, nofun, out⟩ :=
+      Cfg.ext rfl rfl (Subsingleton.elim _ _) (Subsingleton.elim _ _) rfl
+    rw [runFrom_noTapes, hcfg, hrewind, List.append_nil]
+    rfl
+  have hhalt : ((tm.extendTapes (noTapes k)).runFrom
+      (wordsCfgAt input p (some tm.q₀) ws out) (p.val - 1 + 2)).Halted := by
+    rw [hrun]; rfl
+  refine ⟨1, ws, [], ?_, ⟨rfl, rfl, rfl⟩, space_noTapes_le _ _ _⟩
+  rw [extendTapes_q₀, runFrom_eq_of_halt _ _ (by have := p.isLt; omega) hhalt, hrun]
+
 /-- `rewindInputOn k Symbol` moves the input head from anywhere on the input `x` back to its start
 and changes nothing else. -/
 theorem transformsTapesAt_rewindInput (x : List Symbol) :
     TransformsTapesAt (rewindInputOn k Symbol) (fun input _ _ => input = x)
+      (fun _ _ ws p' ws' e => p' = 1 ∧ ws' = ws ∧ e = []) (x.length + 2) k :=
+  transformsTapesAt_rewindInput_of_run (rewindInput Symbol)
+    (fun p out => runFrom_rewindInput p _ _ out) x
+
+end Turing.MultiTapeTM
+
+namespace Turing.MultiTapeMachine
+
+/-- The explicit input rewinder restores the input head, preserves every tape and output, and
+uses one visited cell on each unused work tape. -/
+theorem transformsTapesAt_rewindInputOn {k : ℕ} {Symbol : Type} (x : List Symbol) :
+    MultiTapeTM.TransformsTapesAt (rewindInputOn k Symbol).toTM
+      (fun input _ _ => input = x)
       (fun _ _ ws p' ws' e => p' = 1 ∧ ws' = ws ∧ e = []) (x.length + 2) k := by
-  rintro input p ws out rfl
-  have hrun : (rewindInputOn k Symbol).runFrom
-      (wordsCfgAt input p (some (rewindInputOn k Symbol).q₀) ws out) (p.val - 1 + 2) =
-        wordsCfgAt input 1 none ws (out ++ []) := by
-    have hcfg : noTapesCfg (wordsCfgAt input p (some (rewindInputOn k Symbol).q₀) ws out) =
-        ⟨some (rewindInput Symbol).q₀, p, nofun, nofun, out⟩ :=
-      Cfg.ext rfl rfl (Subsingleton.elim _ _) (Subsingleton.elim _ _) rfl
-    rw [rewindInputOn] at hcfg ⊢
-    rw [runFrom_noTapes, hcfg, runFrom_rewindInput, List.append_nil]
-    rfl
-  have hhalt : ((rewindInputOn k Symbol).runFrom
-      (wordsCfgAt input p (some (rewindInputOn k Symbol).q₀) ws out) (p.val - 1 + 2)).Halted := by
-    rw [hrun]; rfl
-  refine ⟨1, ws, [], ?_, ⟨rfl, rfl, rfl⟩, space_noTapes_le _ _ _⟩
-  rw [runFrom_eq_of_halt _ _ (by have := p.isLt; omega) hhalt, hrun]
+  rw [rewindInputOn, toTM_extendTapes]
+  exact MultiTapeTM.transformsTapesAt_rewindInput_of_run (rewindInput Symbol).toTM
+    (fun p out => runFrom_rewindInput p _ _ out) x
+
+end Turing.MultiTapeMachine
+
+namespace Turing.MultiTapeTM
+
+variable {k : ℕ} {Symbol State State₀ State₁ : Type*}
 
 -- upstream: vendored crei:crei/tidy-universal @9cce4cc7 (unsubmitted)
 -- vendored: the `TransformsWordsAt` block below, from that revision's `Plumbing/Cursor`
