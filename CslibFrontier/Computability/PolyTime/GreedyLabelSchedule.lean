@@ -775,9 +775,11 @@ theorem length_encOuterState_run_le (p : ScheduleParams) {s : ℕ}
   have hlt1 := ComputableInPolyTime.binary_lt' hsBin (ComputableInPolyTime.unary_to_binary.comp' hn)
   have hlt2 :=
     ComputableInPolyTime.binary_lt' hsBin (ComputableInPolyTime.unary_to_binary.comp' hnm)
-  have hb1 := (ComputableInPolyTime.optionSome (encPair encBool encUnary)).comp'
+  have hb1 := (ComputableInPolyTime.optionSome (encPair encBool encUnary)
+    (encO := encOption (encPair encBool encUnary))).comp'
     ((ComputableInPolyTime.const (encOut := encBool) false).prod hsCap)
-  have hb2 := (ComputableInPolyTime.optionSome (encPair encBool encUnary)).comp'
+  have hb2 := (ComputableInPolyTime.optionSome (encPair encBool encUnary)
+    (encO := encOption (encPair encBool encUnary))).comp'
     ((ComputableInPolyTime.const (encOut := encBool) true).prod
       (ComputableInPolyTime.unary_sub.comp' (hsCap.prod hn)))
   refine (hlt1.ite' hb1 (hlt2.ite' hb2 (.const none))).of_enc_eq fun p => ?_
@@ -806,6 +808,7 @@ private theorem computableInPolyTime_pendingSlotOfState :
   have hq2 := ComputableInPolyTime.snd encOuterSt (encPair encBool encUnary)
   have his :=
     (computableInPolyTime_readSlotSchedule.comp' (hq2.prod (hacc.snd'.comp' hq1))).optionIsSome
+      (encB := encList encNat)
   exact ComputableInPolyTime.optionElimWithInput hsl (.const none)
     (his.ite' (.const none)
       ((ComputableInPolyTime.optionSome (encPair encBool encUnary)).comp' hq2))

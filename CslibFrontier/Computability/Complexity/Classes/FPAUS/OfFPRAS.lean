@@ -538,7 +538,8 @@ theorem isPPTOn_sampler
       (ComputableInPolyTime.fst (encPair enc encUnary) (encPair encNat encNat)).snd'
   have hgood : ComputableInPolyTime (fun o : Option (List Bool) => o.isSome) (encOption encBits)
       encBool :=
-    ComputableInPolyTime.optionIsSome (ComputableInPolyTime.id' (encIn := encOption encBits))
+    ComputableInPolyTime.optionIsSome (encB := encBits)
+      (ComputableInPolyTime.id' (encIn := encOption encBits))
   have hretry := (R.isPPTOn_trial A hA).retry hgood hfuel
   have hjoin : ComputableInPolyTime (fun o : Option (Option (List Bool)) => o.join)
       (encOption (encOption encBits)) (encOption encBits) := by

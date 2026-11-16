@@ -1087,7 +1087,7 @@ private theorem computableInPolyTime_ciPost (E : SymmetricCipher) :
       (fun pair : (ℕ × List Bool) × (List Bool × List (List Bool)) =>
         (E.decrypt pair.1.1 pair.1.2 pair.2.1).isSome)
       EOut encBool :=
-    (E.decrypt_polyTime.comp hdecArg).optionIsSome
+    (E.decrypt_polyTime.comp hdecArg).optionIsSome (encB := encBits)
   exact ComputableInPolyTime.bool_and.comp
     ((ComputableInPolyTime.bool_not.comp hcontains).prod hdec)
 

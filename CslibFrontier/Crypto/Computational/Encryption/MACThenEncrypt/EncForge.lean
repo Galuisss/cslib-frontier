@@ -154,7 +154,7 @@ private theorem computableInPolyTime_mteMACPost {S : Type} (encS : S ↪ List Bo
       (fun p : ((ℕ × List Bool) × List Bool) × (List Bool × S) =>
         (E.decrypt (ptLen p.1.1.1) p.1.2 p.2.1).isSome)
       EPost encBool :=
-    hdec.optionIsSome
+    hdec.optionIsSome (encB := encBits)
   have hdecTidy : ComputableTidilyInPolyTime
       (fun p : ((ℕ × List Bool) × List Bool) × (List Bool × S) =>
         E.decrypt (ptLen p.1.1.1) p.1.2 p.2.1)

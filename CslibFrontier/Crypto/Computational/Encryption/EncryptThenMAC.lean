@@ -345,7 +345,7 @@ private theorem computableInPolyTime_etmMACPost {S : Type} (encS : S ↪ List Bo
       (fun p : ((ℕ × List Bool) × List Bool) × (List Bool × S) =>
         (E.decrypt p.1.1.1 p.1.2 (unframe p.2.1)).isSome)
       EPost encBool :=
-    (E.decrypt_polyTime.comp hdecArg).optionIsSome
+    (E.decrypt_polyTime.comp hdecArg).optionIsSome (encB := encBits)
   have hpostYes : ComputableInPolyTime
       (fun p : ((ℕ × List Bool) × List Bool) × (List Bool × S) =>
         (unframe p.2.1, dropFrame p.2.1))

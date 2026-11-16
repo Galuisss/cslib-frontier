@@ -498,7 +498,7 @@ private theorem isPPTOn_run_cramerShoupCollisionPhase2Oracle
   have hsplitIn := (computableInPolyTime_splitCramerShoupQuery hasAD).comp hE2.fst'.snd'
   have hcollIn := F.computableInPolyTime_isCramerShoupCollision hH
     (hd.comp hE1) hsplitIn.fst' hsplitIn.snd' (hct.comp hE1) (had.comp hE1)
-  have hsome := ComputableInPolyTime.optionSome encBits
+  have hsome := ComputableInPolyTime.optionSome encBits (encO := encSilentOption encBits)
   have hnextState := hcollIn.ite
     (hsome.comp (computableInPolyTime_extractCramerShoupTuple.comp hsplitIn))
     hE2.snd'

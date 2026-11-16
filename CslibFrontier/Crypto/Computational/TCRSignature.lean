@@ -582,8 +582,9 @@ private theorem computableInPolyTime_simStep {k : ℕ} {Control : Type} [Finite 
     (computableInPolyTime_finiteConfig_reqWord hcfg)
   have hrZero := ComputableInPolyTime.unary_beq' hr.fst' (.const 0)
   have hisNone : ComputableInPolyTime (fun q : Q => q.1.2.2.isNone) encQ encBool :=
-    (hqOpt.optionIsSome.trans ComputableInPolyTime.bool_not).of_enc_eq fun q => by
-      cases q.1.2.2 <;> rfl
+    ((hqOpt.optionIsSome (encB := encBits)).trans ComputableInPolyTime.bool_not).of_enc_eq
+      fun q => by
+        cases q.1.2.2 <;> rfl
   have hcond := hrZero.bool_and' hisNone
   exact (computableInPolyTime_finiteConfig_cases machine hcfg hcoin hacc
     (fun action symbol move =>
@@ -1253,7 +1254,8 @@ theorem isOraclePPT_oneTimeForger {k : ℕ} {Control : Type} [Finite Control]
           let r1 := simRun machine word reply q.1.2
           let out := outDecoder.decode r1.1
           return otsForgeryOf H n out.2.1 out.2.2) := by
-    have hite := IsOraclePPTOn.cond' hmR0.snd'.optionIsSome hbranchSome hbranchNone
+    have hite := IsOraclePPTOn.cond' (hmR0.snd'.optionIsSome (encB := encBits))
+      hbranchSome hbranchNone
     refine hite.congr fun q State oracle s => ?_
     dsimp only
     cases hopt : (simRun machine (simWordOf (otsParamInv H q.1.1.1) q.1.1.2) [] q.1.2).2 with
@@ -1317,7 +1319,7 @@ theorem isPPT_tcrAdversary {k : ℕ} {Control : Type} [Finite Control]
     have hword := computableInPolyTime_wordOf hn hkeys.fst'
     have hfuel := computableInPolyTime_fuelOf c d hn hkeys.fst'
     have hr0 := computableInPolyTime_simRun_comp machine hword (.const []) hcoins
-    have hisSome := hr0.snd'.optionIsSome
+    have hisSome := hr0.snd'.optionIsSome (encB := encBits)
     have hbranchNone : IsPPTOn encFIn encBits
         (fun p : FIn =>
           let saved := stateDecoder.decode p.2.1

@@ -755,7 +755,7 @@ private theorem computableInPolyTime_bucketStep :
       encQ encSt := by
     dsimp only [encQ, encSt, encOpt]
     simpa only [Function.comp_def, decide_eq_true_eq] using (binary_lt' hrem hcap).ite hsome hnone
-  exact hst.snd'.optionIsSome.ite hst hinner
+  exact (hst.snd'.optionIsSome (encB := encPair encUnary encNat)).ite hst hinner
 
 private theorem computableInPolyTime_findBucket :
     ComputableInPolyTime

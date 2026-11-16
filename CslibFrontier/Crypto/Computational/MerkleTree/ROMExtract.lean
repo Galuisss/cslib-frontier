@@ -997,7 +997,8 @@ theorem computableInPolyTime_extractTraceCollision
     cases findQueryInTrace (tr p.1) (H (k p.1) p.2) <;> rfl
   have hfind := ComputableInPolyTime.findWithInput
     (test := fun a q => findQueryInTrace (tr a) (H (k a) q) != some q) hinputs htest
-  have hbody := hq.prod (hlookup.optionGetDWithInput (ComputableInPolyTime.const []))
+  have hbody := hq.prod
+    (hlookup.optionGetDWithInput (encB := encBits) (ComputableInPolyTime.const []))
   convert hfind.optionElimWithInput
     (body := fun a q => (q, (findQueryInTrace (tr a) (H (k a) q)).getD []))
     (ComputableInPolyTime.const ([], [])) hbody using 1

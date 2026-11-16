@@ -602,8 +602,8 @@ private theorem computableInPolyTime_clearedPartialCollision {α γ : Type} [Dec
   have hgi := ComputableInPolyTime.listGetD_binary (encA := encOption encA) none ha hi
   have hgj := ComputableInPolyTime.listGetD_binary (encA := encOption encA) none ha hj
   have hboth := ComputableInPolyTime.bool_and'
-    (ComputableInPolyTime.optionIsSome hgi)
-    (ComputableInPolyTime.optionIsSome hgj)
+    (ComputableInPolyTime.optionIsSome (encB := encA) hgi)
+    (ComputableInPolyTime.optionIsSome (encB := encA) hgj)
   have hinner :=
     ComputableInPolyTime.ite_decide (ComputableInPolyTime.decide_eq' hgi hgj) hc (.const 0)
   have hmatch := hboth.ite' hinner (.const 1)

@@ -602,7 +602,7 @@ private theorem isPPTOn_appendTraceStep {k : ℕ} {Control α : Type} [Finite Co
       (fun a => decide ((queryOf machine
         (replayCfg machine (limit a) (word a) (trace a)) (b a)).isSome = true))
       input encBool :=
-    hqOpt.optionIsSome.of_enc_eq fun _ => rfl
+    (hqOpt.optionIsSome (encB := encBits)).of_enc_eq fun _ => rfl
   refine (IsPPTOn.ite' hcond hsome hnone).congr fun a => ?_
   dsimp only [appendTraceStep]
   cases queryOf machine (replayCfg machine (limit a) (word a) (trace a)) (b a) with
