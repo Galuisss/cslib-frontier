@@ -280,8 +280,10 @@ theorem exists_isometry_compress_pauliFamily (X Z : (ι → Bool) → Matrix κ 
   rw [key, show f p = (signVal p.sign : ℂ) • (X p.x * Z p.z) from rfl, ← smul_sub,
     AlgState.norm_smul, Complex.norm_real, Real.norm_eq_abs, abs_signVal, one_mul]
 
-/-- **Compression from game-level conditions**, a step toward robust Pauli rigidity
-[Natarajan and Vidick, §4.2, Theorems 13 and 14][NatarajanVidick2017]: for unitaries `X(a)`,
+/-- **Compression from consistency, anticommutation and linearity**, a step toward robust Pauli
+rigidity [Natarajan and Vidick, §4.2, Theorem 14][NatarajanVidick2017], for unitary families (see
+`CslibFrontier/Foundations/Quantum/Algebra/PauliFamily.lean` for how these conditions relate to
+the source's): for unitaries `X(a)`,
 `Z(b)` (Alice) and `Zᴮ(b)` (Bob, commuting with Alice's) on `ℂ^κ`, there is one isometry
 `W : ℂ^κ → ℂ^{2ⁿ} ⊗ ℂ^J` such that in every state `φ`
 `E_{a,b} ‖X(a) Z(b) - Wᴴ (X^a Z^b ⊗ 1) W‖²_φ ≤ 5 (8 ε_c + ε_a + ε_X + ε_Z)`, with the

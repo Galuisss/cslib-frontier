@@ -32,9 +32,19 @@ Here:
 * `ε_X`, `ε_Z` are the linearity defects `E ‖X(a) X(a') - X(a+a')‖²_φ` and
   `E ‖Z(b) Z(b') - Z(b+b')‖²_φ`.
 
-These are the conditions of the Pauli braiding analysis
-[Natarajan and Vidick, §4.2, Theorems 13 and 14][NatarajanVidick2017] (arXiv:1610.03574v1);
-only the consistency of `Z` is needed here.
+This is a bridge for *unitary* families. It relates to the conditions of the Pauli braiding
+analysis [Natarajan and Vidick, §4.2, Theorem 13][NatarajanVidick2017] (arXiv:1610.03574v1,
+p. 19; that version is titled *Robust self-testing of many-qubit states*) as follows:
+
+* the source's operators, eq. (11) on p. 18, are averaged marginals of the provers' measurements,
+  not unitaries; deriving unitary families `X`, `Z`, `Zᴮ` from a strategy is a further input;
+* the source separates anticommutation on the pairs with `a·b = 1` from commutation on the pairs
+  with `a·b = 0`; the defect `ε_a` here combines both over all pairs, as the signed relation
+  `Z(b) X(a) = (-1)^{a·b} X(a) Z(b)`;
+* only the consistency of `Z` is needed here.
+
+The connection from the game to these unitary families and the all-pairs error is tracked in
+[#6149](https://github.com/cslib-community/cslib-frontier/issues/6149) (milestone M3).
 
 The proof is a `calc` chain in the state calculus (`Cslib.Quantum.norm_mul_mul_mul_sub_le`).
 Multiplication on the right does not preserve closeness in a state. So each operator that must be
@@ -172,12 +182,12 @@ theorem norm_mul_mul_mul_sub_le (φ : AlgState A) (X Z ZB : (ι → Bool) → A)
   simp only [hs, one_mul] at chain
   linarith
 
-/-- `(x₁ + ⋯ + x₅)² ≤ 5 (x₁² + ⋯ + x₅²)`. -/
+/-- `(x₁ + ⋯ + x₅)² ≤ 5 (x₁² + ⋯ + x₅²)`, Cauchy–Schwarz against the constant `1`. -/
 private theorem sq_add₅_le (x₁ x₂ x₃ x₄ x₅ : ℝ) :
     (x₁ + x₂ + x₃ + x₄ + x₅) ^ 2 ≤ 5 * (x₁ ^ 2 + x₂ ^ 2 + x₃ ^ 2 + x₄ ^ 2 + x₅ ^ 2) := by
-  nlinarith [sq_nonneg (x₁ - x₂), sq_nonneg (x₁ - x₃), sq_nonneg (x₁ - x₄), sq_nonneg (x₁ - x₅),
-    sq_nonneg (x₂ - x₃), sq_nonneg (x₂ - x₄), sq_nonneg (x₂ - x₅), sq_nonneg (x₃ - x₄),
-    sq_nonneg (x₃ - x₅), sq_nonneg (x₄ - x₅)]
+  have h := Finset.sum_mul_sq_le_sq_mul_sq Finset.univ ![x₁, x₂, x₃, x₄, x₅] fun _ => (1 : ℝ)
+  simp only [Fin.sum_univ_five, Matrix.cons_val, mul_one, one_pow] at h
+  linarith
 
 /-- **The Pauli-family defect from game-level conditions**: with Bob's observables `Zᴮ(b)`
 commuting with Alice's `X`, `Z`,
