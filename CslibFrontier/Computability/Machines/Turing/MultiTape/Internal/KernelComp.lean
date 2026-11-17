@@ -177,7 +177,11 @@ private theorem wordsCfg_append_words {State' : Type} {outer : List Symbol}
     Turing.wordsCfg outer state (Fin.append tapes ![word, []]) out =
       ⟨state, 1, Fin.append (fun tape => Turing.tapeOfList (tapes tape))
         ![Turing.tapeOfList word, fun _ => none], fun _ => 0, out⟩ := by
-  tm_step
+  refine Cfg.ext rfl rfl
+    ((Fin.comp_append Turing.tapeOfList tapes ![word, []]).trans
+      (congrArg _ (funext fun i => ?_))) rfl rfl
+  match i with
+  | 0 | 1 => simp
 
 private theorem exists_runPath_setFlag (mark : Symbol) (tapes : Fin k → List Symbol)
     (word out outer : List Symbol) :

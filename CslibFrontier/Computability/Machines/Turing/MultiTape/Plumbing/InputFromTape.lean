@@ -123,7 +123,10 @@ private lemma wordsCfg_append_words {State' : Type*} {outer : List Symbol} (q : 
     wordsCfg outer q (Fin.append ws ![w, []]) out =
       ⟨q, 1, Fin.append (fun j => tapeOfList (ws j)) ![tapeOfList w, fun _ => none],
         fun _ => 0, out⟩ := by
-  tm_step
+  refine Cfg.ext rfl rfl
+    ((Fin.comp_append tapeOfList ws ![w, []]).trans (congrArg _ (funext fun i => ?_))) rfl rfl
+  match i with
+  | 0 | 1 => simp
 
 section Flag
 
