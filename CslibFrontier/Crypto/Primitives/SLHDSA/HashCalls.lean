@@ -41,8 +41,8 @@ validation, a security proof, or an asymptotic parameter family. It does not def
 
 * `Cslib.Crypto.SLHDSA.HashFamily`: the SHAKE and SHA2 instantiation families.
 * `Cslib.Crypto.SLHDSA.NBytes`, `TwoNBytes`, `LBlocksBytes`: typed call inputs.
-* `Cslib.BitString.blocksEquiv.symm`, `Cslib.Crypto.FixedBytes.pairBlocks`: construct inputs from
-  typed blocks without discarding their structure.
+* `Cslib.Crypto.FixedBytes.pairBlocks`: construct a two-block input without discarding its
+  structure.
 * `Cslib.Crypto.SLHDSA.shakeInput`, `sha256Input`, `sha512Input`: exact byte packages.
 * `Cslib.Crypto.SLHDSA.prf`, `f`, `h`, `tL`: the four addressed FIPS 205 calls.
 * `Cslib.Crypto.SLHDSA.ValidTInput`: the underlying SHA-2 input-domain obligation for `T_l`.
