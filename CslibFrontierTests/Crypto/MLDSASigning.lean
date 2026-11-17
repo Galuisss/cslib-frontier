@@ -7,7 +7,7 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (test)
 
-import CslibFrontier.Crypto.Computational.MLDSA.SigningSimulation
+import CslibFrontier.Crypto.Computational.MLDSA.SigningROM
 import Mathlib.Data.Fin.VecNotation
 import Mathlib.Tactic.FinCases
 
@@ -186,5 +186,29 @@ example {σ : CompressedSignature correctnessToy}
     compressedVerify correctnessToy 2 correctnessHash correctnessSk.publicKey [] σ = true :=
   compressedVerify_compressedSignBounded correctnessToy correctnessToy_valid (by decide)
     correctnessHash_inBall correctnessSk_short hout
+
+open Cslib Cslib.OracleComp
+
+-- The first internal trial rejects. The second accepts. Direct hash queries on either side
+-- see the same state, while the outer program receives only the final signing reply.
+private def interleaved : OracleComp (SigningROMSpec toy Bool) Bool := do
+  let before ← query (spec := SigningROMSpec toy Bool) (.inr (0, []))
+  let sig ← query (spec := SigningROMSpec toy Bool) (.inl [])
+  let after ← query (spec := SigningROMSpec toy Bool) (.inr (0, []))
+  return !before && sig.isSome && after
+
+private def countTrials : (q : List Bool ⊕ SigningHashPoint toy) →
+    StateM ℕ (SigningROMSpec toy Bool q) :=
+  sumHandler (fun _ n =>
+    (if n == 0 then none else
+      some (true, ⟨0, fun _ _ => false, 0⟩), n + 1))
+    (fun _ n => (n != 0, n))
+
+-- Four permitted attempts stop after the second, and the following direct query sees both.
+example : (interpret countTrials (expandSigningRetries toy 4 interleaved)).run 0 = (true, 2) := by
+  have hr : List.range 4 = [0, 1, 2, 3] := by decide
+  simp only [expandSigningRetries, interleaved, hr, List.findSomeM?_cons, List.findSomeM?_nil,
+    sumHandler, interpret_bind, interpret_query, countTrials, StateT.run, bind_pure_comp]
+  rfl
 
 end MLDSASigningTests

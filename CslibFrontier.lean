@@ -4872,6 +4872,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.Decompose
 public import CslibFrontier.Crypto.Computational.MLDSA.Hint
 public import CslibFrontier.Crypto.Computational.MLDSA.KeyOnly
 public import CslibFrontier.Crypto.Computational.MLDSA.Signing
+public import CslibFrontier.Crypto.Computational.MLDSA.SigningROM
 public import CslibFrontier.Crypto.Computational.MLDSA.SigningSimulation
 public import CslibFrontier.Crypto.Computational.MerkleDamgard
 public import CslibFrontier.Crypto.Computational.MerkleDamgard.LengthPadding
