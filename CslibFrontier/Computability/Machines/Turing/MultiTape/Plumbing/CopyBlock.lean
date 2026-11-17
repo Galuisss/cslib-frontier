@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.TapeLemmas
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step
 import Mathlib.Tactic.FinCases
 
 /-!
@@ -136,11 +137,7 @@ unchanged input position and output. -/
 
 @[simp] theorem progress_zero (erase : Bool) (cfg : Cfg 3 Symbol Unit input)
     (hstate : cfg.state = some ()) : progress erase cfg 0 = cfg := by
-  refine Cfg.ext hstate.symm rfl ?_ ?_ rfl
-  · funext i
-    fin_cases i <;> simp [progress, tapes]
-  · funext i
-    simp [progress]
+  tm_step [progress, tapes, hstate]
 
 private theorem source_at_progress (erase : Bool) (cfg : Cfg 3 Symbol Unit input) (count : ℕ) :
     (progress erase cfg count).workTapeSymbols 0 =
@@ -160,17 +157,7 @@ private theorem step_progress (erase : Bool) (cfg : Cfg 3 Symbol Unit input) (co
   cases hc : cfg.workTapes 2 (cfg.workTapePos 2 + count) with
   | none => exact False.elim (hcount hc)
   | some a =>
-    refine Cfg.ext rfl ?_ ?_ ?_ ?_
-    · simp [Action.apply, progress]
-    · funext i
-      fin_cases i
-      · cases erase <;> simp [Action.apply, progress, tapes, writeBlock_succ]
-      · simp only [Action.apply, progress, tapes]
-        simp [writeBlock_succ]
-      · simp [Action.apply, progress, tapes, writeBlock_succ]
-    · funext i
-      simp [Action.apply, progress, Nat.cast_add, add_assoc]
-    · simp [Action.apply, progress]
+    tm_step [progress, tapes, writeBlock_succ, Nat.cast_add, add_assoc]
 
 /-- Each nonblank counter cell permits one native transfer. -/
 theorem runFrom_progress (erase : Bool) (cfg : Cfg 3 Symbol Unit input) (count : ℕ)

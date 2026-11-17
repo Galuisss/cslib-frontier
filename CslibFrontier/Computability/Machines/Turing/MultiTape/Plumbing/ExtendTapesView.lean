@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.ExtendTapes
 public import Cslib.Foundations.Data.Fin.Tuple
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step
 
 /-!
 # The view of a configuration through a tape embedding
@@ -46,10 +47,7 @@ def viewCfg (e : Fin k ↪ Fin k') (cfg : Cfg k' Symbol State input) : Cfg k Sym
 /-- A configuration is its view through `e`, placed back on the tapes `e j`. -/
 theorem embed_viewCfg (e : Fin k ↪ Fin k') (cfg : Cfg k' Symbol State input) :
     embed e (viewCfg e cfg) cfg.workTapes cfg.workTapePos = cfg := by
-  refine Cfg.ext rfl rfl ?_ ?_ rfl <;> funext l <;> simp only [embed, viewCfg] <;>
-    · cases h : partialInv e l with
-      | none => rfl
-      | some j => rw [← partialInv_eq_some e h]
+  tm_step [embed, viewCfg] <;> exact congrArg _ (partialInv_eq_some e ‹_›)
 
 /-- **Running a machine on the tapes selected by an embedding.** The run is the run on the view of
 the configuration, placed back on the selected tapes; every other tape and head keeps its starting
@@ -75,16 +73,11 @@ theorem embed_castAdd (cfg : Cfg k Symbol State input)
     embed (Fin.castAddEmb k') cfg tapes heads =
       ⟨cfg.state, cfg.inputPos, Fin.append cfg.workTapes (fun i => tapes (Fin.natAdd k i)),
         Fin.append cfg.workTapePos (fun i => heads (Fin.natAdd k i)), cfg.output⟩ := by
-  refine Cfg.ext rfl rfl ?_ ?_ rfl <;> funext i <;> induction i using Fin.addCases with
-  | left i =>
-    have h : partialInv (Fin.castAddEmb k') (i.castAdd k') = some i :=
-      partialInv_embed (Fin.castAddEmb k') i
-    simp [embed, h]
-  | right i =>
-    have h : Fin.natAdd k i ∉ Set.range (Fin.castAddEmb k') := by
-      rintro ⟨j, hj⟩
-      exact Fin.castAdd_ne_natAdd j i hj
-    simp [embed, partialInv_eq_none _ h]
+  have hl (i : Fin k) : partialInv (Fin.castAddEmb k') (i.castAdd k') = some i :=
+    partialInv_embed (Fin.castAddEmb k') i
+  have hr (i : Fin k') : partialInv (Fin.castAddEmb k') (Fin.natAdd k i) = none :=
+    partialInv_eq_none _ fun ⟨j, hj⟩ => Fin.castAdd_ne_natAdd j i hj
+  tm_step [embed, hl, hr]
 
 /-- Placing a configuration after a block of extra tapes gives an appended family. -/
 theorem embed_natAdd (cfg : Cfg k Symbol State input)
@@ -92,16 +85,11 @@ theorem embed_natAdd (cfg : Cfg k Symbol State input)
     embed (Fin.natAddEmb k') cfg tapes heads =
       ⟨cfg.state, cfg.inputPos, Fin.append (fun i => tapes (i.castAdd k)) cfg.workTapes,
         Fin.append (fun i => heads (i.castAdd k)) cfg.workTapePos, cfg.output⟩ := by
-  refine Cfg.ext rfl rfl ?_ ?_ rfl <;> funext i <;> induction i using Fin.addCases with
-  | left i =>
-    have h : i.castAdd k ∉ Set.range (Fin.natAddEmb k') := by
-      rintro ⟨j, hj⟩
-      exact Fin.castAdd_ne_natAdd i j hj.symm
-    simp [embed, partialInv_eq_none _ h]
-  | right i =>
-    have h : partialInv (Fin.natAddEmb k') (Fin.natAdd k' i) = some i :=
-      partialInv_embed (Fin.natAddEmb k') i
-    simp [embed, h]
+  have hl (i : Fin k') : partialInv (Fin.natAddEmb k') (i.castAdd k) = none :=
+    partialInv_eq_none _ fun ⟨j, hj⟩ => Fin.castAdd_ne_natAdd i j hj.symm
+  have hr (i : Fin k) : partialInv (Fin.natAddEmb k') (Fin.natAdd k' i) = some i :=
+    partialInv_embed (Fin.natAddEmb k') i
+  tm_step [embed, hl, hr]
 
 /-- Reserving one last tape is the corresponding `Fin.lastCases` family. -/
 theorem embed_castSucc (cfg : Cfg k Symbol State input)
@@ -111,7 +99,6 @@ theorem embed_castSucc (cfg : Cfg k Symbol State input)
         Fin.lastCases (heads (Fin.last k)) cfg.workTapePos, cfg.output⟩ := by
   change embed (Fin.castAddEmb 1) cfg tapes heads = _
   rw [embed_castAdd]
-  refine Cfg.ext rfl rfl ?_ ?_ rfl <;> funext i <;> induction i using Fin.lastCases <;>
-    simp [Fin.append, Fin.addCases]
+  tm_step [Fin.append, Fin.addCases]
 
 end Turing.MultiTapeTM
