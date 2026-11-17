@@ -35,10 +35,15 @@ def canary(tracking: str = "") -> str:
             "end Cslib.Crypto.Canary\n")
 
 
-def hits(source: str, names: set[str] = frozenset(), modules: set[str] = frozenset()
-         ) -> list[tuple[str, str, str]]:
+PATH = "CslibFrontier/Crypto/A.lean"
+OTHER_PATH = "CslibFrontier/Crypto/B.lean"
+
+
+def hits(source: str, records: dict[str, str] | None = None) -> list[tuple[str, str, str]]:
+    """The disclaimers of the module `PATH` with the text `source` as `(declaration, sentence,
+    tracked)`, given the recorded declarations `records` with their modules."""
     return [(hit.declaration, hit.sentence, hit.tracked)
-            for hit in c.module_hits("CslibFrontier/Crypto/A.lean", source, names, modules)]
+            for hit in c.module_hits(PATH, source, records or {})]
 
 
 def found(doc: str) -> list[str]:
@@ -46,10 +51,14 @@ def found(doc: str) -> list[str]:
     return [sentence for _, sentence, _ in hits(f"/-! {doc} -/\n")]
 
 
+def named(name: str) -> str:
+    return f"the entry of {name}"
+
+
 class RuleTests(unittest.TestCase):
     def test_canary_an_honest_disclaimer_without_an_issue_is_untracked(self) -> None:
         self.assertEqual(hits(canary()), [(CANARY_NAME, CANARY_SENTENCE, "")])
-        hit, = c.module_hits("CslibFrontier/Crypto/A.lean", canary(), set(), set())
+        hit, = c.module_hits(PATH, canary(), {})
         self.assertEqual(hit.line, 10)
 
     def test_an_issue_number_in_the_docstring_tracks_it(self) -> None:
@@ -66,23 +75,75 @@ class RuleTests(unittest.TestCase):
         self.assertEqual(hits(canary() + other), [(CANARY_NAME, CANARY_SENTENCE, "")])
 
     def test_a_baseline_entry_of_the_declaration_tracks_it(self) -> None:
-        self.assertEqual(hits(canary(), {CANARY_NAME}),
-                         [(CANARY_NAME, CANARY_SENTENCE, "baseline entry")])
-        self.assertEqual(hits(canary(), {"Cslib.Crypto.Canary.other", "cpaSecure"})[0][2], "")
-        # An issue number is reported first.
-        self.assertEqual(hits(canary(" Tracked in #5293."), {CANARY_NAME})[0][2], "#5293")
+        self.assertEqual(hits(canary(), {CANARY_NAME: PATH}),
+                         [(CANARY_NAME, CANARY_SENTENCE, c.OWN)])
+        self.assertEqual(hits(canary(), {"Cslib.Crypto.Canary.other": PATH, "cpaSecure": PATH}),
+                         [(CANARY_NAME, CANARY_SENTENCE, "")])
+        # An issue number is reported first, and the declaration's own entry before a named one.
+        both = {CANARY_NAME: PATH, "Cslib.Crypto.Canary.toDDH": PATH}
+        self.assertEqual(hits(canary(" Tracked in #5293."), both)[0][2], "#5293")
+        self.assertEqual(hits(canary(), both)[0][2], c.OWN)
 
-    def test_a_module_docstring_is_tracked_by_an_entry_of_its_module(self) -> None:
+    def test_an_unrelated_entry_of_the_module_does_not_track_a_module_docstring(self) -> None:
         source = "/-! # Title\n\nRunning time is not tracked. -/\n" + canary()
         sentence = "Running time is not tracked."
         self.assertEqual(hits(source)[0], (c.MODULE_DOC, sentence, ""))
-        self.assertEqual(hits(source, modules={"CslibFrontier/Crypto/A.lean"})[0],
-                         (c.MODULE_DOC, sentence, "baseline entry"))
-        self.assertEqual(hits(source, modules={"CslibFrontier/Crypto/B.lean"})[0][2], "")
-        # The declaration's own entry does not track the module docstring, nor the reverse.
-        self.assertEqual([t for _, _, t in hits(source, {CANARY_NAME})], ["", "baseline entry"])
-        self.assertEqual([t for _, _, t in hits(source, modules={"CslibFrontier/Crypto/A.lean"})],
-                         ["baseline entry", ""])
+        # Neither the entry of a declaration of the module, nor that of the canary itself.
+        self.assertEqual(hits(source, {"Cslib.Crypto.Canary.other": PATH})[0],
+                         (c.MODULE_DOC, sentence, ""))
+        self.assertEqual([t for _, _, t in hits(source, {CANARY_NAME: PATH})], ["", c.OWN])
+        # An issue number in the module docstring does, and only there.
+        cited = source.replace("is not tracked.", "is not tracked (#5293).")
+        self.assertEqual([t for _, _, t in hits(cited)], ["#5293", ""])
+
+    def test_a_sentence_that_names_a_recorded_declaration_is_tracked(self) -> None:
+        to_ddh = "Cslib.Crypto.Canary.toDDH"
+        # The canary names its reduction: `toDDH A` and `toDDH`.
+        self.assertEqual(hits(canary(), {to_ddh: PATH}),
+                         [(CANARY_NAME, CANARY_SENTENCE, named(to_ddh))])
+        # In a module docstring, by the full name or by the name an entry of the module ends with.
+        for written in (to_ddh, "toDDH", "Canary.toDDH", "_root_." + to_ddh):
+            with self.subTest(written=written):
+                source = f"/-! `{written}` has no efficiency certificate. -/\n" + canary(" #5293")
+                self.assertEqual(hits(source, {to_ddh: PATH})[0][2], named(to_ddh))
+        # Another sentence of the same docstring is not tracked by the name.
+        source = "/-! Depth is not certified. The reduction `toDDH` has no PPT certificate. -/\n"
+        self.assertEqual([t for _, _, t in hits(source, {to_ddh: PATH})], ["", named(to_ddh)])
+        # The name must be in a code span and must be the whole identifier.
+        for doc in ("toDDH has no efficiency certificate.", "`toDDH'` is not certified.",
+                    "`A.toDDH` is not certified.", "`toDDH.spec` is not certified.",
+                    "`DDH` is not certified."):
+            with self.subTest(doc=doc):
+                self.assertEqual(hits(f"/-! {doc} -/\n", {to_ddh: PATH})[0][2], "")
+
+    def test_a_written_name_resolves_through_namespaces_or_within_the_module(self) -> None:
+        def tracked(doc: str, records: dict[str, str], namespace: str = "A.B") -> str:
+            source = (f"namespace {namespace}\n/-- {doc} -/\ntheorem C.t : True := trivial\n"
+                      f"end {namespace}\n")
+            return hits(HEADER + source, records)[0][2]
+        doc = "`reduction` has no efficiency certificate."
+        # As Lean reads it: the declaration's namespace first, then the enclosing ones.
+        records = {"A.B.C.reduction": OTHER_PATH, "A.B.reduction": OTHER_PATH,
+                   "A.reduction": OTHER_PATH, "reduction": OTHER_PATH, "X.reduction": PATH}
+        self.assertEqual(tracked(doc, records), named("A.B.C.reduction"))
+        del records["A.B.C.reduction"]
+        self.assertEqual(tracked(doc, records), named("A.B.reduction"))
+        self.assertEqual(tracked(doc, records, "A"), named("A.reduction"))
+        self.assertEqual(tracked(doc, records, "Z"), named("reduction"))
+        # Otherwise the one entry of this module that ends with the name.
+        self.assertEqual(tracked(doc, {"X.reduction": PATH}), named("X.reduction"))
+        self.assertEqual(tracked("`X.reduction` is not certified.", {"W.X.reduction": PATH}),
+                         named("W.X.reduction"))
+        # Two such entries are ambiguous, and an entry of another module is not looked at.
+        self.assertEqual(tracked(doc, {"X.reduction": PATH, "Y.reduction": PATH}), "")
+        self.assertEqual(tracked(doc, {"X.reduction": OTHER_PATH}), "")
+        self.assertEqual(tracked(doc, {"X.reduction": PATH, "Y.reduction": OTHER_PATH}),
+                         named("X.reduction"))
+        self.assertEqual(tracked(doc, {"X.thereduction": PATH}), "")
+        # A module docstring is read outside every namespace.
+        source = "namespace A\n/-! `reduction` has no efficiency certificate. -/\nend A\n"
+        self.assertEqual(hits(source, {"A.reduction": OTHER_PATH})[0][2], "")
+        self.assertEqual(hits(source, {"A.reduction": PATH})[0][2], named("A.reduction"))
 
     def test_comments_strings_and_code_are_not_read(self) -> None:
         self.assertEqual(hits(
@@ -227,8 +288,9 @@ class RatchetTests(unittest.TestCase):
             code, out, err = self.run_main(*args)
             self.assertEqual((code, err), (0, ""))
             self.assertIn("1 disclaimer(s) under CslibFrontier/Crypto: 0 tracked (0 by an issue "
-                          "number, 0 by a premise or witness baseline entry), 1 untracked, of "
-                          "which 1 baselined and 0 new; 0 stale baseline entries", out)
+                          "number, 0 by their declaration's baseline entry, 0 by the entry of a "
+                          "declaration they name), 1 untracked, of which 1 baselined and 0 new; "
+                          "0 stale baseline entries", out)
 
     def test_canary_a_new_untracked_disclaimer_fails_only_when_enforced(self) -> None:
         self.write("CslibFrontier/Crypto/Canary.lean", canary())
@@ -248,25 +310,43 @@ class RatchetTests(unittest.TestCase):
         self.assertIn(CANARY_SENTENCE, out)
 
     def test_a_tracked_disclaimer_passes(self) -> None:
-        self.write("CslibFrontier/Crypto/Canary.lean", canary(" Tracked in #5293."))
+        canary_path = "CslibFrontier/Crypto/Canary.lean"
+        self.write(canary_path, canary(" Tracked in #5293."))
         code, out, _ = self.run_main("--enforce")
         self.assertEqual(code, 0)
         self.assertIn("2 disclaimer(s) under CslibFrontier/Crypto: 1 tracked (1 by an issue "
-                      "number, 0 by a premise or witness baseline entry), 1 untracked", out)
-        self.write("CslibFrontier/Crypto/Canary.lean", canary())
+                      "number, 0 by their declaration's baseline entry, 0 by the entry of a "
+                      "declaration they name), 1 untracked", out)
+        # Through the security-premise entry of the canary theorem itself.
+        self.write(canary_path, canary())
         self.write(c.RECORDS[0], json.dumps({CANARY_NAME: {
-            "module": "CslibFrontier/Crypto/Canary.lean", "premises": ["hB"], "why": "helper"}}))
+            "module": canary_path, "premises": ["hB"], "why": "helper"}}))
         code, out, _ = self.run_main("--enforce")
         self.assertEqual(code, 0)
-        self.assertIn("1 tracked (0 by an issue number, 1 by a premise or witness baseline entry)",
-                      out)
-        # A reduction-witness entry of the module tracks its module docstring.
+        self.assertIn("1 tracked (0 by an issue number, 1 by their declaration's baseline entry, "
+                      "0 by the entry of a declaration they name)", out)
+        # Through the reduction-witness entry of the reduction that the sentence names.
         self.write(c.RECORDS[0], "{}")
-        self.write(self.B, "/-! Running time is not tracked. -/\n" + self.module("A plain fact."))
         self.assertEqual(self.run_main("--enforce")[0], 1)
+        self.write(c.RECORDS[1], json.dumps({"Cslib.Crypto.Canary.toDDH": {
+            "module": canary_path, "kind": "gap", "why": "tracked in #5293"}}))
+        code, out, _ = self.run_main("--enforce")
+        self.assertEqual(code, 0)
+        self.assertIn("1 tracked (0 by an issue number, 0 by their declaration's baseline entry, "
+                      "1 by the entry of a declaration they name)", out)
+        code, out, _ = self.run_main("--list")
+        self.assertIn(f"{canary_path}:10: {CANARY_NAME}: tracked by the entry of "
+                      "Cslib.Crypto.Canary.toDDH", out)
+
+    def test_an_unrelated_entry_of_the_module_does_not_track_its_module_docstring(self) -> None:
+        self.write(self.B, "/-! Running time is not tracked. -/\n" + self.module("A plain fact."))
         self.write(c.RECORDS[1], json.dumps({"Cslib.Crypto.red": {
             "module": self.B, "kind": "gap", "why": "tracked in #5293"}}))
-        self.write("CslibFrontier/Crypto/Canary.lean", canary(" Tracked in #5293."))
+        code, _, err = self.run_main("--enforce")
+        self.assertEqual(code, 1)
+        self.assertIn(f"{self.B}:1: {c.MODULE_DOC}\n    Running time is not tracked.", err)
+        self.write(self.B, "/-! Running time of `red` is not tracked. -/\n"
+                   + self.module("A plain fact."))
         self.assertEqual(self.run_main("--enforce")[0], 0)
 
     def test_moving_and_rewrapping_a_sentence_keeps_its_entry(self) -> None:

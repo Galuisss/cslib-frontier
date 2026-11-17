@@ -118,9 +118,10 @@ jobs:
         if: github.event_name != 'pull_request'
         run: python3 -B scripts/check_projection_chains.py --report
       # A docstring that states a limitation (what is not proved, what is assumed, what is left to
-      # the caller) cites an issue number, or its declaration has an entry in the security-premise
-      # or reduction-witness baseline (policy/taste.md, "A stated limitation is tracked"). The
-      # untracked ones are recorded in scripts/disclaimers_baseline.json, a list of debts.
+      # the caller) cites an issue number, or its declaration or a declaration that the sentence
+      # names has an entry in the security-premise or reduction-witness baseline (policy/taste.md,
+      # "A stated limitation is tracked"). The untracked ones are recorded in
+      # scripts/disclaimers_baseline.json, a list of debts.
       # REPORT ONLY for now: the step prints new untracked disclaimers and stale entries in the
       # modules a pull request changes and succeeds. To turn enforcement on, add `--enforce` to
       # the pull-request command below and to its mirror in scripts/full_check.py. Merge groups

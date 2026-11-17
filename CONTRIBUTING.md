@@ -329,31 +329,40 @@ Liu–Pass converse), `Pseudoentropy.SamplablePair.HasGap` and `HasGapWithAdvice
 
 **Stated limitations** ([#5293](https://github.com/cslib-community/cslib-frontier/issues/5293)). A
 docstring that says what is not proved, what is assumed or what is left to the caller makes the gap
-known; it does not close it. Such a sentence cites an issue number, or its declaration has an entry
-in the security-premise or reduction-witness baseline ([policy/taste.md](policy/taste.md), "A stated
+known; it does not close it. Such a sentence cites an issue number or is covered by an entry of the
+security-premise or reduction-witness baseline ([policy/taste.md](policy/taste.md), "A stated
 limitation is tracked", #6027). `python3 scripts/check_disclaimers.py` reads the declaration and
 module docstrings under `CslibFrontier/Crypto`, without a build, and flags each sentence that
 contains one of the phrases in its `PATTERNS` list, such as "does not prove", "is not proved", "no
 efficiency certificate", "the caller supplies", "as a hypothesis", "remains open", "limitations",
-"is not tracked" or "stand-in". A flagged sentence is *tracked* when its docstring contains `#NNNN`
-(three to five digits), or when the declaration after the docstring has an entry in
-`scripts/security_premises_baseline.json` or `scripts/reduction_witnesses_baseline.json`; a module
-docstring is tracked when some entry of those files names its module. So the way to make a sentence
-tracked is to open or find the issue that owns the gap and cite its number in the same docstring.
-The untracked sentences are recorded in `scripts/disclaimers_baseline.json`, keyed by file and a
-digest of the sentence, so that moving or rewrapping a sentence keeps its entry and rewording it
-does not. That baseline is a list of debts to pay down, not a list of exemptions: an entry says that
-a limitation is stated and nothing tracks it yet, and it goes away when the limitation is removed
-(proved, or the declaration renamed and restated to say what it proves) or tracked. In the modules a
-change touches, an untracked sentence without an entry is new, and an entry whose sentence is gone
-or is now tracked is stale; `--update-baseline` removes stale entries and records new ones only with
-`--allow-increase`, and `--list` prints every flagged sentence with how it is tracked. For now the
-check only reports: CI prints the new sentences and stale entries and passes. Enforcement will be
-turned on later, by passing `--enforce` in CI, and both will then fail a pull request. The check is
-wording-based: a limitation phrased in other words is not seen, a listed phrase used in another
-sense is flagged, and the check does not judge whether the cited issue or the baseline entry is
-about the limitation. The declaration is found by reading the source, so a docstring before a
-`macro`, `notation`, `alias` or anonymous instance is attached to nothing.
+"is not tracked" or "stand-in". A flagged sentence is *tracked* in one of three ways: its docstring
+contains `#NNNN` (three to five digits); the declaration after the docstring has an entry in
+`scripts/security_premises_baseline.json` or `scripts/reduction_witnesses_baseline.json`; or the
+sentence itself names, in a code span, a declaration that has such an entry, as in
+"`plantInverter` has no efficiency certificate". A module docstring has no declaration, so only an
+issue number or a named declaration tracks its sentences: that some declaration of the module has
+an entry does not, since that entry may be about something else. So the way to make a sentence
+tracked is to open or find the issue that owns the gap and cite its number in the same docstring,
+or, when one of the two baselines already records the declaration that the limitation is about, to
+name that declaration in the sentence. The untracked sentences are recorded in
+`scripts/disclaimers_baseline.json`, keyed by file and a digest of the sentence, so that moving or
+rewrapping a sentence keeps its entry and rewording it does not. That baseline is a list of debts
+to pay down, not a list of exemptions: an entry says that a limitation is stated and nothing tracks
+it yet, and it goes away when the limitation is removed (proved, or the declaration renamed and
+restated to say what it proves) or tracked. In the modules a change touches, an untracked sentence
+without an entry is new, and an entry whose sentence is gone or is now tracked is stale;
+`--update-baseline` removes stale entries and records new ones only with `--allow-increase`, and
+`--list` prints every flagged sentence with how it is tracked. For now the check only reports: CI
+prints the new sentences and stale entries and passes. Enforcement will be turned on later, by
+passing `--enforce` in CI, and both will then fail a pull request. The check is wording-based: a
+limitation phrased in other words is not seen, a listed phrase used in another sense is flagged,
+and the check does not judge whether the cited issue or the baseline entry is about the limitation.
+Declarations are found by reading the source. A docstring before a `macro`, `notation`, `alias` or
+anonymous instance is attached to nothing. A name in a sentence is read as Lean would read it at
+the docstring's declaration (qualified by its namespace or an enclosing one, or as written) or,
+failing that, as the one entry of the same module whose name ends with it; two such entries are
+ambiguous and track nothing, and `open`ed namespaces and dot notation on a variable are not
+followed.
 
 ### Algorithms are programs
 
