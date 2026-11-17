@@ -112,6 +112,7 @@ def hMessageMGFSeed {p : SecurityBytes} {digestBytes : ℕ}
 
 SHAKE256 accepts every finite byte message. The SHA2 branches expose exactly the HMAC input
 predicate selected by FIPS 205. -/
+@[expose]
 def ValidPRFMessageInput (family : HashFamily) {p : SecurityBytes}
     (secretPRF optionalRandomness : NBytes p) (message : List Byte) : Prop :=
   match family, p with
@@ -136,26 +137,29 @@ instance (family : HashFamily) {p : SecurityBytes}
 def prfMessage (family : HashFamily) {p : SecurityBytes}
     (secretPRF optionalRandomness : NBytes p) (message : List Byte)
     (hinput : ValidPRFMessageInput family secretPRF optionalRandomness message) : NBytes p :=
-  match family, p with
-  | .shake, _ =>
+  match family with
+  | .shake =>
       FixedBytes.ofListExact
         (Keccak.shake256 (shakePRFMessageInput secretPRF optionalRandomness message) p.count)
         (Keccak.length_shake256 _ _)
-  | .sha2, .bytes16 =>
-      (HMAC.hmacSHA256 secretPRF.toList (prfMessageText optionalRandomness message) (by
-        simpa [ValidPRFMessageInput] using hinput)).take 16 (by decide)
-  | .sha2, .bytes24 =>
-      (HMAC.hmacSHA512 secretPRF.toList (prfMessageText optionalRandomness message) (by
-        simpa [ValidPRFMessageInput] using hinput)).take 24 (by decide)
-  | .sha2, .bytes32 =>
-      (HMAC.hmacSHA512 secretPRF.toList (prfMessageText optionalRandomness message) (by
-        simpa [ValidPRFMessageInput] using hinput)).take 32 (by decide)
+  | .sha2 =>
+      match p with
+      | .bytes16 =>
+          Fin.take 16 (by decide)
+            (HMAC.hmacSHA256 secretPRF.toList (prfMessageText optionalRandomness message))
+      | .bytes24 =>
+          Fin.take 24 (by decide)
+            (HMAC.hmacSHA512 secretPRF.toList (prfMessageText optionalRandomness message))
+      | .bytes32 =>
+          Fin.take 32 (by decide)
+            (HMAC.hmacSHA512 secretPRF.toList (prfMessageText optionalRandomness message))
 
 /-- The source-domain obligation for `H_msg`.
 
 The first conjunct is the inner SHA-2 digest domain. The remaining conjuncts are the MGF1 seed and
 output bounds after substituting the fixed seed length. These are proof preconditions rather than
 runtime errors. -/
+@[expose]
 def ValidHMessageInput (family : HashFamily) {p : SecurityBytes} (shape : ParameterShape)
     (randomizer publicSeed publicRoot : NBytes p) (message : List Byte) : Prop :=
   match family, p with
@@ -187,42 +191,32 @@ def hMessage (family : HashFamily) {p : SecurityBytes} (shape : ParameterShape)
     (randomizer publicSeed publicRoot : NBytes p) (message : List Byte)
     (hinput : ValidHMessageInput family shape randomizer publicSeed publicRoot message) :
     MessageDigestBytes p shape :=
-  match family, p with
-  | .shake, _ =>
+  match family with
+  | .shake =>
       FixedBytes.ofListExact
         (Keccak.shake256 (hMessageDigestInput randomizer publicSeed publicRoot message)
           (ParameterShape.digestBytes p shape))
         (Keccak.length_shake256 _ _)
-  | .sha2, .bytes16 =>
-      let digestInput := hMessageDigestInput randomizer publicSeed publicRoot message
-      let digest := SHA2.sha256 digestInput (by
-        simpa [ValidHMessageInput] using hinput.1)
-      let seed := hMessageMGFSeed randomizer publicSeed digest
-      MGF1.mgf1SHA256 seed (ParameterShape.digestBytes p shape) (by
-        change
-          (ParameterShape.digestBytes p shape = 0 ∨ seed.length + 4 < 2 ^ 61) ∧
-            ParameterShape.digestBytes p shape ≤ 2 ^ 32 * 32
-        simpa [seed] using hinput.2)
-  | .sha2, .bytes24 =>
-      let digestInput := hMessageDigestInput randomizer publicSeed publicRoot message
-      let digest := SHA2.sha512 digestInput (by
-        simpa [ValidHMessageInput] using hinput.1)
-      let seed := hMessageMGFSeed randomizer publicSeed digest
-      MGF1.mgf1SHA512 seed (ParameterShape.digestBytes p shape) (by
-        change
-          (ParameterShape.digestBytes p shape = 0 ∨ seed.length + 4 < 2 ^ 125) ∧
-            ParameterShape.digestBytes p shape ≤ 2 ^ 32 * 64
-        simpa [seed] using hinput.2)
-  | .sha2, .bytes32 =>
-      let digestInput := hMessageDigestInput randomizer publicSeed publicRoot message
-      let digest := SHA2.sha512 digestInput (by
-        simpa [ValidHMessageInput] using hinput.1)
-      let seed := hMessageMGFSeed randomizer publicSeed digest
-      MGF1.mgf1SHA512 seed (ParameterShape.digestBytes p shape) (by
-        change
-          (ParameterShape.digestBytes p shape = 0 ∨ seed.length + 4 < 2 ^ 125) ∧
-            ParameterShape.digestBytes p shape ≤ 2 ^ 32 * 64
-        simpa [seed] using hinput.2)
+  | .sha2 =>
+      match p with
+      | .bytes16 =>
+          let digestInput := hMessageDigestInput randomizer publicSeed publicRoot message
+          let digest := SHA2.sha256 digestInput
+          let seed := hMessageMGFSeed randomizer publicSeed digest
+          MGF1.mgf1SHA256 seed (ParameterShape.digestBytes .bytes16 shape) (by
+            exact hinput.2.2)
+      | .bytes24 =>
+          let digestInput := hMessageDigestInput randomizer publicSeed publicRoot message
+          let digest := SHA2.sha512 digestInput
+          let seed := hMessageMGFSeed randomizer publicSeed digest
+          MGF1.mgf1SHA512 seed (ParameterShape.digestBytes .bytes24 shape) (by
+            exact hinput.2.2)
+      | .bytes32 =>
+          let digestInput := hMessageDigestInput randomizer publicSeed publicRoot message
+          let digest := SHA2.sha512 digestInput
+          let seed := hMessageMGFSeed randomizer publicSeed digest
+          MGF1.mgf1SHA512 seed (ParameterShape.digestBytes .bytes32 shape) (by
+            exact hinput.2.2)
 
 /-! ### Source-level component counts -/
 
@@ -320,6 +314,7 @@ def mgfCounterBytes : ℕ := 4
 def digestLengthTableEntries : ℕ := 6
 
 /-- Oracle handlers installed by either pure executable message call. -/
+@[expose]
 def oracleHandlerCount : ℕ := 0
 
 /-- These pure executable message calls install no oracle handler. -/

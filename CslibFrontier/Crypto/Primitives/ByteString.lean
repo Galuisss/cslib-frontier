@@ -59,7 +59,7 @@ namespace FixedBytes
 
 /-- Turn a list whose length is known exactly into a fixed-length byte string. -/
 def ofListExact {n : ℕ} (X : List Byte) (h : X.length = n) : FixedBytes n := fun i =>
-  X.get ⟨i.val, by simpa [h] using i.isLt⟩
+  X.get ⟨i.val, by simp [h]⟩
 
 /-- The list view of a fixed-length byte string. -/
 def toList {n : ℕ} (X : FixedBytes n) : List Byte := List.ofFn X

@@ -77,6 +77,7 @@ inductive ParameterShape where
 namespace ParameterShape
 
 /-- The total hypertree height `h` from FIPS 205, Table 2. -/
+@[expose]
 def totalHeight : SecurityBytes → ParameterShape → ℕ
   | .bytes16, .small => 63
   | .bytes16, .fast => 66
@@ -95,6 +96,7 @@ def layers : SecurityBytes → ParameterShape → ℕ
   | .bytes32, .fast => 17
 
 /-- The height `h'` of one XMSS tree from FIPS 205, Table 2. -/
+@[expose]
 def xmssHeight : SecurityBytes → ParameterShape → ℕ
   | .bytes16, .small => 9
   | .bytes16, .fast => 3
@@ -104,6 +106,7 @@ def xmssHeight : SecurityBytes → ParameterShape → ℕ
   | .bytes32, .fast => 4
 
 /-- The FORS tree height `a` from FIPS 205, Table 2. -/
+@[expose]
 def forsHeight : SecurityBytes → ParameterShape → ℕ
   | .bytes16, .small => 12
   | .bytes16, .fast => 6
@@ -113,6 +116,7 @@ def forsHeight : SecurityBytes → ParameterShape → ℕ
   | .bytes32, .fast => 9
 
 /-- The number `k` of FORS trees from FIPS 205, Table 2. -/
+@[expose]
 def forsTrees : SecurityBytes → ParameterShape → ℕ
   | .bytes16, .small => 14
   | .bytes16, .fast => 33
@@ -122,6 +126,7 @@ def forsTrees : SecurityBytes → ParameterShape → ℕ
   | .bytes32, .fast => 35
 
 /-- The Section 9 message-digest length `m`, in bytes. -/
+@[expose]
 def digestBytes (p : SecurityBytes) (shape : ParameterShape) : ℕ :=
   (totalHeight p shape - xmssHeight p shape) ⌈/⌉ 8 +
     (forsTrees p shape * forsHeight p shape) ⌈/⌉ 8 +
