@@ -11,7 +11,6 @@ public import CslibFrontier.Computability.Catalytic.Comparison
 public import CslibFrontier.Foundations.Data.Nat.CeilDiv
 public import CslibFrontier.Foundations.Data.Nat.Radix
 public import Mathlib.Data.Nat.Log
-import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.Positivity
 import Mathlib.Tactic.Ring
 
@@ -293,7 +292,7 @@ theorem natChunkVec_eq_iff {q ℓ x y : ℕ} (hx : x < 2 ^ (ℓ * q)) (hy : y < 
   rw [← hvx, ← hvy, hdx_eq, hdy_eq, h]
 
 private theorem mul_two_pow_sub_one_sq_lt (q ℓ : ℕ) :
-    ℓ * (2 ^ q - 1) ^ 2 < 2 ^ (2 * q + Nat.log 2 ℓ + 1) := by
+    ℓ * (2 ^ q - 1) ^ 2 < 2 ^ (Nat.log 2 ℓ + 1 + 2 * q) := by
   have hℓ : ℓ < 2 ^ (Nat.log 2 ℓ + 1) := Nat.lt_pow_succ_log_self (by decide) ℓ
   have hsq : (2 ^ q - 1) ^ 2 ≤ 2 ^ (2 * q) := by
     calc (2 ^ q - 1) ^ 2 ≤ (2 ^ q) ^ 2 := Nat.pow_le_pow_left (Nat.sub_le _ _) 2
@@ -302,10 +301,8 @@ private theorem mul_two_pow_sub_one_sq_lt (q ℓ : ℕ) :
       ≤ ℓ * 2 ^ (2 * q) := Nat.mul_le_mul_left ℓ hsq
     _ < 2 ^ (Nat.log 2 ℓ + 1) * 2 ^ (2 * q) :=
         Nat.mul_lt_mul_of_pos_right hℓ (by positivity)
-    _ = 2 ^ (2 * q + Nat.log 2 ℓ + 1) := by
+    _ = 2 ^ (Nat.log 2 ℓ + 1 + 2 * q) := by
         rw [← pow_add]
-        congr 1
-        omega
 
 /-! ### Two-stage bit-width parameterization and 64-excursion vertex equality -/
 
@@ -317,7 +314,7 @@ private theorem mul_two_pow_sub_one_sq_lt (q ℓ : ℕ) :
 
 /-- Bit-width `k₁` of the Stage-1 sum-of-squares accumulator over `ZMod (2 ^ k₁)`. -/
 @[expose] def outerAccBits (B n : ℕ) : ℕ :=
-  2 * outerChunkBits B + Nat.log 2 (outerDigits B n) + 1
+  Nat.log 2 (outerDigits B n) + 1 + 2 * outerChunkBits B
 
 /-- Inner chunk bit-width `q₂ = max 1 ⌊q₁ / 2⌋`. -/
 @[expose] def innerChunkBits (B : ℕ) : ℕ := max 1 (outerChunkBits B / 2)
@@ -327,7 +324,7 @@ private theorem mul_two_pow_sub_one_sq_lt (q ℓ : ℕ) :
 
 /-- Bit-width `k₂` of the Stage-2 sum-of-squares accumulator (and `log₂` of the Stage-3 table). -/
 @[expose] def innerAccBits (B n : ℕ) : ℕ :=
-  2 * innerChunkBits B + Nat.log 2 (innerDigits B n) + 1
+  Nat.log 2 (innerDigits B n) + 1 + 2 * innerChunkBits B
 
 /-- Stage-1 catalytic register and accumulator state (`(ℓ₁ + 1) · k₁` bits). -/
 abbrev OuterRegState (B n : ℕ) : Type :=
@@ -359,25 +356,38 @@ abbrev VertexLocalFrame : Type := Fin 64 × ZMod 2
 and its inverse. -/
 @[expose] def twoStageSqDistProc (B n : ℕ) (c₂ : ZMod (2 ^ innerAccBits B n)) :
     ExcursionProc 16 ℕ (OuterRegState B n × InnerRegState B n) :=
-  ExcursionProc.liftAlternating (stageOneSqDistProc B n 1) (stageOneSqDistProc B n (-1)) Prod.snd
-    (sqDistProc c₂ () fun z : ZMod (2 ^ outerAccBits B n) ↦
-      (↑) ∘ natChunkVec (innerChunkBits B) (innerDigits B n) z.val)
+  (fun (ℓ₁ k₁ q₂ ℓ₂ k₂ : ℕ)
+      (P₁ P₂ : ExcursionProc 4 ℕ ((Unit → Fin ℓ₁ → ZMod (2 ^ k₁)) × ZMod (2 ^ k₁)))
+      (c : ZMod (2 ^ k₂)) ↦
+    ExcursionProc.liftAlternating P₁ P₂ Prod.snd
+      (sqDistProc c () fun z : ZMod (2 ^ k₁) ↦ (↑) ∘ natChunkVec q₂ ℓ₂ z.val))
+    (outerDigits B n) (outerAccBits B n) (innerChunkBits B) (innerDigits B n) (innerAccBits B n)
+    (stageOneSqDistProc B n 1) (stageOneSqDistProc B n (-1)) c₂
 
 /-- State reassociation separating the shared catalyst `VertexCatState B n` from the `1`-bit local
 accumulator `ZMod 2`. -/
 @[expose] def vertexStateEquiv (B n : ℕ) :
     ((OuterRegState B n × InnerRegState B n) × (KeyTableState B n × ZMod 2)) ≃
       (VertexCatState B n × ZMod 2) :=
-  (Equiv.prodAssoc (OuterRegState B n × InnerRegState B n) (KeyTableState B n) (ZMod 2)).symm.trans
-    ((Equiv.prodAssoc (OuterRegState B n) (InnerRegState B n) (KeyTableState B n)).prodCongr
-      (Equiv.refl (ZMod 2)))
+  (fun (A B C D : Type) ↦
+    (Equiv.prodAssoc (A × B) C D).symm.trans
+      ((Equiv.prodAssoc A B C).prodCongr (Equiv.refl D)))
+    (OuterRegState B n) (InnerRegState B n) (KeyTableState B n) (ZMod 2)
 
 /-- **The `64`-excursion catalytic vertex-equality procedure.** On endpoints `x, y < 2 ^ n`, it
 restores any incoming catalytic state `cat : VertexCatState B n` and adds `1 : ZMod 2` into the
 local result bit iff `x = y`. -/
 @[expose] def vertexEqProc (B n : ℕ) : ExcursionProc 64 ℕ (VertexCatState B n × ZMod 2) :=
-  (ExcursionProc.liftAlternating (twoStageSqDistProc B n 1) (twoStageSqDistProc B n (-1))
-    (Prod.snd ∘ Prod.snd) (keyTestProc (1 : ZMod 2) id)).mapState (vertexStateEquiv B n)
+  (fun (S₁ : Type) (ℓ₂ k₂ : ℕ)
+      (P₁ P₂ : ExcursionProc 16 ℕ (S₁ × ((Unit → Fin ℓ₂ → ZMod (2 ^ k₂)) × ZMod (2 ^ k₂))))
+      (e : ((S₁ × ((Unit → Fin ℓ₂ → ZMod (2 ^ k₂)) × ZMod (2 ^ k₂))) ×
+            ((ZMod (2 ^ k₂) → ZMod 2) × ZMod 2)) ≃
+           ((S₁ × ((Unit → Fin ℓ₂ → ZMod (2 ^ k₂)) × ZMod (2 ^ k₂)) ×
+            (ZMod (2 ^ k₂) → ZMod 2)) × ZMod 2)) ↦
+    (ExcursionProc.liftAlternating P₁ P₂ (Prod.snd ∘ Prod.snd)
+      (keyTestProc (1 : ZMod 2) id)).mapState e)
+    (OuterRegState B n) (innerDigits B n) (innerAccBits B n)
+    (twoStageSqDistProc B n 1) (twoStageSqDistProc B n (-1)) (vertexStateEquiv B n)
 
 /-- **Boolean catalytic vertex equality via single-endpoint excursions.** Initializes the local
 result bit to `0 : ZMod 2`, runs the `64` excursions through `visit`, and returns the equality
@@ -385,8 +395,11 @@ decision together with the restored catalytic state. -/
 @[expose] def catalyticVertexEq (B n : ℕ)
     (visit : Bool → VertexCatState B n → ℕ × VertexCatState B n)
     (cat₀ : VertexCatState B n) : Bool × VertexCatState B n :=
-  let res := (vertexEqProc B n).runExcursions visit cat₀ 0
-  (decide (res.2 = 1), res.1)
+  (fun (Cat : Type) (P : ExcursionProc 64 ℕ (Cat × ZMod 2))
+      (v : Bool → Cat → ℕ × Cat) (c₀ : Cat) ↦
+    let res := P.runExcursions v c₀ 0
+    (decide (res.2 = 1), res.1))
+    (VertexCatState B n) (vertexEqProc B n) visit cat₀
 
 /-! ### Exactness and exact restoration -/
 
@@ -407,29 +420,43 @@ private theorem run_twoStageSqDistProc (B n : ℕ) (c₂ : ZMod (2 ^ innerAccBit
           ((stageOneSqDistProc B n 1).run x y T₁).2.val)
         T₂) := by
   have hinv : (stageOneSqDistProc B n (-1)).run x y ((stageOneSqDistProc B n 1).run x y T₁) =
-      T₁ := addSqDist_neg_addSqDist 1 () _ _ T₁
-  exact ExcursionProc.run_liftAlternating _ _ _ _ rfl hinv T₂
+      T₁ := by
+    simp only [stageOneSqDistProc, run_sqDistProc]
+    exact addSqDist_neg_addSqDist 1 () _ _ T₁
+  dsimp only [twoStageSqDistProc]
+  rw [ExcursionProc.run_liftAlternating _ _ _ _ rfl hinv, run_sqDistProc]
 
 private theorem run_twoStageSqDistProc_neg (B n x y : ℕ)
     (T : OuterRegState B n × InnerRegState B n) :
     (twoStageSqDistProc B n (-1)).run x y ((twoStageSqDistProc B n 1).run x y T) = T := by
   obtain ⟨T₁, T₂⟩ := T
-  rw [run_twoStageSqDistProc, run_twoStageSqDistProc, addSqDist_neg_addSqDist]
+  rw [run_twoStageSqDistProc, run_twoStageSqDistProc]
+  have h (k ℓ : ℕ) (u v : Fin ℓ → ZMod (2 ^ k))
+      (S : (Unit → Fin ℓ → ZMod (2 ^ k)) × ZMod (2 ^ k)) :
+      addSqDist (-1) () u v (addSqDist 1 () u v S) = S :=
+    addSqDist_neg_addSqDist 1 () u v S
+  exact congrArg (T₁, ·) (h (innerAccBits B n) _ _ _ T₂)
 
 private theorem stageTwo_shift_eq_iff {B n : ℕ} (z₁ z₁' : ZMod (2 ^ outerAccBits B n))
     (T₂ : InnerRegState B n) :
     T₂.2 = (addSqDist 1 ()
       ((↑) ∘ natChunkVec (innerChunkBits B) (innerDigits B n) z₁.val)
       ((↑) ∘ natChunkVec (innerChunkBits B) (innerDigits B n) z₁'.val) T₂).2 ↔ z₁ = z₁' := by
-  have hq₂ : 0 < innerChunkBits B := by simp [innerChunkBits]
+  have hq₂ : 0 < innerChunkBits B := Nat.lt_of_lt_of_le Nat.zero_lt_one (le_max_left 1 _)
   have hcov : outerAccBits B n ≤ innerDigits B n * innerChunkBits B := Nat.le_ceilDiv_mul hq₂
   have hz₁ : z₁.val < 2 ^ (innerDigits B n * innerChunkBits B) :=
     (ZMod.val_lt z₁).trans_le (Nat.pow_le_pow_right (by decide) hcov)
   have hz₁' : z₁'.val < 2 ^ (innerDigits B n * innerChunkBits B) :=
     (ZMod.val_lt z₁').trans_le (Nat.pow_le_pow_right (by decide) hcov)
-  simp only [addSqDist_eq, one_mul, left_eq_add]
-  exact (natCast_sqDist_eq_zero_iff (natChunkVec_lt _ _ z₁.val) (natChunkVec_lt _ _ z₁'.val)
-      (mul_two_pow_sub_one_sq_lt (innerChunkBits B) (innerDigits B n))).trans
+  have hsq (k ℓ b : ℕ) (u v : Fin ℓ → ℕ) (hu : ∀ i, u i < b) (hv : ∀ i, v i < b)
+      (hm : ℓ * (b - 1) ^ 2 < 2 ^ k)
+      (S : (Unit → Fin ℓ → ZMod (2 ^ k)) × ZMod (2 ^ k)) :
+      S.2 = (addSqDist 1 () ((↑) ∘ u) ((↑) ∘ v) S).2 ↔ u = v := by
+    simp only [addSqDist_eq, one_mul, left_eq_add]
+    exact natCast_sqDist_eq_zero_iff hu hv hm
+  exact (hsq (innerAccBits B n) (innerDigits B n) (2 ^ innerChunkBits B) _ _
+      (natChunkVec_lt _ _ z₁.val) (natChunkVec_lt _ _ z₁'.val)
+      (mul_two_pow_sub_one_sq_lt (innerChunkBits B) (innerDigits B n)) T₂).trans
     ((natChunkVec_eq_iff hz₁ hz₁').trans (ZMod.val_injective (2 ^ outerAccBits B n)).eq_iff)
 
 /-- **Unconditional restoration and chunk-equality characterization of `vertexEqProc`**: for all
@@ -441,15 +468,14 @@ theorem run_vertexEqProc_chunk (B n x y : ℕ) (cat : VertexCatState B n) (s₀ 
       (cat, s₀ + if natChunkVec (outerChunkBits B) (outerDigits B n) x =
           natChunkVec (outerChunkBits B) (outerDigits B n) y then 1 else 0) := by
   obtain ⟨T₁, T₂, W⟩ := cat
-  rw [vertexEqProc, ExcursionProc.run_mapState]
-  change vertexStateEquiv B n
-      ((ExcursionProc.liftAlternating (twoStageSqDistProc B n 1) (twoStageSqDistProc B n (-1))
-        (Prod.snd ∘ Prod.snd) (keyTestProc (1 : ZMod 2) id)).run x y (((T₁, T₂), (W, s₀)))) = _
-  rw [ExcursionProc.run_liftAlternating _ _ _ _ rfl (run_twoStageSqDistProc_neg B n x y (T₁, T₂)),
+  have hsymm : (vertexStateEquiv B n).symm ((T₁, T₂, W), s₀) = ((T₁, T₂), (W, s₀)) := rfl
+  have hfwd (s : ZMod 2) : vertexStateEquiv B n ((T₁, T₂), (W, s)) = ((T₁, T₂, W), s) := rfl
+  dsimp only [vertexEqProc]
+  rw [ExcursionProc.run_mapState, hsymm,
+    ExcursionProc.run_liftAlternating _ _ _ _ rfl (run_twoStageSqDistProc_neg B n x y (T₁, T₂)),
     run_keyTestProc]
-  simp only [Function.comp_apply, id_eq, run_twoStageSqDistProc, keyTest_eq, vertexStateEquiv,
-    Equiv.trans_apply, Equiv.prodAssoc_symm_apply, Equiv.prodCongr_apply, Equiv.prodAssoc_apply,
-    Equiv.refl_apply, Prod.map_apply, stageTwo_shift_eq_iff, stageOne_shift_eq_chunk_iff]
+  simp only [Function.comp_apply, id_eq, run_twoStageSqDistProc, keyTest_eq, hfwd,
+    stageTwo_shift_eq_iff, stageOne_shift_eq_chunk_iff]
 
 /-- **Direct correctness and restoration of `vertexEqProc`**: for all `B n : ℕ`, all `x, y < 2 ^ n`,
 and any initial catalytic contents `cat` and local bit `s₀ : ZMod 2`, `vertexEqProc` restores `cat`
@@ -554,10 +580,14 @@ private theorem outerAccBits_le {B n C_N : ℕ} (hn : n ≤ C_N * B) :
 theorem innerDigits_le {B n C_N : ℕ} (hn : n ≤ C_N * B) :
     innerDigits B n ≤ Nat.log 2 (C_N + 1) + 11 := by
   have hk₁ := outerAccBits_le hn
-  have hq₂ : 0 < innerChunkBits B := by simp [innerChunkBits]
-  have hq₁_le : outerChunkBits B ≤ 3 * innerChunkBits B := by grind [innerChunkBits]
-  rw [innerDigits, Nat.ceilDiv_le_iff hq₂]
-  nlinarith
+  have hq₂ : 0 < innerChunkBits B := Nat.lt_of_lt_of_le Nat.zero_lt_one (le_max_left 1 _)
+  have hq₁_le : outerChunkBits B ≤ 3 * innerChunkBits B := by rw [innerChunkBits]; omega
+  have hmul : Nat.log 2 (C_N + 1) + 2 ≤ (Nat.log 2 (C_N + 1) + 2) * innerChunkBits B :=
+    Nat.le_mul_of_pos_right _ hq₂
+  rw [innerDigits, Nat.ceilDiv_le_iff hq₂,
+    show (Nat.log 2 (C_N + 1) + 11) * innerChunkBits B =
+      (Nat.log 2 (C_N + 1) + 2) * innerChunkBits B + 9 * innerChunkBits B by rw [← Nat.add_mul]]
+  omega
 
 /-- **`O(B)` catalytic bit budget.** Whenever `n ≤ C_N * B`, the total number of shared catalytic
 bits satisfies `vertexCatBits B n ≤ vertexCatLinearConst C_N * (B + 1)`. -/
@@ -565,16 +595,19 @@ theorem vertexCatBits_le {B n C_N : ℕ} (hn : n ≤ C_N * B) :
     vertexCatBits B n ≤ vertexCatLinearConst C_N * (B + 1) := by
   set c := Nat.log 2 (C_N + 1)
   set d := Nat.log 2 (c + 11) + 1
-  have hq₁_pos : 0 < outerChunkBits B := by simp [outerChunkBits]
+  have hq₁_pos : 0 < outerChunkBits B := Nat.lt_of_lt_of_le Nat.zero_lt_one (le_max_left 1 _)
   have hq₁_le_B : outerChunkBits B ≤ B + 1 := by
     have := Nat.log_le_self 2 B
     rw [outerChunkBits]
     omega
-  have hq₂_le_B : innerChunkBits B ≤ B + 1 := by grind [innerChunkBits]
+  have hq₂_le_B : innerChunkBits B ≤ B + 1 := by rw [innerChunkBits]; omega
   -- Stage 1 bit bound: `(ℓ₁ + 1) * k₁ ≤ (c + 5) * (C_N + 2) * (B + 1)`.
   have hk₁_le : outerAccBits B n ≤ (c + 5) * outerChunkBits B := by
-    have : outerAccBits B n ≤ 3 * outerChunkBits B + c + 2 := outerAccBits_le hn
-    nlinarith
+    have h1 : outerAccBits B n ≤ 3 * outerChunkBits B + c + 2 := outerAccBits_le hn
+    have h2 : c + 2 ≤ (c + 2) * outerChunkBits B := Nat.le_mul_of_pos_right _ hq₁_pos
+    rw [show (c + 5) * outerChunkBits B =
+      (c + 2) * outerChunkBits B + 3 * outerChunkBits B by rw [← Nat.add_mul]]
+    omega
   have hℓ₁_mul : outerDigits B n * outerChunkBits B < n + outerChunkBits B :=
     Nat.ceilDiv_mul_lt hq₁_pos
   have hstage1 : (outerDigits B n + 1) * outerAccBits B n ≤ (c + 5) * (C_N + 2) * (B + 1) := by
@@ -583,25 +616,30 @@ theorem vertexCatBits_le {B n C_N : ℕ} (hn : n ≤ C_N * B) :
       _ = (c + 5) * (outerDigits B n * outerChunkBits B + outerChunkBits B) := by ring
       _ ≤ (c + 5) * ((C_N + 2) * (B + 1)) := by
           refine Nat.mul_le_mul_left _ ?_
-          nlinarith
+          have hCN : C_N * B ≤ C_N * (B + 1) := Nat.mul_le_mul_left C_N (Nat.le_succ B)
+          rw [Nat.add_mul]
+          omega
       _ = (c + 5) * (C_N + 2) * (B + 1) := by ring
   -- Stage 2 bit bound and Stage 3 table bound via `k₂ ≤ 2 * q₂ + d`.
   have hℓ₂ : innerDigits B n ≤ c + 11 := innerDigits_le hn
   have hlog_ℓ₂ : Nat.log 2 (innerDigits B n) ≤ Nat.log 2 (c + 11) := Nat.log_mono_right hℓ₂
-  have hk₂ : innerAccBits B n ≤ 2 * innerChunkBits B + d := by grind [innerAccBits]
+  have hk₂ : innerAccBits B n ≤ 2 * innerChunkBits B + d := by rw [innerAccBits]; omega
   have hk₂_lin : innerAccBits B n ≤ (d + 2) * (B + 1) := by
-    nlinarith
+    have hd : d ≤ d * (B + 1) := Nat.le_mul_of_pos_right d (Nat.succ_pos B)
+    rw [Nat.add_mul]
+    omega
   have hstage2 : (innerDigits B n + 1) * innerAccBits B n ≤ (c + 12) * (d + 2) * (B + 1) := by
     calc (innerDigits B n + 1) * innerAccBits B n
         ≤ (c + 12) * ((d + 2) * (B + 1)) := Nat.mul_le_mul (by omega) hk₂_lin
       _ = (c + 12) * (d + 2) * (B + 1) := by ring
   have hpow_q₂ : 2 ^ (2 * innerChunkBits B) ≤ 4 * (B + 1) := by
     by_cases hlog : Nat.log 2 B ≤ 1
-    · have hq₂_eq : innerChunkBits B = 1 := by grind [innerChunkBits, outerChunkBits]
+    · have hq₂_eq : innerChunkBits B = 1 := by rw [innerChunkBits, outerChunkBits]; omega
       rw [hq₂_eq]
       omega
     · have hB0 : B ≠ 0 := by intro h0; subst h0; simp at hlog
-      have h2q₂ : 2 * innerChunkBits B ≤ Nat.log 2 B := by grind [innerChunkBits, outerChunkBits]
+      have h2q₂ : 2 * innerChunkBits B ≤ Nat.log 2 B := by
+        rw [innerChunkBits, outerChunkBits]; omega
       calc 2 ^ (2 * innerChunkBits B)
           ≤ 2 ^ Nat.log 2 B := Nat.pow_le_pow_right (by decide) h2q₂
         _ ≤ B := Nat.pow_log_le_self 2 hB0
