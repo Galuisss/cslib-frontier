@@ -4872,8 +4872,10 @@ public import CslibFrontier.Crypto.Computational.MLDSA.CommitmentCollision
 public import CslibFrontier.Crypto.Computational.MLDSA.CompressedKeyOnly
 public import CslibFrontier.Crypto.Computational.MLDSA.Decompose
 public import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
+public import CslibFrontier.Crypto.Computational.MLDSA.FIPS204ResponseBinding
 public import CslibFrontier.Crypto.Computational.MLDSA.Hint
 public import CslibFrontier.Crypto.Computational.MLDSA.KeyOnly
+public import CslibFrontier.Crypto.Computational.MLDSA.MatrixOracle
 public import CslibFrontier.Crypto.Computational.MLDSA.ResponseBinding
 public import CslibFrontier.Crypto.Computational.MLDSA.Signing
 public import CslibFrontier.Crypto.Computational.MLDSA.SigningROM
