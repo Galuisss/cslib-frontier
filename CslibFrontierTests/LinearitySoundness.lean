@@ -11,9 +11,9 @@ import CslibFrontier.Computability.PCP.TwoProverGame.LinearitySoundness
 
 /-! # Soundness of the linearity test for tensor-product strategies
 
-Checked client: every tensor-product strategy, projective or not, that wins the linearity test
-with probability `1 - ε` by the linearity-test verifier has exactly linear unitaries on the point player's dilated factor, close
-to its observables. A concrete instance: with `ε = 0`, the bound is `0`.
+Checked client: every tensor-product strategy, projective or not, that the linearity-test
+verifier accepts with probability `1 - ε` has exactly linear unitaries on the point player's
+dilated factor, close to its observables. With `ε = 0` the bound is `0`.
 -/
 
 set_option linter.privateModule false
