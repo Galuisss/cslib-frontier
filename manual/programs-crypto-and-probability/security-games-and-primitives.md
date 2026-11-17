@@ -850,9 +850,9 @@ Figures 3–9. `Address.toCompressedBits` is literally the byte-slice projection
 by the SHA2 parameter sets, and `Address.toCompressedBytes` gives its typed 22-byte form. The
 compressed projection is injective under `Address.FitsCompressed`, which records that the
 one-byte layer and eight-byte tree fields do not overflow. The unrestricted compressed format is
-not injective, and the checked client exhibits the discarded high tree word. This address module
-does not itself define the FIPS 205 hash instantiations, WOTS+, XMSS, FORS, the hypertree, signing
-or verification, nor does it prove classical or quantum security.
+not injective, and the checked client exhibits the discarded high tree word. This module does not
+define the FIPS 205 hash instantiations, WOTS+, XMSS, FORS, the hypertree, signing or verification,
+nor does it prove classical or quantum security.
 
 FIPS 202 SHA3-512, SHAKE256 and SHAKE128 ([fips202][fips202]) are implemented in
 [`Hash/Keccak.lean`](../../CslibFrontier/Crypto/Primitives/Hash/Keccak.lean) and
@@ -900,22 +900,10 @@ Equal-length byte lists and their `bytesToBitsBE` serializations have the same l
 The implementation follows the standard's byte-aligned padding, message schedule, compression and
 digest conversion, but no independent functional-correctness theorem is claimed. The
 [ordinary-import client](../../CslibFrontierTests/Crypto/SHA2.lean) checks NIST's official
-one- and two-block SHA-256 and SHA-512 examples and both padding boundaries.
-
-The addressed FIPS 205 hash calls are packaged in
-[`SLHDSA/HashCalls.lean`](../../CslibFrontier/Crypto/Primitives/SLHDSA/HashCalls.lean), with
-ordinary-import byte-package and independently computed oracle clients in
-[`SLHDSAHashCalls.lean`](../../CslibFrontierTests/Crypto/SLHDSAHashCalls.lean). The public types
-record the standardized `n = 16, 24, 32` byte lengths and the `n`, `2n`, and `l*n` input arities.
-For SHAKE, `PRF`, `F`, `H`, and `T_l` use the full address and request `8n` bits (`n` bytes). For
-SHA2, they use the compressed address and exact zero padding; `PRF` and `F` always use SHA-256,
-while `H` and `T_l` use SHA-256 at `n = 16` and SHA-512 at `n = 24, 32`. General block
-concatenation reuses `BitString.blocksEquiv.symm`, while the two-block convenience wrapper is
-derived from `FixedBytes.append`; WOTS+, FORS, and tree clients therefore preserve block structure
-at this byte boundary. The arbitrary-`l` SHA2 input-domain obligation is explicit, and the
-standardized block counts are proved valid. This executable layer does not yet package `PRF_msg`
-or `H_msg` and establishes no asymptotic or concrete security, query, machine-resource, or
-program-size bound.
+one- and two-block SHA-256 and SHA-512 examples and both padding boundaries. This is reusable
+executable infrastructure: it does not yet package FIPS 205's `F`, `H`, `T_l`, `PRF`, `PRF_msg` or
+`H_msg` calls, and establishes neither asymptotic security nor concrete candidate-parameter
+advantage, query, machine-resource or program-size bounds.
 
 Falcon's current checked layer ([falcon2020][falcon2020]) is deliberately narrower than a security
 theorem. Import
@@ -978,9 +966,10 @@ standard values `n = 16, 24, 32`, `WOTS.digits` implements the common first seve
 `wots_sign` and `wots_pkFromSig`: the `2n` base-16 message digits followed by the three complement
 checksum digits, including the specified four-bit left shift and two-byte encoding. The client now
 uses the same `Byte` and `bytesToBitsBE` boundary as SHA-2 rather than a parallel serialization.
-This milestone does not define the WOTS+ hash chain, key generation, signing, public-key
-reconstruction, or any security reduction; those remain obligations under the NIST post-quantum
-portfolio roadmap item.
+This milestone
+does not define the WOTS+ hash chain, key generation, signing, public-key reconstruction, concrete
+FIPS 205 hash instantiations, or any security reduction; those remain obligations under the NIST
+post-quantum portfolio roadmap item.
 
 These are implications from hardness assumptions. They do not prove that a concrete OWF, DDH group, LWE family or SIS parameter choice is hard. `DecisionLWE` runs the fixed-instance experiments `LWE.realExperiment` and `LWE.randomExperiment` over `ZMod (2 ^ w)`: a typed distinguisher receives a uniform matrix `A` and either `A t + e`, with independent errors and one shared uniform secret, or an independent uniform vector. For other secret and error laws over any finite commutative ring, `LWE.advantage` is the distance between `LWE.realGame` and `LWE.randomGame`. The distinguisher's machine reads only the row-major binary word of `[b | A]`, and `decisionLWE_iff_encoded` shows that this is the word-level assumption on the serialized public matrix `[B*t+e | B]` (checked in [`CslibFrontierTests/Crypto/DecisionLWE.lean`](../../CslibFrontierTests/Crypto/DecisionLWE.lean)); in [`SIS/Module.lean`](../../CslibFrontier/Crypto/Computational/SIS/Module.lean), `expandModuleMatrix` and `flattenPolyVec` embed negacyclic `ModuleSIS` and `ModuleLWE` instances over `ℤ_q[X]/(X^n+1)` into unstructured `(d * n) × (k * n)` matrices over `ℤ_q` (checked with concrete evaluations and nonvacuity proofs in [`CslibFrontierTests/Crypto/ModuleSIS.lean`](../../CslibFrontierTests/Crypto/ModuleSIS.lean)); [`LWE/Module.lean`](../../CslibFrontier/Crypto/Computational/LWE/Module.lean) states decision Module-LWE as the typed games `ModuleLWE.realGame` and `ModuleLWE.randomGame` for any secret and error laws, whose advantage `ModuleLWE.advantage` is the LWE advantage over the ring `Negacyclic (ZMod q) n` (`ModuleLWE.advantage_eq_lweAdvantage`), and the assumption `DecisionModuleLWEWith` takes an explicit secret law and error law, as the CRYSTALS-Kyber and CRYSTALS-Dilithium submissions state Module-LWE with short secrets, and is the word-level assumption by `decisionModuleLWEWith_iff_encoded`; it is meaningful only for a parameter family that grows with the security parameter, and `DecisionModuleLWE` is its uniform-secret case (checked in [`CslibFrontierTests/Crypto/DecisionModuleLWE.lean`](../../CslibFrontierTests/Crypto/DecisionModuleLWE.lean)); and [`SIS/ModuleEncryption.lean`](../../CslibFrontier/Crypto/Computational/SIS/ModuleEncryption.lean) builds Module-LWE public-key encryption (`moduleLWEKeyGen`, `moduleLWEEncrypt`, `moduleLWEDecrypt`), bounded-noise decryption correctness (`moduleLWEDecrypt_moduleLWEEncrypt_eq`), and two-hop public-key/ciphertext reductions to `ModuleLWE.sampleLaw` (`advantage_realEncryptionView_uniform_le`, `advantage_realEncryptionView_msg_le`, checked in [`CslibFrontierTests/Crypto/ModuleEncryption.lean`](../../CslibFrontierTests/Crypto/ModuleEncryption.lean)); no worst-case lattice reduction is asserted there.
 
