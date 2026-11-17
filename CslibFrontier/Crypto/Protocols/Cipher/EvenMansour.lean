@@ -725,12 +725,8 @@ to achieve key-recovery game advantage `1 - |G|⁻¹`. -/
 theorem advantage_preWhitenKeyRecoveryGame_eq (x : G) :
     (Game.advantage (preWhitenKeyRecoveryRealGame x) (preWhitenKeyRecoveryIdealGame x) : ℝ) =
       1 - (Fintype.card G : ℝ)⁻¹ := by
-  rw [Game.coe_advantage, Game.coe_succProbability, Game.coe_succProbability,
-    preWhitenKeyRecoveryRealGame_eq_pure_true, preWhitenKeyRecoveryIdealGame_true_toReal]
-  simp only [PMF.pure_apply, ↓reduceIte, ENNReal.toReal_one]
-  have hle : (Fintype.card G : ℝ)⁻¹ ≤ 1 :=
-    inv_le_one_of_one_le₀ (by exact_mod_cast Fintype.card_pos)
-  exact abs_of_nonneg (by linarith)
+  rw [preWhitenKeyRecoveryRealGame_eq_pure_true, Game.coe_advantage_pure_true_left,
+    preWhitenKeyRecoveryIdealGame_true_toReal]
 
 /-- Key-recovery game for post-whitening-only Even–Mansour: draw `π ← Equiv.Perm G` and
 `k₁ ← G`, run `postWhitenKeyRecoveryAttack x` against `postWhitenEquiv π k₁` and `π`, and test
@@ -770,12 +766,8 @@ to achieve key-recovery game advantage `1 - |G|⁻¹`. -/
 theorem advantage_postWhitenKeyRecoveryGame_eq (x : G) :
     (Game.advantage (postWhitenKeyRecoveryRealGame x) (postWhitenKeyRecoveryIdealGame x) : ℝ) =
       1 - (Fintype.card G : ℝ)⁻¹ := by
-  rw [Game.coe_advantage, Game.coe_succProbability, Game.coe_succProbability,
-    postWhitenKeyRecoveryRealGame_eq_pure_true, postWhitenKeyRecoveryIdealGame_true_toReal]
-  simp only [PMF.pure_apply, ↓reduceIte, ENNReal.toReal_one]
-  have hle : (Fintype.card G : ℝ)⁻¹ ≤ 1 :=
-    inv_le_one_of_one_le₀ (by exact_mod_cast Fintype.card_pos)
-  exact abs_of_nonneg (by linarith)
+  rw [postWhitenKeyRecoveryRealGame_eq_pure_true, Game.coe_advantage_pure_true_left,
+    postWhitenKeyRecoveryIdealGame_true_toReal]
 
 end Games
 
@@ -1330,7 +1322,7 @@ private theorem cacheRel_nil (k : G × G) : CacheRel k [] [] [] where
 omit [Nonempty G] in
 private theorem CacheRel.map_unusedRange_subset_e {k : G × G} {c_e c_π c : Cache G}
     (hrel : CacheRel k c_e c_π c) :
-    (unusedRange c).map (Equiv.addRight k.2).toEmbedding ⊆ unusedRange c_e := by
+    (unusedRange c).map (Equiv.subRight k.2).symm.toEmbedding ⊆ unusedRange c_e := by
   intro y hy
   rw [Finset.mem_map] at hy
   obtain ⟨v, hv, rfl⟩ := hy
@@ -1470,29 +1462,22 @@ omit [AddGroup G] in
 private theorem eq_or_exists_cons_of_mem_answer_support {q : PermQuery G} {cache cache' : Cache G}
     {a : G} (hmem : (a, cache') ∈ (RandomPermutation.answer q cache).support) :
     cache' = cache ∨ ∃ e, cache' = e :: cache := by
-  cases q with
-  | forward x =>
-    dsimp [RandomPermutation.answer] at hmem
-    cases hx : cache.lookup x with
-    | some y =>
-      rw [hx, PMF.mem_support_pure_iff] at hmem
-      exact .inl (Prod.mk.inj hmem).2
-    | none =>
-      rw [hx] at hmem
-      split_ifs at hmem with hne <;>
-        · obtain ⟨_, _, heq⟩ := (PMF.mem_support_map_iff _ _ _).mp hmem
-          exact .inr ⟨_, (Prod.mk.inj heq).2.symm⟩
-  | inverse y =>
-    dsimp [RandomPermutation.answer] at hmem
-    cases hy : RandomPermutation.invLookup cache y with
-    | some x =>
-      rw [hy, PMF.mem_support_pure_iff] at hmem
-      exact .inl (Prod.mk.inj hmem).2
-    | none =>
-      rw [hy] at hmem
-      split_ifs at hmem with hne <;>
-        · obtain ⟨_, _, heq⟩ := (PMF.mem_support_map_iff _ _ _).mp hmem
-          exact .inr ⟨_, (Prod.mk.inj heq).2.symm⟩
+  cases hq : cachedAnswer cache q with
+  | some _ =>
+    rw [RandomPermutation.answer_of_cachedAnswer_eq_some hq, PMF.mem_support_pure_iff] at hmem
+    exact .inl (Prod.mk.inj hmem).2
+  | none =>
+    have hcons : ∃ μ : PMF G, RandomPermutation.answer q cache =
+        μ.map fun ans => (ans, PermQuery.toCacheEntry ⟨q, ans⟩ :: cache) := by
+      by_cases hne : (freshAnswers cache q).Nonempty
+      · exact ⟨_, RandomPermutation.answer_of_cachedAnswer_eq_none hq hne⟩
+      · cases q <;>
+          · dsimp only [cachedAnswer, freshAnswers] at hq hne
+            exact ⟨PMF.uniformOfFintype G, by simp [RandomPermutation.answer, hq, hne]⟩
+    obtain ⟨_, hμ⟩ := hcons
+    rw [hμ, PMF.mem_support_map_iff] at hmem
+    obtain ⟨_, _, heq⟩ := hmem
+    exact .inr ⟨_, (Prod.mk.inj heq).2.symm⟩
 
 omit [AddGroup G] in
 private theorem mem_of_mem_answer_support {q : PermQuery G} {cache cache' : Cache G} {a : G}
@@ -1591,6 +1576,56 @@ private theorem sum_uniform_le_of_good (U V : Finset G) (e : G ≃ G) (bad : G �
   · simpa only [Equiv.symm_apply_apply] using mul_le_mul' hcard
       (hgood (e y) (hsub (Finset.mem_map_of_mem _ hy)) (Bool.eq_false_iff.mpr hb)).2
 
+omit [AddGroup G] in
+/-- Couple one lazy `RandomPermutation.answer` step against a key-shifted step via `e`. -/
+private theorem answer_bind_toOuterMeasure_le {α β : Type}
+    {q_id : PermQuery G} {c_id : Cache G} (hc_id : IsPartialBijection c_id)
+    {q_re : PermQuery G} {c : Cache G} (hc : IsPartialBijection c)
+    (e : G ≃ G) (bad : G → Bool)
+    (F_id : G × Cache G → PMF α) (S_id : Set α)
+    (F_re : G × Cache G → PMF β) (S_re : Set β)
+    (hhit : ∀ a, cachedAnswer c_id q_id = some a →
+      cachedAnswer c q_re = some (e.symm a) ∧
+        (F_id (a, c_id)).toOuterMeasure S_id ≤ (F_re (a, c)).toOuterMeasure S_re)
+    (hsub : (freshAnswers c q_re).map e.toEmbedding ⊆ freshAnswers c_id q_id)
+    (hzero : cachedAnswer c_id q_id = none → ∀ a, bad a = true →
+      (F_id (a, PermQuery.toCacheEntry ⟨q_id, a⟩ :: c_id)).toOuterMeasure S_id = 0)
+    (hgood : cachedAnswer c_id q_id = none → ∀ a ∈ freshAnswers c_id q_id, bad a = false →
+      cachedAnswer c q_re = none ∧ e.symm a ∈ freshAnswers c q_re ∧
+        (F_id (a, PermQuery.toCacheEntry ⟨q_id, a⟩ :: c_id)).toOuterMeasure S_id ≤
+          (F_re (a, PermQuery.toCacheEntry ⟨q_re, e.symm a⟩ :: c)).toOuterMeasure S_re) :
+    ((RandomPermutation.answer q_id c_id).bind F_id).toOuterMeasure S_id ≤
+      ((RandomPermutation.answer q_re c).bind fun p => F_re (e p.1, p.2)).toOuterMeasure S_re := by
+  cases hq_id : cachedAnswer c_id q_id with
+  | some a =>
+    obtain ⟨hq_re, hle⟩ := hhit a hq_id
+    rw [answer_of_cachedAnswer_eq_some hq_id, answer_of_cachedAnswer_eq_some hq_re,
+      PMF.pure_bind, PMF.pure_bind, e.apply_symm_apply]
+    exact hle
+  | none =>
+    have hne_id := hc_id.freshAnswers_nonempty hq_id
+    rw [answer_of_cachedAnswer_eq_none hq_id hne_id, PMF.bind_map]
+    simp only [Function.comp_def]
+    rw [toOuterMeasure_uniformOfFinset_bind hne_id]
+    cases hq_re : cachedAnswer c q_re with
+    | some _ =>
+      refine (le_of_eq (Finset.sum_eq_zero fun a ha => ?_)).trans zero_le
+      have hbad : bad a = true := Bool.eq_true_of_not_eq_false fun hgb => by
+        have hnone := (hgood hq_id a ha hgb).1
+        rw [hq_re] at hnone
+        exact Option.some_ne_none _ hnone
+      rw [hzero hq_id a hbad, mul_zero]
+    | none =>
+      have hne_re := hc.freshAnswers_nonempty hq_re
+      rw [answer_of_cachedAnswer_eq_none hq_re hne_re, PMF.bind_map]
+      simp only [Function.comp_def]
+      rw [toOuterMeasure_uniformOfFinset_bind hne_re]
+      refine sum_uniform_le_of_good (freshAnswers c_id q_id) (freshAnswers c q_re) e bad _ _
+        hsub (hzero hq_id) fun a ha hgb => ?_
+      obtain ⟨_, ha_re, hle⟩ := hgood hq_id a ha hgb
+      rw [e.apply_symm_apply]
+      exact ⟨ha_re, hle⟩
+
 /-- **Lazy coupling inequality**: starting from any cache triple `(c_e, c_π, c)` satisfying
 `CacheRel k c_e c_π c`, the probability that `idealLazyHandler` produces an output satisfying `P`
 without triggering `isBadEvenMansourKey` is at most the probability that `realLazyHandler k`
@@ -1606,9 +1641,8 @@ theorem run_idealLazyHandler_good_le_realLazyHandler {α : Type}
   have hset :
       {(r, c_e', c_π') : α × Cache G × Cache G |
         P r ∧ isBadEvenMansourKey c_e' c_π' k = false} =
-      {res | P res.1 ∧ isBadEvenMansourKey res.2.1 res.2.2 k = false} := by
-    ext ⟨_, _, _⟩
-    simp
+      {res | P res.1 ∧ isBadEvenMansourKey res.2.1 res.2.2 k = false} :=
+    Set.ext fun ⟨_, _, _⟩ => Iff.rfl
   rw [hset]
   induction program generalizing c_e c_π c with
   | pure a =>
@@ -1626,113 +1660,43 @@ theorem run_idealLazyHandler_good_le_realLazyHandler {α : Type}
       (OracleComp.interpret (realLazyHandler k) (cont p.1)).run p.2
     change ((idealLazyHandler q (c_e, c_π)).bind cont_ideal).toOuterMeasure S_ideal ≤
       ((realLazyHandler k q c).bind cont_real).toOuterMeasure S_real
-    rcases q with (x | y) | (u | v)
-    · -- Case 1: .inl (.forward x)
-      dsimp [idealLazyHandler, realLazyHandler, toPermQuery, fromPermAnswer,
-        RandomPermutation.answer]
-      cases hx : c_e.lookup x with
-      | some y =>
-        rw [hrel.lookup_c_of_lookup_e hx]
-        simp only [PMF.pure_map, PMF.pure_bind, sub_add_cancel]
-        exact ih y hrel
-      | none =>
-        have hne_e := hrel.partial_e.unusedRange_nonempty hx
-        simp only [pmf_norm, dite_eq_left hne_e, toOuterMeasure_uniformOfFinset_bind]
-        by_cases hxc : c.lookup (x + k.1) = none
-        · have hne_c := hrel.partial_c.unusedRange_nonempty hxc
-          simp only [hxc, dite_eq_left hne_c, Function.comp_def, PMF.bind_map,
-            toOuterMeasure_uniformOfFinset_bind]
-          refine sum_uniform_le_of_good _ _ (Equiv.subRight k.2).symm
-            (fun y => isBadEvenMansourKey ((x, y) :: c_e) c_π k) _ _
-            hrel.map_unusedRange_subset_e
-            (fun y hbad => toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont y) P hbad) ?_
-          intro y hy hgood
-          obtain ⟨_, hyc, hrel'⟩ := hrel.cons_cipher hx (mem_unusedRange_iff.mp hy) hgood
-          refine ⟨mem_unusedRange_iff.mpr hyc, ?_⟩
-          simpa using ih y hrel'
-        · refine (le_of_eq (Finset.sum_eq_zero fun y hy => ?_)).trans zero_le
-          have hbad := Bool.eq_true_of_not_eq_false fun hgood =>
-            hxc (hrel.cons_cipher hx (mem_unusedRange_iff.mp hy) hgood).1
-          rw [toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont y) P hbad, mul_zero]
-    · -- Case 2: .inl (.inverse y)
-      dsimp [idealLazyHandler, realLazyHandler, toPermQuery, fromPermAnswer,
-        RandomPermutation.answer]
-      cases hy : invLookup c_e y with
-      | some x =>
-        rw [hrel.invLookup_c_of_invLookup_e hy]
-        simp only [PMF.pure_map, PMF.pure_bind, add_sub_cancel_right]
-        exact ih x hrel
-      | none =>
-        have hne_e := hrel.partial_e.unusedDomain_nonempty hy
-        simp only [pmf_norm, dite_eq_left hne_e, toOuterMeasure_uniformOfFinset_bind]
-        by_cases hyc : invLookup c (y - k.2) = none
-        · have hne_c := hrel.partial_c.unusedDomain_nonempty hyc
-          simp only [hyc, dite_eq_left hne_c, Function.comp_def, PMF.bind_map,
-            toOuterMeasure_uniformOfFinset_bind]
-          refine sum_uniform_le_of_good _ _ (Equiv.subRight k.1)
-            (fun x => isBadEvenMansourKey ((x, y) :: c_e) c_π k) _ _
-            hrel.map_unusedDomain_subset_e
-            (fun x hbad => toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont x) P hbad) ?_
-          intro x hx hgood
-          obtain ⟨hxc, _, hrel'⟩ := hrel.cons_cipher (mem_unusedDomain_iff.mp hx) hy hgood
-          refine ⟨mem_unusedDomain_iff.mpr hxc, ?_⟩
-          simpa [Equiv.subRight] using ih x hrel'
-        · refine (le_of_eq (Finset.sum_eq_zero fun x hx => ?_)).trans zero_le
-          have hbad := Bool.eq_true_of_not_eq_false fun hgood =>
-            hyc (hrel.cons_cipher (mem_unusedDomain_iff.mp hx) hy hgood).2.1
-          rw [toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont x) P hbad, mul_zero]
-    · -- Case 3: .inr (.forward u)
-      dsimp [idealLazyHandler, realLazyHandler, toPermQuery, fromPermAnswer,
-        RandomPermutation.answer]
-      cases hu : c_π.lookup u with
-      | some v =>
-        rw [hrel.lookup_c_of_lookup_π hu]
-        simp only [PMF.pure_map, PMF.pure_bind]
-        exact ih v hrel
-      | none =>
-        have hne_π := hrel.partial_π.unusedRange_nonempty hu
-        simp only [pmf_norm, dite_eq_left hne_π, toOuterMeasure_uniformOfFinset_bind]
-        by_cases huc : c.lookup u = none
-        · have hne_c := hrel.partial_c.unusedRange_nonempty huc
-          simp only [huc, dite_eq_left hne_c, Function.comp_def, PMF.bind_map,
-            toOuterMeasure_uniformOfFinset_bind]
-          refine sum_uniform_le_of_good _ _ (Equiv.refl G)
-            (fun v => isBadEvenMansourKey c_e ((u, v) :: c_π) k) _ _
-            (by simpa using hrel.unusedRange_subset_π)
-            (fun v hbad => toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont v) P hbad) ?_
-          intro v hv hgood
-          obtain ⟨_, hvc, hrel'⟩ := hrel.cons_perm hu (mem_unusedRange_iff.mp hv) hgood
-          exact ⟨mem_unusedRange_iff.mpr hvc, ih v hrel'⟩
-        · refine (le_of_eq (Finset.sum_eq_zero fun v hv => ?_)).trans zero_le
-          have hbad := Bool.eq_true_of_not_eq_false fun hgood =>
-            huc (hrel.cons_perm hu (mem_unusedRange_iff.mp hv) hgood).1
-          rw [toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont v) P hbad, mul_zero]
-    · -- Case 4: .inr (.inverse v)
-      dsimp [idealLazyHandler, realLazyHandler, toPermQuery, fromPermAnswer,
-        RandomPermutation.answer]
-      cases hv : invLookup c_π v with
-      | some u =>
-        rw [hrel.invLookup_c_of_invLookup_π hv]
-        simp only [PMF.pure_map, PMF.pure_bind]
-        exact ih u hrel
-      | none =>
-        have hne_π := hrel.partial_π.unusedDomain_nonempty hv
-        simp only [pmf_norm, dite_eq_left hne_π, toOuterMeasure_uniformOfFinset_bind]
-        by_cases hvc : invLookup c v = none
-        · have hne_c := hrel.partial_c.unusedDomain_nonempty hvc
-          simp only [hvc, dite_eq_left hne_c, Function.comp_def, PMF.bind_map,
-            toOuterMeasure_uniformOfFinset_bind]
-          refine sum_uniform_le_of_good _ _ (Equiv.refl G)
-            (fun u => isBadEvenMansourKey c_e ((u, v) :: c_π) k) _ _
-            (by simpa using hrel.unusedDomain_subset_π)
-            (fun u hbad => toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont u) P hbad) ?_
-          intro u hu hgood
-          obtain ⟨huc, _, hrel'⟩ := hrel.cons_perm (mem_unusedDomain_iff.mp hu) hv hgood
-          exact ⟨mem_unusedDomain_iff.mpr huc, ih u hrel'⟩
-        · refine (le_of_eq (Finset.sum_eq_zero fun u hu => ?_)).trans zero_le
-          have hbad := Bool.eq_true_of_not_eq_false fun hgood =>
-            hvc (hrel.cons_perm (mem_unusedDomain_iff.mp hu) hv hgood).2.1
-          rw [toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont u) P hbad, mul_zero]
+    rcases q with (x | y) | (u | v) <;>
+      simp only [idealLazyHandler, realLazyHandler, toPermQuery, fromPermAnswer, PMF.bind_map,
+        Function.comp_def]
+    · refine answer_bind_toOuterMeasure_le hrel.partial_e hrel.partial_c (Equiv.subRight k.2).symm
+        (fun y => isBadEvenMansourKey ((x, y) :: c_e) c_π k) _ S_ideal _ S_real
+        (fun y hy => ⟨hrel.lookup_c_of_lookup_e hy, ih y hrel⟩)
+        hrel.map_unusedRange_subset_e
+        (fun _ y hbad => toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont y) P hbad)
+        fun hx y hy hgb => ?_
+      obtain ⟨hxc, hyc, hrel'⟩ := hrel.cons_cipher hx (mem_unusedRange_iff.mp hy) hgb
+      exact ⟨hxc, mem_unusedRange_iff.mpr hyc, ih y hrel'⟩
+    · refine answer_bind_toOuterMeasure_le hrel.partial_e hrel.partial_c (Equiv.subRight k.1)
+        (fun x => isBadEvenMansourKey ((x, y) :: c_e) c_π k) _ S_ideal _ S_real
+        (fun x hx => ⟨hrel.invLookup_c_of_invLookup_e hx, ih x hrel⟩)
+        hrel.map_unusedDomain_subset_e
+        (fun _ x hbad => toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont x) P hbad)
+        fun hy x hx hgb => ?_
+      obtain ⟨hxc, hyc, hrel'⟩ := hrel.cons_cipher (mem_unusedDomain_iff.mp hx) hy hgb
+      exact ⟨hyc, mem_unusedDomain_iff.mpr hxc, by
+        dsimp only [Equiv.subRight, Equiv.symm_mk, Equiv.coe_fn_mk]
+        exact ih x hrel'⟩
+    · refine answer_bind_toOuterMeasure_le hrel.partial_π hrel.partial_c (Equiv.refl G)
+        (fun v => isBadEvenMansourKey c_e ((u, v) :: c_π) k) _ S_ideal _ S_real
+        (fun v hv => ⟨hrel.lookup_c_of_lookup_π hv, ih v hrel⟩)
+        (by rw [Equiv.refl_toEmbedding, Finset.map_refl]; exact hrel.unusedRange_subset_π)
+        (fun _ v hbad => toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont v) P hbad)
+        fun hu v hv hgb => ?_
+      obtain ⟨huc, hvc, hrel'⟩ := hrel.cons_perm hu (mem_unusedRange_iff.mp hv) hgb
+      exact ⟨huc, mem_unusedRange_iff.mpr hvc, ih v hrel'⟩
+    · refine answer_bind_toOuterMeasure_le hrel.partial_π hrel.partial_c (Equiv.refl G)
+        (fun u => isBadEvenMansourKey c_e ((u, v) :: c_π) k) _ S_ideal _ S_real
+        (fun u hu => ⟨hrel.invLookup_c_of_invLookup_π hu, ih u hrel⟩)
+        (by rw [Equiv.refl_toEmbedding, Finset.map_refl]; exact hrel.unusedDomain_subset_π)
+        (fun _ u hbad => toOuterMeasure_run_idealLazyHandler_eq_zero_of_bad (cont u) P hbad)
+        fun hv u hu hgb => ?_
+      obtain ⟨huc, hvc, hrel'⟩ := hrel.cons_perm (mem_unusedDomain_iff.mp hu) hv hgb
+      exact ⟨hvc, mem_unusedDomain_iff.mpr huc, ih u hrel'⟩
 
 omit [AddGroup G] in
 private theorem length_proj_idealLazyHandler_le {α : Type}
@@ -1846,9 +1810,8 @@ private theorem idealGame_apply_le_realGame_add_of_keyDist (keyDist : PMF (G × 
               {res : Bool × (Cache G × Cache G) |
                 res.1 = b ∧ isBadEvenMansourKey res.2.1 res.2.2 k = false} =
               {(r, c_e', c_π') : Bool × Cache G × Cache G |
-                r = b ∧ isBadEvenMansourKey c_e' c_π' k = false} := by
-            ext ⟨_, _, _⟩
-            simp
+                r = b ∧ isBadEvenMansourKey c_e' c_π' k = false} :=
+            Set.ext fun ⟨_, _, _⟩ => Iff.rfl
           rw [hset]
           exact add_le_add
             (run_idealLazyHandler_good_le_realLazyHandler program (· = b) k (cacheRel_nil k))
@@ -1866,42 +1829,20 @@ private theorem idealGame_apply_le_realGame_add_of_keyDist (keyDist : PMF (G × 
   have hsum_bad : (∑' k : G × G,
       keyDist k * M_ideal.toOuterMeasure {res | isBadEvenMansourKey res.2.1 res.2.2 k = true}) ≤
       ε := by
-    have hcomm : (keyDist.bind fun k =>
-        M_ideal.map fun res => isBadEvenMansourKey res.2.1 res.2.2 k) true =
-      (M_ideal.bind fun res =>
-        keyDist.map fun k => isBadEvenMansourKey res.2.1 res.2.2 k) true := by
-      simp only [PMF.map, Function.comp_def]
-      rw [PMF.bind_comm]
-    have hleft : (keyDist.bind fun k =>
-        M_ideal.map fun res => isBadEvenMansourKey res.2.1 res.2.2 k) true =
-      ∑' k : G × G,
-        keyDist k *
-          M_ideal.toOuterMeasure {res | isBadEvenMansourKey res.2.1 res.2.2 k = true} := by
-      rw [PMF.bind_apply]
-      congr 1; funext k; congr 1
+    have hmap {β : Type} (μ : PMF β) (f : β → Bool) :
+        μ.toOuterMeasure {x | f x = true} = (μ.map f) true := by
       rw [← PMF.toOuterMeasure_apply_singleton, PMF.toOuterMeasure_map_apply]
       rfl
-    have hright : (M_ideal.bind fun res =>
-        keyDist.map fun k => isBadEvenMansourKey res.2.1 res.2.2 k) true =
-      ∑' res : Bool × (Cache G × Cache G),
-        M_ideal res *
-          keyDist.toOuterMeasure {k | isBadEvenMansourKey res.2.1 res.2.2 k = true} := by
-      rw [PMF.bind_apply]
-      congr 1; funext res; congr 1
-      rw [← PMF.toOuterMeasure_apply_singleton, PMF.toOuterMeasure_map_apply]
-      rfl
-    rw [← hleft, hcomm, hright]
-    calc (∑' res : Bool × (Cache G × Cache G),
-          M_ideal res * keyDist.toOuterMeasure {k | isBadEvenMansourKey res.2.1 res.2.2 k = true})
-        ≤ ∑' res : Bool × (Cache G × Cache G), M_ideal res * ε := by
-          refine tsum_le_tsum fun res => ?_
-          by_cases hmem : res ∈ M_ideal.support
-          · refine mul_le_mul_of_nonneg_left (hbad_le res.2.1 res.2.2 ?_ ?_) zero_le
-            · simpa using length_fst_idealLazyHandler_le hcall.1 hmem
-            · simpa using length_snd_idealLazyHandler_le hcall.2 hmem
-          · rw [PMF.mem_support_iff, not_not] at hmem
-            simp [hmem]
-      _ = ε := by rw [ENNReal.tsum_mul_right, PMF.tsum_coe, one_mul]
+    simp_rw [hmap, ← PMF.bind_apply]
+    simp only [PMF.map, Function.comp_def]
+    rw [PMF.bind_comm]
+    refine Probability.PMF.bind_apply_le_on_support M_ideal fun res hmem => ?_
+    exact (hmap keyDist fun k => isBadEvenMansourKey res.2.1 res.2.2 k).symm.trans_le
+      (hbad_le res.2.1 res.2.2
+        (by simpa only [List.length_nil, Nat.zero_add] using
+          length_fst_idealLazyHandler_le hcall.1 hmem)
+        (by simpa only [List.length_nil, Nat.zero_add] using
+          length_snd_idealLazyHandler_le hcall.2 hmem))
   rw [← hsum_ideal, ← hsum_real]
   calc (∑' k : G × G, keyDist k * evenMansourIdealGame program b)
       ≤ ∑' k : G × G, keyDist k *
