@@ -196,13 +196,16 @@ class ViaTests(unittest.TestCase):
                                    checks))
 
     def test_a_renamed_declaration_fails_in_every_module(self) -> None:
+        # So does an entry scoped to one instance, even when only an unrelated module is enforced.
         checks = self.checks("equality `Cslib.Crypto.GarblingWord.eval_run_wordReduction` does "
                              "not exist", missing=[VIA_ENTRY["equality"]])
-        for paths in (None, {SIGNATURE_PATH}):
-            invalid = c.compare(self.reductions, self.baseline, paths, checks).invalid
-            self.assertEqual([(name, reason) for name, _, reason in invalid], [
-                (VIA_REDUCTION, "equality `Cslib.Crypto.GarblingWord.eval_run_wordReduction` "
-                                "does not exist")])
+        for value in (VIA_ENTRY, SCOPED_ENTRY):
+            for paths in (None, {SIGNATURE_PATH}):
+                invalid = c.compare(self.reductions, {**BASELINE, VIA_REDUCTION: value}, paths,
+                                    checks).invalid
+                self.assertEqual([(name, reason) for name, _, reason in invalid], [
+                    (VIA_REDUCTION, "equality `Cslib.Crypto.GarblingWord.eval_run_wordReduction` "
+                                    "does not exist")], (value.get("scope"), paths))
 
     def test_an_inequality_or_an_unrelated_headline_fails(self) -> None:
         for problem in ("equality `E` is not an equation (its conclusion is headed by "
@@ -324,11 +327,13 @@ class ViaTests(unittest.TestCase):
 def concrete_row(problems: list[str] | None = None,
                  definitions: list[tuple[str, str]] | None = None,
                  modules: tuple[str, ...] = ("CslibFrontier.Crypto.Schnorr",
-                                             "CslibFrontier.Crypto.SchnorrClient")) -> str:
+                                             "CslibFrontier.Crypto.SchnorrClient"),
+                 missing: list[str] | None = None) -> str:
     """A line of the reader's output for the `concrete_only` request of `UNCERTIFIED`, whose
     referrers are in `modules`."""
     return json.dumps({"v": UNCERTIFIED, "p": problems or [], "at": "", "vm": list(modules),
-                       "em": "", "missing": [], "refs": ["Cslib.Crypto.SchnorrClient.bound"],
+                       "em": "", "missing": missing or [],
+                       "refs": ["Cslib.Crypto.SchnorrClient.bound"],
                        "defs": [{"n": n, "m": m} for n, m in definitions or []], "cdefs": []})
 
 
@@ -374,6 +379,19 @@ class ConcreteOnlyTests(unittest.TestCase):
         invalid = c.compare(self.reductions, self.baseline, {SIGNATURE_PATH}).invalid
         self.assertEqual([(name, reason) for name, _, reason in invalid],
                          [(UNCERTIFIED, "the Lean pass did not verify it")])
+
+    def test_a_missing_reduction_fails_in_every_module(self) -> None:
+        # Renamed or deleted, the reduction has no module and no referrers for the pass to report,
+        # so the entry is enforced everywhere, even when only an unrelated module is.
+        problem = (f"reduction `{UNCERTIFIED}` does not exist, publicly or as a private declaration "
+                   "of CslibFrontier.Crypto.Schnorr")
+        checks = c.parse_checks(concrete_row([problem], modules=(), missing=[UNCERTIFIED]))
+        reductions = {n: r for n, r in self.reductions.items() if n != UNCERTIFIED}
+        for paths in (None, {SIGNATURE_PATH}):
+            problems = c.compare(reductions, self.baseline, paths, checks)
+            self.assertEqual([(name, reason) for name, _, reason in problems.invalid],
+                             [(UNCERTIFIED, problem)], paths)
+            self.assertEqual([name for name, _, _ in problems.stale], [UNCERTIFIED], paths)
 
     def test_a_referring_definition_needs_an_entry_of_its_own(self) -> None:
         checks = c.parse_checks(concrete_row(definitions=[(WRAPPER, WORD_MODULE)]))

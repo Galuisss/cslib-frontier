@@ -241,10 +241,12 @@ reductions, or when a certified definition such as its word-level program applie
 `why`. A `gap` names the issue that tracks the missing witness. A `not_a_reduction` entry records a
 definition that the check reports but that is a scheme, game or law, such as a scheme built from a
 component or a protocol's view distribution; review judges it, and the check does not verify it. A
-`concrete_only` entry records a reduction that needs no witness because no theorem applies an
-assumption through it, which the check verifies (below). The former `exempt` kind is rejected. A
-`via_certified_program` entry records a typed reduction that a certified program runs:
-it names the program, the program's efficiency witness, a theorem whose conclusion is an equation
+`concrete_only` entry records a reduction that needs no witness because every theorem that refers to
+it is an exact bound; the check verifies this for the referrers it recognizes (below), which does
+not cover a theorem that reaches the reduction only through a public wrapper. The former `exempt`
+kind is rejected. A `via_certified_program` entry records a typed reduction that a certified program
+runs: it names the program, the program's efficiency witness, a theorem whose conclusion is an
+equation
 between the program's law and the reduction's (a bound, or an equation for one world only, does not
 count) with the file that holds it, and the asymptotic headline that applies the hardness assumption
 to the program: a theorem other than the witness and the equality that concludes a negligibility or
@@ -285,14 +287,19 @@ referrers with no headline set apart: every referring theorem, in the reduction'
 it, must be concrete as above; a Prop-valued referring definition, such as a privacy or correctness
 notion stated with the reduction, fails only when it is a named assumption and otherwise needs no
 entry; and every other referring definition needs an efficiency witness or a baseline entry of its
-own. So a theorem that applies an assumption through the reduction fails the check, and the entry
+own. So a recognized referring theorem that applies an assumption fails the check, and the entry
 becomes a `gap`, or `not_a_reduction` if the definition is a scheme, game or law. The referrers'
-modules join the modules where the entry is enforced. The limits are those above, and the concrete
-test cannot tell an information-theoretic negligibility premise over all adversaries from a
-hardness assumption, so a reduction used under one stays a `gap`. The summary counts each kind, and
-the instance-scoped via entries apart from the others. CI treats it as it treats the premise check:
-a pull request fails when a changed module has an unrecorded uncertified reduction or a baseline
-entry that no longer matches, so the baseline only shrinks; merge groups only report. `--list` shows every reduction with its certificate, and
+modules join the modules where the entry is enforced. The limits are those above. A public
+definition that wraps the reduction stops the search, so the check cannot promise that no theorem
+downstream applies an assumption through the entry: that route is covered by the wrapping
+definition's own entry or witness, as the `gap` entry of `KeyDerivation.roToGuess`, which composes
+the `concrete_only` `listGuessToGuess` and `roToListGuess`, covers the theorem that applies its
+guessing premise. And the concrete test cannot tell an information-theoretic negligibility premise
+over all adversaries from a hardness assumption, so a reduction used under one stays a `gap`. The
+summary counts each kind, and the instance-scoped via entries apart from the others. CI treats it as
+it treats the premise check: a pull request fails when a changed module has an unrecorded
+uncertified reduction or a baseline entry that no longer matches, so the baseline only shrinks;
+merge groups only report. `--list` shows every reduction with its certificate, and
 `--update-baseline` adds entries whose `why` you then fill in. The check does not see a reduction
 written inline in a bound, a bound without an advantage-named constant, a simulator or extractor on
 the bounded side, or an attack, and it does not judge whether a witness assumes only the adversary's

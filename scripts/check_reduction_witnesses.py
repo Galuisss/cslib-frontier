@@ -33,10 +33,10 @@ needs its witness; its `why` names the issue that tracks it. The other kinds nee
   reduction: a scheme, game or law, such as a scheme or protocol built from a component or the
   view distribution of a protocol, which the checker cannot tell apart from a reduction. Its `why`
   says which it is. Review judges it; the checker does not verify it.
-* A `concrete_only` entry records a reduction that needs no witness because no theorem applies an
-  assumption through it: every theorem that refers to it, in its module or outside it, is an exact
-  bound, such as an information-theoretic step or the bound of a finite instance.
-  `scripts/SecurityPremises.lean --reductions` verifies this on every run (below).
+* A `concrete_only` entry records a reduction that needs no witness because every theorem that
+  refers to it, in its module or outside it, is an exact bound, such as an information-theoretic
+  step or the bound of a finite instance. `scripts/SecurityPremises.lean --reductions` verifies
+  this on every run for the referrers it recognizes (below).
 
 There is no other kind: the former `exempt` kind is rejected. Every entry needs a one-line
 justification.
@@ -104,17 +104,20 @@ entries for the unrecorded uncertified definitions and keeps the recorded ones.
 
 A `concrete_only` entry is verified by the same pass (`checkConcrete`) against the same referrers,
 with no headline: every referring theorem, in the reduction's module or outside it, must be
-concrete as above, so a theorem that applies an assumption through the reduction fails the check,
+concrete as above, so a recognized referring theorem that applies an assumption fails the check,
 and the entry must become a `gap` (or a `not_a_reduction` entry, if the definition is a scheme, game
 or law). A Prop-valued referring definition, such as a privacy or correctness notion stated with
 the reduction, fails only when it is a named assumption, and otherwise needs no entry; every other
 referring definition needs an efficiency witness of its own or a baseline entry of its own, as for
 an instance-scoped entry. The referrers' modules join the modules where the entry is enforced. The
-limits are those above: a public declaration stops the search, and the concrete test sees only
-`Negligible` claims and named assumptions, so it cannot tell an information-theoretic premise over
-all adversaries from a hardness assumption; such a reduction stays a `gap` until the test can. The
-summary prints the gap, via, instance-scoped via, not-a-reduction and concrete-only counts
-separately.
+limits are those above. A public declaration stops the search, so the check cannot promise that no
+theorem downstream applies an assumption through the entry: a theorem about a public definition
+that wraps the reduction is covered by that definition's own entry or witness, as the `gap` entry of
+`KeyDerivation.roToGuess` covers the `concrete_only` `listGuessToGuess` and `roToListGuess` that it
+composes. And the concrete test sees only `Negligible` claims and named assumptions, so it cannot
+tell an information-theoretic premise over all adversaries from a hardness assumption; such a
+reduction stays a `gap` until the test can. The summary prints the gap, via, instance-scoped via,
+not-a-reduction and concrete-only counts separately.
 
 In a module that the change touches (adds, modifies or deletes, against the merge base of
 `--base`, default `origin/main`, and the working tree, as `scripts/check_changed_files.py`
@@ -400,11 +403,10 @@ def compare(reductions: dict[str, Reduction], baseline: dict[str, dict],
             new.append(r)
     for name, entry in sorted(baseline.items(), key=lambda i: (i[1]["module"], i[0])):
         r = reductions.get(name)
-        via = entry["kind"] == VIA
         checked = entry["kind"] in CHECKED
         check = checks.get(name) if checked else None
         # A declaration the pass cannot find may have been renamed or deleted in any module.
-        everywhere = (checked and check is None) or (via and bool(check.missing))
+        everywhere = checked and (check is None or bool(check.missing))
         if not (everywhere or scoped(entry["module"], entry.get(EQUALITY_MODULE, ""),
                                      *(r.paths() if r else ()),
                                      *(check.paths if check else ()))):
@@ -475,9 +477,9 @@ def report(problems: Problems) -> str:
                 "word-level program that runs it, and apply the hardness assumption through that "
                 "lemma. If the definition is not a reduction (a scheme, game or law, such as a "
                 "scheme built from a component), record it with `\"kind\": "
-                f"\"{NOT_A_REDUCTION}\"`; if no theorem applies an assumption through it (every "
-                "theorem that refers to it is an exact bound), with `\"kind\": "
-                f"\"{CONCRETE_ONLY}\"`, which the check verifies. `{UPDATE}` adds a `gap` "
+                f"\"{NOT_A_REDUCTION}\"`; if every theorem that refers to it is an exact bound, "
+                f"with `\"kind\": \"{CONCRETE_ONLY}\"`, which the check verifies for the "
+                f"referrers it recognizes. `{UPDATE}` adds a `gap` "
                 "entry; set its `kind` and fill in its `why`.", ""]
         for r in problems.new:
             out += describe(r)

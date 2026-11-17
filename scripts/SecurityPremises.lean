@@ -213,8 +213,8 @@ seen. Whether a `headline` consumer uses `R` at the instance that `E` covers is 
 
 **Reductions whose every use is concrete.** An input line `concrete\t<reduction>\t<its module>`
 asks this mode to verify a `concrete_only` baseline entry (`checkConcrete`): a reduction that needs
-no efficiency witness because no theorem applies an assumption through it. `R` is resolved as for a
-`via` request, and its referrers are computed as above (`referrersOf`). The checks are:
+no efficiency witness because every theorem that refers to it is an exact bound. `R` is resolved as
+for a `via` request, and its referrers are computed as above (`referrersOf`). The checks are:
 
 * every referring theorem, in `R`'s module or outside it, is concrete (`notConcrete`, as above);
 * no Prop-valued referring definition, such as a privacy or correctness notion stated with `R`, is
@@ -227,9 +227,10 @@ It prints the verdict in the shape of a `via` request's, with `at` and `em` empt
 every referrer and `vm` the modules of `R` and its referrers. The limits are those of the
 instance-scoped check: a public declaration stops the search, so a theorem that applies an
 assumption to a definition that wraps `R` is not a referrer of `R` (that definition has an entry or
-a witness of its own instead), and the concrete test does not see a premise that assumes a bound
-without `Negligible` or a named assumption. Nor can it tell an information-theoretic negligibility
-premise, one over all adversaries without an efficiency bound, from a hardness assumption.
+a witness of its own instead), and the pass cannot promise that no theorem downstream applies an
+assumption through `R`. The concrete test does not see a premise that assumes a bound without
+`Negligible` or a named assumption. Nor can it tell an information-theoretic negligibility premise,
+one over all adversaries without an efficiency bound, from a hardness assumption.
 
 **Named assumptions.** With `--assumptions` (`lake env lean --run scripts/SecurityPremises.lean
 <lib-dir> --assumptions`), for `scripts/check_hardness_assumptions.py`, it reports the named
