@@ -219,7 +219,7 @@ theorem initialPrefixBranch_b2ServiceInput (P : PKEParams)
       simp only [splitEquiv_apply_fst, splitEquiv_apply_snd, Function.comp_apply]
       rw [← readBit_fin branch (layout.serviceReplyEmbedding i).val]
       change readBit branch (layout.replyBase + i) = _
-      rw [hregisters.2.2 i i.isLt]
+      rw [hregisters.2.2.1 i i.isLt]
       refine Fin.addCases ?_ ?_ i
       · intro j
         have hj : j = 0 := Subsingleton.elim _ _

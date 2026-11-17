@@ -43,8 +43,8 @@ success experiment remain separate obligations.
   blocks run the zero-oracle-erased first stage F on its public input and coherently prepare the
   request and hidden-bit records.
 * `Cslib.Quantum.ClassicalQueryLayout.Compatible.initialPrefixBranch_registers`: each branch
-  supplies the exact service input, preserves the complete first-stage register, and initializes
-  the hidden-bit/zero-ciphertext reply.
+  supplies the exact service input, preserves the complete first-stage register, initializes
+  the hidden-bit/zero-ciphertext reply, and prepares the second-stage input and ancillas.
 * `Cslib.Quantum.ClassicalQueryLayout.eval_requestHidden_embedState`: the actual request copy,
   Hadamard seed and protected-bit copy preserve the complete first-stage superposition.
 * `Cslib.Quantum.ClassicalQueryLayout.partialTraceLeft_copyRequest_zeroTarget_withReference`:
@@ -138,8 +138,8 @@ theorem Compatible.classicalRun_initialCopies {layout : ClassicalQueryLayout}
       (∀ i < layout.fullInputWidth, readBit prepared i = encoded.getD i false) ∧
       (∀ i < layout.service.width,
         readBit prepared (layout.serviceBase + i) = encoded.getD i false) ∧
-      (∀ i < 2 * κ + 1,
-        readBit prepared (layout.secondBase + i) = encoded.getD i false) ∧
+      (∀ i < layout.second.width,
+        readBit prepared (layout.secondBase + i) = (frame (encUnary κ)).getD i false) ∧
       (∀ i < layout.first.outputWidth,
         readBit prepared (layout.requestBase + i) = false) ∧
       readBit prepared layout.hiddenWire = false ∧
@@ -157,8 +157,8 @@ theorem Compatible.classicalRun_initialCopies {layout : ClassicalQueryLayout}
     (∀ i < layout.fullInputWidth, readBit prepared i = encoded.getD i false) ∧
     (∀ i < layout.service.width,
       readBit prepared (layout.serviceBase + i) = encoded.getD i false) ∧
-    (∀ i < 2 * κ + 1,
-      readBit prepared (layout.secondBase + i) = encoded.getD i false) ∧
+    (∀ i < layout.second.width,
+      readBit prepared (layout.secondBase + i) = (frame (encUnary κ)).getD i false) ∧
     (∀ i < layout.first.outputWidth,
       readBit prepared (layout.requestBase + i) = false) ∧
     readBit prepared layout.hiddenWire = false ∧
@@ -286,15 +286,24 @@ theorem Compatible.classicalRun_initialCopies {layout : ClassicalQueryLayout}
     · rw [hserviceOff _ (Or.inr (by omega)), hinitial,
         List.getD_eq_default encoded false (by rw [hencodedLength]; omega),
         List.getD_eq_default encoded false (by rw [hencodedLength]; omega)]
-  have hreadSecond (i : ℕ) (hi : i < 2 * κ + 1) :
-      readBit prepared (layout.secondBase + i) = encoded.getD i false := by
-    rw [hpreparedEq]
-    let offset : Fin (2 * κ + 1) := ⟨i, hi⟩
-    have hemb : (blockEmb layout.secondBase hsecondTargetFits offset : ℕ) =
-        layout.secondBase + i := by
-      simp only [blockEmb_apply_val, offset, Nat.add_comm]
-    rw [← hemb, readBit_fin, glue_apply_emb, Nat.zero_add,
-      hserviceOff i (Or.inl (hi.trans_le hheaderBeforeService)), hinitial]
+  have hreadSecond (i : ℕ) (hi : i < layout.second.width) :
+      readBit prepared (layout.secondBase + i) = (frame (encUnary κ)).getD i false := by
+    have hframe : (frame (encUnary κ)).length = 2 * κ + 1 := by
+      simp only [encUnary_apply, length_frame, List.length_replicate]
+    by_cases hheader : i < 2 * κ + 1
+    · rw [hpreparedEq]
+      let offset : Fin (2 * κ + 1) := ⟨i, hheader⟩
+      have hemb : (blockEmb layout.secondBase hsecondTargetFits offset : ℕ) =
+          layout.secondBase + i := by
+        simp only [blockEmb_apply_val, offset, Nat.add_comm]
+      rw [← hemb, readBit_fin, glue_apply_emb, Nat.zero_add,
+        hserviceOff i (Or.inl (hheader.trans_le hheaderBeforeService)), hinitial]
+      change (frame (encUnary κ) ++ sample).getD i false = (frame (encUnary κ)).getD i false
+      exact List.getD_append _ _ _ _ (by omega)
+    · rw [hsecondOff _ (Or.inr (by omega)),
+        hserviceOff _ (Or.inr (by omega)), hinitial,
+        List.getD_eq_default encoded false (by rw [hencodedLength]; omega),
+        List.getD_eq_default (frame (encUnary κ)) false (by omega)]
   have hzero (q : ℕ) (hinput : layout.fullInputWidth ≤ q)
       (hservice : q < layout.serviceBase ∨
         layout.serviceBase + layout.fullInputWidth ≤ q)
@@ -832,7 +841,9 @@ theorem Compatible.eval_initialPrefix {layout : ClassicalQueryLayout}
 
 /-- Each branch of the actual initial prefix supplies the service with the original sample,
 recorded request and hidden bit, preserves the full first-stage basis string, and initializes
-the protected reply to the same hidden bit followed by zero ciphertext wires. -/
+the protected reply to the same hidden bit followed by zero ciphertext wires. The second stage
+already contains its canonical header, zero ciphertext, complete saved first-stage memory and
+zero ancillary wires. -/
 theorem Compatible.initialPrefixBranch_registers {layout : ClassicalQueryLayout}
     (h : layout.Compatible) (sample : List Bool)
     (hsample : sample.length = layout.input.classicalInputLength)
@@ -849,7 +860,10 @@ theorem Compatible.initialPrefixBranch_registers {layout : ClassicalQueryLayout}
           List.ofFn request ++ [bit 0]) ∧
       branch ∘ layout.firstEmbedding = z ∧
       (∀ i < 1 + layout.ciphertextWidth,
-        readBit branch (layout.replyBase + i) = if i = 0 then bit 0 else false) := by
+        readBit branch (layout.replyBase + i) = if i = 0 then bit 0 else false) ∧
+      branch ∘ layout.secondEmbedding = inputState layout.second.width
+        (encPair encUnary encBits (layout.input.securityParameter,
+          List.replicate layout.ciphertextWidth false) ++ List.ofFn z) := by
   classical
   let encoded := encPair encUnary encBits (layout.input.securityParameter, sample)
   let prepared := classicalRun
@@ -881,7 +895,7 @@ theorem Compatible.initialPrefixBranch_registers {layout : ClassicalQueryLayout}
       encBits_apply, hsample, fullInputWidth]
   have hinitial := h.classicalRun_initialCopies sample hsample
   change prepared ∘ layout.firstEmbedding = _ ∧ _ at hinitial
-  obtain ⟨_, _, hservice, _, _, _, hreply⟩ := hinitial
+  obtain ⟨_, _, hservice, hsecond, _, _, hreply⟩ := hinitial
   have hfirstOff (q : Fin layout.width) (hq : layout.requestBase ≤ q) :
       firstState q = prepared q := by
     apply glue_of_not
@@ -910,15 +924,25 @@ theorem Compatible.initialPrefixBranch_registers {layout : ClassicalQueryLayout}
   have hbranchOff (q : Fin layout.width) (hq : q.val ≠ layout.replyBase) :
       branch q = seeded q := by
     exact Function.update_of_ne (fun heq => hq (congrArg Fin.val heq)) _ _
+  have hfar (q : Fin layout.width) (hq : layout.serviceBase ≤ q.val)
+      (hr : q.val ≠ layout.replyBase) : branch q = prepared q := by
+    rw [hbranchOff q hr, hseedOff q (by simp only [serviceBase] at hq; omega),
+      hrequestOff q (Or.inr (by simp only [serviceBase] at hq; omega)),
+      hfirstOff q (by simp only [serviceBase, hiddenWire] at hq; omega)]
+  have hfirstRead (i : Fin layout.first.width) : branch (layout.firstEmbedding i) = z i := by
+    have hi := layout.firstWire_lt_requestBase i.isLt
+    have hval : (layout.firstEmbedding i).val = layout.firstWire i := rfl
+    rw [hbranchOff _ (by rw [hval]; simp only [replyBase, serviceBase, hiddenWire]; omega),
+      hseedOff _ (by rw [hval]; simp only [hiddenWire]; omega),
+      hrequestOff _ (Or.inl hi)]
+    exact glue_apply_emb _ _ _ _
   have hservicePhysical (i : Fin layout.service.width)
       (hq : layout.serviceWire i = layout.serviceBase + i) :
       branch (layout.serviceEmbedding i) = encoded.getD i false := by
     have hqVal : (layout.serviceEmbedding i).val = layout.serviceBase + i := hq
     have hbefore := layout.serviceEmbedding_lt_replyBase i
-    rw [hbranchOff _ (by change layout.serviceWire i ≠ _; omega),
-      hseedOff _ (by rw [hqVal]; simp only [serviceBase]; omega),
-      hrequestOff _ (Or.inr (by rw [hqVal]; simp only [serviceBase]; omega)),
-      hfirstOff _ (by rw [hqVal]; simp only [serviceBase, hiddenWire]; omega)]
+    rw [hfar _ (by rw [hqVal]; omega)
+      (by change layout.serviceWire i ≠ _; omega)]
     rw [← readBit_fin prepared (layout.serviceEmbedding i)]
     change readBit prepared (layout.serviceWire i) = _
     rw [hq, hservice i i.isLt]
@@ -974,15 +998,7 @@ theorem Compatible.initialPrefixBranch_registers {layout : ClassicalQueryLayout}
             rw [ite_eq_right (by omega)]),
             List.getD_eq_default encoded false (by omega),
             List.getD_eq_default [bit 0] false (by simp only [List.length_singleton]; omega)]
-  constructor
-  · funext i
-    simp only [Function.comp_apply]
-    have hi := layout.firstWire_lt_requestBase i.isLt
-    have hval : (layout.firstEmbedding i).val = layout.firstWire i := rfl
-    rw [hbranchOff _ (by rw [hval]; simp only [replyBase, serviceBase, hiddenWire]; omega),
-      hseedOff _ (by rw [hval]; simp only [hiddenWire]; omega),
-      hrequestOff _ (Or.inl hi)]
-    exact glue_apply_emb _ _ _ _
+  refine ⟨funext hfirstRead, ?_, ?_⟩
   · intro i hi
     change readBit branch (layout.replyBase + i) = _
     have hfit : layout.replyBase + i < layout.width := by
@@ -1000,6 +1016,47 @@ theorem Compatible.initialPrefixBranch_registers {layout : ClassicalQueryLayout}
         hfirstOff _ (by simp only [replyBase, serviceBase, hiddenWire]; omega),
         ← readBit_fin prepared ⟨layout.replyBase + i, hfit⟩]
       exact hreply i hi
+  · funext i
+    simp only [Function.comp_apply]
+    let header := frame (encUnary layout.input.securityParameter)
+    have hheader : header.length = 2 * layout.input.securityParameter + 1 := by
+      simp only [header, encUnary_apply, length_frame, List.length_replicate]
+    have hinput : (header ++ List.replicate layout.ciphertextWidth false).length =
+        layout.secondInputWidth := by
+      simp only [List.length_append, List.length_replicate, hheader, secondInputWidth]
+    have hsecondPhysical (j : Fin layout.second.width)
+        (hq : layout.secondWire j = layout.secondBase + j) :
+        branch (layout.secondEmbedding j) = header.getD j false := by
+      have hqVal : (layout.secondEmbedding j).val = layout.secondBase + j := hq
+      rw [hfar _ (by rw [hqVal]; simp only [secondBase, replyBase]; omega)
+        (by rw [hqVal]; simp only [secondBase]; omega),
+        ← readBit_fin prepared (layout.secondEmbedding j)]
+      change readBit prepared (layout.secondWire j) = _
+      rw [hq]
+      exact hsecond j j.isLt
+    change branch (layout.secondEmbedding i) =
+      ((header ++ List.replicate layout.ciphertextWidth false) ++ List.ofFn z).getD i false
+    by_cases hi : i.val < layout.secondInputWidth
+    · rw [hsecondPhysical i (by simp only [secondWire, hi, ↓reduceIte]),
+        List.getD_append _ _ _ _ (by omega)]
+      by_cases hh : i.val < header.length
+      · rw [List.getD_append _ _ _ _ hh]
+      · rw [List.getD_append_right _ _ _ _ (by omega),
+          List.getD_eq_default header false (by omega)]
+        simp
+    · rw [List.getD_append_right _ _ _ _ (by omega), hinput]
+      by_cases hmemory : i.val - layout.secondInputWidth < layout.first.width
+      · have hemb : layout.secondEmbedding i = layout.firstEmbedding
+            ⟨i.val - layout.secondInputWidth, hmemory⟩ := by
+          apply Fin.ext
+          change layout.secondWire i = layout.firstWire (i.val - layout.secondInputWidth)
+          simp only [secondWire, hi, hmemory, ↓reduceIte]
+        rw [hemb, hfirstRead]
+        exact (List.getD_ofFn_of_lt z hmemory false).symm
+      · rw [hsecondPhysical i (by simp only [secondWire, hi, hmemory, ↓reduceIte]),
+          List.getD_eq_default header false (by simp only [secondInputWidth] at hi; omega),
+          List.getD_eq_default (List.ofFn z) false (by simp only [List.length_ofFn]; omega)]
+
 
 
 /-- **The final physical suffix accepts exactly when the second-stage guess equals the protected
