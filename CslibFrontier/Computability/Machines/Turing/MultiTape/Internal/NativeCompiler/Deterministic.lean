@@ -10,7 +10,7 @@ module
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatch
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Universal
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatchResourceBounds
-import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ListResourceBounds
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ListGetResourceBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ReadsResourceBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ControlResourceBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ResourceBounds

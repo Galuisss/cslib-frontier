@@ -3633,7 +3633,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Nat
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.FirstMatchResourceBounds
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Interpreter
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.List
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ListResourceBounds
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ListGetResourceBounds
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Nat
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.Range
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeCompiler.ReadsResourceBounds
