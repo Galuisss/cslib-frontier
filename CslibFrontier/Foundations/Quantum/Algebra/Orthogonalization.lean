@@ -64,18 +64,6 @@ private theorem sq_le_three_mul_of_le_add {n x y z : ℝ} (hn : 0 ≤ n) (h : n 
 
 variable [StarModule ℂ A] [SelfAdjointDecompose A]
 
-namespace AlgState
-
-omit [TopologicalSpace A] [ContinuousFunctionalCalculus ℝ A IsSelfAdjoint]
-  [NonnegSpectrumClass ℝ A] in
-/-- A bound `x⋆x ≤ y` bounds the state norm: `‖x‖²_φ ≤ Re φ(y)`. -/
-theorem norm_sq_le_of_star_mul_le (φ : AlgState A) {x y : A} (h : star x * x ≤ y) :
-    φ.norm x ^ 2 ≤ (φ y).re := by
-  rw [norm_sq]
-  exact φ.re_apply_mono h
-
-end AlgState
-
 namespace Measurement
 
 /-- **The orthogonalization estimate** [de la Salle, §3][delaSalle2022]: given projections `q_a`
@@ -132,9 +120,15 @@ theorem sum_norm_sub_sq_le_of_dilation (φ : AlgState A) (M P : Measurement α A
           simp only [map_sub, Complex.sub_re, sum_sub_distrib, ← Complex.re_sum, ← map_sum,
             hsum1, hφ1]
       _ ≤ δ := by linarith
+  -- `(h - 1)² ≤ 1 - h²`, from `h² ≤ h`.
+  have hle : (h - 1) * (h - 1) ≤ 1 - h * h := by
+    have hsq : h * h ≤ h := mul_self_le_self_of_nonneg_of_le_one h0 h1
+    rw [← sub_nonneg]
+    have : 1 - h * h - (h - 1) * (h - 1) = 2 * (h - h * h) := by noncomm_ring
+    rw [this, two_mul]
+    exact add_nonneg (sub_nonneg.mpr hsq) (sub_nonneg.mpr hsq)
   -- Third part: `p_a (h - 1)`.
   have b₃ : ∑ a, φ.norm (P.effect a * (h - 1)) ^ 2 ≤ δ := by
-    have hsq : h * h ≤ h := mul_self_le_self_of_nonneg_of_le_one h0 h1
     calc ∑ a, φ.norm (P.effect a * (h - 1)) ^ 2
         = ∑ a, (φ ((h - 1) * P.effect a * (h - 1))).re := by
           refine sum_congr rfl fun a _ => ?_
@@ -142,24 +136,14 @@ theorem sum_norm_sub_sq_le_of_dilation (φ : AlgState A) (M P : Measurement α A
             ← mul_assoc (P.effect a), hP a, ← mul_assoc]
       _ = (φ ((h - 1) * (h - 1))).re := by
           rw [← Complex.re_sum, ← map_sum, ← sum_mul, ← mul_sum, hsumP, mul_one]
-      _ ≤ (φ (1 - h * h)).re := φ.re_apply_mono (by
-          rw [← sub_nonneg]
-          have : 1 - h * h - (h - 1) * (h - 1) = 2 * (h - h * h) := by noncomm_ring
-          rw [this, two_mul]
-          exact add_nonneg (sub_nonneg.mpr hsq) (sub_nonneg.mpr hsq))
+      _ ≤ (φ (1 - h * h)).re := φ.re_apply_mono hle
       _ ≤ δ := by
           rw [map_sub, Complex.sub_re, hφ1, hh]
           linarith
   -- Second part: `(h - 1) p_a h`.
   have b₂ : ∑ a, φ.norm ((h - 1) * P.effect a * h) ^ 2 ≤ δ := by
-    have hsq : h * h ≤ h := mul_self_le_self_of_nonneg_of_le_one h0 h1
     have t₂ : ∀ a, star ((h - 1) * P.effect a * h) * ((h - 1) * P.effect a * h) ≤
         M.effect a - M.effect a * M.effect a := fun a => by
-      have hle : (h - 1) * (h - 1) ≤ 1 - h * h := by
-        rw [← sub_nonneg]
-        have : 1 - h * h - (h - 1) * (h - 1) = 2 * (h - h * h) := by noncomm_ring
-        rw [this, two_mul]
-        exact add_nonneg (sub_nonneg.mpr hsq) (sub_nonneg.mpr hsq)
       have hconj := star_left_conjugate_le_conjugate hle (P.effect a * h)
       have hlhs : star ((h - 1) * P.effect a * h) * ((h - 1) * P.effect a * h) =
           star (P.effect a * h) * ((h - 1) * (h - 1)) * (P.effect a * h) := by

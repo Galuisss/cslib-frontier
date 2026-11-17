@@ -5684,6 +5684,7 @@ public import CslibFrontier.DataStructure.WordRAM.Resizable.Randomized.StateTran
 public import CslibFrontier.DataStructure.WordRAM.Resizable.StateTransition
 public import CslibFrontier.DataStructure.WordRAM.StateTransition
 public import CslibFrontier.Foundations.Algebra.BigOperators.Fin
+public import CslibFrontier.Foundations.Algebra.BigOperators.Selection
 public import CslibFrontier.Foundations.Algebra.DFT
 public import CslibFrontier.Foundations.Algebra.FiniteMagnitude
 public import CslibFrontier.Foundations.Algebra.GeometricTail
@@ -6640,6 +6641,7 @@ public import CslibFrontier.Foundations.LinearAlgebra.Matrix.NonnegRank
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.NonnegativeForm
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PairedPorts
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PartialDerivatives
+public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Polar
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PosDef
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PosSemidefTrace
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PowPerturbation

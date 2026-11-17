@@ -9,6 +9,8 @@ module
 
 import CslibFrontier.Foundations.Quantum.Algebra.Orthogonalization
 import CslibFrontier.Foundations.Quantum.Orthogonalization
+import CslibFrontier.Foundations.Algebra.BigOperators.Selection
+import CslibFrontier.Foundations.LinearAlgebra.Matrix.Polar
 
 /-! # Orthogonalization of measurements
 
@@ -28,15 +30,16 @@ open scoped MatrixOrder ComplexOrder
 /-- Choosing the two largest of three weights beats the fractional selection `(1, ½, ½)`. -/
 example : ∃ S : Finset (Fin 3), S.card = 2 ∧
     ∑ i, ![3, 2, 1] i * ![1, 1 / 2, 1 / 2] i ≤ ∑ i ∈ S, (![3, 2, 1] i : ℝ) :=
-  exists_card_eq_sum_mul_le _ _ (fun i => by fin_cases i <;> norm_num)
+  Finset.exists_card_eq_sum_mul_le _ _ (fun i => by fin_cases i <;> norm_num)
     (fun i => by fin_cases i <;> norm_num) (by simp [Fin.sum_univ_three]; norm_num)
 
-/-- Polar decomposition of a square matrix. -/
-example {m n : Type} [Fintype m] [Fintype n] [DecidableEq m] [DecidableEq n] (y : Matrix m n ℂ)
-    (hmn : Fintype.card m = Fintype.card n) :
-    ∃ (R : Matrix m n ℂ) (h : Matrix n n ℂ), Rᴴ * R = 1 ∧ R * Rᴴ = 1 ∧ h.PosSemidef ∧
-      h * h = yᴴ * y ∧ y = R * h ∧ (yᴴ * y ≤ 1 → h ≤ 1) :=
-  exists_polar y hmn
+/-- Every square matrix is a unitary times a positive semidefinite matrix. -/
+example {n : Type} [Fintype n] [DecidableEq n] (y : Matrix n n ℂ) :
+    ∃ R ∈ unitaryGroup n ℂ, ∃ h : Matrix n n ℂ, h.PosSemidef ∧ y = R * h := by
+  obtain ⟨R, h, hR1, hR2, hh, -, hy, -⟩ := Matrix.exists_polar y rfl
+  refine ⟨R, ?_, h, hh, hy⟩
+  rw [mem_unitaryGroup_iff, star_eq_conjTranspose]
+  exact hR2
 
 /-- **Orthogonalization**: a measurement with `φ(∑_a M_a²) ≥ 1 - ε` is `9ε`-close to a projective
 measurement on the same space, in any state, for instance the vector state of a unit vector. -/
