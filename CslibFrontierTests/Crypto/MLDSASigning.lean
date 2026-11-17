@@ -9,6 +9,7 @@ module
 
 import CslibFrontier.Crypto.Computational.MLDSA.CommitmentCollision
 import CslibFrontier.Crypto.Computational.MLDSA.CompressedKeyOnly
+import CslibFrontier.Crypto.Game.CloseTo.RejectedProgramming
 import Mathlib.Data.Fin.VecNotation
 import Mathlib.Tactic.FinCases
 
@@ -214,9 +215,23 @@ example : (interpret countTrials (expandSigningRetries toy 4 interleaved)).run 0
 
 -- The two-mask ordinary MSIS solver stays within the classical fork radius at every
 -- FIPS parameter set, including the asymmetric upper endpoint of the signing mask.
-example : ∀ P ∈ [mldsa44, mldsa65, mldsa87],
+example : ∀ P ∈ [Params.mldsa44, Params.mldsa65, Params.mldsa87],
     max (2 * P.γ₁ - 1) (2 * P.γ₂) ≤ 2 * compressedSelfTargetRadius P 13 := by
   simp only [List.mem_cons, List.not_mem_nil, or_false]
-  rintro P (rfl | rfl | rfl) <;> decide
+  rintro P (rfl | rfl | rfl) <;> decide +kernel
+
+-- The rejected point is the first coin, and its digest equals that coin. Among the four
+-- equiprobable two-coin tapes, reading `false` returns true once if the rejected write is kept,
+-- twice if it is erased. Comparing only the response of the signing attempt misses this effect.
+private def readAfterRejection (keep : Bool) (coins : Bool × Bool) : Bool :=
+  let step := RandomOracle.programmedTrialStep keep (fun (_ : Unit) x => x) id
+    (fun _ _ => (none : Option Unit))
+  let rejected := step (.inl ()) coins.1 []
+  (step (.inr false) coins.2 rejected.2).1
+
+example :
+    let tapes := [(false, false), (false, true), (true, false), (true, true)]
+    (tapes.countP (readAfterRejection true), tapes.countP (readAfterRejection false)) = (1, 2) := by
+  decide +kernel
 
 end MLDSASigningTests

@@ -144,7 +144,7 @@ theorem signingMaskLaw_apply_le [NeZero P.q] (hγ : 0 < P.γ₁) (hq : 2 * P.γ�
 /-- The signing attempt with an ideal, coefficientwise uniform mask and the given fresh
 challenge. On success it emits the high bits of the original commitment `A y` and the
 signature returned by Algorithm 7's two rejection stages. -/
-noncomputable def freshSigningAttempt (d ω : ℕ) (hγ : 0 < P.γ₁) (sk : SecretKey P)
+@[expose] noncomputable def freshSigningAttempt (d ω : ℕ) (hγ : 0 < P.γ₁) (sk : SecretKey P)
     (c : Fin P.n → ZMod P.q) : PMF (Option (AttemptTranscript P)) :=
   (signingMaskLaw P hγ).map fun y =>
     (compressedSignAttempt P d ω (fun _ => c) sk [] y).map fun σ =>

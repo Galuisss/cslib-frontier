@@ -5081,6 +5081,7 @@ public import CslibFrontier.Crypto.Game.AttackResources
 public import CslibFrontier.Crypto.Game.CloseTo
 public import CslibFrontier.Crypto.Game.CloseTo.IntBox
 public import CslibFrontier.Crypto.Game.CloseTo.RandomOracle
+public import CslibFrontier.Crypto.Game.CloseTo.RejectedProgramming
 public import CslibFrontier.Crypto.Game.CloseTo.UniformNat
 public import CslibFrontier.Crypto.Game.CloseTo.UntilBad
 public import CslibFrontier.Crypto.Game.Concrete

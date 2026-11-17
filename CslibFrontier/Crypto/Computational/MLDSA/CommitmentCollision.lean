@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Crypto.Computational.MLDSA.SigningROM
 public import CslibFrontier.Crypto.Computational.SIS.Hermite
+import CslibFrontier.Crypto.Game.CloseTo
 import CslibFrontier.Probability.Collision
 import CslibFrontier.Probability.PMF.Bool
 import CslibFrontier.Probability.PMF.Expect
@@ -192,8 +193,8 @@ theorem closeTo_simulateSigning_uniformMatrix [NeZero P.q] (hP : P.Valid)
         Prod.fst)
       ((PMF.uniformOfFintype _).bind fun A =>
         let pk := (SecretKey.mk A s₁ s₂ : SecretKey P).publicKey
-        (runAcceptedSigningROM P K dist (fun c => simulateFreshSigningAttempt P d ω hβ pk (expand c))
-          (forger pk)).map Prod.fst)
+        (runAcceptedSigningROM P K dist
+          (fun c => simulateFreshSigningAttempt P d ω hβ pk (expand c)) (forger pk)).map Prod.fst)
       ((2 * (S * K) * H + (S * K).choose 2 : ℕ) * ENNReal.ofReal
         (Real.sqrt (Game.succProbability
           (ModuleSIS.hermiteExperiment (max (2 * P.γ₁ - 1) (2 * P.γ₂))
@@ -212,11 +213,11 @@ theorem closeTo_simulateSigning_uniformMatrix [NeZero P.q] (hP : P.Valid)
     exact iSup_le fun _ => PMF.coe_le_one _ _
   rw [tsum_fintype]
   simp only [err, PMF.uniformOfFintype_apply, mul_left_comm _ (count : ℝ≥0∞), ← mul_sum]
-  apply mul_le_mul_left'
+  apply mul_le_mul_of_nonneg_left _ zero_le
   apply (ENNReal.le_ofReal_iff_toReal_le ?_ (Real.sqrt_nonneg _)).2
-  · simpa only [ENNReal.toReal_sum (fun a _ => ENNReal.mul_ne_top (by simp) (finite a)),
-      ENNReal.toReal_mul, ENNReal.toReal_inv, ENNReal.toReal_natCast, Fintype.expect_eq_sum_div_card,
-      div_eq_inv_mul, mul_sum] using hmean
-  · exact ENNReal.sum_ne_top.mpr fun a _ => ENNReal.mul_ne_top (by simp) (finite a)
+  · simpa only [ENNReal.toReal_mul, ENNReal.toReal_sum (fun a _ => finite a),
+      ENNReal.toReal_inv, ENNReal.toReal_natCast, Fintype.expect_eq_sum_div_card,
+      div_eq_inv_mul] using hmean
+  · exact ENNReal.mul_ne_top (by simp) (ENNReal.sum_ne_top.mpr fun a _ => finite a)
 
 end Cslib.Crypto.MLDSA
