@@ -8,7 +8,8 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.NativeOracleProgram
-public import CslibFrontier.Computability.Probabilistic.Oracle.Tidy
+public import CslibFrontier.Computability.Probabilistic.Oracle
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Oracle.Phase
 
 /-!
 # Forgetting named native oracle programs
@@ -49,6 +50,7 @@ theorem isOraclePPTOn (witness : NativeOracleProgram r program encIn encOut)
       (fun input => (encIn input).length) witness.time) :
     IsOraclePPTOn encIn encOut program := by
   let _ := witness.stateFintype
-  exact (IsTidyOraclePPTOn.of_polyBounded witness.machine htime witness.computes).isOraclePPTOn
+  exact (Oracle.IsTidyOraclePPTOn.of_polyBounded
+    witness.machine htime witness.computes).isOraclePPTOn
 
 end Turing.MultiTapePTM.Internal.NativeOracleProgram

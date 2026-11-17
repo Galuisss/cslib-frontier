@@ -783,7 +783,7 @@ end OnlineAccounting
 /-! ### Resource-classified deterministic phases -/
 
 /-- An actual named deterministic compiler together with a componentwise classification of the
-same certified clock and a workspace bound. This adds no semantic callback: `compiler.machine` is
+same certified clock and a workspace bound. This adds no semantic callback: `compiler.table.toTM` is
 the executed phase, and the equalities tie every aggregate back to its machine certificate. -/
 structure ClassifiedCompiler {Alpha : Type u} {Beta : Type v} (f : Alpha → Beta)
     (encIn : Alpha ↪ List Bool) (encOut : Beta ↪ List Bool) where
@@ -982,7 +982,7 @@ table are exactly those of `witness`. -/
   runsInSpace := witness.runsInSpace
 
 /-- Lift a retained deterministic compiler to a named oracle artifact with pure semantics. The
-actual machine is `ofDeterministic classified.compiler.machine`: it ignores private coins and all
+actual machine is `ofDeterministic classified.compiler.table.toTM`: it ignores private coins and all
 oracle channels, retains the compiler state encoding, and uses exactly the classified online
 record. No dummy query or semantic callback is introduced. -/
 @[expose] noncomputable def ofCompiler {Alpha : Type u} {Beta : Type} {f : Alpha → Beta}
@@ -993,7 +993,7 @@ record. No dummy query or semantic callback is introduced. -/
   exact {
     tapeCount := classified.compiler.tapeCount
     State := classified.compiler.State
-    machine := ofDeterministic classified.compiler.machine
+    machine := ofDeterministic classified.compiler.table.toTM
     stateEncoding := classified.compiler.stateEncoding
     online := classified.online
     computes := fun input => by
@@ -1005,7 +1005,7 @@ record. No dummy query or semantic callback is introduced. -/
       rw [classified.time_eq]
       intro path hhead htime
       exact (clockedRunsInSpace_mul_time_add_one
-        (ofDeterministic (Oracle := Fin r) classified.compiler.machine)
+        (ofDeterministic (Oracle := Fin r) classified.compiler.table.toTM)
         (encIn input) (classified.compiler.time input) path hhead htime).trans
           (classified.clockWorkspace_le input)
   }
@@ -1208,7 +1208,7 @@ theorem totalTime_queryTakeOnline (input : List Bool × ℕ) :
     queryTakeOnline.totalTime input = 4 * input.1.length + 2 * input.2 + 6 := by
   rcases input with ⟨q, limit⟩
   norm_num [OnlineAccounting.totalTime, queryTakeOnline]
-  all_goals omega
+  omega
 
 theorem totalWorkspace_queryTakeOnline (input : List Bool × ℕ) :
     queryTakeOnline.totalWorkspace input = 0 := by
@@ -1277,7 +1277,7 @@ private theorem computes_preprocess {Alpha : Type u} {Middle : Type v} {Output :
     {program : Middle → ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Output}
     (source : NativeOracleProgram r program encMiddle encOutput) (input : Alpha) :
     (source.machine.tidyComp
-      (ofDeterministic (Oracle := Fin r) prepare.compiler.machine) true).ComputesTidily
+      (ofDeterministic (Oracle := Fin r) prepare.compiler.table.toTM) true).ComputesTidily
         (encIn input) ((preprocessAccounting prepare source).totalTime input)
         (encOutput <$> program (f input)) := by
   rw [totalTime_preprocessAccounting]
@@ -1332,7 +1332,7 @@ noncomputable def preprocess {Alpha : Type u} {Middle : Type v} {Output : Type}
   let tapes := max prepare.compiler.tapeCount source.tapeCount + 2
   let online := preprocessAccounting prepare source
   let machine := source.machine.tidyComp
-    (ofDeterministic (Oracle := Fin r) prepare.compiler.machine) true
+    (ofDeterministic (Oracle := Fin r) prepare.compiler.table.toTM) true
   exact {
     tapeCount := tapes
     State := State
@@ -1400,7 +1400,7 @@ private theorem computes_postprocess {Alpha : Type u} {Middle Beta : Type}
         post.online.time phase middle ≤ postOnline.time phase input ∧
         post.online.workspace phase middle ≤ postOnline.workspace phase input)
     (input : Alpha) :
-    ((ofDeterministic (Oracle := Fin r) post.compiler.machine).tidyComp
+    ((ofDeterministic (Oracle := Fin r) post.compiler.table.toTM).tidyComp
       source.machine true).ComputesTidily
       (encIn input) ((postprocessAccounting source post postOnline).totalTime input)
         (encOut <$> (f <$> program input)) := by
@@ -1465,7 +1465,7 @@ noncomputable def postprocess {Alpha : Type u} {Middle Beta : Type}
   letI : Fintype State := inferInstance
   let tapes := max source.tapeCount post.compiler.tapeCount + 2
   let online := postprocessAccounting source post postOnline
-  let machine := (ofDeterministic (Oracle := Fin r) post.compiler.machine).tidyComp
+  let machine := (ofDeterministic (Oracle := Fin r) post.compiler.table.toTM).tidyComp
     source.machine true
   exact {
     tapeCount := tapes
@@ -1578,7 +1578,7 @@ private theorem computes_dispatch {Alpha : Type u} {Beta : Type}
       ProbOracleComp (fun _ : Fin r × List Bool => List Bool) Beta}
     (yes : NativeOracleProgram r yesProgram encIn encOut)
     (no : NativeOracleProgram r noProgram encIn encOut) (input : Alpha) :
-    (itePTM (ofDeterministic (Oracle := Fin r) condition.compiler.machine)
+    (itePTM (ofDeterministic (Oracle := Fin r) condition.compiler.table.toTM)
       yes.machine no.machine).ComputesTidily
         (encIn input) ((dispatchAccounting condition yes no).totalTime input)
         (encOut <$> if test input = [] then noProgram input else yesProgram input) := by
@@ -1643,7 +1643,7 @@ noncomputable def dispatch {Alpha : Type u} {Beta : Type}
   let tapes := max condition.compiler.tapeCount (max yes.tapeCount no.tapeCount) + 1
   let online := dispatchAccounting condition yes no
   let machine := itePTM
-    (ofDeterministic (Oracle := Fin r) condition.compiler.machine) yes.machine no.machine
+    (ofDeterministic (Oracle := Fin r) condition.compiler.table.toTM) yes.machine no.machine
   exact {
     tapeCount := tapes
     State := State
@@ -1778,14 +1778,14 @@ private theorem computes_sequenceCaptured {Alpha Middle Beta : Type}
     (second.machine.tidyComp
       (appendPTM
         (ofDeterministic (Oracle := Fin r)
-          (Turing.MultiTapeTM.Internal.NativeCompiler.encodeFrame encIn).machine)
+          (Turing.MultiTapeTM.Internal.NativeCompiler.encodeFrame encIn).table.toTM)
         first.machine) true).ComputesTidily
       (encIn input) ((capturedAccounting first second secondOnline).totalTime input)
       (encOut <$> capturedProgram firstProgram secondProgram input) := by
   rw [totalTime_capturedAccounting]
   let framing := Turing.MultiTapeTM.Internal.NativeCompiler.encodeFrame encIn
   let captureMachine := appendPTM
-    (ofDeterministic (Oracle := Fin r) framing.machine) first.machine
+    (ofDeterministic (Oracle := Fin r) framing.table.toTM) first.machine
   have hcapture := ComputesTidily.prefix (Operation := Fin r) (framing.computes input)
     (first.computes input)
   have hcaptureTyped : captureMachine.ComputesTidily (encIn input)
@@ -1872,7 +1872,7 @@ noncomputable def sequenceCaptured {Alpha Middle Beta : Type}
   let captureTapes := max framing.tapeCount first.tapeCount
   let tapes := max captureTapes second.tapeCount + 2
   let captureMachine := appendPTM
-    (ofDeterministic (Oracle := Fin r) framing.machine) first.machine
+    (ofDeterministic (Oracle := Fin r) framing.table.toTM) first.machine
   let machine := second.machine.tidyComp captureMachine true
   let online := capturedAccounting first second secondOnline
   exact {
