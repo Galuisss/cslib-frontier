@@ -8,18 +8,19 @@ module
 -- upstream: local-only (tests)
 
 import CslibFrontier.Foundations.Quantum.PauliGroup
-import CslibFrontier.Foundations.Quantum.PauliRigidity
+import CslibFrontier.Foundations.Quantum.PauliCompression
 
-/-! # Robust Pauli rigidity
+/-! # Compression of the Pauli family
 
 Checked clients: the Pauli group relations, the Pauli strings as an exact representation of the
-Pauli group, robust rigidity for arbitrary unitaries, and its concrete instance on the Pauli
-strings, where the defect vanishes and the isometry recovers them exactly on the vector.
+Pauli group, the compression bound for arbitrary unitaries, and its concrete instance on the
+Pauli strings, where the defect vanishes and the isometry recovers the products exactly on the
+vector.
 -/
 
 set_option linter.privateModule false
 
-namespace CslibFrontierTests.PauliRigidity
+namespace CslibFrontierTests.PauliCompression
 
 open Matrix Cslib Cslib.Quantum Cslib.Quantum.PauliGroup Cslib.BitString
 open scoped Kronecker
@@ -29,7 +30,7 @@ example {ι : Type} [Fintype ι] (a b : ι → Bool) :
     ofZ b * ofX a = (if a ⬝ᵥ b then negOne else 1) * (ofX a * ofZ b) :=
   ofZ_mul_ofX a b
 
-/-- **Robust Pauli rigidity** for arbitrary unitaries. -/
+/-- **Compression of the Pauli family** for arbitrary unitaries. -/
 example {ι κ : Type} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
     (X Z : (ι → Bool) → Matrix κ κ ℂ) (hX : ∀ a, (X a)ᴴ * X a = 1)
     (hZ : ∀ b, (Z b)ᴴ * Z b = 1) (ψ : EuclideanSpace ℂ κ) :
@@ -41,7 +42,7 @@ example {ι κ : Type} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq �
         (∑ p, ∑ q, ‖(WithLp.toLp 2 ((pauliFamily X Z p * pauliFamily X Z q -
           pauliFamily X Z (p * q)) *ᵥ ψ.ofLp) : EuclideanSpace ℂ κ)‖ ^ 2) /
           (Fintype.card (PauliGroup ι)) ^ 2 :=
-  exists_isometry_pauliFamily X Z hX hZ ψ
+  exists_isometry_compress_pauliFamily X Z hX hZ ψ
 
 /-- **Concrete client.** For the Pauli strings on two qubits the defect vanishes, so on any vector
 the isometry recovers every product `X^a Z^b` exactly. -/
@@ -54,7 +55,7 @@ example (ψ : EuclideanSpace ℂ (Fin 2 → Bool)) :
     rw [(pauliXPow_isHermitian a).eq, pauliXPow_mul_self]
   have hZ : ∀ b : Fin 2 → Bool, (pauliZPow b)ᴴ * pauliZPow b = 1 := fun b => by
     rw [(pauliZPow_isHermitian b).eq, pauliZPow_mul_self]
-  obtain ⟨J, _, _, W, hW, h⟩ := exists_isometry_pauliFamily pauliXPow pauliZPow hX hZ ψ
+  obtain ⟨J, _, _, W, hW, h⟩ := exists_isometry_compress_pauliFamily pauliXPow pauliZPow hX hZ ψ
   refine ⟨J, inferInstance, inferInstance, W, hW, fun a b => ?_⟩
   simp only [pauliFamily_pauliXPow_mul, sub_self, zero_mulVec, WithLp.toLp_zero, norm_zero,
     ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true, zero_pow, Finset.sum_const_zero,
@@ -72,4 +73,4 @@ example (ψ : EuclideanSpace ℂ (Fin 2 → Bool)) :
     sub_eq_zero] at this
   exact this
 
-end CslibFrontierTests.PauliRigidity
+end CslibFrontierTests.PauliCompression

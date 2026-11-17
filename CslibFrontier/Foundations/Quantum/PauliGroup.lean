@@ -13,6 +13,7 @@ public import Mathlib.Data.Fintype.Prod
 public import Mathlib.Data.Fintype.Pi
 public import Mathlib.Data.Matrix.Mul
 import Mathlib.Tactic.Abel
+import Mathlib.Algebra.Ring.BooleanRing
 
 /-!
 # The Pauli group
@@ -83,8 +84,6 @@ omit [Fintype ι] in
 @[simp] theorem inv_x (p : PauliGroup ι) : p⁻¹.x = p.x := rfl
 @[simp] theorem inv_z (p : PauliGroup ι) : p⁻¹.z = p.z := rfl
 
-private theorem bool_add_self (b : Bool) : b + b = 0 := by cases b <;> rfl
-
 instance : Group (PauliGroup ι) where
   mul_assoc p q r := by
     ext
@@ -96,14 +95,14 @@ instance : Group (PauliGroup ι) where
   inv_mul_cancel p := by
     ext
     · simp only [mul_sign, inv_sign, inv_z, one_sign]
-      rw [add_assoc _ p.sign]; exact bool_add_self (p.sign + p.z ⬝ᵥ p.x)
-    · simp [bool_add_self]
-    · simp [bool_add_self]
+      rw [add_assoc _ p.sign]; exact BooleanRing.add_self (p.sign + p.z ⬝ᵥ p.x)
+    · exact BooleanRing.add_self _
+    · exact BooleanRing.add_self _
 
 /-- `PauliGroup ι ≃ Bool × (ι → Bool) × (ι → Bool)`. -/
 def equivProd : PauliGroup ι ≃ Bool × (ι → Bool) × (ι → Bool) where
   toFun p := (p.sign, p.x, p.z)
-  invFun t := ⟨t.1, t.2.1, t.2.2⟩
+  invFun | (s, a, b) => ⟨s, a, b⟩
   left_inv _ := rfl
   right_inv _ := rfl
 

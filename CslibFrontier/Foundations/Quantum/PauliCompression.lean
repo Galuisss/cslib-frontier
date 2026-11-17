@@ -13,21 +13,25 @@ public import CslibFrontier.Foundations.Quantum.RegularCompression
 import CslibFrontier.Foundations.LinearAlgebra.Matrix.Polar
 
 /-!
-# Robust Pauli rigidity
+# Compression of the Pauli family
 
-Unitaries `X(a)`, `Z(b)` on `ℂ^κ`, indexed by bit strings `a, b : ι → Bool`, that approximately
-satisfy the Pauli relations on a vector `ψ` are close on `ψ` to the Pauli strings on `n = |ι|`
-qubits: there is an isometry `W : ℂ^κ → ℂ^{2ⁿ} ⊗ ℂ^J` with
+A step toward robust Pauli rigidity, the analysis of the Pauli braiding test
+[Natarajan and Vidick, §4.2, Theorem 14][NatarajanVidick2017] (arXiv:1610.03574v1, p. 19). That
+theorem starts from consistency, linearity and anticommutation conditions of a strategy and
+produces exact Pauli operators close to each generator `X(a)`, `Z(b)` on an enlarged state. This
+file proves the compression bound behind it, for the products `X(a) Z(b)`. For unitaries `X(a)`,
+`Z(b)` on `ℂ^κ` and a vector `ψ` there is an isometry `W : ℂ^κ → ℂ^{2ⁿ} ⊗ ℂ^J` with
 
 `E_{a,b} ‖(X(a) Z(b) - Wᴴ (X^a Z^b ⊗ 1) W) ψ‖² ≤ E_{p,q} ‖(f(p) f(q) - f(pq)) ψ‖²`,
 
 where `f(s, a, b) = (-1)^s X(a) Z(b)` is the **Pauli family** on the Pauli group
-(`Cslib.Quantum.pauliFamily`) and the right side is its multiplicative defect
-(`Cslib.Quantum.exists_isometry_pauliFamily`). The error does not depend on `n`. This is the
-rigidity step of the analysis of the Pauli braiding test,
-[Natarajan and Vidick, §4.2, Theorem 14][NatarajanVidick2017] (arXiv:1610.03574v1), reached here
-by the stability route rather than through their linearity test; its hypothesis is the defect of
-the Pauli family rather than their consistency, linearity and anticommutation conditions.
+(`Cslib.Quantum.pauliFamily`), and the right side is its multiplicative defect
+(`Cslib.Quantum.exists_isometry_compress_pauliFamily`). The bound does not depend on `n`.
+
+Two steps toward Theorem 14 are not formalized here: bounding the defect of the Pauli family by
+the consistency, linearity and anticommutation conditions, and passing from the products to the
+individual generators. The bound alone does not certify the generators: `X(a) = -X^a`,
+`Z(b) = -Z^b` give the Pauli strings as products, with defect `0`, but `X(0) = Z(0) = -1`.
 
 The proof composes three steps:
 
@@ -51,7 +55,7 @@ The proof composes three steps:
 
 * `Cslib.Quantum.pauliFamily_pauliXPow_mul`: the Pauli strings are an exact representation.
 * `Cslib.Quantum.regularRep_negOne_mul_regularIsometry`: `g(-1) V = -V`.
-* `Cslib.Quantum.exists_isometry_pauliFamily`: robust Pauli rigidity in a vector state.
+* `Cslib.Quantum.exists_isometry_compress_pauliFamily`: the compression bound for the Pauli family.
 
 ## References
 
@@ -230,11 +234,13 @@ private theorem sum_pauliGroup (F : (ι → Bool) → (ι → Bool) → ℝ) :
   rw [← Fintype.sum_equiv equivProd.symm (fun t => F t.2.1 t.2.2) _ (fun _ => rfl),
     Fintype.sum_prod_type, Fintype.sum_bool, Fintype.sum_prod_type, two_mul]
 
-/-- **Robust Pauli rigidity in a vector state**: for unitaries `X(a)`, `Z(b)` on `ℂ^κ` and a
-vector `ψ`, there is an isometry `W : ℂ^κ → ℂ^{2ⁿ} ⊗ ℂ^J` under which the products `X(a) Z(b)` are
-close on `ψ`, on average, to the Pauli strings `X^a Z^b ⊗ 1`, with error the multiplicative
-defect of the Pauli family `(s, a, b) ↦ (-1)^s X(a) Z(b)` and no dependence on `n`. -/
-theorem exists_isometry_pauliFamily (X Z : (ι → Bool) → Matrix κ κ ℂ)
+/-- **Compression of the Pauli family**, a step toward robust Pauli rigidity
+[Natarajan and Vidick, §4.2, Theorem 14][NatarajanVidick2017]: for unitaries `X(a)`, `Z(b)` on
+`ℂ^κ` and a vector `ψ`, there is an isometry `W : ℂ^κ → ℂ^{2ⁿ} ⊗ ℂ^J` under which the products
+`X(a) Z(b)` are close on `ψ`, on average, to the Pauli strings `X^a Z^b ⊗ 1`, with error the
+multiplicative defect of the Pauli family `(s, a, b) ↦ (-1)^s X(a) Z(b)` and no dependence on
+`n`. -/
+theorem exists_isometry_compress_pauliFamily (X Z : (ι → Bool) → Matrix κ κ ℂ)
     (hX : ∀ a, (X a)ᴴ * X a = 1) (hZ : ∀ b, (Z b)ᴴ * Z b = 1) (ψ : EuclideanSpace ℂ κ) :
     ∃ (J : Type (max u v)) (_ : Fintype J) (_ : DecidableEq J)
       (W : Matrix ((ι → Bool) × J) κ ℂ), Wᴴ * W = 1 ∧
