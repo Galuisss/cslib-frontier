@@ -103,7 +103,7 @@ private theorem length_redirectEntry_le (e : Key × Act) (s : Option ℕ)
   · have hs' : s = some marker ∨ s = none := by simpa [vlift] using hs
     rcases hs' with rfl | rfl <;> rcases output with _ | output <;>
       rcases next with _ | next <;> rcases move with _ | _ | _ <;>
-      simp_all [redirectEntry, eKey_apply, eAct_apply, eTA, length_encList,
+      simp_all [redirectEntry, eKey_apply, eAct_apply, eTA,
         encUnary_apply, encSign, encOption, vmove, marker] <;> omega
   · by_cases hi : i = marker
     · simp [vlift, hi] at hs
@@ -111,7 +111,7 @@ private theorem length_redirectEntry_le (e : Key × Act) (s : Option ℕ)
       subst s
       rcases output with _ | output <;> rcases next with _ | next <;>
         rcases move with _ | _ | _ <;>
-        simp_all [redirectEntry, eKey_apply, eAct_apply, eTA, length_encList,
+        simp_all [redirectEntry, eKey_apply, eAct_apply, eTA,
           encUnary_apply, encSign, encOption, vmove, marker] <;> omega
 
 private theorem length_encList_redirect_le (d : Desc) :
@@ -140,29 +140,29 @@ private theorem length_prepEntry_le {d : Desc} {p : List Bool} {e : Key × Act}
   rcases he with ((⟨r, hr, rfl⟩ | ⟨⟨b, i⟩, hbi, r, hr, rfl⟩) | (rfl | rfl | rfl)) |
     (⟨s, hs, rfl⟩ | rfl)
   · rcases hr with rfl | rfl | rfl <;>
-      simp [eKey_apply, eAct_apply, eTA, length_encList, encUnary_apply, encSign,
+      simp [eKey_apply, eAct_apply, eTA, encUnary_apply, encSign,
         encOption, marker] <;> omega
   · rw [List.mem_zipIdx_iff_getElem?] at hbi
     have hi : i < p.length := by
       simpa only [List.length_reverse] using (List.getElem?_eq_some_iff.mp hbi).1
     have hbit : eBit b ≤ 1 := by cases b <;> decide
     rcases hr with rfl | rfl | rfl <;>
-      simp [eKey_apply, eAct_apply, eTA, length_encList, encUnary_apply, encSign,
+      simp [eKey_apply, eAct_apply, eTA, encUnary_apply, encSign,
         encOption] <;> omega
-  · simp [eKey_apply, eAct_apply, eTA, length_encList, encUnary_apply, encSign,
+  · simp [eKey_apply, eAct_apply, eTA, encUnary_apply, encSign,
       encOption]
     omega
-  · simp [eKey_apply, eAct_apply, eTA, length_encList, encUnary_apply, encSign,
+  · simp [eKey_apply, eAct_apply, eTA, encUnary_apply, encSign,
       encOption]
     omega
-  · simp [eKey_apply, eAct_apply, eTA, length_encList, encUnary_apply, encSign,
+  · simp [eKey_apply, eAct_apply, eTA, encUnary_apply, encSign,
       encOption]
     omega
   · rcases hs with rfl | rfl | rfl <;>
-      simp [eKey_apply, eAct_apply, eTA, length_encList, encUnary_apply, encSign,
+      simp [eKey_apply, eAct_apply, eTA, encUnary_apply, encSign,
         encOption]
     all_goals omega
-  · simp [eKey_apply, eAct_apply, eTA, length_encList, encUnary_apply, encSign,
+  · simp [eKey_apply, eAct_apply, eTA, encUnary_apply, encSign,
       encOption, marker]
     omega
 

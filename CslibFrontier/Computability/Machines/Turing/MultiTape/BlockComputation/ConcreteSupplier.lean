@@ -129,8 +129,7 @@ theorem start_inSpace (M : MultiTapeTM k Bool Q) (e : Q ≃ Fin s) :
   refine (budget_ite hnode hleft (budget_ite hgate hright hempty)).of_enc_eq ?_
   rintro ⟨context, params, tag, path, point, chunk⟩
   dsimp only [Function.comp_def]
-  simp only [QueryReplay.GateReply.encState, encSum_inl, RawController.encReply,
-    encPair_apply, encNat_apply]
+  simp only [QueryReplay.GateReply.encState, RawController.encReply]
   by_cases hz : tag = 0 <;> by_cases ho : tag = 1 <;> simp [start, hz, ho]
 
 end Turing.MultiTapePTM.BlockComputation.ConcreteSupplier

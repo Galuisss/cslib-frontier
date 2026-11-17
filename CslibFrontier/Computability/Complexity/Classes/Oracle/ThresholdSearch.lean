@@ -1221,7 +1221,7 @@ theorem length_encCNF_applyPartial_le (answers : List (Literal ℕ)) (φ : CNF �
       · simp only [List.filter_cons_of_pos hp, encList_cons, List.length_append]
         exact Nat.add_le_add_left ih _
       · simp only [List.filter_cons_of_neg hp]
-        exact ih.trans (by simp [encList_cons])
+        exact ih.trans (by simp )
   induction φ with
   | nil => simp [applyPartial, encCNF]
   | cons c cs ih =>

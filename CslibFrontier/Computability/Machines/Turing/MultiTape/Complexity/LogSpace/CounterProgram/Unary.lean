@@ -107,7 +107,7 @@ private theorem encPair_unary (a b : ℕ) :
 
 private theorem length_input (a b : ℕ) :
     (encPair encUnary encUnary (a, b)).length = 2 * a + 1 + b := by
-  simp [length_frame]
+  simp
 
 private theorem bounded4 {a₀ a₁ a₂ a₃ : ℕ} (h₀ : a₀ ≤ B) (h₁ : a₁ ≤ B) (h₂ : a₂ ≤ B)
     (h₃ : a₃ ≤ B) : ∀ x ∈ [a₀, a₁, a₂, a₃], x ≤ B := by

@@ -154,20 +154,20 @@ theorem computableInPolyTime_lyubashevskyExtractList :
     have hbit := ComputableInPolyTime.listGetD (encA := encBool) (encL := encBits) false
     apply ComputableInPolyTime.listAppend'
     · apply ComputableInPolyTime.mapWithInput (ComputableInPolyTime.range.comp (by fun_prop))
-      let A := (ℕ × ℕ) × ((List Bool × Option (List ℤ)) ×
-        (List Bool × Option (List ℤ)))
       let encA := encPair (encPair encUnary encUnary)
         (encPair (encPair encBits (encSilentOption (encList encIntBin)))
           (encPair encBits (encSilentOption (encList encIntBin))))
       have hindex := ComputableInPolyTime.snd encA encUnary
-      have hresponse {response : A × ℕ → Option (List ℤ)}
+      have hresponse {response :
+          ((ℕ × ℕ) × ((List Bool × Option (List ℤ)) ×
+            (List Bool × Option (List ℤ)))) × ℕ → Option (List ℤ)}
           (hr : ComputableInPolyTime response (encPair encA encUnary)
             (encSilentOption (encList encIntBin))) :
           ComputableInPolyTime (fun p => ((response p).getD []).getD p.2 0)
             (encPair encA encUnary) encIntBin :=
         hcoord.comp ((hget.comp (hr.prod (.const []))).prod hindex)
-      have hleft := hresponse (response := fun (p : A × ℕ) => p.1.2.1.2) (by fun_prop)
-      have hright := hresponse (response := fun (p : A × ℕ) => p.1.2.2.2) (by fun_prop)
+      have hleft := hresponse (response := fun p => p.1.2.1.2) (by fun_prop)
+      have hright := hresponse (response := fun p => p.1.2.2.2) (by fun_prop)
       exact (ComputableInPolyTime.intBin_sub.comp (hleft.prod hright) :)
     · apply ComputableInPolyTime.mapWithInput (ComputableInPolyTime.range.comp (by fun_prop))
       have hlookup := hbit
