@@ -31,10 +31,9 @@ the table among its arguments.
 
 * `tm_step`, `tm_step [defs, facts]`: prove an equality of configurations (`Turing.Cfg`,
   `Turing.MultiTapeMachine.Config`), leaving the cases that `simp` does not close as goals.
-* `tm_step_simps`, declared in
-  `CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step.Init` and filled here: the
-  simp set with which `tm_step` computes the fields of a configuration after an action, and the
-  values of a family of tapes at the indices it splits on.
+* `tm_step_simps`: the simp set with which `tm_step` computes the fields of a configuration after
+  an action, and the values of a family of tapes at the indices it splits on. It is declared in
+  `CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step.Init` and filled here.
 -/
 
 public section

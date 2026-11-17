@@ -4,7 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Samuel Schlesinger
 -/
 
-import CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step
+module
+-- upstream: local-only (tests of the tm_step tactic)
+
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step
 
 /-!
 # Steps and equalities of configurations with `tm_step`
@@ -13,6 +16,8 @@ One test for each way `tm_step` reads a goal: the step of a running and of a hal
 split of the index of the work tapes, a machine without work tapes, a move of the input head, a
 configuration with oracle channels, the goals it leaves, and its two errors.
 -/
+
+public section
 
 namespace CslibFrontierTests.TMStep
 
