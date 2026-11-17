@@ -217,7 +217,9 @@ theorem publicKeyInput_eq_direct (family : HashFamily) {p : SecurityBytes} (sig 
               have hi := (digits M i).isLt
               omega) := by
   unfold publicKeyInput
-  congr 1
+  apply congrArg blocksEquiv.symm
+  funext i
+  exact chainEndNodes_eq_chain family sig M publicSeed address haddress i
 
 /-- The result and source-call ledger of an instrumented Algorithm 8 invocation. -/
 structure PublicKeyFromSigRun (p : SecurityBytes) where
@@ -228,7 +230,6 @@ structure PublicKeyFromSigRun (p : SecurityBytes) where
 
 /-- Instrumented FIPS 205 Algorithm 8. The variable call counts are summed from the instrumented
 Algorithm 5 runs used to construct the actual compression input. -/
-@[expose]
 def wotsPkFromSigWithCalls (family : HashFamily) {p : SecurityBytes} (sig : Signature p)
     (M : Message p) (publicSeed : NBytes p) (address : Address)
     (haddress : ValidHashAddress address) : PublicKeyFromSigRun p :=
@@ -258,7 +259,6 @@ def wotsPkFromSigWithCalls (family : HashFamily) {p : SecurityBytes} (sig : Sign
       chainEndRuns_calls, chainCalls_fCalls, chainCalls_hashAddressWrites]
 
 /-- FIPS 205 Algorithm 8 (`wots_pkFromSig`) as the output projection of the instrumented run. -/
-@[expose]
 def wotsPkFromSig (family : HashFamily) {p : SecurityBytes} (sig : Signature p) (M : Message p)
     (publicSeed : NBytes p) (address : Address) (haddress : ValidHashAddress address) : NBytes p :=
   (wotsPkFromSigWithCalls family sig M publicSeed address haddress).output
@@ -269,7 +269,7 @@ theorem wotsPkFromSigWithCalls_output (family : HashFamily) {p : SecurityBytes}
     (haddress : ValidHashAddress address) :
     (wotsPkFromSigWithCalls family sig M publicSeed address haddress).output =
       wotsPkFromSig family sig M publicSeed address haddress :=
-  rfl
+  (rfl)
 
 /-- Algorithm 8 is visibly one `T_len` call over the canonical array of chain ends. -/
 theorem wotsPkFromSig_eq (family : HashFamily) {p : SecurityBytes} (sig : Signature p)
@@ -278,7 +278,7 @@ theorem wotsPkFromSig_eq (family : HashFamily) {p : SecurityBytes} (sig : Signat
     wotsPkFromSig family sig M publicSeed address haddress =
       tL family (len p) publicSeed (publicKeyAddress address)
         (publicKeyInput family sig M publicSeed address haddress) :=
-  rfl
+  (rfl)
 
 /-- Algorithm 8 expanded directly into its digit-selected chains, canonical block concatenation,
 address transition and final `T_len` call. This equation is the downstream unfolding interface;
