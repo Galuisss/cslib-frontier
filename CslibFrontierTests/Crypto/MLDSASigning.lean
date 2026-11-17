@@ -7,7 +7,8 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (test)
 
-import CslibFrontier.Crypto.Computational.MLDSA.SigningROM
+import CslibFrontier.Crypto.Computational.MLDSA.CommitmentCollision
+import CslibFrontier.Crypto.Computational.MLDSA.CompressedKeyOnly
 import Mathlib.Data.Fin.VecNotation
 import Mathlib.Tactic.FinCases
 
@@ -210,5 +211,12 @@ example : (interpret countTrials (expandSigningRetries toy 4 interleaved)).run 0
   simp only [expandSigningRetries, interleaved, hr, List.findSomeM?_cons, List.findSomeM?_nil,
     sumHandler, interpret_bind, interpret_query, countTrials, StateT.run, bind_pure_comp]
   rfl
+
+-- The two-mask ordinary MSIS solver stays within the classical fork radius at every
+-- FIPS parameter set, including the asymmetric upper endpoint of the signing mask.
+example : ∀ P ∈ [mldsa44, mldsa65, mldsa87],
+    max (2 * P.γ₁ - 1) (2 * P.γ₂) ≤ 2 * compressedSelfTargetRadius P 13 := by
+  simp only [List.mem_cons, List.not_mem_nil, or_false]
+  rintro P (rfl | rfl | rfl) <;> decide
 
 end MLDSASigningTests

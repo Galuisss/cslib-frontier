@@ -9,6 +9,8 @@ module
 
 public import CslibFrontier.Crypto.Computational.MLDSA.Signing
 public import CslibFrontier.Probability.RejectionSampling
+public import CslibFrontier.Languages.Probabilistic.Basic
+import CslibFrontier.Probability.PMF.Uniform
 import CslibFrontier.Probability.PMF.Bind
 
 /-!
@@ -32,6 +34,7 @@ public section
 namespace Cslib.Crypto.MLDSA
 
 open Cslib.Probability
+open scoped ENNReal
 
 variable (P : Params)
 
@@ -102,6 +105,42 @@ private theorem sub_mem_mask {v z : Fin P.ℓ → Fin P.n → ZMod P.q}
 noncomputable def signingMaskLaw (hγ : 0 < P.γ₁) : PMF (Fin P.ℓ → Fin P.n → ZMod P.q) :=
   PMF.uniformOfFinset (maskSet P) (mask_nonempty P hγ)
 
+/-- Draw an ideal signing mask using one uniform finite choice. -/
+noncomputable def sampleSigningMask (hγ : 0 < P.γ₁) : ProbComp (Fin P.ℓ → Fin P.n → ZMod P.q) :=
+  letI : Nonempty (maskSet P) := Finset.nonempty_coe_sort.mpr (mask_nonempty P hγ)
+  Subtype.val <$> ProbComp.uniform (maskSet P)
+
+@[simp] theorem eval_sampleSigningMask (hγ : 0 < P.γ₁) :
+    (sampleSigningMask P hγ).eval = signingMaskLaw P hγ := by
+  let : Nonempty (maskSet P) := Finset.nonempty_coe_sort.mpr (mask_nonempty P hγ)
+  simp only [sampleSigningMask, ProbComp.eval_map, ProbComp.eval_uniform, signingMaskLaw,
+    Probability.PMF.uniformOfFintype_finset_map_val]
+
+/-- Every lifted coefficient of a supported signing mask belongs to `(-γ₁,γ₁]`. -/
+theorem signingMaskLaw_support_bounds [NeZero P.q] {hγ : 0 < P.γ₁} (hq : 2 * P.γ₁ < P.q)
+    {y : Fin P.ℓ → Fin P.n → ZMod P.q} (hy : y ∈ (signingMaskLaw P hγ).support) (i j) :
+    1 - (P.γ₁ : ℤ) ≤ (y i j).valMinAbs ∧ (y i j).valMinAbs ≤ P.γ₁ := by
+  rw [signingMaskLaw, PMF.mem_support_uniformOfFinset_iff, mem_intervalVectors] at hy
+  obtain ⟨x, ⟨hl, hu⟩, hx⟩ := hy i j
+  have he : (y i j).valMinAbs = x := (ZMod.valMinAbs_spec _ _).2 ⟨hx.symm, by
+    exact ⟨by lia, by lia⟩⟩
+  rw [he]
+  exact ⟨hl, hu⟩
+
+private theorem mask_card [NeZero P.q] (hγ : 0 < P.γ₁) (hq : 2 * P.γ₁ < P.q) :
+    (maskSet P).card = (2 * P.γ₁) ^ (P.ℓ * P.n) := by
+  rw [intervalVectors_card P (by lia) (by lia)]
+  congr 1
+  lia
+
+/-- A specified mask occurs with probability at most the reciprocal of the box size. -/
+theorem signingMaskLaw_apply_le [NeZero P.q] (hγ : 0 < P.γ₁) (hq : 2 * P.γ₁ < P.q)
+    (y : Fin P.ℓ → Fin P.n → ZMod P.q) :
+    signingMaskLaw P hγ y ≤ (↑((2 * P.γ₁) ^ (P.ℓ * P.n)) : ℝ≥0∞)⁻¹ := by
+  classical
+  simp only [signingMaskLaw, PMF.uniformOfFinset_apply, mask_card P hγ hq]
+  split <;> simp
+
 /-- The signing attempt with an ideal, coefficientwise uniform mask and the given fresh
 challenge. On success it emits the high bits of the original commitment `A y` and the
 signature returned by Algorithm 7's two rejection stages. -/
@@ -149,10 +188,7 @@ theorem freshSigningAttempt_eq_simulate (hP : P.Valid) (hq : 2 * P.γ₁ < P.q)
     sub_mem_mask P ((mem_response_iff P hq z).1 hz) hv
   have hgate := PMF.shiftReject_eq_sampleWithRatio (hB := mask_nonempty P (by lia)) hpre
     (response_nonempty P hβ)
-  have hm : (maskSet P).card = (2 * P.γ₁) ^ (P.ℓ * P.n) := by
-    rw [intervalVectors_card P (by lia) (by lia)]
-    congr 1
-    lia
+  have hm := mask_card P (by lia) hq
   have hr : (responseSet P).card = (2 * (P.γ₁ - P.β) - 1) ^ (P.ℓ * P.n) := by
     rw [intervalVectors_card P (by lia) (by lia)]
     congr 1
