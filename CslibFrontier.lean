@@ -1180,6 +1180,7 @@ public import CslibFrontier.Computability.Circuit.Boolean.DuplicateFlags
 public import CslibFrontier.Computability.Circuit.Boolean.ElementDistinctness
 public import CslibFrontier.Computability.Circuit.Boolean.Encoding
 public import CslibFrontier.Computability.Circuit.Boolean.Encoding.Certificate
+public import CslibFrontier.Computability.Circuit.Boolean.Encoding.PolyTime
 public import CslibFrontier.Computability.Circuit.Boolean.EncodingSize
 public import CslibFrontier.Computability.Circuit.Boolean.Equality
 public import CslibFrontier.Computability.Circuit.Boolean.EvaluationTime
@@ -3338,6 +3339,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.B
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.PolynomialPadding
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.PolynomialQueries
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.Preprocess
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.Sigma
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.Sum
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.TwoPow
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.ZipFold
@@ -3507,6 +3509,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.P
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.RotationMap.TowerTable
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.RotationMap.TowerTable.Family
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.RotationMap.Walk
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Sigma
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Sum
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Tape
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Window
@@ -3586,6 +3589,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Pa
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Pair.Projections
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Pi
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Rat
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Sigma
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.StepMachine
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.StepMachineComp
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.StreamFold

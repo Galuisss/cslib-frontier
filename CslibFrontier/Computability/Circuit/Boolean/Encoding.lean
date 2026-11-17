@@ -12,7 +12,7 @@ public import CslibFrontier.Computability.Circuit.WireNumber
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Primitives
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.List
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Nat
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Pair
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Sigma
 import Mathlib.Data.List.GetD
 import CslibFrontier.Tactic.EncLen
 
@@ -406,8 +406,8 @@ abbrev encCode {Op : Type} (encOp : Op ↪ List Bool) : (List (Op × List ℕ) �
 variable {σ : Signature}
 
 /-- **Binary encoding of circuits** with `m` outputs over an arbitrary signature `σ` equipped with
-`encOp : σ.Op ↪ List Bool`: the input count `n` in unary, followed by the code of the circuit
-(`encCode encOp`). -/
+`encOp : σ.Op ↪ List Bool`: the dependent pair (`Turing.MultiTapeTM.encSigma`) of the input count
+`n` in unary and the circuit, which is encoded by its code (`encCode encOp`). -/
 def encCircuit (encOp : σ.Op ↪ List Bool) (m : ℕ) : (Σ n, Circuit σ n m) ↪ List Bool :=
   Cslib.Encoding.encSigma encUnary fun n =>
     (⟨Circuit.code, Circuit.code_injective⟩ : Circuit σ n m ↪ _).trans (encCode encOp)
