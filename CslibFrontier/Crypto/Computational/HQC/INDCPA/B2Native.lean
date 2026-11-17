@@ -235,9 +235,11 @@ distinguishes precisely the complete `[hidden bit | u | v]` labels emitted by th
 identity retains an arbitrary reference register and permits a branch-dependent continuation
 selected by the full reply; no product-state or independence hypothesis is used.
 
-This is the service-level density identity.  Connecting its two coherent records and continuation
-to the physical controller register blocks, and then to the final comparison measurement, are
-separate obligations; this statement is not the native B2 success-law or a security theorem. -/
+The original hidden register is part of the discarded service environment, rather than being
+duplicated in the output. The continuation acts only on the saved reference factor; in the B2
+controller this is where the saved first-stage state and inaccessible reference live. Connecting
+this identity to the physical reply-copy block, and then to the final comparison measurement,
+remain separate obligations; this is not the native B2 success-law or a security theorem. -/
 theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
     (securityParameter : ℕ)
     (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen)
@@ -245,7 +247,7 @@ theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
     (messages : MessagePair (PKEMessage P))
     {Reference ι' : Type*} [Fintype Reference] [DecidableEq Reference]
     (V : (Fin (1 + (P.n + P.codeLen)) → Bool) →
-      Matrix ι' (Bool × Reference) ℂ)
+      Matrix ι' Reference ℂ)
     (ρ : Matrix (Bool × Reference) (Bool × Reference) ℂ) :
     let serviceInput : Bool →
         Fin (b2ServiceDescription P securityParameter encoder).width → Bool :=
@@ -253,32 +255,34 @@ theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
         inputState (b2ServiceDescription P securityParameter encoder).width
           (encPair encUnary encBits (securityParameter, sample.toWord) ++
             List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [hidden])
-    let serviceEnvironment : (Bool × Reference) →
+    let serviceEnvironment : Bool →
         (Fin (b2ServiceDescription P securityParameter encoder).width → Bool) :=
-      fun p => classicalRun (b2ServiceCodes P securityParameter encoder) (serviceInput p.1)
-    let serviceReply : (Bool × Reference) → Fin (1 + (P.n + P.codeLen)) → Bool :=
-      fun p =>
-        let environment := serviceEnvironment p
+      fun hidden => classicalRun (b2ServiceCodes P securityParameter encoder)
+        (serviceInput hidden)
+    let serviceReply : Bool → Fin (1 + (P.n + P.codeLen)) → Bool :=
+      fun hidden =>
+        let environment := serviceEnvironment hidden
         let ciphertext := b2ServiceReadout P environment
         Fin.append
           (fun _ : Fin 1 => readBit environment
             (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k))
           (Fin.append ciphertext.u ciphertext.v)
-    let fullReply : (Bool × Reference) → Fin (1 + (P.n + P.codeLen)) → Bool :=
-      fun p =>
+    let fullReply : Bool → Fin (1 + (P.n + P.codeLen)) → Bool :=
+      fun hidden =>
         let ciphertext := sample.toPKECiphertext P
-          (encoder.eval interpretation) (messages.select p.1)
-        Fin.append (fun _ : Fin 1 => p.1) (Fin.append ciphertext.u ciphertext.v)
+          (encoder.eval interpretation) (messages.select hidden)
+        Fin.append (fun _ : Fin 1 => hidden) (Fin.append ciphertext.u ciphertext.v)
     partialTraceLeft
         (densityConj
           (((1 : Matrix
                 (Fin (b2ServiceDescription P securityParameter encoder).width → Bool)
                 (Fin (b2ServiceDescription P securityParameter encoder).width → Bool) ℂ) ⊗ₖ
               (Matrix.blockDiagonal V).submatrix Prod.swap Prod.swap) *
-            (coherentRecord (serviceEnvironment ∘ Prod.snd) *
-              coherentRecord serviceReply)) ρ) =
+            coherentEnvironmentRecord serviceEnvironment serviceReply) ρ) =
       ∑ reply, (pureState (ket reply) ⊗ₖ
-        densityConj (V reply) (classicalDensityBranch fullReply reply ρ)) := by
+        densityConj (V reply)
+          (partialTraceLeft
+            (classicalDensityBranch (fullReply ∘ Prod.fst) reply ρ))) := by
   classical
   dsimp only
   have hfit (hidden : Bool) :
@@ -321,42 +325,46 @@ theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
     rw [readBit_classicalRun_b2ServiceCodes_quantumInput P securityParameter encoder _
       ⟨2 * P.k, by omega⟩, hinputHidden]
   have hserviceReply :
-      (fun p : Bool × Reference =>
+      (fun hidden : Bool =>
         let environment := classicalRun (b2ServiceCodes P securityParameter encoder)
           (inputState (b2ServiceDescription P securityParameter encoder).width
             (encPair encUnary encBits (securityParameter, sample.toWord) ++
-              List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [p.1]))
+              List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [hidden]))
         let ciphertext := b2ServiceReadout P environment
         Fin.append
           (fun _ : Fin 1 => readBit environment
             (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k))
           (Fin.append ciphertext.u ciphertext.v)) =
-        (fun p : Bool × Reference =>
+        (fun hidden : Bool =>
           let ciphertext := sample.toPKECiphertext P
-            (encoder.eval interpretation) (messages.select p.1)
-          Fin.append (fun _ : Fin 1 => p.1) (Fin.append ciphertext.u ciphertext.v)) := by
-    funext p
+            (encoder.eval interpretation) (messages.select hidden)
+          Fin.append (fun _ : Fin 1 => hidden) (Fin.append ciphertext.u ciphertext.v)) := by
+    funext hidden
     dsimp only
     rw [hserviceHidden]
-    rw [b2ServiceReadout_classicalRun P securityParameter encoder sample messages p.1]
+    rw [b2ServiceReadout_classicalRun P securityParameter encoder sample messages hidden]
   rw [hserviceReply]
-  apply partialTraceLeft_densityConj_controlled_environmentRecord
-  rintro ⟨hiddenLeft, _referenceLeft⟩ ⟨hiddenRight, _referenceRight⟩
-  constructor
-  · intro henvironment
-    have hhidden := congrArg
-      (fun state => readBit state
-        (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k))
-      henvironment
-    rw [hserviceHidden hiddenLeft, hserviceHidden hiddenRight] at hhidden
-    subst hiddenRight
-    rfl
-  · intro hreply
-    have hhidden : hiddenLeft = hiddenRight := by
-      have h := congrFun hreply
-        (Fin.castAdd (P.n + P.codeLen) (0 : Fin 1))
-      simpa only [Fin.append_left] using h
-    subst hiddenRight
-    rfl
+  apply partialTraceLeft_densityConj_controlled_coherentEnvironmentRecord
+  · intro hiddenLeft hiddenRight
+    constructor
+    · intro henvironment
+      have hhidden := congrArg
+        (fun state => readBit state
+          (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k))
+        henvironment
+      rw [hserviceHidden hiddenLeft, hserviceHidden hiddenRight] at hhidden
+      subst hiddenRight
+      rfl
+    · intro hreply
+      have hhidden : hiddenLeft = hiddenRight := by
+        have h := congrFun hreply
+          (Fin.castAdd (P.n + P.codeLen) (0 : Fin 1))
+        simpa only [Fin.append_left] using h
+      subst hiddenRight
+      rfl
+  · intro hiddenLeft hiddenRight hreply
+    have h := congrFun hreply
+      (Fin.castAdd (P.n + P.codeLen) (0 : Fin 1))
+    simpa only [Fin.append_left] using h
 
 end Cslib.Crypto.HQC

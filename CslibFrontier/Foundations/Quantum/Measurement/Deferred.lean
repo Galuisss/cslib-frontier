@@ -30,6 +30,8 @@ original formalization infrastructure.
 
 * `Cslib.Quantum.coherentRecord`: the rectangular matrix that coherently records a classical
   label in a fresh register.
+* `Cslib.Quantum.coherentEnvironmentRecord`: replace a hidden classical register by its
+  reversible environment, record a complete label and retain an arbitrary reference.
 
 ## Main results
 
@@ -41,9 +43,12 @@ original formalization infrastructure.
   discarding one copy retains the other as a classical branch label.
 * `Cslib.Quantum.partialTraceLeft_densityConj_controlled_coherentRecord_twice`: the retained
   full label controls a branch-dependent continuation and remains in the joint output.
-* `Cslib.Quantum.partialTraceLeft_densityConj_controlled_environmentRecord`: an orthogonal
-  discarded environment may replace the second label copy when it distinguishes exactly the
-  same full-label branches.
+* `Cslib.Quantum.partialTraceLeft_densityConj_coherentEnvironmentRecord`: replacing a hidden
+  register by an injective environment and tracing that environment gives the full-label
+  classical branches with the hidden register discarded.
+* `Cslib.Quantum.partialTraceLeft_densityConj_controlled_coherentEnvironmentRecord`: replacing a
+  hidden register by an equivalent environment leaves the recorded label and a continuation on
+  the reference.
 -/
 
 public section
@@ -59,6 +64,14 @@ variable {ι A : Type*} [Fintype ι] [DecidableEq ι] [DecidableEq A]
 index `i`.  Thus column `i` is the basis vector `(f i, i)`. -/
 @[expose] def coherentRecord (f : ι → A) : Matrix (A × ι) ι ℂ :=
   fun p i => if p = (f i, i) then 1 else 0
+
+/-- Replace a hidden classical basis register by its reversible environment, record a complete
+classical label, and retain a separate reference register. Unlike `coherentRecord`, this matrix
+does not retain the hidden input as an additional output factor. -/
+@[expose] def coherentEnvironmentRecord {H R S B : Type*}
+    [DecidableEq S] [DecidableEq B] [DecidableEq R]
+    (env : H → S) (f : H → B) : Matrix (S × (B × R)) (H × R) ℂ :=
+  fun p i => if p = (env i.1, (f i.1, i.2)) then 1 else 0
 
 /-- The coherent classical-record matrix has orthonormal columns. -/
 theorem coherentRecord_isometry [Fintype A] (f : ι → A) :
@@ -152,6 +165,75 @@ theorem densityConj_blockDiagonal_swap_kronecker {ι' : Type*} [Fintype A]
     Matrix.blockDiagonal_apply, pureState_apply, ket_apply, kroneckerMap_apply]
   split_ifs <;> simp_all
 
+/-- Replacing an injectively encoded hidden basis register by its environment and tracing that
+environment gives the classical full-label branches, with the hidden register itself discarded.
+The reference may be entangled with the hidden register; no product-state or normalization
+hypothesis is used. -/
+theorem partialTraceLeft_densityConj_coherentEnvironmentRecord
+    {H R S B : Type*} [Fintype H] [Fintype R] [Fintype S] [Fintype B]
+    [DecidableEq H] [DecidableEq R] [DecidableEq S] [DecidableEq B]
+    (env : H → S) (f : H → B)
+    (henv : ∀ left right, env left = env right ↔ f left = f right)
+    (hf : Function.Injective f) (ρ : Matrix (H × R) (H × R) ℂ) :
+    partialTraceLeft (densityConj (coherentEnvironmentRecord env f) ρ) =
+      ∑ y, pureState (ket y) ⊗ₖ
+        partialTraceLeft (classicalDensityBranch (f ∘ Prod.fst) y ρ) := by
+  classical
+  have henvInjective : Function.Injective env := fun left right h =>
+    hf ((henv left right).mp h)
+  ext ⟨y, r⟩ ⟨z, q⟩
+  have hsum :
+      if y = z then
+        (∑ x : H, if z = f x then ρ (x, r) (x, q) else 0) =
+          ∑ i : S, ∑ x : H,
+            if i = env x then
+              if z = f x then
+                ∑ x' : H,
+                  if i = env x' then
+                    if y = f x' then ρ (x', r) (x, q) else 0
+                  else 0
+              else 0
+            else 0
+      else
+        0 = ∑ i : S, ∑ x : H,
+          if i = env x then
+            if z = f x then
+              ∑ x' : H,
+                if i = env x' then
+                  if y = f x' then ρ (x', r) (x, q) else 0
+                else 0
+            else 0
+          else 0 := by
+    by_cases hyz : y = z
+    · simp only [hyz, ite_true]
+      subst z
+      conv_rhs =>
+        rw [Finset.sum_comm (s := (Finset.univ : Finset S))
+          (t := (Finset.univ : Finset H))]
+      simp only [henvInjective.eq_iff, Fintype.sum_ite_eq, Fintype.sum_ite_eq']
+      apply Finset.sum_congr rfl
+      intro x _
+      by_cases hx : y = f x
+      · simp only [hx, ite_true]
+      · simp only [hx, ite_false]
+    · simp only [hyz, ite_false]
+      conv_rhs =>
+        rw [Finset.sum_comm (s := (Finset.univ : Finset S))
+          (t := (Finset.univ : Finset H))]
+      simp only [henvInjective.eq_iff, Fintype.sum_ite_eq, Fintype.sum_ite_eq']
+      rw [eq_comm]
+      apply Finset.sum_eq_zero
+      intro x _
+      by_cases hzx : z = f x
+      · have hyf : y ≠ f x := fun hyf => hyz (hyf.trans hzx.symm)
+        simp only [hzx, hyf, ↓reduceIte]
+      · simp only [hzx, ↓reduceIte]
+  simpa [partialTraceLeft_apply, densityConj_apply, Matrix.mul_apply,
+    coherentEnvironmentRecord, Matrix.conjTranspose_apply, Fintype.sum_prod_type,
+    Matrix.sum_apply, pureState_apply, ket_apply, classicalDensityBranch_apply,
+    ite_and, eq_comm, apply_ite, ite_mul, one_mul, mul_one, zero_mul, mul_zero,
+    Finset.sum_ite_irrel, Finset.sum_const_zero] using hsum
+
 /-- **Deferred full-label readout followed by a controlled continuation.** Record the complete
 label twice, discard one orthogonal copy, and apply the label-selected rectangular map to the
 retained input.  The retained label remains classical and correlated with the complete evolved
@@ -174,71 +256,28 @@ theorem partialTraceLeft_densityConj_controlled_coherentRecord_twice {ι' : Type
   intro y _
   rw [densityConj_blockDiagonal_swap_kronecker]
 
-private theorem sum_ite_eq_pair {X : Type*} [Fintype X] [DecidableEq X]
-    (a b : X) (c : ℂ) :
-    (∑ x, if x = a ∧ x = b then c else 0) = if a = b then c else 0 := by
-  by_cases hab : a = b
-  · subst b
-    simp
-  · simp only [hab, ↓reduceIte]
-    apply Finset.sum_eq_zero
-    intro x _
-    split_ifs with hx
-    · exact (hab (hx.1.symm.trans hx.2)).elim
-    · rfl
-
-/-- **Deferred full-label readout with an equivalent discarded environment.** The discarded
-environment record `env` may differ from the retained label `f`, provided equality of environment
-states is equivalent to equality of complete labels. This preserves all coherence within a label
-branch and removes exactly the cross-label terms. The retained full label then controls the same
-branch-dependent continuation as in
-`partialTraceLeft_densityConj_controlled_coherentRecord_twice`.
-
-This form applies when a reversible service leaves an orthogonal garbage state while a separate
-record stores the service's complete classical reply. -/
-theorem partialTraceLeft_densityConj_controlled_environmentRecord
-    {S ι' : Type*} [Fintype A] [Fintype S] [DecidableEq S]
-    (f : ι → A) (env : ι → S) (henv : ∀ i j, env i = env j ↔ f i = f j)
-    (V : A → Matrix ι' ι ℂ) (ρ : Matrix ι ι ℂ) :
+/-- **A reversible environment may replace the hidden label register.** The environment and
+recorded full label distinguish the same hidden branches, and the full label is injective. After
+discarding the environment, a label-controlled continuation acts only on the retained reference;
+the hidden register is not duplicated in the output. This is the deferred-measurement form for
+an actual reversible service followed by a protected classical reply record. -/
+theorem partialTraceLeft_densityConj_controlled_coherentEnvironmentRecord
+    {H R S B ι' : Type*} [Fintype H] [Fintype R] [Fintype S] [Fintype B]
+    [DecidableEq H] [DecidableEq R] [DecidableEq S] [DecidableEq B]
+    (env : H → S) (f : H → B)
+    (henv : ∀ left right, env left = env right ↔ f left = f right)
+    (hf : Function.Injective f) (V : B → Matrix ι' R ℂ)
+    (ρ : Matrix (H × R) (H × R) ℂ) :
     partialTraceLeft
         (densityConj
           (((1 : Matrix S S ℂ) ⊗ₖ
               (Matrix.blockDiagonal V).submatrix Prod.swap Prod.swap) *
-            (coherentRecord (env ∘ Prod.snd) * coherentRecord f)) ρ) =
-      ∑ y, (pureState (ket y) ⊗ₖ
-        densityConj (V y) (classicalDensityBranch f y ρ)) := by
-  rw [densityConj_mul, partialTraceLeft_densityConj_one_kronecker]
-  have hrecord :
-      partialTraceLeft
-          (densityConj (coherentRecord (env ∘ Prod.snd) * coherentRecord f) ρ) =
-        partialTraceLeft
-          (densityConj
-            (coherentRecord (Prod.fst : A × ι → A) * coherentRecord f) ρ) := by
-    rw [densityConj_mul, densityConj_mul]
-    ext ⟨y, i⟩ ⟨z, j⟩
-    simp only [partialTraceLeft_apply, densityConj_coherentRecord_apply,
-      Function.comp_apply]
-    rw [sum_ite_eq_pair (X := S) (env i) (env j)
-      (if y = f i ∧ z = f j then ρ i j else 0)]
-    rw [sum_ite_eq_pair (X := A) y z
-      (if y = f i ∧ z = f j then ρ i j else 0)]
-    by_cases h : env i = env j
-    · have hf := (henv i j).mp h
-      simp only [h, ↓reduceIte]
-      by_cases hyz : y = z
-      · simp only [hyz, ↓reduceIte]
-      · have hc : ¬(y = f i ∧ z = f j) := fun hc =>
-          hyz (hc.1.trans (hf.trans hc.2.symm))
-        simp only [hyz, hc, ↓reduceIte]
-    · have hf : f i ≠ f j := fun hf => h ((henv i j).mpr hf)
-      simp only [h, ↓reduceIte]
-      by_cases hyz : y = z
-      · subst z
-        have hc : ¬(y = f i ∧ y = f j) := fun hc =>
-          hf (hc.1.symm.trans hc.2)
-        simp only [hc, ↓reduceIte]
-      · simp only [hyz, ↓reduceIte]
-  rw [hrecord, partialTraceLeft_densityConj_coherentRecord_twice, map_sum]
+            coherentEnvironmentRecord env f) ρ) =
+      ∑ y, pureState (ket y) ⊗ₖ
+        densityConj (V y)
+          (partialTraceLeft (classicalDensityBranch (f ∘ Prod.fst) y ρ)) := by
+  rw [densityConj_mul, partialTraceLeft_densityConj_one_kronecker,
+    partialTraceLeft_densityConj_coherentEnvironmentRecord env f henv hf, map_sum]
   apply Finset.sum_congr rfl
   intro y _
   rw [densityConj_blockDiagonal_swap_kronecker]
