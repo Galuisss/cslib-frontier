@@ -12,8 +12,9 @@ import CslibFrontier.Foundations.Quantum.LocalOrthogonalization
 /-! # Local orthogonalization
 
 Checked clients: pulling a joint state back to a party, simultaneous local orthogonalization with
-commuting results, and the local character corollary. A concrete instance: a projective local
-measurement satisfies the hypothesis with defect `0` in every joint state, so it is matched exactly.
+commuting results, and the local character corollary. A zero-defect client: a projective local
+measurement satisfies the hypothesis with defect `0` in every joint state, so it has a projective
+partner at zero distance in the joint state's seminorm.
 -/
 
 set_option linter.privateModule false
@@ -28,7 +29,7 @@ variable {ι κ α β : Type} [Fintype ι] [DecidableEq ι] [Fintype κ] [Decida
 
 /-- The pulled-back state evaluates the first party's observable as `M ⊗ 1`. -/
 example (φ : AlgState (Matrix (ι × κ) (ι × κ) ℂ)) (M : Matrix ι ι ℂ) :
-    φ.comap kroneckerOne monotone_kroneckerOne M = φ (M ⊗ₖ 1) :=
+    φ.comap kroneckerOne (OrderHomClass.mono _) M = φ (M ⊗ₖ 1) :=
   rfl
 
 /-- **Simultaneous local orthogonalization**, with commuting results. -/
@@ -53,8 +54,9 @@ example {n : Type} [Fintype n] [DecidableEq n] (φ : AlgState (Matrix (ι × κ)
       𝔼 a, φ.norm ((M.charObs a - P.charObs a) ⊗ₖ 1) ^ 2 ≤ 9 * ε :=
   Measurement.exists_isProjective_charObs_kroneckerOne φ M hε
 
-/-- **Concrete instance.** A projective measurement of the first party has defect `0` in every
-joint state, so local orthogonalization matches it exactly. -/
+/-- **Zero defect.** A projective measurement of the first party has defect `0` in every joint
+state, so local orthogonalization gives a projective measurement at zero distance in the joint
+state's seminorm. -/
 example (φ : AlgState (Matrix (ι × κ) (ι × κ) ℂ)) (M : Measurement α (Matrix ι ι ℂ))
     (hM : M.IsProjective) :
     ∃ P : Measurement α (Matrix ι ι ℂ), P.IsProjective ∧
@@ -63,7 +65,6 @@ example (φ : AlgState (Matrix (ι × κ) (ι × κ) ℂ)) (M : Measurement α (
     simp_rw [hM _]
     rw [← Complex.re_sum, ← map_sum, ← map_sum, M.sum_effect, map_one, φ.map_one, sub_zero,
       Complex.one_re]
-  simpa using Measurement.exists_isProjective_sum_norm_map_sub_sq_le φ kroneckerOne
-    monotone_kroneckerOne M h1
+  simpa using Measurement.exists_isProjective_sum_norm_map_sub_sq_le φ kroneckerOne M h1
 
 end CslibFrontierTests.LocalOrthogonalization

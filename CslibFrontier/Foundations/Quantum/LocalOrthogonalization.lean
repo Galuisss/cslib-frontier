@@ -20,11 +20,12 @@ factor*, so that the two parties' operators still commute. De la Salle's theorem
 factor, so it suffices to pull the joint state back to the factor.
 
 * `Cslib.Quantum.AlgState.comap` pulls a state back along a monotone star-algebra homomorphism `f`,
-  with `‖a‖_{φ ∘ f} = ‖f a‖_φ` (`Cslib.Quantum.AlgState.norm_comap`). Pulling back along `f`
-  carries orthogonalization from the factor into the image of `f`
+  with `‖a‖_{φ ∘ f} = ‖f a‖_φ` (`Cslib.Quantum.AlgState.norm_comap`). A star-algebra
+  homomorphism out of `M_ι(ℂ)` into a star-ordered algebra is monotone (Mathlib's
+  `StarRingHomClass.instOrderHomClass`), so pulling back along it carries orthogonalization from
+  the factor into its image
   (`Cslib.Quantum.Measurement.exists_isProjective_sum_norm_map_sub_sq_le`).
-* The local embeddings `M ↦ M ⊗ 1` and `M ↦ 1 ⊗ M` are monotone
-  (`Cslib.Quantum.monotone_kroneckerOne`, `Cslib.Quantum.monotone_oneKronecker`), so both parties
+* Applied to the local embeddings `M ↦ M ⊗ 1` and `M ↦ 1 ⊗ M`, both parties
   orthogonalize at once, into projective measurements whose operators commute across the parties
   (`Cslib.Quantum.Measurement.exists_isProjective_local`).
 * Character observables are linear in the effects, so the local version of
@@ -39,7 +40,7 @@ cslib-community/cslib-frontier#6149.
 ## Main results
 
 * `Cslib.Quantum.Measurement.exists_isProjective_sum_norm_map_sub_sq_le`: orthogonalization
-  through a monotone star-algebra homomorphism.
+  through a star-algebra homomorphism.
 * `Cslib.Quantum.Measurement.exists_isProjective_local`: simultaneous local orthogonalization of
   both parties' measurements, with commuting projective measurements.
 * `Cslib.Quantum.Measurement.exists_isProjective_charObs_kroneckerOne`: unitary, exactly linear
@@ -61,33 +62,22 @@ open scoped Kronecker MatrixOrder ComplexOrder BigOperators
 
 variable {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
 
-/-- The embedding `M ↦ M ⊗ 1` is monotone. -/
-theorem monotone_kroneckerOne : Monotone (kroneckerOne (ι := ι) (κ := κ)) := fun M N h => by
-  rw [Matrix.le_iff] at h ⊢
-  rw [← map_sub, kroneckerOne_apply]
-  exact h.kronecker PosSemidef.one
-
-/-- The embedding `M ↦ 1 ⊗ M` is monotone. -/
-theorem monotone_oneKronecker : Monotone (oneKronecker (ι := ι) (κ := κ)) := fun M N h => by
-  rw [Matrix.le_iff] at h ⊢
-  rw [← map_sub, oneKronecker_apply]
-  exact PosSemidef.one.kronecker h
-
 namespace Measurement
 
 variable {α β : Type*} [Fintype α] [Fintype β]
 
-/-- **Orthogonalization through a homomorphism.** If `f` is a monotone star-algebra homomorphism
+/-- **Orthogonalization through a homomorphism.** If `f` is a star-algebra homomorphism
 out of `M_ι(ℂ)` and the measurement `M` on `ℂ^ι` has `φ(f(∑_a M_a²)) ≥ 1 - ε`, then a projective
 measurement `P` on `ℂ^ι` has `∑_a ‖f (M_a - P_a)‖²_φ ≤ 9ε`. -/
 theorem exists_isProjective_sum_norm_map_sub_sq_le {B : Type*} [Ring B] [StarRing B]
     [PartialOrder B] [StarOrderedRing B] [Algebra ℂ B] [StarModule ℂ B] [SelfAdjointDecompose B]
-    (φ : AlgState B) (f : Matrix ι ι ℂ →⋆ₐ[ℂ] B) (hf : Monotone f)
+    (φ : AlgState B) (f : Matrix ι ι ℂ →⋆ₐ[ℂ] B)
     (M : Measurement α (Matrix ι ι ℂ)) {ε : ℝ}
     (hε : 1 - ε ≤ ∑ a, (φ (f (M.effect a * M.effect a))).re) :
     ∃ P : Measurement α (Matrix ι ι ℂ), P.IsProjective ∧
       ∑ a, φ.norm (f (M.effect a - P.effect a)) ^ 2 ≤ 9 * ε := by
-  obtain ⟨P, hP, h⟩ := exists_isProjective_sum_norm_sub_sq_le_of_le (φ.comap f hf) M hε
+  obtain ⟨P, hP, h⟩ :=
+    exists_isProjective_sum_norm_sub_sq_le_of_le (φ.comap f (OrderHomClass.mono f)) M hε
   refine ⟨P, hP, ?_⟩
   simpa only [AlgState.norm_comap] using h
 
@@ -106,9 +96,9 @@ theorem exists_isProjective_local (φ : AlgState (Matrix (ι × κ) (ι × κ) �
       ∑ b, φ.norm (1 ⊗ₖ (N.effect b - R.effect b)) ^ 2 ≤ 9 * ε' ∧
       ∀ a b, Commute (P.effect a ⊗ₖ (1 : Matrix κ κ ℂ)) ((1 : Matrix ι ι ℂ) ⊗ₖ R.effect b) := by
   obtain ⟨P, hP, hMP⟩ :=
-    exists_isProjective_sum_norm_map_sub_sq_le φ kroneckerOne monotone_kroneckerOne M hε
+    exists_isProjective_sum_norm_map_sub_sq_le φ kroneckerOne M hε
   obtain ⟨R, hR, hNR⟩ :=
-    exists_isProjective_sum_norm_map_sub_sq_le φ oneKronecker monotone_oneKronecker N hε'
+    exists_isProjective_sum_norm_map_sub_sq_le φ oneKronecker N hε'
   refine ⟨P, R, hP, hR, ?_, ?_, fun a b => commute_kroneckerOne_oneKronecker _ _⟩
   · simpa only [kroneckerOne_apply] using hMP
   · simpa only [oneKronecker_apply] using hNR
@@ -126,7 +116,7 @@ theorem exists_isProjective_charObs_kroneckerOne {n : Type*} [Fintype n] [Decida
       (∀ a a', P.charObs a * P.charObs a' = P.charObs (a + a')) ∧
       𝔼 a, φ.norm ((M.charObs a - P.charObs a) ⊗ₖ 1) ^ 2 ≤ 9 * ε := by
   obtain ⟨P, hP, hU, hmul, h⟩ :=
-    exists_isProjective_charObs (φ.comap kroneckerOne monotone_kroneckerOne) M hε
+    exists_isProjective_charObs (φ.comap kroneckerOne (OrderHomClass.mono _)) M hε
   refine ⟨P, hP, hU, hmul, ?_⟩
   simpa only [AlgState.norm_comap, kroneckerOne_apply] using h
 
