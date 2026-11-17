@@ -9,6 +9,8 @@ module
 
 public import CslibFrontier.Crypto.Primitives.SLHDSA.XMSS.PublicKeyFromSignature
 
+set_option linter.privateModule false
+
 /-!
 # Checked clients for FIPS 205 XMSS public-key reconstruction
 

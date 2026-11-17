@@ -131,12 +131,12 @@ private theorem nextTreeIndexAddressWord_eq_half (current : AddressWord) (left :
     (hleft : left = true ↔ current.val % 2 = 0) :
     (nextTreeIndexAddressWord current left).val = current.val / 2 := by
   by_cases h : left = true
-  · simp only [nextTreeIndexAddressWord, h, if_true]
+  · simp only [nextTreeIndexAddressWord, h, ite_true]
   · have hodd : current.val % 2 = 1 := by
       rcases Nat.mod_two_eq_zero_or_one current.val with heven | hodd
       · exact (h (hleft.mpr heven)).elim
       · exact hodd
-    simp only [nextTreeIndexAddressWord, h, if_false]
+    simp only [nextTreeIndexAddressWord, h, Bool.false_eq_true, ite_false]
     omega
 
 private def authenticationStepAddress {p : SecurityBytes} {shape : ParameterShape}
@@ -173,7 +173,7 @@ private def AddressAtLevel {p : SecurityBytes} {shape : ParameterShape}
 private theorem addressAtLevel_initial {p : SecurityBytes} {shape : ParameterShape}
     (initial : Address) (idx : LeafIndex p shape) :
     AddressAtLevel initial idx 0 (initialTreeAddress initial idx) := by
-  simp [AddressAtLevel, initialTreeAddress]
+  simp [AddressAtLevel, initialTreeAddress, Address.setTreeIndex, leafAddressWord]
 
 /-- Lines 9 and 11/14 advance the exact mutable-address invariant by one level. -/
 private theorem addressAtLevel_step {p : SecurityBytes} {shape : ParameterShape}
@@ -251,7 +251,9 @@ theorem authenticationCalls_branch_partition (index levels : ℕ) :
   | zero => rfl
   | succ levels ih =>
       cases hleft : nodeIsLeft index levels <;>
-        simp [authenticationCalls, AuthenticationCalls.addStep, hleft, ih]
+        simp only [authenticationCalls, AuthenticationCalls.addStep, hleft,
+          Bool.false_eq_true, ite_false, ite_true] <;>
+        omega
 
 private structure AuthenticationRun (p : SecurityBytes) where
   /-- The current `n`-byte tree node. -/
@@ -290,7 +292,7 @@ private theorem authenticationRootWithCalls_calls (family : HashFamily) {p : Sec
   induction levels with
   | zero => rfl
   | succ levels ih =>
-      simp only [authenticationRootWithCalls, ih]
+      simp only [authenticationRootWithCalls, ih, authenticationCalls]
 
 /-- The address carried by the actual recursive run has the exact Algorithm 11 state after every
 processed prefix. -/
@@ -303,7 +305,7 @@ private theorem authenticationRootWithCalls_addressAtLevel (family : HashFamily)
     AddressAtLevel address idx levels
       (authenticationRootWithCalls family idx authentication publicSeed address leaf levels
         hlevels).address := by
-  induction levels generalizing hlevels with
+  induction levels with
   | zero => exact addressAtLevel_initial address idx
   | succ levels ih =>
       change AddressAtLevel address idx (levels + 1)
@@ -425,6 +427,7 @@ def xmssPkFromSigWithLedger (family : HashFamily) {p : SecurityBytes}
         staticDescription := staticDescriptionLedger p shape } }
 
 /-- FIPS 205 Algorithm 11 as the output projection of its instrumented evaluator. -/
+@[expose]
 def xmssPkFromSig (family : HashFamily) {p : SecurityBytes} {shape : ParameterShape}
     (idx : LeafIndex p shape) (sig : Signature p shape) (M : WOTS.Message p)
     (publicSeed : NBytes p) (address : Address) : NBytes p :=
