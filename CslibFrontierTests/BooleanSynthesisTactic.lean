@@ -13,7 +13,7 @@ import CslibFrontier.Tactic.Synthesis
 
 namespace CslibFrontierTests.BooleanSynthesisTactic
 
-open Cslib.Circuits Cslib.Circuits.Boolean
+open Cslib Cslib.Circuits Cslib.Circuits.Boolean
 
 variable {n : ℕ} {s : Set (BooleanFunction n)} {f g h j : BooleanFunction n}
 
