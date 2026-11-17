@@ -206,7 +206,8 @@ attribute [fun_prop] encLyubashevskyParams_n_polyTime encLyubashevskyParams_m_po
   encLyubashevskyParams_q_polyTime encLyubashevskyParams_γ_polyTime
   encLyubashevskyParams_β_polyTime encLyubashevskyParams_mk_polyTime
 
-/-- Encode an optional integer response `Option (Fin m → ℤ)` via `encSilentOption (encList encIntBin)`. -/
+/-- Encode an optional integer response `Option (Fin m → ℤ)` via
+`encSilentOption (encList encIntBin)`. -/
 def encIntVecOption (m : ℕ) : Option (Fin m → ℤ) ↪ List Bool :=
   ⟨fun oz => encSilentOption (encList encIntBin) (oz.map List.ofFn),
     (encSilentOption (encList encIntBin)).injective.comp
@@ -433,6 +434,10 @@ theorem computableInPolyTime_lyubashevskyVerifyWord :
     ComputableInPolyTime lyubashevskyVerifyWord
       (encPair encLyubashevskyParams (encPair encBits (encPair encBits (encPair encBits encBits))))
       encBool := by
+  have hsome : ComputableInPolyTime (fun zw => (responseListDecoder.decode zw).isSome)
+      encBits encBool :=
+    ComputableInPolyTime.optionIsSome (encB := encList encIntBin)
+      computableInPolyTime_decodeResponseList
   unfold lyubashevskyVerifyWord lyubashevskyVerifyList inBoxList lyubashevskyVerifyEqList
   fun_prop
 
