@@ -91,6 +91,15 @@ example (family : HashFamily) (p : SecurityBytes) (i : Fin (len p)) (j : Fin p.c
   publicKeyInput_apply family (zeroSignature p) (zeroMessage p) (zeroBytes p) hashAddress
     hashAddress_valid i j
 
+-- The actual Algorithm 8 compression input lies in the standard's source domain independently of
+-- the total `tL` evaluator.
+example (family : HashFamily) {p : SecurityBytes} (sig : Signature p) (M : Message p)
+    (publicSeed : NBytes p) (address : Address) (haddress : ValidHashAddress address) :
+    ValidTInput family publicSeed (publicKeyAddress address)
+      (publicKeyInput family sig M publicSeed address haddress) :=
+  validTInput_of_blocks_le_67 family publicSeed (publicKeyAddress address)
+    (publicKeyInput family sig M publicSeed address haddress) (len_le_67 p)
+
 private def recompute (family : HashFamily) (p : SecurityBytes) : NBytes p :=
   tL family (len p) (zeroBytes p) (publicKeyAddress hashAddress)
     (blocksEquiv.symm fun i =>
@@ -101,16 +110,6 @@ private def recompute (family : HashFamily) (p : SecurityBytes) : NBytes p :=
           unfold ValidChainRange
           have hi := (digits (zeroMessage p) i).isLt
           omega))
-    (validTInput_of_blocks_le_67 family (zeroBytes p) (publicKeyAddress hashAddress)
-      (blocksEquiv.symm fun i =>
-        chain family (zeroSignature p i) (digits (zeroMessage p) i).val
-          (w - 1 - (digits (zeroMessage p) i).val) (zeroBytes p)
-          (hashAddress.setChainAddress ⟨i, i.isLt.trans_le ((len_le_67 p).trans (by decide))⟩)
-          (by simpa only [ValidHashAddress, Address.setChainAddress] using hashAddress_valid) (by
-            unfold ValidChainRange
-            have hi := (digits (zeroMessage p) i).isLt
-            omega))
-      (len_le_67 p))
 
 example (family : HashFamily) (p : SecurityBytes) :
     wotsPkFromSig family (zeroSignature p) (zeroMessage p) (zeroBytes p) hashAddress
