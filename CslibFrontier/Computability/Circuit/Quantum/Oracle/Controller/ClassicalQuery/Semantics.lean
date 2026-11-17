@@ -717,7 +717,7 @@ theorem eval_requestHidden_embedState (layout : ClassicalQueryLayout)
 /-- The physical basis branch after the first-stage request is copied and a fresh hidden bit
 is supplied to the service and the protected reply. The first-stage basis string is retained in
 full; all other wires come from the actual two-copy initializer. -/
-@[expose] noncomputable def Compatible.initialPrefixBranch {layout : ClassicalQueryLayout}
+noncomputable def Compatible.initialPrefixBranch {layout : ClassicalQueryLayout}
     (h : layout.Compatible) (sample : List Bool)
     (z : Fin layout.first.width → Bool) (bit : Fin 1 → Bool) : Fin layout.width → Bool :=
   let hfirstInput : layout.firstInputWidth ≤ layout.first.width := by
