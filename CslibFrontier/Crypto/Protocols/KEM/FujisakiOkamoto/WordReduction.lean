@@ -43,7 +43,8 @@ is `IsOraclePPT encBool A`.
 **The simulator.** `WordPKE.simFilterWordHandler d` answers the adversary without the secret key.
 A request in the domain is answered by the typed keyless simulator `Scheme.simFilterHandler` of
 the bundle `WordPKE.scheme P keyLen n`, on the same state `SimState`; a decapsulation answer is
-encoded with `encSilentOption encBits`. The domain is: messages of length `msgLen n` for `G`; for `H`,
+encoded with `encSilentOption encBits`. The domain is: messages of length `msgLen n` for `G`;
+  for `H`,
 the canonical encodings `encHQuery (b, m, c)` of a message `m` of length `msgLen n` and a
 ciphertext `c` of length at most `ctLen n` (`WordPKE.isHQuery`); and ciphertexts of length at most
 `ctLen n` for decapsulation. Any other request gets the empty reply and leaves the state
@@ -155,7 +156,8 @@ def isHQuery (n : ℕ) (w : List Bool) : Bool :=
 /-- The native keyless simulator with decapsulation filter `d` at parameter `n`, for public key
 `pk` and challenge ciphertext `cStar`. A request in the domain is answered by the typed simulator
 `Scheme.simFilterHandler` of the bundle `scheme P keyLen n`, on the same state; a decapsulation
-answer is encoded with `encSilentOption encBits`. A request outside the domain gets the empty reply and
+answer is encoded with `encSilentOption encBits`. A request outside the domain gets the empty
+  reply and
 leaves the state unchanged: a `G` request that is not a message of length `msgLen n`, an `H`
 request that fails `isHQuery`, and a decapsulation request longer than `ctLen n`. -/
 noncomputable def simFilterWordHandler

@@ -181,7 +181,8 @@ private theorem computableInPolyTime_elGamalMaulTarget {Msg : Type} {encMsg : Ms
     (hd : ComputableInPolyTime d encUnary F.encDesc)
     (hmsg₁ : ComputableInPolyTime msg₁ encUnary encMsg) :
     ComputableInPolyTime
-      (fun p : ℕ × List Bool => encSilentOption encBits (some (F.add (d p.1, encodeMsg (d p.1) (msg₁ p.1),
+      (fun p : ℕ × List Bool => encSilentOption encBits (some (F.add (d p.1, encodeMsg (d p.1)
+        (msg₁ p.1),
         F.encode (d p.1) (F.generator (d p.1))))))
       (encPair encUnary encBits) encBits := by
   have hn := ComputableInPolyTime.fst encUnary encBits

@@ -2525,7 +2525,8 @@ private noncomputable def ccaBadOracleOn (E : SymmetricCipher)
         return ([], state)
       else
         let dec := E.decrypt n k request.2
-        return (if reveal then encSilentOption encBits dec else [], (state.1, state.2 || dec.isSome))
+        return (if reveal then encSilentOption encBits dec else [], (state.1, state.2 ||
+          dec.isSome))
     else
       let m0 := unframe request.2
       let m1 := dropFrame request.2

@@ -669,7 +669,7 @@ theorem hybridDecrypt_encPair {Msg : Type}
     hybridDecrypt decaps decryptSym n sk (encPair encBits encBits (ctKem, ctDem)) = (do
       let k ← decaps n sk ctKem
       decryptSym n k ctDem) := by
-  simp [hybridDecrypt, encPair_apply, encBits_apply, unframe_frame_append, dropFrame_frame_append]
+  simp [hybridDecrypt]
 
 /-- **Hybrid decryption correctness**: supported encapsulations decapsulate to `some k`, and
 supported symmetric ciphertexts decrypt to `some msg`. Then every supported hybrid ciphertext

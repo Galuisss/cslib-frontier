@@ -152,7 +152,23 @@ theorem computableInPolyTime_lyubashevskyExtractList :
     have hcoord := ComputableInPolyTime.listGetD (encA := encIntBin)
       (encL := encList encIntBin) (0 : ℤ)
     have hbit := ComputableInPolyTime.listGetD (encA := encBool) (encL := encBits) false
-    fun_prop
+    apply ComputableInPolyTime.listAppend'
+    · apply ComputableInPolyTime.mapWithInput (ComputableInPolyTime.range.comp (by fun_prop))
+      apply ComputableInPolyTime.intBin_sub.comp
+      apply ComputableInPolyTime.prod
+      · apply hcoord.comp
+        apply ComputableInPolyTime.prod
+        · apply hget.comp
+          exact (ComputableInPolyTime.prod (by fun_prop) (.const []))
+        · fun_prop
+      · apply hcoord.comp
+        apply ComputableInPolyTime.prod
+        · apply hget.comp
+          exact (ComputableInPolyTime.prod (by fun_prop) (.const []))
+        · fun_prop
+    · apply ComputableInPolyTime.mapWithInput (ComputableInPolyTime.range.comp (by fun_prop))
+      have hlookup := hbit
+      fun_prop
   have hfields : ComputableInPolyTime
       (fun r : LyubashevskyExtractInput => ((r.dims.m, r.dims.k),
         ((r.first.challenge, r.first.response), (r.second.challenge, r.second.response))))

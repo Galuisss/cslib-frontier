@@ -67,7 +67,7 @@ private theorem sessionAdvance_polyTime :
     simp only [Session.advance]
     fun_prop
   | table values => simp only [Session.advance]; fun_prop
-  | seal => simp only [Session.advance]; fun_prop
+  | «seal» => simp only [Session.advance]; fun_prop
   | abort => simp only [Session.advance]; fun_prop
 
 private theorem sessionAdvance_length (k : ℕ) (request : SenderOperation × List Bool)

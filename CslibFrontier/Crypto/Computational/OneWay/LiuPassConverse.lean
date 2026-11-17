@@ -249,7 +249,9 @@ private theorem computableInPolyTime_liuPassCoreWithInput {α : Type} {input : �
     (encOC := encSilentOption encBits) (f := fun _ b => b)
     hrun (ComputableInPolyTime.snd input encBits)
   exact ((computableInPolyTime_decodeLen hn hx).prod hsilent).of_enc_eq fun a => by
-    simp only [liuPassCore, Function.comp_def, Option.map_id]
+    simp only [liuPassCore, Function.comp_def, encBits_apply]
+    congr 1
+    cases DescriptionMethod.universalTMRunFor (decodeProg (n a) (x a)) (t (n a)) <;> rfl
 
 private theorem computableInPolyTime_targetImage {α : Type} {input : α ↪ List Bool}
     {i : α → ℕ} {y : α → List Bool}

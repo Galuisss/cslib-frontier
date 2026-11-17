@@ -316,7 +316,7 @@ noncomputable def challenger (P : Protocol) (n : ℕ) (ideal : Option Idealizati
 theorem encDeliverReply_some (message : List Bool) (phase : Phase) (partner key : List Bool) :
     encDeliverReply ⟨message, phase, partner, some key⟩ =
       encDeliverReply ⟨message, phase, partner, none⟩ ++ true :: key := by
-  simp [encDeliverReply_apply, encPair_apply]
+  simp [encDeliverReply_apply]
 
 /-- Query equation for `.registerHonest`. -/
 theorem challenger_registerHonest (P : Protocol) (n : ℕ) (ideal : Option Idealization)

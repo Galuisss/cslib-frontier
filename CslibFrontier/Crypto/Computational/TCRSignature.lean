@@ -11,7 +11,8 @@ public import CslibFrontier.Crypto.Computational.IndexedSignature.Double
 public import CslibFrontier.Crypto.Computational.NaorYungUOWHF
 public import CslibFrontier.Crypto.Computational.OneWayToSignature
 public import CslibFrontier.Crypto.Computational.TreeSignature.Security
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Configuration
+public import
+  CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Configuration
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.QueryBounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.BitString
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Finite
@@ -1208,7 +1209,7 @@ theorem isOraclePPT_oneTimeForger {k : ℕ} {Control : Type} [Finite Control]
         pure (otsForgeryOf H (otsParamInv H q.1.1.1) out.2.1 out.2.2)) :=
     ((computableInPolyTime_otsForgeryOf_comp H hmN hmOut0.snd'.fst' hmOut0.snd'.snd').of_enc_eq
       fun _ => rfl).isOraclePPTOn
-  have hmM0 := hmR0.snd'.optionGetDWithInput (.const [])
+  have hmM0 := hmR0.snd'.optionGetDWithInput (encB := encBits) (.const [])
   have hmOtsReq := computableInPolyTime_otsMsg_eval_comp H hmN hmK hmM0
   have hqueryOts : IsOraclePPTOn (Operation := Unit) encMid encBits
       (fun q : Mid => List.take (sigBound (otsParamInv H q.1.1.1)) <$>
@@ -1298,7 +1299,7 @@ theorem isPPT_tcrAdversary {k : ℕ} {Control : Type} [Finite Control]
       have hqCoins := ComputableInPolyTime.snd encKIn encBits
       have hr0 := computableInPolyTime_simRun_comp machine
         (hqIn.trans hword) (.const []) hqCoins
-      have hm0 := hr0.snd'.optionGetDWithInput (.const [])
+      have hm0 := hr0.snd'.optionGetDWithInput (encB := encBits) (.const [])
       have hencState : ComputableInPolyTime (encPair (encPair encBits encBits) encBits)
           (encPair (encPair encBits encBits) encBits) encBits := .of_eq fun _ => rfl
       have hst := ((hqIn.trans hkeys).prod hqCoins).trans hencState
@@ -1326,7 +1327,7 @@ theorem isPPT_tcrAdversary {k : ℕ} {Control : Type} [Finite Control]
           let r0 := simRun machine (simWordOf p.1 saved.1.1) [] saved.2
           pure (outDecoder.decode r0.1).2.1) :=
       (((hr0.fst'.trans outDecoder.computableInPolyTime).snd'.fst').of_enc_eq fun _ => rfl).isPPTOn
-    have hm0 := hr0.snd'.optionGetDWithInput (.const [])
+    have hm0 := hr0.snd'.optionGetDWithInput (encB := encBits) (.const [])
     have hM0 := computableInPolyTime_otsMsg_eval_comp H hn hhashKey hm0
     have hsignOts := S.isPPTOn_sign_comp (hkeys.snd'.of_enc_eq fun _ => rfl)
       (hM0.of_enc_eq fun _ => rfl)

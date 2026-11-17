@@ -180,7 +180,8 @@ def typedHQuery (n : ℕ) (w : List Bool) :
 /-- A request of a native adversary at parameter `n` as a query of the typed ROM IND-CCA
 interface of `finiteScheme n`, with the typed answer returned as a word: `G` on messages of length
 `msgLen n`, `H` on requests in the `H` domain, and decapsulation on words of length at most
-`ctLen n`, whose answer is encoded with `encSilentOption encBits`. Every other request is answered with
+`ctLen n`, whose answer is encoded with `encSilentOption encBits`. Every other request is
+  answered with
 the empty word and makes no query. These are the answers of the word game `romIndCcaGameWord` and
 of the native simulator `simFilterWordHandler`. -/
 noncomputable def typedQuery (n : ℕ) : CCAOp → List Bool →

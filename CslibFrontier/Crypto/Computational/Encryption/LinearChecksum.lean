@@ -92,6 +92,8 @@ noncomputable def prfChecksumCipher (family : List Bool → List Bool → List B
   decrypt_polyTime := by
     refine ComputableInPolyTime.optionElimWithInput
       (encB := encBits) (encO := encSilentOption encBits)
+      (value := fun x : ℕ × List Bool × List Bool =>
+        (prfCipher family hpoly hlen).decrypt (x.1 + csLen x.1) x.2.1 x.2.2)
       (body := fun (x : ℕ × List Bool × List Bool) p => if p.drop x.1 == checksum (p.take x.1)
         then some (p.take x.1) else none) ?_ (ComputableInPolyTime.const none) ?_
     · exact (prfCipher family hpoly hlen).decrypt_polyTime.comp (by fun_prop)

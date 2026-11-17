@@ -253,8 +253,8 @@ private theorem eval_run_hybridDEMContinuation (E : SymmetricCipher)
         (do let ct ← E.encrypt n k
               (if bit then ChoiceOut.msg₁ choice.1 else ChoiceOut.msg₀ choice.1)
             return (ct, [ct])) := by
-      simp [StateT.run, SymmetricCipher.oneTimeCCAOracle, encPair_apply, encBits_apply,
-        unframe_frame_append, dropFrame_frame_append, hvalid]
+      simp [StateT.run, SymmetricCipher.oneTimeCCAOracle,
+        hvalid]
     rw [henc]
     simp only [pmf_norm]
     apply PMF.bind_congr_on_support
