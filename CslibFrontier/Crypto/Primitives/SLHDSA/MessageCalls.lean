@@ -241,10 +241,15 @@ def sha512CompressionBlocks (inputBytes : ℕ) : ℕ := (inputBytes + 17) ⌈/�
 /-- Exact dynamic component counts for one source-level message call. `packagedBytes` totals the
 inputs presented to primitive hashes; `outputBytes` is the exposed call result. -/
 structure MessageCallCost where
+  /-- Sum of byte lengths presented to all primitive-hash invocations in the call. -/
   packagedBytes : ℕ
+  /-- Byte length of the message-call result exposed to its caller. -/
   outputBytes : ℕ
+  /-- Number of Keccak-f evaluations performed by SHAKE256 invocations. -/
   keccakPermutations : ℕ
+  /-- Number of SHA-256 compression-function evaluations. -/
   sha256Compressions : ℕ
+  /-- Number of SHA-512 compression-function evaluations. -/
   sha512Compressions : ℕ
   deriving DecidableEq, Repr
 
