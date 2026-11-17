@@ -69,6 +69,9 @@ STEPS = (
          ('python3 -B scripts/check_encoding_readability.py --base "$BASE"',)),
     Step("Projection chain ratchet (changed modules)",
          ('python3 -B scripts/check_projection_chains.py --base "$BASE"',)),
+    # Report only until CI passes `--enforce`; add it here in the same change.
+    Step("Stated-limitation tracking (changed modules)",
+         ('python3 -B scripts/check_disclaimers.py --base "$BASE"',)),
     Step("Documentation pins", ("python3 -B scripts/check_docs.py --config-only",)),
     Step("Test Lake build handoff reuse",
          ("python3 -B -m unittest test_cache_handoff.HandoffTests"
@@ -130,6 +133,8 @@ CI_ONLY = {
     "Encoding readability report":
         "merge groups and main pushes only; reports and always succeeds",
     "Projection chain report":
+        "merge groups and main pushes only; reports and always succeeds",
+    "Stated-limitation tracking report":
         "merge groups and main pushes only; reports and always succeeds",
     "Security premise report":
         "merge groups and main pushes only; reports and always succeeds",

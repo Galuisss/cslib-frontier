@@ -43,6 +43,8 @@ SOURCE_CHECK_NAMES = frozenset({
     "Encoding readability report",
     "Projection chain ratchet (changed modules)",
     "Projection chain report",
+    "Stated-limitation tracking (changed modules)",
+    "Stated-limitation tracking report",
     "Repeated-proof-block notice (advisory)",
     "Documentation pins",
 })

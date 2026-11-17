@@ -117,6 +117,28 @@ jobs:
       - name: "Projection chain report"
         if: github.event_name != 'pull_request'
         run: python3 -B scripts/check_projection_chains.py --report
+      # A docstring that states a limitation (what is not proved, what is assumed, what is left to
+      # the caller) cites an issue number, or its declaration has an entry in the security-premise
+      # or reduction-witness baseline (policy/taste.md, "A stated limitation is tracked"). The
+      # untracked ones are recorded in scripts/disclaimers_baseline.json, a list of debts.
+      # REPORT ONLY for now: the step prints new untracked disclaimers and stale entries in the
+      # modules a pull request changes and succeeds. To turn enforcement on, add `--enforce` to
+      # the pull-request command below and to its mirror in scripts/full_check.py. Merge groups
+      # and pushes only report. The base is the first parent of the merge commit, as above.
+      # Sources only: no Lean.
+      - name: "Stated-limitation tracking (changed modules)"
+        if: github.event_name == 'pull_request'
+        env:
+          RECORDED_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -e
+          BASE=$(git cat-file -p HEAD | sed -n 's/^parent //p' | head -n 1)
+          BASE=${BASE:-$RECORDED_BASE}
+          git fetch --no-tags --depth=1 origin "$BASE"
+          python3 -B scripts/check_disclaimers.py --base "$BASE"
+      - name: "Stated-limitation tracking report"
+        if: github.event_name != 'pull_request'
+        run: python3 -B scripts/check_disclaimers.py --report
       # Advisory only: tactic blocks on lines a pull request adds or changes that repeat a block
       # of another proof in the same file or directory nearly verbatim (#3725). Candidates go to
       # the job summary and appear as notices; the step never fails the job. Sources only: no
