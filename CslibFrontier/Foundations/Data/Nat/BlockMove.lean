@@ -36,12 +36,14 @@ private theorem blockMove_eq_finAddFlip (before moved after : ℕ)
     (i : Fin (moved + after)) :
     blockMove before moved after (before + i.val) = before + (finAddFlip i).val := by
   unfold blockMove
-  rw [if_neg (by omega)]
+  rw [ite_eq_right (by omega)]
   by_cases hi : i.val < moved
-  · rw [if_pos (by omega), finAddFlip_apply_mk_left hi]
+  · rw [ite_eq_left (by omega), finAddFlip_apply_mk_left hi]
+    change before + i.val + after = before + (after + i.val)
     omega
-  · rw [if_neg (by omega), if_pos (by omega),
+  · rw [ite_eq_right (by omega), ite_eq_left (by omega),
       finAddFlip_apply_mk_right (by omega) i.isLt]
+    change before + i.val - moved = before + (i.val - moved)
     omega
 
 /-- Exchanging the two lengths gives the literal inverse on every raw index, including
@@ -49,7 +51,7 @@ out-of-range binary entries. This does not assume an index or table validity gua
 theorem blockMove_inverse (before moved after i : ℕ) :
     blockMove before after moved (blockMove before moved after i) = i := by
   by_cases hp : i < before
-  · simp only [blockMove, if_pos hp]
+  · simp only [blockMove, ite_eq_left hp]
   by_cases hb : i < before + moved + after
   · let j : Fin (moved + after) := ⟨i - before, by omega⟩
     have he : before + j.val = i := by dsimp [j]; omega
@@ -63,13 +65,14 @@ theorem blockMove_inverse (before moved after i : ℕ) :
   · have hs : ¬i < before + moved := by omega
     have hp' : ¬i < before + after := by omega
     have hb' : ¬i < before + after + moved := by omega
-    simp only [blockMove, if_neg hp, if_neg hs, if_neg hb, if_neg hp', if_neg hb']
+    simp only [blockMove, ite_eq_right hp, ite_eq_right hs, ite_eq_right hb,
+      ite_eq_right hp', ite_eq_right hb']
 
 /-- An index inside the actual three blocks stays inside their unchanged total length. -/
 theorem blockMove_lt {before moved after i : ℕ} (hi : i < before + moved + after) :
     blockMove before moved after i < before + moved + after := by
   by_cases hp : i < before
-  · simp only [blockMove, if_pos hp]
+  · simp only [blockMove, ite_eq_left hp]
     omega
   · let j : Fin (moved + after) := ⟨i - before, by omega⟩
     have he : before + j.val = i := by dsimp [j]; omega

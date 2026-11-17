@@ -61,7 +61,8 @@ theorem reindex_eq_ofRotation_transport {G H : Graph} (r : RotationSystem G)
   apply (ofRotation_eq_iff _ _).mpr
   refine ⟨length_reindex _ _ _ _, fun a => ?_⟩
   obtain ⟨b, rfl⟩ := e.surjective a
-  rw [getD_reindex _ _ _ _ (Dart.indexEquiv H (e b)).isLt, hb, ht]
+  have hi : (e b).index < 2 * H.edges.length := (Dart.indexEquiv H (e b)).isLt
+  rw [getD_reindex _ _ _ _ hi, hb, ht]
   change forward (r.rotate b).index = ((e.permCongr r.rotate) (e b)).index
   rw [Equiv.permCongr_apply, Equiv.symm_apply_apply]
   exact (hf (r.rotate b)).symm

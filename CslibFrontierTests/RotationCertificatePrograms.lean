@@ -48,6 +48,6 @@ example : (appendRawCertificate 1 1 1 0 singlePort ⟨[0, 1]⟩).successor =
 example : verify body [0] (appendRawCertificate 1 1 1 0 singlePort ⟨[0, 1]⟩) = true := by
   decide +kernel
 
-example : appendRawCertificate 0 0 0 0 ⟨[]⟩ ⟨[]⟩ = ⟨[]⟩ := by decide +kernel
+example : appendRawCertificate 0 0 0 0 ⟨[]⟩ ⟨[]⟩ = ⟨[]⟩ := rfl
 
 end CslibFrontierTests.RotationCertificatePrograms

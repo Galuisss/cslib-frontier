@@ -11,6 +11,9 @@ public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSyst
 public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.CertificateCornerSwap
 public import CslibFrontier.Computability.PolyTime.Graph.RotationSystem
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Captured
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat.Binary
 
 /-!
 # Native raw successor-table reindexing
@@ -48,7 +51,7 @@ theorem computableInPolyTime_reindex {α : Type} {input : α ↪ List Bool}
       (ComputableTidilyInPolyTime.snd input encUnary)
     have hback := hb.tidy.comp (hx.prod hi)
     have htable := computableInPolyTime_successor.tidy.comp (hc.tidy.comp hx)
-    have hread := ComputableTidilyInPolyTime.listGetD_binary 0 htable hback
+    have hread := ComputableTidilyInPolyTime.listGetD_binary (encA := encNat) 0 htable hback
     exact hf.tidy.comp (hx.prod hread)
   exact encRotationCertificate_mk_deg.computableInPolyTime.comp hw.computableInPolyTime
 
@@ -63,13 +66,16 @@ theorem computableInPolyTime_swapSuccessors {α : Type} {input : α ↪ List Boo
       input encRotationCertificate := by
   have hn : ComputableInPolyTime (fun x => (table x).successor.length) input encUnary := by
     have hs := computableInPolyTime_successor.comp hc
-    fun_prop
+    exact ((ComputableTidilyInPolyTime.length_list encNat).comp hs.tidy).computableInPolyTime
   have hl' := hl.comp (ComputableInPolyTime.fst input encNat)
   have hr' := hr.comp (ComputableInPolyTime.fst input encNat)
   have hb : ComputableInPolyTime (fun p : α × ℕ =>
       if p.2 = left p.1 then right p.1 else if p.2 = right p.1 then left p.1 else p.2)
       (encPair input encNat) encNat := by fun_prop
-  have h := computableInPolyTime_reindex hc hn (ComputableInPolyTime.snd input encNat) hb
+  have h := computableInPolyTime_reindex
+    (forward := fun _ i => i)
+    (back := fun x i => if i = left x then right x else if i = right x then left x else i)
+    hc hn (ComputableInPolyTime.snd input encNat) hb
   simpa only [swapSuccessors, reindex] using h
 
 end Cslib.Complexity.Graph.RotationCertificate
