@@ -45,8 +45,6 @@ the code space, `Φ(|z⟩ ⊗ ℓ) = X(z) E ℓ` is then unitary, and it intertw
 
 * `Cslib.Quantum.PauliRep.exists_isometry_codeProj`: an isometry onto the code space.
 * `Cslib.Quantum.PauliRep.exists_unitary_eq_pauli`: the Stone–von Neumann theorem for qubits.
-* `Cslib.Quantum.pauliXPow_mul`, `Cslib.Quantum.pauliZPow_mul`,
-  `Cslib.Quantum.pauliZPow_mul_pauliXPow`: the Pauli strings satisfy the Pauli relations.
 
 ## References
 
@@ -62,10 +60,6 @@ open scoped Kronecker
 namespace Cslib.Quantum
 
 variable {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
-
-omit [Fintype ι] [DecidableEq ι] in
-theorem boolVec_add_self (a : ι → Bool) : a + a = 0 := by
-  ext i; change (a i ^^ a i) = false; simp
 
 /-- Hermitian matrices `X(a)`, `Z(b)` on `ℂ^κ`, indexed by bit strings, satisfying the **Pauli
 relations**: `X` and `Z` are representations of `(ℤ/2)^ι`, and
@@ -84,7 +78,7 @@ structure PauliRep (ι κ : Type*) [Fintype ι] [Fintype κ] [DecidableEq κ] wh
   Z_mul_X : ∀ a b, Z b * X a = (signVal (a ⬝ᵥ b) : ℂ) • (X a * Z b)
 
 /-- Character orthogonality: `∑_b (-1)^{c·b} = 2ⁿ δ_{c,0}`. -/
-theorem sum_signVal_dotProduct (c : ι → Bool) :
+private theorem sum_signVal_dotProduct (c : ι → Bool) :
     ∑ b : ι → Bool, (signVal (c ⬝ᵥ b) : ℂ) = if c = 0 then (2 : ℂ) ^ Fintype.card ι else 0 := by
   have h := sum_signVal_dotProduct_mul_signVal_dotProduct c 0
   have h0 : signVal (0 : Bool) = 1 := signVal_false
@@ -100,7 +94,7 @@ variable (R : PauliRep ι κ)
 
 omit [DecidableEq ι] in
 theorem X_mul_self (a : ι → Bool) : R.X a * R.X a = 1 := by
-  rw [R.X_mul, boolVec_add_self, R.X_zero]
+  rw [R.X_mul, BitString.add_self, R.X_zero]
 
 omit [DecidableEq ι] in
 theorem X_mul_Z (a b : ι → Bool) : R.X a * R.Z b = (signVal (a ⬝ᵥ b) : ℂ) • (R.Z b * R.X a) := by
@@ -179,13 +173,13 @@ theorem sum_X_mul_codeProj_mul_X : ∑ z, R.X z * R.codeProj * R.X z = 1 := by
   rw [inv_mul_cancel₀ (pow_ne_zero _ two_ne_zero), one_smul]
 
 omit [Fintype ι] [DecidableEq ι] in
-theorem boolVec_add_eq_zero_iff {z z' : ι → Bool} : z + z' = 0 ↔ z = z' := by
+private theorem boolVec_add_eq_zero_iff {z z' : ι → Bool} : z + z' = 0 ↔ z = z' := by
   constructor
   · intro h
     have := congrArg (· + z') h
-    simpa [add_assoc, boolVec_add_self] using this
+    simpa [add_assoc, BitString.add_self] using this
   · rintro rfl
-    exact boolVec_add_self z
+    exact BitString.add_self z
 
 /-- `Eᴴ X(z) X(z') E = δ_{z,z'}` for an isometry `E` onto the code space. -/
 private theorem isometry_X_mul_X {L : Type*} [DecidableEq L] {E : Matrix κ L ℂ}
@@ -247,11 +241,11 @@ theorem exists_unitary_eq_pauli : ∃ (L : Finset κ) (Φ : Matrix κ ((ι → B
         refine sum_eq_zero fun l' _ => ?_
         rw [kronecker_apply, pauliXPow_apply, ite_eq_right]
         · simp
-        · intro h; apply hz'; rw [h, add_assoc, boolVec_add_self, add_zero]) (by simp)]
+        · intro h; apply hz'; rw [h, BitString.add_cancel_right]) (by simp)]
     rw [sum_eq_single l (fun l' _ hl' => by simp [hl'])
       (by simp)]
-    simp only [Φ, Matrix.of_apply, kronecker_apply, pauliXPow_apply, add_assoc,
-      boolVec_add_self, add_zero, ite_true, Matrix.one_apply_eq, mul_one]
+    simp only [Φ, Matrix.of_apply, kronecker_apply, pauliXPow_apply, BitString.add_cancel_right,
+      ite_true, Matrix.one_apply_eq, mul_one]
     rw [← Matrix.mul_apply, ← Matrix.mul_assoc, R.X_mul, add_comm]
   have hZ : ∀ b, R.Z b * Φ = Φ * (pauliZPow b ⊗ₖ (1 : Matrix L L ℂ)) := fun b => by
     ext i ⟨z, l⟩
@@ -271,68 +265,6 @@ theorem exists_unitary_eq_pauli : ∃ (L : Finset κ) (Φ : Matrix κ ((ι → B
   · rw [← hZ, Matrix.mul_assoc, hΦΦ', Matrix.mul_one]
 
 end PauliRep
-
-/-! ### The Pauli strings -/
-
-theorem pauliXPow_mul (a a' : ι → Bool) : pauliXPow a * pauliXPow a' = pauliXPow (a + a') := by
-  ext y z
-  rw [Matrix.mul_apply, sum_eq_single (y + a) (fun w _ hw => by
-    rw [pauliXPow_apply, ite_eq_right (fun h => hw h), zero_mul]) (by simp)]
-  simp only [pauliXPow_apply, ite_true, one_mul, add_assoc]
-
-omit [DecidableEq ι] in
-theorem signVal_add_dotProduct (b b' z : ι → Bool) :
-    (signVal ((b + b') ⬝ᵥ z) : ℂ) = signVal (b ⬝ᵥ z) * signVal (b' ⬝ᵥ z) := by
-  rw [add_dotProduct]
-  exact_mod_cast signVal_xor _ _
-
-private theorem mul_pauliZPow_apply {M : Matrix (ι → Bool) (ι → Bool) ℂ} (b y z : ι → Bool) :
-    (M * pauliZPow b) y z = M y z * signVal (b ⬝ᵥ z) := by
-  rw [Matrix.mul_apply, sum_eq_single z (fun w _ hw => by
-    rw [pauliZPow_apply, ite_eq_right hw, mul_zero]) (by simp)]
-  rw [pauliZPow_apply, ite_eq_left rfl]
-
-private theorem pauliZPow_mul_apply {M : Matrix (ι → Bool) (ι → Bool) ℂ} (b y z : ι → Bool) :
-    (pauliZPow b * M) y z = signVal (b ⬝ᵥ y) * M y z := by
-  rw [Matrix.mul_apply, sum_eq_single y (fun w _ hw => by
-    rw [pauliZPow_apply, ite_eq_right (Ne.symm hw), zero_mul]) (by simp)]
-  rw [pauliZPow_apply, ite_eq_left rfl]
-
-theorem pauliZPow_mul (b b' : ι → Bool) : pauliZPow b * pauliZPow b' = pauliZPow (b + b') := by
-  ext y z
-  rw [mul_pauliZPow_apply, pauliZPow_apply, pauliZPow_apply]
-  split_ifs with h
-  · rw [signVal_add_dotProduct]
-  · rw [zero_mul]
-
-omit [DecidableEq ι] in
-theorem pauliXPow_zero : pauliXPow (0 : ι → Bool) = 1 := by
-  classical
-  ext y z
-  rw [pauliXPow_apply, add_zero, Matrix.one_apply]
-  exact if_congr eq_comm rfl rfl
-
-omit [DecidableEq ι] in
-theorem pauliZPow_zero : pauliZPow (0 : ι → Bool) = 1 := by
-  classical
-  ext y z
-  have h0 : signVal (0 : Bool) = 1 := signVal_false
-  rw [pauliZPow_apply, Matrix.one_apply, zero_dotProduct, h0, Complex.ofReal_one]
-
-theorem pauliZPow_mul_pauliXPow (a b : ι → Bool) :
-    pauliZPow b * pauliXPow a = (signVal (a ⬝ᵥ b) : ℂ) • (pauliXPow a * pauliZPow b) := by
-  ext y z
-  rw [pauliZPow_mul_apply, Matrix.smul_apply, mul_pauliZPow_apply, pauliXPow_apply, smul_eq_mul]
-  split_ifs with h
-  · subst h
-    have e : b ⬝ᵥ (y + a) = (b ⬝ᵥ y ^^ a ⬝ᵥ b) := by
-      rw [dotProduct_add, dotProduct_comm b a]; rfl
-    rw [e]
-    push_cast [signVal_xor]
-    have := signVal_mul_self (a ⬝ᵥ b)
-    have h' : (signVal (a ⬝ᵥ b) : ℂ) * signVal (a ⬝ᵥ b) = 1 := by exact_mod_cast this
-    linear_combination -(signVal (b ⬝ᵥ y) : ℂ) * h'
-  · simp
 
 /-- The Pauli strings on `ι → Bool` satisfy the Pauli relations. -/
 noncomputable def PauliRep.standard : PauliRep ι (ι → Bool) where
