@@ -202,8 +202,8 @@ theorem norm_le_one (φ : AlgState A) {a : A} (h : star a * a ≤ 1) : φ.norm a
 
 omit [StarModule ℂ A] [SelfAdjointDecompose A] in
 /-- The **pullback** `φ ∘ f` of a state along a monotone star-algebra homomorphism `f`. -/
-noncomputable def comap {B : Type*} [Ring B] [StarRing B] [PartialOrder B] [StarOrderedRing B]
-    [Algebra ℂ B] (φ : AlgState B) (f : A →⋆ₐ[ℂ] B) (hf : Monotone f) : AlgState A where
+noncomputable def comap {B : Type*} [Ring B] [StarRing B] [PartialOrder B] [Algebra ℂ B]
+    (φ : AlgState B) (f : A →⋆ₐ[ℂ] B) (hf : Monotone f) : AlgState A where
   toFun a := φ (f a)
   map_add' a b := by simp [map_add]
   map_smul' z a := by simp [map_smul]
@@ -211,8 +211,8 @@ noncomputable def comap {B : Type*} [Ring B] [StarRing B] [PartialOrder B] [Star
   map_one' := by simp [φ.map_one]
 
 omit [StarOrderedRing A] [StarModule ℂ A] [SelfAdjointDecompose A] in
-theorem comap_apply {B : Type*} [Ring B] [StarRing B] [PartialOrder B] [StarOrderedRing B]
-    [Algebra ℂ B] (φ : AlgState B) (f : A →⋆ₐ[ℂ] B) (hf : Monotone f) (a : A) :
+theorem comap_apply {B : Type*} [Ring B] [StarRing B] [PartialOrder B] [Algebra ℂ B]
+    (φ : AlgState B) (f : A →⋆ₐ[ℂ] B) (hf : Monotone f) (a : A) :
     φ.comap f hf a = φ (f a) :=
   rfl
 
