@@ -9,7 +9,7 @@ module
 
 public import CslibFrontier.Computability.Complexity.Problems.Graph.OrthogonalDrawing.RotationCertificate
 public import CslibFrontier.Foundations.Geometry.Orthogonal.Polygonal
-import CslibFrontier.Foundations.Geometry.Polygonal.LocalSplitOrder
+import CslibFrontier.Foundations.Geometry.Polygonal.AngleOrder
 
 /-!
 # The executed cardinal ranks have the literal clockwise angle order

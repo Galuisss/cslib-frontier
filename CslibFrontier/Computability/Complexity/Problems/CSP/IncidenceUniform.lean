@@ -42,10 +42,11 @@ label or maximum variable index occurs in this bound. -/
 theorem length_edges_incidenceGraph_eq_mul (k : ℕ)
     (hw : ∀ row ∈ F, row.scope.length = k) :
     (incidenceGraph F).edges.length = k * F.length := by
-  have hlen : (incidenceGraph F).edges.length = F.vars.length := by
-    rw [incidenceGraph_edges, List.length_map]
-    simpa only [List.length_map] using congrArg List.length (CSP.map_occurrences F)
-  rw [hlen, Cslib.Logic.PL.CSP.vars, List.length_flatMap_of_forall_length_eq hw,
-    Nat.mul_comm]
+  rw [length_edges_incidenceGraph]
+  calc
+    _ = (F.map (fun _ => k)).sum := by
+      apply congrArg List.sum
+      exact List.map_congr_left hw
+    _ = k * F.length := by simp [List.map_const', List.sum_replicate, Nat.mul_comm]
 
 end Cslib.Complexity.CSP

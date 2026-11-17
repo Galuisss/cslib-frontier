@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Computability.Complexity.Problems.CSP.OneHot3.Order
 public import CslibFrontier.Computability.PolyTime.Graph.RotationSystem
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat.BinaryDiv
+import CslibFrontier.Computability.PolyTime.Graph.RotationSystem.Reindex
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Captured
 
 /-!
@@ -102,26 +103,19 @@ inputs, even when lookups or table entries have enormous binary indices. -/
 theorem computableInPolyTime_orderedCertificate :
     ComputableInPolyTime (fun p : CSP Unit ℕ × RotationCertificate =>
       orderedCertificate p.1 p.2) encOrderInput encRotationCertificate := by
-  have hg := (computableInPolyTime_incidenceGraph encUnit encNat).tidy.comp
-    (ComputableTidilyInPolyTime.fst (encCSP encUnit encNat) encRotationCertificate)
-  have hword : ComputableTidilyInPolyTime
-      (fun p : CSP Unit ℕ × RotationCertificate =>
-        (List.range (2 * (incidenceGraph p.1).edges.length)).map fun a =>
-          dartReindex p.2 (p.2.successor.getD (dartReindex p.2 a) 0))
-      encOrderInput (encList encNat) := by
-    apply ComputableTidilyInPolyTime.mapWithInput (encA := encUnary)
-      (by unfold encOrderInput encGraph; fun_prop)
-    have ha := ComputableTidilyInPolyTime.unary_to_binary.comp
-      (ComputableTidilyInPolyTime.snd encOrderInput encUnary)
-    have hc : ComputableTidilyInPolyTime
-        (fun p : (CSP Unit ℕ × RotationCertificate) × ℕ => p.1.2)
-        (encPair encOrderInput encUnary) encRotationCertificate := by
-      unfold encOrderInput
-      fun_prop
-    have hi := dartReindex_tidy.comp (hc.prod ha)
-    have hs := RotationCertificate.computableInPolyTime_successor.tidy.comp hc
-    have hn := ComputableTidilyInPolyTime.listGetD_binary 0 hs hi
-    exact dartReindex_tidy.comp (hc.prod hn)
-  exact encRotationCertificate_mk_deg.computableInPolyTime.comp hword.computableInPolyTime
+  have hg := (computableInPolyTime_incidenceGraph encUnit encNat).comp
+    (ComputableInPolyTime.fst (encCSP encUnit encNat) encRotationCertificate)
+  have hn : ComputableInPolyTime (fun p : CSP Unit ℕ × RotationCertificate =>
+      2 * (incidenceGraph p.1).edges.length) encOrderInput encUnary := by
+    unfold encOrderInput encGraph
+    fun_prop
+  have hc : ComputableInPolyTime (fun p : CSP Unit ℕ × RotationCertificate => p.2)
+      encOrderInput encRotationCertificate := ComputableInPolyTime.snd _ _
+  have hr : ComputableInPolyTime (fun p : (CSP Unit ℕ × RotationCertificate) × ℕ =>
+      dartReindex p.1.2 p.2) (encPair encOrderInput encNat) encNat :=
+    dartReindex_tidy.computableInPolyTime.comp (by
+      unfold encOrderInput encTableIndex
+      fun_prop)
+  exact RotationCertificate.computableInPolyTime_reindex hc hn hr hr
 
 end Cslib.Complexity.CSP.OneHot3

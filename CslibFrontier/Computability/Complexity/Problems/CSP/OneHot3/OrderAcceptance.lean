@@ -129,28 +129,18 @@ private theorem orderedCertificate_eq_ofRotation (F : CSP Unit ℕ) (c : Rotatio
     (hw : F.WellFormed arity) (r : RotationSystem (incidenceGraph F))
     (ht : ∀ a, c.successor.getD a.index 0 = (r.rotate a).index) :
     orderedCertificate F c = RotationCertificate.ofRotation (orderedRotation F c hw r) := by
-  let e := orderedOccurrenceEquiv F c hw
   have hcount : (incidenceGraph (orderedConstraints F c)).edges.length =
       (incidenceGraph F).edges.length := by
     rw [length_edges_incidenceGraph_eq_mul 3
       (fun row hrow => wellFormed_orderedConstraints F c hw row hrow),
       length_edges_incidenceGraph_eq_mul 3 (fun row hrow => hw row hrow),
       length_orderedConstraints]
-  symm
-  apply (RotationCertificate.ofRotation_eq_iff _ _).mpr
-  refine ⟨?_, fun a => ?_⟩
-  · rw [length_orderedCertificate, hcount]
-  · obtain ⟨b, rfl⟩ := (occurrenceDartEquiv e).surjective a
-    have hb : (occurrenceDartEquiv e b).index < 2 * (incidenceGraph F).edges.length := by
-      rw [← hcount]
-      exact (Dart.indexEquiv _ (occurrenceDartEquiv e b)).isLt
-    rw [getD_orderedCertificate F c hb, index_orderedDart,
-      dartReindex_involutive c, ht]
-    change dartReindex c (r.rotate b).index =
-      ((occurrenceTransport r e (variable_fibers F c hw) (constraint_fibers F c hw)).rotate
-        (occurrenceDartEquiv e b)).index
-    rw [occurrenceTransport_rotate]
-    exact (index_orderedDart F c hw (r.rotate b)).symm
+  have h := RotationCertificate.reindex_eq_ofRotation_transport r c ht
+    (occurrenceDartEquiv (orderedOccurrenceEquiv F c hw))
+    (occurrenceDartEquiv_vertex_eq_iff _ (variable_fibers F c hw) (constraint_fibers F c hw))
+    (dartReindex c) (dartReindex c) (index_orderedDart F c hw)
+    (fun a => by rw [index_orderedDart, dartReindex_involutive c])
+  simpa only [orderedCertificate, orderedRotation, occurrenceTransport, hcount] using h
 
 private theorem constraint_cycle_step (F : CSP Unit ℕ) (c : RotationCertificate)
     (hw : F.WellFormed arity) (r : RotationSystem (incidenceGraph F))

@@ -8,7 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Complexity.Problems.CSP.OneHot3
-public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Certificate
+public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.CertificateReindex
 import Mathlib.Data.List.GetD
 
 /-!
@@ -164,13 +164,13 @@ theorem dartReindex_lt (c : RotationCertificate) {a n : ℕ} (ha : a < 6 * n) :
 Only the original graph's actual edge-list length funds the output scan. -/
 @[expose] def orderedCertificate (F : CSP Unit ℕ) (c : RotationCertificate) :
     RotationCertificate :=
-  ⟨(List.range (2 * (incidenceGraph F).edges.length)).map fun a =>
-    dartReindex c (c.successor.getD (dartReindex c a) 0)⟩
+  RotationCertificate.reindex c (2 * (incidenceGraph F).edges.length)
+    (dartReindex c) (dartReindex c)
 
 /-- The table has one entry per original indexed edge end, even for invalid input data. -/
 @[simp] theorem length_orderedCertificate (F : CSP Unit ℕ) (c : RotationCertificate) :
     (orderedCertificate F c).successor.length = 2 * (incidenceGraph F).edges.length := by
-  simp only [orderedCertificate, List.length_map, List.length_range]
+  exact RotationCertificate.length_reindex _ _ _ _
 
 /-- Reading an actual output position gives the literal conjugation of the supplied
 table. All missing input entries still use the program's fixed zero fallback. -/
@@ -178,7 +178,6 @@ theorem getD_orderedCertificate (F : CSP Unit ℕ) (c : RotationCertificate) {a 
     (ha : a < 2 * (incidenceGraph F).edges.length) :
     (orderedCertificate F c).successor.getD a 0 =
       dartReindex c (c.successor.getD (dartReindex c a) 0) := by
-  rw [List.getD_eq_getElem _ _ (by rw [length_orderedCertificate]; exact ha)]
-  simp only [orderedCertificate, List.getElem_map, List.getElem_range]
+  exact RotationCertificate.getD_reindex _ _ _ _ ha
 
 end Cslib.Complexity.CSP.OneHot3
