@@ -114,6 +114,14 @@ def equivProd : MessagePair M ≃ M × M where
   left_inv _ := rfl
   right_inv _ := rfl
 
+/-- The finite enumeration of message pairs induced by the enumerations of both messages. -/
+instance [Fintype M] : Fintype (MessagePair M) :=
+  Fintype.ofEquiv _ equivProd.symm
+
+/-- Equality of message pairs is decidable whenever equality of messages is decidable. -/
+instance [DecidableEq M] : DecidableEq (MessagePair M) :=
+  equivProd.decidableEq
+
 end MessagePair
 
 /-- The encoding of a message pair: the encoding `encPair encM encM` of `(msg₀, msg₁)`, that is

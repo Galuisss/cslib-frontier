@@ -982,12 +982,13 @@ theorem matrix_b2ReplyCopySecondStage_withReference (P : PKEParams)
         simp [hreply, hsaved, hreference]
 
 /-- **The actual reversible B2 service dephases exactly its complete reply.**  For a fixed
-truncated-syndrome sample and measured message pair, the discarded service environment
-distinguishes precisely the complete `[hidden bit | u | v]` labels emitted by the service.  The
-identity accepts an arbitrary, possibly entangled state on the hidden bit and saved reference,
-and permits a full-reply-selected continuation on that reference; no product-state or
-independence hypothesis is used. To preserve an inaccessible subfactor, that continuation must
-be instantiated as the active continuation tensored with its identity.
+truncated-syndrome sample, the discarded service environment distinguishes every two-message
+request and hidden bit while the retained record contains the complete `[hidden bit | u | v]`
+reply emitted by the service.  The identity accepts an arbitrary, possibly entangled state on
+the request, hidden bit and saved reference, and permits a full-reply-selected continuation on
+that reference; no product-state or independence hypothesis is used. To preserve an inaccessible
+subfactor, that continuation must be instantiated as the active continuation tensored with its
+identity.
 
 The original hidden register is part of the discarded service environment, rather than being
 duplicated in the output. The continuation acts only on the saved reference factor; in the B2
@@ -1001,34 +1002,36 @@ theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
     (securityParameter : ℕ)
     (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen)
     (sample : TruncatedSyndromeSample P.n P.codeLen)
-    (messages : MessagePair (PKEMessage P))
     {Reference ι' : Type*} [Fintype Reference] [DecidableEq Reference]
     (V : (Fin (1 + (P.n + P.codeLen)) → Bool) →
       Matrix ι' Reference ℂ)
-    (ρ : Matrix (Bool × Reference) (Bool × Reference) ℂ) :
-    let serviceInput : Bool →
+    (ρ : Matrix ((MessagePair (PKEMessage P) × Bool) × Reference)
+      ((MessagePair (PKEMessage P) × Bool) × Reference) ℂ) :
+    let serviceInput : MessagePair (PKEMessage P) × Bool →
         Fin (b2ServiceDescription P securityParameter encoder).width → Bool :=
-      fun hidden =>
+      fun request =>
         inputState (b2ServiceDescription P securityParameter encoder).width
           (encPair encUnary encBits (securityParameter, sample.toWord) ++
-            List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [hidden])
-    let serviceEnvironment : Bool →
+            List.ofFn request.1.msg₀ ++ List.ofFn request.1.msg₁ ++ [request.2])
+    let serviceEnvironment : MessagePair (PKEMessage P) × Bool →
         (Fin (b2ServiceDescription P securityParameter encoder).width → Bool) :=
-      fun hidden => classicalRun (b2ServiceCodes P securityParameter encoder)
-        (serviceInput hidden)
-    let serviceReply : Bool → Fin (1 + (P.n + P.codeLen)) → Bool :=
-      fun hidden =>
-        let environment := serviceEnvironment hidden
+      fun request => classicalRun (b2ServiceCodes P securityParameter encoder)
+        (serviceInput request)
+    let serviceReply : MessagePair (PKEMessage P) × Bool →
+        Fin (1 + (P.n + P.codeLen)) → Bool :=
+      fun request =>
+        let environment := serviceEnvironment request
         let ciphertext := b2ServiceReadout P environment
         Fin.append
           (fun _ : Fin 1 => readBit environment
             (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k))
           (Fin.append ciphertext.u ciphertext.v)
-    let fullReply : Bool → Fin (1 + (P.n + P.codeLen)) → Bool :=
-      fun hidden =>
+    let fullReply : MessagePair (PKEMessage P) × Bool →
+        Fin (1 + (P.n + P.codeLen)) → Bool :=
+      fun request =>
         let ciphertext := sample.toPKECiphertext P
-          (encoder.eval interpretation) (messages.select hidden)
-        Fin.append (fun _ : Fin 1 => hidden) (Fin.append ciphertext.u ciphertext.v)
+          (encoder.eval interpretation) (request.1.select request.2)
+        Fin.append (fun _ : Fin 1 => request.2) (Fin.append ciphertext.u ciphertext.v)
     partialTraceLeft
         (densityConj
           (((1 : Matrix
@@ -1042,9 +1045,9 @@ theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
             (classicalDensityBranch (fullReply ∘ Prod.fst) reply ρ))) := by
   classical
   dsimp only
-  have hfit (hidden : Bool) :
+  have hfit (request : MessagePair (PKEMessage P) × Bool) :
       (encPair encUnary encBits (securityParameter, sample.toWord) ++
-        List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [hidden]).length ≤
+        List.ofFn request.1.msg₀ ++ List.ofFn request.1.msg₁ ++ [request.2]).length ≤
           (b2ServiceDescription P securityParameter encoder).width := by
     have h := (wellFormed_b2ServiceDescription P securityParameter encoder).input_le
     simp only [b2ServiceDescription_quantumInputWidth] at h
@@ -1052,15 +1055,15 @@ theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
       List.length_replicate, encBits_apply, TruncatedSyndromeSample.length_toWord,
       List.length_ofFn, List.length_singleton]
     omega
-  have hinputHidden (hidden : Bool) :
+  have hinputHidden (request : MessagePair (PKEMessage P) × Bool) :
       readBit
           (inputState (b2ServiceDescription P securityParameter encoder).width
             (encPair encUnary encBits (securityParameter, sample.toWord) ++
-              List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [hidden]))
-          (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k) = hidden := by
-    rw [readBit_inputState (hfit hidden)]
+              List.ofFn request.1.msg₀ ++ List.ofFn request.1.msg₁ ++ [request.2]))
+          (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k) = request.2 := by
+    rw [readBit_inputState (hfit request)]
     let inputPrefix := encPair encUnary encBits (securityParameter, sample.toWord) ++
-      List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁
+      List.ofFn request.1.msg₀ ++ List.ofFn request.1.msg₁
     have hprefix : inputPrefix.length =
         2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k := by
       dsimp only [inputPrefix]
@@ -1068,46 +1071,129 @@ theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
         List.length_replicate, encBits_apply, TruncatedSyndromeSample.length_toWord,
         List.length_ofFn]
       omega
-    change (inputPrefix ++ [hidden]).getD
-      (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k) false = hidden
-    rw [List.getD_append_right inputPrefix [hidden] false _ (by omega), hprefix]
+    change (inputPrefix ++ [request.2]).getD
+      (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k) false = request.2
+    rw [List.getD_append_right inputPrefix [request.2] false _ (by omega), hprefix]
     simp
-  have hserviceHidden (hidden : Bool) :
+  have hserviceHidden (request : MessagePair (PKEMessage P) × Bool) :
       readBit
           (classicalRun (b2ServiceCodes P securityParameter encoder)
             (inputState (b2ServiceDescription P securityParameter encoder).width
               (encPair encUnary encBits (securityParameter, sample.toWord) ++
-                List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [hidden])))
-          (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k) = hidden := by
+                List.ofFn request.1.msg₀ ++ List.ofFn request.1.msg₁ ++ [request.2])))
+          (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k) = request.2 := by
     rw [readBit_classicalRun_b2ServiceCodes_quantumInput P securityParameter encoder _
       ⟨2 * P.k, by omega⟩, hinputHidden]
   have hserviceReply :
-      (fun hidden : Bool =>
+      (fun request : MessagePair (PKEMessage P) × Bool =>
         let environment := classicalRun (b2ServiceCodes P securityParameter encoder)
           (inputState (b2ServiceDescription P securityParameter encoder).width
             (encPair encUnary encBits (securityParameter, sample.toWord) ++
-              List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [hidden]))
+              List.ofFn request.1.msg₀ ++ List.ofFn request.1.msg₁ ++ [request.2]))
         let ciphertext := b2ServiceReadout P environment
         Fin.append
           (fun _ : Fin 1 => readBit environment
             (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k))
           (Fin.append ciphertext.u ciphertext.v)) =
-        (fun hidden : Bool =>
+        (fun request : MessagePair (PKEMessage P) × Bool =>
           let ciphertext := sample.toPKECiphertext P
-            (encoder.eval interpretation) (messages.select hidden)
-          Fin.append (fun _ : Fin 1 => hidden) (Fin.append ciphertext.u ciphertext.v)) := by
-    funext hidden
+            (encoder.eval interpretation) (request.1.select request.2)
+          Fin.append (fun _ : Fin 1 => request.2) (Fin.append ciphertext.u ciphertext.v)) := by
+    funext request
     dsimp only
     rw [hserviceHidden]
-    rw [b2ServiceReadout_classicalRun P securityParameter encoder sample messages hidden]
+    rw [b2ServiceReadout_classicalRun P securityParameter encoder sample request.1 request.2]
   rw [hserviceReply]
   apply partialTraceLeft_densityConj_controlled_coherentEnvironmentRecord
-  intro hiddenLeft hiddenRight henvironment
-  have hhidden := congrArg
-    (fun state => readBit state
-      (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k))
-    henvironment
-  rw [hserviceHidden hiddenLeft, hserviceHidden hiddenRight] at hhidden
-  exact hhidden
+  let requestWord : MessagePair (PKEMessage P) × Bool → List Bool :=
+    fun request =>
+      encPair encUnary encBits (securityParameter, sample.toWord) ++
+        List.ofFn request.1.msg₀ ++ List.ofFn request.1.msg₁ ++ [request.2]
+  have hrequestWord : Function.Injective requestWord := by
+    rintro ⟨messagesLeft, hiddenLeft⟩ ⟨messagesRight, hiddenRight⟩ hword
+    have htail :
+        List.ofFn messagesLeft.msg₀ ++ (List.ofFn messagesLeft.msg₁ ++ [hiddenLeft]) =
+          List.ofFn messagesRight.msg₀ ++ (List.ofFn messagesRight.msg₁ ++ [hiddenRight]) := by
+      apply List.append_right_injective
+        (encPair encUnary encBits (securityParameter, sample.toWord))
+      simpa only [requestWord, List.append_assoc] using hword
+    have hmessageZeroList :
+        List.ofFn messagesLeft.msg₀ = List.ofFn messagesRight.msg₀ := by
+      calc
+        List.ofFn messagesLeft.msg₀ =
+            List.take (List.ofFn messagesLeft.msg₀).length
+              (List.ofFn messagesLeft.msg₀ ++
+                (List.ofFn messagesLeft.msg₁ ++ [hiddenLeft])) :=
+          List.take_append_length.symm
+        _ = List.take (List.ofFn messagesLeft.msg₀).length
+              (List.ofFn messagesRight.msg₀ ++
+                (List.ofFn messagesRight.msg₁ ++ [hiddenRight])) := congrArg _ htail
+        _ = List.take (List.ofFn messagesRight.msg₀).length
+              (List.ofFn messagesRight.msg₀ ++
+                (List.ofFn messagesRight.msg₁ ++ [hiddenRight])) := by
+          simp only [List.length_ofFn]
+        _ = List.ofFn messagesRight.msg₀ := List.take_append_length
+    have hrest :
+        List.ofFn messagesLeft.msg₁ ++ [hiddenLeft] =
+          List.ofFn messagesRight.msg₁ ++ [hiddenRight] := by
+      rw [hmessageZeroList] at htail
+      exact List.append_right_injective (List.ofFn messagesRight.msg₀) htail
+    have hmessageOneList :
+        List.ofFn messagesLeft.msg₁ = List.ofFn messagesRight.msg₁ := by
+      calc
+        List.ofFn messagesLeft.msg₁ =
+            List.take (List.ofFn messagesLeft.msg₁).length
+              (List.ofFn messagesLeft.msg₁ ++ [hiddenLeft]) :=
+          List.take_append_length.symm
+        _ = List.take (List.ofFn messagesLeft.msg₁).length
+              (List.ofFn messagesRight.msg₁ ++ [hiddenRight]) := congrArg _ hrest
+        _ = List.take (List.ofFn messagesRight.msg₁).length
+              (List.ofFn messagesRight.msg₁ ++ [hiddenRight]) := by
+          simp only [List.length_ofFn]
+        _ = List.ofFn messagesRight.msg₁ := List.take_append_length
+    have hhidden : hiddenLeft = hiddenRight := by
+      rw [hmessageOneList] at hrest
+      have hsingleton := List.append_right_injective (List.ofFn messagesRight.msg₁) hrest
+      exact (List.cons.inj hsingleton).1
+    have hmessages : messagesLeft = messagesRight :=
+      MessagePair.equivProd.injective
+        (Prod.ext (List.ofFn_injective hmessageZeroList)
+          (List.ofFn_injective hmessageOneList))
+    exact Prod.ext
+      hmessages hhidden
+  intro requestLeft requestRight henvironment
+  apply hrequestWord
+  have hinput := congrArg
+    (classicalUnrun (b2ServiceCodes P securityParameter encoder)) henvironment
+  rw [classicalUnrun_classicalRun
+      (isClassical_b2ServiceDescription P securityParameter encoder),
+    classicalUnrun_classicalRun
+      (isClassical_b2ServiceDescription P securityParameter encoder)] at hinput
+  have hbits := congrArg List.ofFn hinput
+  rw [ofFn_inputState (hfit requestLeft), ofFn_inputState (hfit requestRight)] at hbits
+  change
+    requestWord requestLeft ++
+        List.replicate ((b2ServiceDescription P securityParameter encoder).width -
+          (requestWord requestLeft).length) false =
+      requestWord requestRight ++
+        List.replicate ((b2ServiceDescription P securityParameter encoder).width -
+          (requestWord requestRight).length) false at hbits
+  have hlength : (requestWord requestLeft).length = (requestWord requestRight).length := by
+    simp only [requestWord, List.length_append, List.length_ofFn, List.length_singleton]
+  calc
+    requestWord requestLeft =
+        List.take (requestWord requestLeft).length
+          (requestWord requestLeft ++
+            List.replicate ((b2ServiceDescription P securityParameter encoder).width -
+              (requestWord requestLeft).length) false) := List.take_append_length.symm
+    _ = List.take (requestWord requestLeft).length
+          (requestWord requestRight ++
+            List.replicate ((b2ServiceDescription P securityParameter encoder).width -
+              (requestWord requestRight).length) false) := congrArg _ hbits
+    _ = List.take (requestWord requestRight).length
+          (requestWord requestRight ++
+            List.replicate ((b2ServiceDescription P securityParameter encoder).width -
+              (requestWord requestRight).length) false) := by rw [hlength]
+    _ = requestWord requestRight := List.take_append_length
 
 end Cslib.Crypto.HQC
