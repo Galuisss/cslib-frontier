@@ -130,11 +130,10 @@ private theorem step_compile {w : ℕ} {code : List (Instr M L)}
     refine ⟨z, n + m, by omega, ?_, hz.with_pc _⟩
     simpa only [Instr.next, hcond, mul_ite] using hr.trans hmrun
   | _ =>
-    all_goals
-      simp only [rawBlock] at hc
-      have hr := he.runs hc.append_left
-      refine ⟨z, n + 1, by omega, hr.tail _ _ _ _ ?_, hz.with_pc _⟩
-      exact Cslib.WordRAM.step_jump
+    simp only [rawBlock] at hc
+    have hr := he.runs hc.append_left
+    refine ⟨z, n + 1, by omega, hr.tail _ _ _ _ ?_, hz.with_pc _⟩
+    exact Cslib.WordRAM.step_jump
         (by simpa only [Cslib.WordRAM.Code.length_assemble, Instr.next] using hc.append_right.head)
 
 /-- Compile a run from represented input, preserving the complete final state. The overhead is

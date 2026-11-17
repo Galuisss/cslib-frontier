@@ -46,14 +46,14 @@ private def initial (query : ℕ) : State model (layout 2 2) where
 
 private def source (_ : Fin 3) : Fin 4 := 3
 
-private def code : List (Instr model (layout 2 2)) :=
+private def sampleCode : List (Instr model (layout 2 2)) :=
   AVLTree.PointerMachine.insert (M := model) false true 0 1 2 1 source
 
 -- An arbitrary query has an actual finite-program execution with the complete insertion
 -- outcome. It preserves non-height scalar fields of all old records, including the unrelated
 -- third record; it does not assert a full frame for that record's pointer and height fields.
 example (query : ℕ) : ∃ t result time,
-    Executes code (initial query) t time ∧ time ≤ 315 ∧
+    Executes sampleCode (initial query) t time ∧ time ≤ 315 ∧
     InsertResult id 1 source (initial query) t tree result original := by
   have valid : original.Valid := by
     simp [original, AVLTree.Valid, AVLTree.Ordered, AVLTree.HeightConsistent,
@@ -70,7 +70,7 @@ example (query : ℕ) : ∃ t result time,
   exact ⟨t, result, time, exec, bound, outcome⟩
 
 private def after (query : ℕ) : State model (layout 2 2) :=
-  (fun x => (step code x).getD x)^[315] (initial query)
+  (fun x => (step sampleCode x).getD x)^[315] (initial query)
 
 -- Single rotation promotes the old left child; double rotation promotes the fresh node.
 example : (after 5).ptr 1 = some 1 ∧ (after 5).heap.length = 4 := by decide +kernel
