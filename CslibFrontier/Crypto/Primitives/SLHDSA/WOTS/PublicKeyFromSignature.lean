@@ -234,8 +234,6 @@ def wotsPkFromSigWithCalls (family : HashFamily) {p : SecurityBytes} (sig : Sign
     (haddress : ValidHashAddress address) : PublicKeyFromSigRun p :=
   { output := tL family (len p) publicSeed (publicKeyAddress address)
       (publicKeyInput family sig M publicSeed address haddress)
-      (validTInput_of_blocks_le_67 family publicSeed (publicKeyAddress address)
-        (publicKeyInput family sig M publicSeed address haddress) (len_le_67 p))
     calls :=
       { chainTraversals := len p
         chainAddressWrites := len p
@@ -279,9 +277,7 @@ theorem wotsPkFromSig_eq (family : HashFamily) {p : SecurityBytes} (sig : Signat
     (haddress : ValidHashAddress address) :
     wotsPkFromSig family sig M publicSeed address haddress =
       tL family (len p) publicSeed (publicKeyAddress address)
-        (publicKeyInput family sig M publicSeed address haddress)
-        (validTInput_of_blocks_le_67 family publicSeed (publicKeyAddress address)
-          (publicKeyInput family sig M publicSeed address haddress) (len_le_67 p)) :=
+        (publicKeyInput family sig M publicSeed address haddress) :=
   rfl
 
 /-- Algorithm 8 expanded directly into its digit-selected chains, canonical block concatenation,
@@ -299,17 +295,7 @@ theorem wotsPkFromSig_eq_direct (family : HashFamily) {p : SecurityBytes} (sig :
                 simpa only [ValidHashAddress, Address.setChainAddress] using haddress) (by
                 unfold ValidChainRange
                 have hi := (digits M i).isLt
-                omega))
-        (validTInput_of_blocks_le_67 family publicSeed (publicKeyAddress address)
-          (blocksEquiv.symm fun i =>
-            chain family (sig i) (digits M i).val (w - 1 - (digits M i).val) publicSeed
-              (address.setChainAddress
-                ⟨i, i.isLt.trans_le ((len_le_67 p).trans (by decide))⟩) (by
-                  simpa only [ValidHashAddress, Address.setChainAddress] using haddress) (by
-                  unfold ValidChainRange
-                  have hi := (digits M i).isLt
-                  omega))
-          (len_le_67 p)) :=
+                omega)) :=
   by rw [wotsPkFromSig_eq, publicKeyInput_eq_direct]
 
 @[simp] theorem publicKeyFromSigCalls_fCalls {p : SecurityBytes} (M : Message p) :
