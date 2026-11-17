@@ -292,18 +292,12 @@ def sha256Bytes (input : List Byte) : List Byte :=
 def sha512Bytes (input : List Byte) : List Byte :=
   (sha512StateBytes (sha512State input)).toList
 
-private theorem sha256Bytes_eq_toList_private (input : List Byte) :
-    sha256Bytes input = (sha256 input).toList := rfl
-
-private theorem sha512Bytes_eq_toList_private (input : List Byte) :
-    sha512Bytes input = (sha512 input).toList := rfl
-
 /-- The materialized SHA-256 digest is byte-for-byte the existing typed digest. -/
 theorem sha256Bytes_eq_toList (input : List Byte) : sha256Bytes input = (sha256 input).toList :=
-  sha256Bytes_eq_toList_private input
+  (rfl)
 
 /-- The materialized SHA-512 digest is byte-for-byte the existing typed digest. -/
 theorem sha512Bytes_eq_toList (input : List Byte) : sha512Bytes input = (sha512 input).toList :=
-  sha512Bytes_eq_toList_private input
+  (rfl)
 
 end Cslib.Crypto.SHA2

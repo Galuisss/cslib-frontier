@@ -174,29 +174,19 @@ def mgf1SHA512 (seed : List Byte) (maskLen : ℕ)
   let output := mgf1SHA512Bytes seed maskLen hinput
   fun i => output.getD i.val 0
 
-private theorem ofFn_mgf1SHA256_private (seed : List Byte) (maskLen : ℕ)
+/-- Enumerating the typed SHA-256 MGF1 output gives the materialized bytes exactly. -/
+theorem ofFn_mgf1SHA256 (seed : List Byte) (maskLen : ℕ)
     (hinput : ValidMGF1SHA256Input maskLen) :
     List.ofFn (mgf1SHA256 seed maskLen hinput) = mgf1SHA256Bytes seed maskLen hinput := by
   unfold mgf1SHA256 mgf1SHA256Bytes
   exact List.ofFn_getD_eq_of_length 0 (length_sha256Output seed maskLen)
 
-private theorem ofFn_mgf1SHA512_private (seed : List Byte) (maskLen : ℕ)
+/-- Enumerating the typed SHA-512 MGF1 output gives the materialized bytes exactly. -/
+theorem ofFn_mgf1SHA512 (seed : List Byte) (maskLen : ℕ)
     (hinput : ValidMGF1SHA512Input maskLen) :
     List.ofFn (mgf1SHA512 seed maskLen hinput) = mgf1SHA512Bytes seed maskLen hinput := by
   unfold mgf1SHA512 mgf1SHA512Bytes
   exact List.ofFn_getD_eq_of_length 0 (length_sha512Output seed maskLen)
-
-/-- Enumerating the typed SHA-256 MGF1 output gives the materialized bytes exactly. -/
-theorem ofFn_mgf1SHA256 (seed : List Byte) (maskLen : ℕ)
-    (hinput : ValidMGF1SHA256Input maskLen) :
-    List.ofFn (mgf1SHA256 seed maskLen hinput) = mgf1SHA256Bytes seed maskLen hinput :=
-  ofFn_mgf1SHA256_private seed maskLen hinput
-
-/-- Enumerating the typed SHA-512 MGF1 output gives the materialized bytes exactly. -/
-theorem ofFn_mgf1SHA512 (seed : List Byte) (maskLen : ℕ)
-    (hinput : ValidMGF1SHA512Input maskLen) :
-    List.ofFn (mgf1SHA512 seed maskLen hinput) = mgf1SHA512Bytes seed maskLen hinput :=
-  ofFn_mgf1SHA512_private seed maskLen hinput
 
 /-- A shorter valid SHA-256 MGF1 mask is the corresponding prefix of any longer valid mask. -/
 theorem mgf1SHA256_prefix (seed : List Byte) {shorter longer : ℕ}
