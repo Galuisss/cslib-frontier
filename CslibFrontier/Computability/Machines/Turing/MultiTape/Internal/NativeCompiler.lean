@@ -34,6 +34,11 @@ exact encoded source and emitted-result lengths; `time` and `workspace` apply on
 machine is executed.
 In particular, using a precompiled result does not pay compiler runtime, but a result used as code
 still carries its `outputBits` program-size charge. No scalar total is built into this kernel.
+Each coordinate counts one concrete artifact occurrence: a separately stored copy must be charged
+again by the enclosing certificate. Thus a payload hardwired into the compiler description and a
+copy emitted as output are distinct artifacts, not double counting. The constructor clocks charge
+their actual copying, framing, rewinding and intermediate marshalling; they provide no free scan of
+an encoded program through finite control.
 
 The constructors use the existing machine combinators directly. In particular, they do not select
 a machine from `ComputableInPolyTime`, `ComputableInO`, `ComputableInDegree`, or a normal-form
@@ -45,6 +50,8 @@ The constructors assemble fixed machine terms at the proof level; they are not a
 generator. The functions and encodings in their types specify behavior and resource expressions,
 not callbacks executed outside the packaged machine. A compiler that receives descriptions at
 runtime must itself be a `NativeCompiler` whose machine performs that encoded transformation.
+Oracle handlers, query/service implementations and universal interpretation are not coordinates of
+this deterministic kernel and must be added separately by constructions that use them.
 
 This is a bounded internal prerequisite for concrete compilers. It does not claim that an arbitrary
 existential computability proof can be extracted into a `NativeCompiler`.
@@ -53,11 +60,20 @@ existential computability proof can be extracted into a `NativeCompiler`.
 
 * `Turing.MultiTapeTM.Internal.NativeCompiler`: a named native machine and resource certificate.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.staticBits`: exact encoded compiler-machine length.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.stateBound`: numeric range of the recorded state
+  encoding, computed from its actual codes rather than from state cardinality.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.fintypeStateEncoding`: canonical numeric enumeration
+  for an inferred finite combinator-state type.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.transducerMachineStateEncoding`: constructive
+  encoding of the full control state produced by `Transducer.toTM`.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.inputBits`: exact encoded input length.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.outputBits`: exact encoded output length.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.identity`: the copy-and-rewind machine.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.const`: a named constant-output machine.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.ofInputEq`, `.ofOutputEq`: zero-runtime semantic
+  retyping when the actual input or output words agree.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.comp`: direct machine composition.
+* `Turing.MultiTapeTM.Internal.NativeCompiler.append`: direct raw-word output concatenation.
 * `Turing.MultiTapeTM.Internal.NativeCompiler.pair`: direct standard-pair construction.
 
 ## Main results
@@ -113,9 +129,26 @@ namespace NativeCompiler
   (Equiv.optionEquivSumPUnit S).toEmbedding.trans
     (sumStateEncoding state (Function.Embedding.punit 0))
 
+/-- Constructive encoding of the transducer machine's source state, pending output bit and
+end-of-input flag. -/
+@[expose] def transducerMachineStateEncoding {State : Type}
+    (stateEncoding : State ↪ ℕ) : State × Option Bool × Bool ↪ ℕ :=
+  prodStateEncoding stateEncoding
+    (prodStateEncoding (optionStateEncoding eBit) eBit)
+
 /-- The unique unit state is encoded as zero. -/
 @[expose] def unitStateEncoding : Unit ↪ ℕ :=
   ⟨fun _ => 0, by intro a b _; cases a; cases b; rfl⟩
+
+/-- Canonical numeric enumeration of an inferred finite state type. This is useful for deeply
+nested direct combinators whose state type is fixed by the machine term itself. -/
+@[expose] noncomputable def fintypeStateEncoding (State : Type*) [Fintype State] : State ↪ ℕ :=
+  (Fintype.equivFin State).toEmbedding.trans Fin.valEmbedding
+
+/-- The canonical finite-state enumeration lies in its actual `Fintype.card` range. -/
+theorem fintypeStateEncoding_lt_card (State : Type*) [Fintype State] (state : State) :
+    fintypeStateEncoding State state < Fintype.card State :=
+  (Fintype.equivFin State state).isLt
 
 /-- Explicit encoding of the input-rewinding states. -/
 @[expose] def rewindStateEncoding : RewindState ↪ ℕ :=
@@ -171,6 +204,25 @@ theorem staticBits_eq_descLen {α β : Type*} {f : α → β} {encIn : α ↪ Li
     compiler.staticBits = descLen compiler.description :=
   rfl
 
+/-- One past the largest numeric code used by the recorded control-state encoding. This is an
+actual-code bound, not the cardinality of the state type. -/
+@[expose] noncomputable def stateBound {α β : Type*} {f : α → β}
+    {encIn : α ↪ List Bool} {encOut : β ↪ List Bool}
+    (compiler : NativeCompiler f encIn encOut) : ℕ := by
+  letI := compiler.stateFintype
+  exact Finset.univ.sup (fun state => compiler.stateEncoding state) + 1
+
+/-- Every recorded state code lies strictly below `stateBound`. -/
+theorem stateEncoding_lt_stateBound {α β : Type*} {f : α → β}
+    {encIn : α ↪ List Bool} {encOut : β ↪ List Bool}
+    (compiler : NativeCompiler f encIn encOut) (state : compiler.State) :
+    compiler.stateEncoding state < compiler.stateBound := by
+  let := compiler.stateFintype
+  have h := Finset.le_sup (s := Finset.univ)
+    (f := fun state => compiler.stateEncoding state) (Finset.mem_univ state)
+  simp only [stateBound]
+  omega
+
 /-- Forget tidiness while retaining the same named machine and independent bounds. -/
 theorem computesInTimeAndSpace {α β : Type*} {f : α → β} {encIn : α ↪ List Bool}
     {encOut : β ↪ List Bool} (compiler : NativeCompiler f encIn encOut) :
@@ -186,6 +238,58 @@ theorem computableInTimeAndSpace {α β : Type*} {f : α → β} {encIn : α ↪
   ⟨compiler.tapeCount, compiler.State, @Finite.of_fintype _ compiler.stateFintype,
     compiler.machine,
     compiler.computesInTimeAndSpace⟩
+
+/-- Retype the semantic input of a named compiler when its actual input word is unchanged. The
+same machine is retained and no runtime callback is introduced. -/
+@[expose] noncomputable def ofInputEq {α β γ : Type*} {f : β → γ}
+    {encIn : α ↪ List Bool} {encMid : β ↪ List Bool} {encOut : γ ↪ List Bool}
+    (compiler : NativeCompiler f encMid encOut) (toInput : α → β)
+    (henc : ∀ input, encIn input = encMid (toInput input)) :
+    NativeCompiler (fun input => f (toInput input)) encIn encOut :=
+  { tapeCount := compiler.tapeCount
+    State := compiler.State
+    stateFintype := compiler.stateFintype
+    machine := compiler.machine
+    stateEncoding := compiler.stateEncoding
+    time := fun input => compiler.time (toInput input)
+    workspace := fun input => compiler.workspace (toInput input)
+    computes := fun input => by
+      rw [henc input]
+      exact compiler.computes (toInput input) }
+
+/-- Retype the semantic output of a named compiler when the actual emitted word is unchanged. The
+same machine and resource maps are retained. -/
+@[expose] noncomputable def ofOutputEq {α β γ : Type*} {f : α → β} {g : α → γ}
+    {encIn : α ↪ List Bool} {encMid : β ↪ List Bool} {encOut : γ ↪ List Bool}
+    (compiler : NativeCompiler f encIn encMid)
+    (henc : ∀ input, encOut (g input) = encMid (f input)) :
+    NativeCompiler g encIn encOut :=
+  { tapeCount := compiler.tapeCount
+    State := compiler.State
+    stateFintype := compiler.stateFintype
+    machine := compiler.machine
+    stateEncoding := compiler.stateEncoding
+    time := compiler.time
+    workspace := compiler.workspace
+    computes := fun input => by
+      rw [henc input]
+      exact compiler.computes input }
+
+/-- Input retyping preserves the actual named machine definitionally. -/
+theorem machine_ofInputEq {α β γ : Type*} {f : β → γ}
+    {encIn : α ↪ List Bool} {encMid : β ↪ List Bool} {encOut : γ ↪ List Bool}
+    (compiler : NativeCompiler f encMid encOut) (toInput : α → β)
+    (henc : ∀ input, encIn input = encMid (toInput input)) :
+    (compiler.ofInputEq toInput henc).machine = compiler.machine :=
+  rfl
+
+/-- Output retyping preserves the actual named machine definitionally. -/
+theorem machine_ofOutputEq {α β γ : Type*} {f : α → β} {g : α → γ}
+    {encIn : α ↪ List Bool} {encMid : β ↪ List Bool} {encOut : γ ↪ List Bool}
+    (compiler : NativeCompiler f encIn encMid)
+    (henc : ∀ input, encOut (g input) = encMid (f input)) :
+    (compiler.ofOutputEq henc).machine = compiler.machine :=
+  rfl
 
 /-- The named copy-and-rewind machine. -/
 @[expose] noncomputable def identity {α : Type*} (enc : α ↪ List Bool) :
@@ -325,6 +429,37 @@ theorem machine_comp {α β γ : Type*} {g : α → β} {f : β → γ}
     (outer.comp inner).machine = outer.machine.comp inner.machine true :=
   rfl
 
+/-- Concatenate the raw-word outputs of two named machines on the same input. -/
+@[expose] noncomputable def append {α : Type*} {left right : α → List Bool}
+    {encIn : α ↪ List Bool}
+    (leftCompiler : NativeCompiler left encIn encBits)
+    (rightCompiler : NativeCompiler right encIn encBits) :
+    NativeCompiler (fun input => left input ++ right input) encIn encBits := by
+  letI := leftCompiler.stateFintype
+  letI := rightCompiler.stateFintype
+  letI : Fintype (leftCompiler.State ⊕ rightCompiler.State) := inferInstance
+  exact {
+    tapeCount := max leftCompiler.tapeCount rightCompiler.tapeCount
+    State := leftCompiler.State ⊕ rightCompiler.State
+    machine := appendTM leftCompiler.machine rightCompiler.machine
+    stateEncoding := sumStateEncoding leftCompiler.stateEncoding rightCompiler.stateEncoding
+    time := fun input => leftCompiler.time input + rightCompiler.time input
+    workspace := fun input => leftCompiler.workspace input + rightCompiler.workspace input +
+      2 * max leftCompiler.tapeCount rightCompiler.tapeCount
+    computes := fun input => by
+      simpa only [encBits_apply] using
+        (leftCompiler.computes input).append (rightCompiler.computes input)
+  }
+
+/-- Raw-word concatenation retains the actual append kernel. -/
+theorem machine_append {α : Type*} {left right : α → List Bool}
+    {encIn : α ↪ List Bool}
+    (leftCompiler : NativeCompiler left encIn encBits)
+    (rightCompiler : NativeCompiler right encIn encBits) :
+    (append leftCompiler rightCompiler).machine =
+      appendTM leftCompiler.machine rightCompiler.machine :=
+  rfl
+
 /-- The named finite-state transducer that frames an encoded value. -/
 @[expose] noncomputable def encodeFrame {β : Type*} (enc : β ↪ List Bool) :
     NativeCompiler (fun b => frame (enc b)) enc encBits := by
@@ -337,8 +472,7 @@ theorem machine_comp {α β γ : Type*} {g : α → β} {f : β → γ}
     State := FrameState
     machine := frameMachine
     stateEncoding := sumStateEncoding
-      (prodStateEncoding unitStateEncoding
-        (prodStateEncoding (optionStateEncoding eBit) eBit))
+      (transducerMachineStateEncoding unitStateEncoding)
       rewindStateEncoding
     time := fun b => 4 * (enc b).length + 8
     workspace := fun _ => 0
@@ -351,11 +485,12 @@ theorem machine_encodeFrame {β : Type*} (enc : β ↪ List Bool) :
     (encodeFrame enc).machine = Encodings.frameT.toTM.seq (rewindInput Bool) :=
   rfl
 
-universe u
+universe u v w
 
 /-- Direct standard-pair construction from two named machines on a common input. The left encoded
 output is framed by `encodeFrame`, then the right output is appended. -/
-@[expose] noncomputable def pair {α β γ : Type u} {f : α → β} {g : α → γ}
+@[expose] noncomputable def pair {α : Type u} {β : Type v} {γ : Type w}
+    {f : α → β} {g : α → γ}
     {encIn : α ↪ List Bool} {encLeft : β ↪ List Bool} {encRight : γ ↪ List Bool}
     (left : NativeCompiler f encIn encLeft) (right : NativeCompiler g encIn encRight) :
     NativeCompiler (fun a => (f a, g a)) encIn (encPair encLeft encRight) := by
@@ -377,7 +512,8 @@ output is framed by `encodeFrame`, then the right output is appended. -/
   }
 
 /-- Pairing retains the actual framing, composition and append machine terms. -/
-theorem machine_pair {α β γ : Type u} {f : α → β} {g : α → γ}
+theorem machine_pair {α : Type u} {β : Type v} {γ : Type w}
+    {f : α → β} {g : α → γ}
     {encIn : α ↪ List Bool} {encLeft : β ↪ List Bool} {encRight : γ ↪ List Bool}
     (left : NativeCompiler f encIn encLeft) (right : NativeCompiler g encIn encRight) :
     (left.pair right).machine =
