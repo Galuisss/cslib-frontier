@@ -1940,6 +1940,7 @@ public import CslibFrontier.Computability.Complexity.Classes.BPP.Collapse
 public import CslibFrontier.Computability.Complexity.Classes.BPP.Derandomization
 public import CslibFrontier.Computability.Complexity.Classes.BPP.Derandomization.CanonicalDerandomizer
 public import CslibFrontier.Computability.Complexity.Classes.BPP.Derandomization.CircuitPRG
+public import CslibFrontier.Computability.Complexity.Classes.BPP.Derandomization.GeneralTime
 public import CslibFrontier.Computability.Complexity.Classes.BPP.Derandomization.Generator
 public import CslibFrontier.Computability.Complexity.Classes.BPP.Derandomization.SeedEnumeration
 public import CslibFrontier.Computability.Complexity.Classes.BPP.KarpLipton
@@ -2347,6 +2348,7 @@ public import CslibFrontier.Computability.Complexity.Classes.Toda
 public import CslibFrontier.Computability.Complexity.Classes.Toda.Counting
 public import CslibFrontier.Computability.Complexity.Classes.Toda.Hierarchy
 public import CslibFrontier.Computability.Complexity.Classes.Toda.Isolation
+public import CslibFrontier.Computability.Complexity.Classes.Toda.SharpSAT
 public import CslibFrontier.Computability.Complexity.Classes.TruncatedVerifier
 public import CslibFrontier.Computability.Complexity.Classes.UP
 public import CslibFrontier.Computability.Complexity.Classes.UP.Machine
@@ -2509,6 +2511,8 @@ public import CslibFrontier.Computability.Complexity.Problems.CSP.Hardness
 public import CslibFrontier.Computability.Complexity.Problems.CSP.Horn
 public import CslibFrontier.Computability.Complexity.Problems.CSP.Incidence
 public import CslibFrontier.Computability.Complexity.Problems.CSP.Majority
+public import CslibFrontier.Computability.Complexity.Problems.CSP.RotationSAT
+public import CslibFrontier.Computability.Complexity.Problems.CSP.RotationSAT.Tractable
 public import CslibFrontier.Computability.Complexity.Problems.CSP.RotationSystem
 public import CslibFrontier.Computability.Complexity.Problems.CSP.RotationSystem.AdjacentIdentification
 public import CslibFrontier.Computability.Complexity.Problems.CSP.RotationSystem.AppendScope
@@ -2831,6 +2835,7 @@ public import CslibFrontier.Computability.Complexity.Problems.TSP
 public import CslibFrontier.Computability.Complexity.Problems.TSP.Approximation
 public import CslibFrontier.Computability.Complexity.Problems.TSP.Christofides
 public import CslibFrontier.Computability.Complexity.Problems.TSP.HeldKarp
+public import CslibFrontier.Computability.Complexity.Problems.TSP.Symmetric
 public import CslibFrontier.Computability.Complexity.Problems.Tautology
 public import CslibFrontier.Computability.Complexity.Problems.ThreeSAT
 public import CslibFrontier.Computability.Complexity.Problems.ThreeSAT.Collapse
@@ -3647,6 +3652,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Ker
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelOnWords
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelReverse
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelStackLoop
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelStreamTable
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelTakeDropUnary
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelTransducer
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.KernelZeroSpace
@@ -3719,6 +3725,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.Prog
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.Sequential
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.Simulation
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.Space
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.WorkCursor
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Map
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Nondeterministic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.OutView
@@ -3884,6 +3891,7 @@ public import CslibFrontier.Computability.PCP.Amplification
 public import CslibFrontier.Computability.PCP.Amplification.Arithmetic
 public import CslibFrontier.Computability.PCP.Amplification.Family
 public import CslibFrontier.Computability.PCP.Amplifier
+public import CslibFrontier.Computability.PCP.Approximation.AssignmentGraph
 public import CslibFrontier.Computability.PCP.Approximation.BinPacking
 public import CslibFrontier.Computability.PCP.Approximation.Hastad
 public import CslibFrontier.Computability.PCP.Approximation.Hastad.LinearTest
@@ -3964,6 +3972,7 @@ public import CslibFrontier.Computability.PCP.ThreeSAT
 public import CslibFrontier.Computability.PCP.TwoProverGame
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSH
 public import CslibFrontier.Computability.PCP.TwoProverGame.Quantum
+public import CslibFrontier.Computability.PCP.TwoProverGame.RotationStrategy
 public import CslibFrontier.Computability.PCP.TwoProverGame.Tsirelson
 public import CslibFrontier.Computability.Pebbling.Basic
 public import CslibFrontier.Computability.Pebbling.BinaryTree
@@ -4267,6 +4276,7 @@ public import CslibFrontier.Computability.RelationAlgebra.Tiling.Frame
 public import CslibFrontier.Computability.RelationAlgebra.Tiling.Reduction
 public import CslibFrontier.Computability.RelationAlgebra.Tiling.TilingOfWinning
 public import CslibFrontier.Computability.RelationAlgebra.Tiling.WinningOfTiling
+public import CslibFrontier.Computability.RelationAlgebra.Undecidable
 public import CslibFrontier.Computability.StreamArithmetic.EstimatorRecipes
 public import CslibFrontier.Computability.StreamArithmetic.Interface
 public import CslibFrontier.Computability.StreamArithmetic.Primitives
@@ -4366,6 +4376,7 @@ public import CslibFrontier.Computability.WangTile.Robinson.Signals
 public import CslibFrontier.Computability.WangTile.Robinson.Tiles
 public import CslibFrontier.Computability.WangTile.Routing
 public import CslibFrontier.Computability.WangTile.SeededUndecidable
+public import CslibFrontier.Computability.WangTile.TilesPlaneOfEveryTileOccurs
 public import CslibFrontier.Computability.WangTile.Undecidable
 public import CslibFrontier.Computability.WordRAM.Admission
 public import CslibFrontier.Computability.WordRAM.Allocation
@@ -4627,6 +4638,7 @@ public import CslibFrontier.Crypto.Computational.Falcon.BerExp
 public import CslibFrontier.Crypto.Computational.Falcon.BerExpLazy
 public import CslibFrontier.Crypto.Computational.Falcon.Verification
 public import CslibFrontier.Crypto.Computational.Falcon.VerificationFrontend
+public import CslibFrontier.Crypto.Computational.FarIndistinguishable
 public import CslibFrontier.Crypto.Computational.FlipHeadBit
 public import CslibFrontier.Crypto.Computational.ForgerBridge
 public import CslibFrontier.Crypto.Computational.FuzzyExtractor.Basic
@@ -5114,6 +5126,7 @@ public import CslibFrontier.Crypto.Primitives.PRG.NisanWigderson.BitPolynomial
 public import CslibFrontier.Crypto.Primitives.PRG.NisanWigderson.Circuit
 public import CslibFrontier.Crypto.Primitives.PRG.NisanWigderson.Derandomization
 public import CslibFrontier.Crypto.Primitives.PRG.NisanWigderson.Design
+public import CslibFrontier.Crypto.Primitives.PRG.NisanWigderson.GreedyDesignSize
 public import CslibFrontier.Crypto.Primitives.PRG.NisanWigderson.MXCircuit
 public import CslibFrontier.Crypto.Primitives.PRG.NisanWigderson.Queries
 public import CslibFrontier.Crypto.Primitives.PRG.NisanWigderson.Reconstruction
@@ -6211,6 +6224,7 @@ public import CslibFrontier.Foundations.Data.Fin.Append
 public import CslibFrontier.Foundations.Data.Fin.BalancedBlocks
 public import CslibFrontier.Foundations.Data.Fin.Counting
 public import CslibFrontier.Foundations.Data.Fin.Decode
+public import CslibFrontier.Foundations.Data.Fin.Embedding
 public import CslibFrontier.Foundations.Data.Fin.Order
 public import CslibFrontier.Foundations.Data.Fin.Tuple
 public import CslibFrontier.Foundations.Data.Finset.ApplyUpdate
@@ -6837,6 +6851,7 @@ public import CslibFrontier.GameTheory.Mechanism.Vickrey
 public import CslibFrontier.GameTheory.Mechanism.VickreyVCG
 public import CslibFrontier.GameTheory.Mechanism.VirtualValue
 public import CslibFrontier.GameTheory.MixedStrategy
+public import CslibFrontier.GameTheory.PerfectInformation
 public import CslibFrontier.GameTheory.SocialChoice.Arrow
 public import CslibFrontier.GameTheory.SocialChoice.GibbardSatterthwaite
 public import CslibFrontier.GameTheory.SocialChoice.Ranking
