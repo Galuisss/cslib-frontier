@@ -5,6 +5,8 @@ Authors: Samuel Schlesinger
 -/
 
 import CslibFrontier.Computability.QueryComplexity.Quantum.Search
+import CslibFrontier.Computability.QueryComplexity.Quantum.ValueQueryUpdate
+import Mathlib.Algebra.Ring.BooleanRing
 
 /-! The quantum query model: the oracle and a satisfiable instance of the search hypothesis. -/
 
@@ -41,5 +43,21 @@ example (ψ : State 3 Unit) :
 example (ψ : State 3 Unit) :
     (phaseOracle (marked 1) ψ).ofLp (1, (false, ())) = ψ.ofLp (1, (false, ())) := by
   simp
+
+-- A single coherent XOR query records the old table entry. Reading it against an
+-- independently refreshed bit succeeds with probability 1/2, and with the old bit surely.
+private noncomputable def readBit (bit : Bool) : ValueState Unit Bool Unit :=
+  runValue addStep (fun _ => LinearIsometry.id) (ket ((), false, ())) (fun _ => bit) 1
+
+private theorem storedBit (old current : Bool) :
+    measureProb (readBit old) {((), current, ())} = if old = current then 1 else 0 := by
+  cases old <;> cases current <;>
+    simp [readBit, runValue, measureProb, valueOracle_apply, addStep_apply, Bool.zero_eq_false]
+
+open scoped BigOperators in
+example (old : Bool) :
+    (𝔼 fresh : Bool, measureProb (readBit old) {((), fresh, ())}) = (1 / 2 : ℝ) ∧
+      measureProb (readBit old) {((), old, ())} = 1 := by
+  cases old <;> norm_num [Fintype.expect_eq_sum_div_card, storedBit, Fintype.sum_bool]
 
 end CslibFrontierTests.QuantumSearch
