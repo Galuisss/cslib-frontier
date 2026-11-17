@@ -51,6 +51,12 @@ example (p : Point) : (ePoint p).length =
     2 * (encNat p.x).length + 1 + 2 * p.y.length + 1 + (encList encUnary p.z).length := by
   enc_len
 
+-- Generated scoped equations also preserve an already bounded record length when only the
+-- goal's outer pair needs expansion; the hypothesis is deliberately outside the location.
+example (p : Point) (n T : ℕ) (h : T ≤ (ePoint p).length) :
+    T ≤ (encPair ePoint encNat (p, n)).length := by
+  enc_len
+
 /-! The field and constructor rules assemble programs over the structure. -/
 
 example : ComputableInDegree (fun p : Point => Point.mk p.x p.y p.z) ePoint ePoint 1 1 := by

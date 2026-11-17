@@ -20,11 +20,13 @@ public meta import Lean.Elab.Tactic.Simp
 /-!
 # Closing bounds on encoded lengths
 
-`enc_len` first tries component-to-container bounds, then expands encoded lengths into the
-lengths of their fields and counts with `omega`.
+`enc_len` first tries component-to-container bounds, then expands standard encoded lengths and
+counts with `omega`. If that fails, it retries from the original goal with the registered
+`enc_len` equations too. Trying the standard rules first preserves opaque encoding lengths
+that are already bounded by local hypotheses, unless the caller explicitly asks to unfold them.
 
-The expansion is `simp only` with the `enc_len` simp set and the lemmas given at the call.
-The set includes the standard encodings and `nil`, `cons`, and append of `encList`.
+Both expansions use `simp only` with the lemmas given at the call. The `enc_len` simp set
+includes the standard encodings and `nil`, `cons`, and append of `encList`.
 Register a reusable encoding equation with `attribute [local enc_len] eFoo_apply`, or use
 `scoped enc_len` to activate it with its namespace. `enc_structure` registers its generated
 equations and field bounds in the same scopes as its `fun_prop` rules. A one-off equation can
@@ -50,14 +52,24 @@ namespace Cslib.Tactic.EncLen
 
 open Lean Parser.Tactic Elab Tactic Turing.MultiTapeTM
 
-attribute [enc_len] length_encPair length_frame encUnary_apply List.length_replicate
-  encBits_apply encBool_apply encOption_none encOption_some encSum_inl encSum_inr
-  encList_nil encList_cons encList_append List.length_nil List.length_cons List.length_append
+/-- The original expansion rules, before any client-specific equations are tried. Keeping this
+list separate preserves opaque lengths already bounded in hypotheses outside the location. -/
+private meta def standardRules : Array Name := #[
+  ``length_encPair, ``length_frame, ``encUnary_apply, ``List.length_replicate,
+  ``encBits_apply, ``encBool_apply, ``encOption_none, ``encOption_some,
+  ``encSum_inl, ``encSum_inr, ``encList_nil, ``encList_cons, ``List.length_nil,
+  ``List.length_cons, ``List.length_append]
+
+-- Register the standard rules from the same list used by the conservative first attempt.
+run_cmd
+  let rules := (standardRules.push ``encList_append).map mkCIdent
+  Lean.Elab.Command.elabCommand (← `(command| attribute [enc_len] $rules*))
 
 /-- `enc_len` closes a linear bound on encoded lengths: it expands standard encodings (pairs,
 frames, unary numbers, raw bit lists, Booleans, options, sums, and framed list constructors)
-and equations registered in the `enc_len` simp set, then runs `omega`. Before expanding it tries
-the component bounds in `enc_component`.
+and runs `omega`. If that fails, it retries with equations registered in the `enc_len` simp set.
+Before either expansion it tries the component bounds in `enc_component`. Opaque record lengths
+already bounded in local hypotheses can therefore remain atoms in the successful attempt.
 
 * `enc_len [eFoo_apply]` also unfolds the local encoding `eFoo`.
 * `attribute [local enc_len] eFoo_apply` registers that equation for calls in the current scope.
@@ -76,19 +88,28 @@ elab_rules : tactic
       if (← getUnsolvedGoals).isEmpty then return
     catch _ => pure ()
     saved.restore
+    let standard ← standardRules.mapM fun name => `(simpLemma| $(mkCIdent name):term)
+    let closeExpanded (rules : Array Syntax) : TacticM Unit := do
+      let rules : Syntax.TSepArray [``simpStar, ``simpErase, ``simpLemma] "," :=
+        ⟨(Syntax.mkSep (rules ++ args.map (·.raw)) (mkAtom ",")).getArgs⟩
+      try
+        evalTactic (← `(tactic| simp only [$rules,*] $[$loc]?))
+      catch ex =>
+        throwError "enc_len: the expansion failed: {ex.toMessageData}\n\
+          If there is no encoded length to expand, use `omega`."
+      if (← getUnsolvedGoals).isEmpty then return
+      let goal ← getMainGoal
+      try
+        evalTactic (← `(tactic| omega))
+      catch ex =>
+        throwError "enc_len: `omega` could not close the expanded goal. Products are atoms, so \
+          bound them by facts in context, and unfold local encodings with `enc_len [eFoo_apply]`.\n\
+          {goal}\n{ex.toMessageData}"
     try
-      evalTactic (← `(tactic| simp only [enc_len, $args,*] $[$loc]?))
-    catch ex =>
-      throwError "enc_len: the expansion failed: {ex.toMessageData}\n\
-        If there is no encoded length to expand, use `omega`."
-    if (← getUnsolvedGoals).isEmpty then return
-    let goal ← getMainGoal
-    try
-      evalTactic (← `(tactic| omega))
-    catch ex =>
-      throwError "enc_len: `omega` could not close the expanded goal. Products are atoms, so \
-        bound them by facts in context, and unfold local encodings with `enc_len [eFoo_apply]`.\n\
-        {goal}\n{ex.toMessageData}"
+      closeExpanded (standard.map (·.raw))
+      return
+    catch _ => saved.restore
+    closeExpanded #[(← `(simpLemma| enc_len)).raw]
 
 end Cslib.Tactic.EncLen
 

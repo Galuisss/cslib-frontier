@@ -88,6 +88,13 @@ open scoped EncLenScope in
 example (p : ℕ × Bool) : (eLocal p).length = 2 * p.1 + 2 := by
   enc_len
 
+-- Registered equations must not destroy a previously bounded opaque length in an untouched
+-- hypothesis. This is the shape of the graph-verifier certificate-length bound.
+open scoped EncLenScope in
+example (p : ℕ × Bool) (n T : ℕ) (h : T ≤ (eLocal p).length) :
+    T ≤ (encPair eLocal encUnary (p, n)).length := by
+  enc_len
+
 -- Framed append and collection membership use their registered standard rules.
 example (xs ys : List α) :
     (encList eA (xs ++ ys)).length = (encList eA xs).length + (encList eA ys).length := by
@@ -96,6 +103,11 @@ example (xs ys : List α) :
 example (xs : List α) (a : α) (ha : a ∈ xs) :
     (eA a).length ≤ (encList eA xs).length := by
   enc_len [ha]
+
+-- Framed append is also a late expansion: retain it as an atom when already bounded.
+example (xs ys : List α) (n T : ℕ) (h : T ≤ (encList eA (xs ++ ys)).length) :
+    T ≤ (encPair (encList eA) encUnary (xs ++ ys, n)).length := by
+  enc_len
 
 /-! Locations work as for `simp`, and hypotheses stay unexpanded otherwise. -/
 
