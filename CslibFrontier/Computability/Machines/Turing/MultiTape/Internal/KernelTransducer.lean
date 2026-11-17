@@ -164,7 +164,7 @@ public theorem computesInTimeAndSpace_toTM (input : List Symbol) :
     τ.toTM.ComputesInTimeAndSpace input (τ.run τ.q₀ input) (2 * input.length + 3) 0 := by
   obtain ⟨u, hu, pos, hrun⟩ := τ.exists_runFrom_halt τ.q₀ (Nat.zero_le input.length) []
   have hinit : τ.toTM.initCfg input = cfg input (some (τ.q₀, none, false)) ⟨0 + 1, by omega⟩ [] :=
-    by tm_step [MultiTapeNTM.initCfg, Cfg.init, cfg]
+    by tm_step
   rw [← hinit, List.drop_zero, List.nil_append] at hrun
   have hhalt : (τ.toTM.runFrom (τ.toTM.initCfg input) u).Halted := by
     rw [hrun]

@@ -98,7 +98,7 @@ theorem apply_tick (cfg : Config k Bool State Empty input)
 theorem apply_stop (cfg : Config k Bool State Empty input)
     (tape : ℤ → Option Bool) (position : ℤ) :
     (idle none 0).apply (config cfg tape position) = stopped cfg tape position := by
-  tm_step [idle, config, stopped]
+  tm_step [idle, stopped]
 
 @[simp] theorem config_inputSymbol (cfg : Config k Bool State Empty input)
     (tape : ℤ → Option Bool) (position : ℤ) :

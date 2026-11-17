@@ -127,7 +127,7 @@ theorem step_liftCfg (tm : MultiTapeTM k Bool State) (c : Cfg k Bool State input
   · rw [step_of_halt (show Cfg.Halted ⟨none, ip, wt, wp, out⟩ from rfl)]
     by_cases hv : verdict out = some true
     · rw [step_of_state (q := (none, some true)) (by simp [liftCfg, liftState, hv])]
-      tm_step [liftCfg, liftState, hv, partialize]
+      tm_step [liftCfg, hv, partialize]
     · exact step_of_halt (by simp [liftCfg, liftState, hv])
   · rw [step_of_state (q := q) rfl, step_of_state (q := (some q, verdict out)) rfl,
       inputSymbol_liftCfg, workTapeSymbols_liftCfg]

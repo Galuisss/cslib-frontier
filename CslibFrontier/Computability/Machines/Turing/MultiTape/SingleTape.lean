@@ -97,7 +97,7 @@ theorem runFrom_copyInputToWork (x : List Symbol) :
         ⟨none, p', fun _ => tapeOfList x, fun _ => 0, []⟩ := by
   have hinit : (copyInputToWork Symbol).initCfg x =
       wordsCfgAt x 1 (some (copyInputToWork Symbol).q₀) (fun _ => []) [] := by
-    tm_step [MultiTapeNTM.initCfg, wordsCfgAt]
+    tm_step
   have hval : ((1 : Fin (x.length + 2)) : ℕ) = 1 :=
     (Fin.val_one' _).trans (Nat.mod_eq_of_lt (by omega))
   have hp₀ : ((1 : Fin (x.length + 2)) : ℕ) ≠ 0 := by omega
@@ -120,7 +120,7 @@ theorem runFrom_copyInputToWork (x : List Symbol) :
   change (appendRead (copyReader Symbol) 0).runFrom
       (wordsCfgAt x 1 (some (appendRead (copyReader Symbol) 0).q₀) (fun _ => []) []) _ = _
   rw [hrun, hws', he]
-  tm_step [wordsCfgAt, hval]
+  tm_step [wordsCfgAt]
 
 /-- `BiTape.mk₁ xs` represents `tapeOfList xs` with head at `0`. -/
 theorem represents_tapeOfList (xs : List Symbol) :

@@ -72,7 +72,7 @@ lemma step_check (p : Fin (input.length + 2)) (ws : Fin k → List Symbol) (out 
     simp [Cfg.workTapeSymbols, wordsCfgAt, tapeOfList_zero]
   rw [step_of_state rfl, inputSymbol_eq_inputSymbolAt, hsym]
   rcases hc : condAt c input p ws <;> simp only [condAt] at hc <;>
-    tm_step [whileCond, combine, adaptedTr, condTest, hc, wordsCfgAt]
+    tm_step [combine, adaptedTr, condTest, hc, wordsCfgAt]
 
 /-- One round: from the test with the condition holding, the loop runs `tm` once and is back at
 the test, after at most `τ + 1` steps and with its heads within `[-σ, σ]`. -/

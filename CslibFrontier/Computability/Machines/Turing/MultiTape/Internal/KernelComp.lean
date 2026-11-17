@@ -49,7 +49,7 @@ variable {k : ℕ} {State : Type} {input : List Symbol}
 private theorem outCfg_wordsCfg (state : Option State) :
     MultiTapeTM.outCfg (Turing.wordsCfg input state (fun _ : Fin k => []) []) =
       Turing.wordsCfg input state (fun _ => []) [] := by
-  tm_step [MultiTapeTM.outCfg, Turing.wordsCfg]
+  tm_step [MultiTapeTM.outCfg]
 
 private theorem oneTapeCfg_outCfg_wordsCfg (state : Option State)
     (tapes : Fin k → List Symbol) (out : List Symbol) :
@@ -76,7 +76,7 @@ private theorem exists_runPath_rewindLast (out : List Symbol) :
       ((rewindWork Symbol).toTM.runFrom (MultiTapeTM.oneTapeCfg _ cfg) (out.length + 2)) _ _ = _
     rw [oneTapeCfg_outCfg_wordsCfg, runFrom_rewindWork_none (Symbol := Symbol)
       _ _ _ rfl le_rfl, MultiTapeTM.embed_tapeEmb]
-    tm_step [cfg, Turing.wordsCfg]
+    tm_step [cfg]
   · have hspace : run.space ≤ 1 * (out.length + 2 + 1) :=
       run.space_le_mul_time_add_one
     exact (MultiTapeTM.space_map_embedHom_le ..).trans (by omega)

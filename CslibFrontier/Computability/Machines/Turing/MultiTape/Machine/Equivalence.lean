@@ -149,7 +149,7 @@ private theorem step_eq {cfg : Cfg 0 Symbol MultiTapeTM.RewindState input}
       ⟨action.state, moveInputPos cfg.inputPos action.inputTape, cfg.workTapes,
         cfg.workTapePos, cfg.output⟩ := by
   rw [MultiTapeTM.step_of_state hstate]
-  tm_step [toTM, rewindInput, ofTr, Action.emptyOracleEquiv]
+  tm_step [toTM, rewindInput, ofTr]
 
 private theorem runFrom_walk (position : Fin (input.length + 2))
     (hposition : position.val ≤ input.length) :

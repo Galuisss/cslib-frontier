@@ -192,8 +192,8 @@ private theorem start_oReady (m₂ : MultiTapePTM k₁ Bool State₁ Operation) 
     Sequential.start (oConsumer m₂ k₀) (oReady mark k₁ cfg₀) =
       oConsumerConfig mark cfg₀
         { tapes := Cfg.init m₂.initial cfg₀.tapes.output, channels := cfg₀.channels } := by
-  tm_step [Sequential.start, oReady, oConsumerConfig, InputFromTape.config, Config.embed,
-    MultiTapeTM.embed_castAdd, MultiTapeTM.inCfg, oReserve, MultiTapeTM.embed_natAdd]
+  tm_step [oReady, oConsumerConfig, Config.embed, MultiTapeTM.embed_castAdd, oReserve,
+    MultiTapeTM.embed_natAdd]
 
 private theorem runOracleConfigFrom_oSource [DecidableEq Operation]
     (m₁ : MultiTapePTM k₀ Bool State₀ Operation) (k₁ fuel : ℕ) (x : List Bool) :

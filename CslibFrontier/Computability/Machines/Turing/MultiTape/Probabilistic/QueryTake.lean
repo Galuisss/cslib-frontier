@@ -74,7 +74,7 @@ theorem computesTidily_coinMachine (x : List Bool) :
     refine congrArg (fun f => (PMF.uniformOfFintype Bool).map f) (funext fun bit => ?_)
     refine Prod.ext ?_ rfl
     rw [Config.step, htapes]
-    tm_step [wordsCfg]
+    tm_step
   · rintro ⟨finalCfg, finalState⟩ hfinal op
     supp_cases hfinal
     simp [Config.step, hbuf op]
@@ -192,7 +192,7 @@ theorem run_copyReply (x : List Bool)
     simp only [ProbOracleComp.runWith_pure]
     congr 1
     refine Prod.ext ?_ rfl
-    tm_step [Config.step, config, hlen, hch]
+    tm_step [Config.step, config, hch]
   | succ remLimit ih =>
     intro pre h pos answer out ch hch s
     have hlt : pre.length < x.length := by subst h; simp

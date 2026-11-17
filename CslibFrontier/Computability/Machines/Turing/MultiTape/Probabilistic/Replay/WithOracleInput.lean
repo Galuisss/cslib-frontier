@@ -87,8 +87,7 @@ private theorem start_ready (machine : MultiTapePTM k Bool State Oracle)
         (AuxiliaryTape.config ((machine.extendTapes (Fin.castAddEmb r)).initialConfig input)
           (tapeOfList coins) 0 none) outer 1 := by
   tm_step [ready, MultiTapeMachine.Sequential.start, InputFromTape.config, AuxiliaryTape.config,
-    ReplayInput.initial, initialConfig, inCfg, replayWithOracle, inputFromTape,
-    MultiTapeMachine.inputFromTape]
+    ReplayInput.initial, initialConfig, inCfg]
 
 private def finish {input : List Bool} (cfg : Config k Bool State Oracle input)
     (coins outer : List Bool) : Config (k + 3) Bool (Control State) Oracle outer :=

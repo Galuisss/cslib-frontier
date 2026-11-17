@@ -104,7 +104,7 @@ public theorem transformsTapesAt_peekInput :
       ⟨some .second, p, fun _ => Function.update (tapeOfList (ws 0)) 0 (some a.isSome),
         fun _ => 1, out⟩ := by
     rw [runFrom_one, step_of_state rfl, inputSymbol_eq_inputSymbolAt]
-    tm_step [peekInput, wordsCfgAt, a, Fin.fin_one_eq_zero]
+    tm_step [peekInput, wordsCfgAt, Fin.fin_one_eq_zero]
   have h₂ : peekInput.runFrom (wordsCfgAt input p (some peekInput.q₀) ws out) 2 =
       wordsCfgAt input p none (Function.update ws 0 (peekWord a ++ w)) out := by
     rw [runFrom_succ, h₁, step_of_state rfl, inputSymbol_eq_inputSymbolAt]
@@ -145,7 +145,7 @@ public theorem transformsTapesAt_moveInput :
   have h₁ : moveInput.runFrom (wordsCfgAt input p (some moveInput.q₀) ws out) 1 =
       wordsCfgAt input (moveInputPos p (moveOfCell (ws 0).head?)) none ws out := by
     rw [runFrom_one, step_of_state rfl]
-    tm_step [moveInput, wordsCfgAt, tapeOfList_zero, Fin.fin_one_eq_zero]
+    tm_step [moveInput, wordsCfgAt, tapeOfList_zero]
   refine ⟨_, ws, [], by rw [h₁, List.append_nil], ⟨rfl, rfl, rfl⟩, ?_⟩
   exact space_le_of_workTapePos_const _ _ fun m hm => by
     rcases Nat.le_one_iff_eq_zero_or_eq_one.mp hm with rfl | rfl

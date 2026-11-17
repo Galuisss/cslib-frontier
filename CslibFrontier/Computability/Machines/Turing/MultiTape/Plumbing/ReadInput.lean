@@ -118,7 +118,7 @@ lemma core_step_end (q : Q) (u out : List Symbol) :
       coreCfg none input.length le_rfl u out := by
   rw [step_of_state rfl, inputSymbol_eq_none_of_boundary (.inr (by simp [coreCfg]; omega))]
   tm_step [core, coreTable, MultiTapeMachine.toTM, MultiTapeMachine.ofTr,
-    MultiTapeMachine.Action.emptyOracleEquiv_step, coreCfg, moveInputPos_zero]
+    MultiTapeMachine.Action.emptyOracleEquiv_step, coreCfg]
 
 /-- The run of `core` from state `q` at position `j`, where the rest of the input is `w`: after
 reading `n` symbols and emitting `e`, where `(e, n) = r.read q w`, it halts within `n + 1` steps. -/
@@ -319,7 +319,7 @@ private lemma appendOne_space_le_of (forward : MultiTapeTM 1 Symbol Unit)
               hn w out).withState (some rewind.q₀) =
             (⟨some rewind.q₀, ip, fun _ => tapeOfList w,
               fun _ => (w.length : ℤ), out⟩ : Cfg 1 Symbol RewindWorkState input) :=
-          by tm_step [coreCfg, ip]
+          by tm_step
         simp only [Cfg.withState_workTapePos]
         rw [hstart]
         have := hrewindPos ip (v ++ (r.read r.q₀ (input.drop (p.val - 1))).1) n

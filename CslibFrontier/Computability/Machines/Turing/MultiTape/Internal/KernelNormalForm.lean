@@ -114,7 +114,7 @@ def clearedCfg (l : List (Fin k)) (C : Cfg (k + k) Symbol σ input) :
 omit [DecidableEq Symbol] in
 @[simp] theorem clearedCfg_nil (C : Cfg (k + k) Symbol σ input) :
     clearedCfg (σ' := σ') [] C = C.withState none := by
-  tm_step [clearedCfg]
+  tm_step
 
 omit [DecidableEq Symbol] in
 theorem clearedCfg_cons {σ₁ : Type*} (i : Fin k) (l : List (Fin k))
@@ -157,7 +157,7 @@ theorem runFrom_clearShadowed_pairEmb (hm : m₀ ≠ m₁) {C : Cfg (k + k) Symb
     · exact h.pos_natAdd
   rw [runFrom_extendTapes, hview, runFrom_clearShadowed hm h.insert_eq h.blank]
   have hne : i.addNat k ≠ Fin.castAdd k i := by grind
-  tm_step [embed, partialInv_pairEmb, clearedCfg, pairIdx_eq_iff, hne]
+  tm_step [embed, partialInv_pairEmb, clearedCfg, pairIdx_eq_iff]
 
 /-- The control states of `clearList` for a list of length `n`. -/
 def ClearListState : ℕ → Type

@@ -165,8 +165,7 @@ theorem start_ready [Functor Choose] (machine : MultiTapeMachine k₁ Symbol Sta
     (mark : Symbol) (cfg : Config k₀ Symbol State₀ Empty input) :
     Sequential.start (consumer machine k₀) (ready mark k₁ cfg) =
       consumerConfig mark cfg (machine.initialConfig cfg.tapes.output) := by
-  tm_step [Sequential.start, ready, consumerConfig, InputFromTape.config, Config.embed,
-    MultiTapeTM.embed_castAdd, MultiTapeTM.inCfg, initialConfig, reserve,
+  tm_step [ready, consumerConfig, Config.embed, MultiTapeTM.embed_castAdd, reserve,
     MultiTapeTM.embed_natAdd]
 
 /-- The control-state embeddings of a completed buffered composition. -/

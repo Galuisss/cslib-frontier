@@ -325,7 +325,7 @@ private lemma step_check (d : Cfg k Symbol Unit input) :
   have hi : (d.withState (some (.inr () : State ⊕ Unit))).inputSymbol = d.inputSymbol := rfl
   rw [hw, hi]
   rcases hc : c d.inputSymbol d.workTapeSymbols <;>
-    tm_step [whileCond, combine, adaptedTr, WhileCond.condTest, hc]
+    tm_step [combine, adaptedTr, WhileCond.condTest, hc]
 
 /-- The step that reads the condition keeps the work-tape heads in place, so it visits at most
 `k` cells. -/

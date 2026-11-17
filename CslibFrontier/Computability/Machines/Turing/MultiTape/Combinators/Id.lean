@@ -71,7 +71,7 @@ lemma step_scan {n : ℕ} (hn : n < input.length) :
   rw [step_of_state rfl, hsym]
   simp only [copyInput, MultiTapeMachine.copyInput, MultiTapeMachine.toTM,
     MultiTapeMachine.ofTr, tr_ofTr, MultiTapeMachine.Action.emptyOracleEquiv_step]
-  tm_step [cfg, List.take_add_one]
+  tm_step [cfg]
 
 /-- On the blank at the right end of the input, the copy machine halts in place. -/
 lemma step_halt :

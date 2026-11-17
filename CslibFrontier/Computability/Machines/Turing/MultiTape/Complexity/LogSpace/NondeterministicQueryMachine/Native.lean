@@ -140,7 +140,7 @@ theorem apply_relabelAction {S S' : Type} {input : List Bool}
 
 theorem apply_routeAction {S : Type} {input : List Bool} (q : Option S)
     (c : Cfg k Bool S input) : (routeAction q).apply c = c.withState q := by
-  tm_step [routeAction, SignType.cast]
+  tm_step [routeAction]
 
 /-- The initializer is simulated step for step until its first halt. -/
 theorem step_init {input : List Bool} (choice : Bool) (c : Cfg k Bool SI input)

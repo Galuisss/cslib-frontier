@@ -129,7 +129,7 @@ noncomputable def outputToWord (machine : MultiTapePTM k Bool State Operation) :
 /-- Redirecting the output of a blank `wordsCfg` configuration adds a blank last work tape. -/
 private theorem outCfg_wordsCfg_nil (x : List Bool) (q : Option State) :
     outCfg (wordsCfg x q (fun _ : Fin k => []) []) = wordsCfg x q (fun _ => []) [] := by
-  tm_step [outCfg, wordsCfg]
+  tm_step [outCfg]
 
 /-- Rewinding the last work tape of `outCfg (wordsCfg x _ (fun _ => []) w)` in `r + 2` steps for
 any `w.length ≤ r` leaves `w` on the last work tape and halts. -/
@@ -149,7 +149,7 @@ private theorem runFrom_rewindLast {w : List Bool} {r : ℕ} (hr : w.length ≤ 
       ⟨none, 1, fun _ => tapeOfList w, fun _ => 0, []⟩ := by
     rw [runFrom_eq_of_halt _ _ (by omega : w.length + 2 ≤ r + 2) (by rw [hrun₀]), hrun₀]
   rw [runFrom_tapeEmb, hrun, embed_tapeEmb]
-  tm_step [wordsCfg]
+  tm_step
 
 /-- If `machine` computes `program` tidily in `time` steps and every supported output of `program`
 has length at most `l`, then `machine.outputToWord` writes `program`'s output onto its new last

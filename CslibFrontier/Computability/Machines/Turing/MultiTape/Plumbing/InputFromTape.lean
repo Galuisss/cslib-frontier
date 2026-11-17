@@ -73,7 +73,7 @@ public lemma inCfg_wordsCfg (mark : Symbol) {w : List Symbol} (q : Option State)
       ⟨q, 1, Fin.append (fun j => tapeOfList (ws j))
           ![tapeOfList w, Function.update (fun _ => none) (-1) (some mark)],
         fun _ => 0, o⟩ := by
-  tm_step [inCfg, wordsCfg]
+  tm_step [inCfg]
 
 /-- Updating the flag tape of an appended family of tapes only changes the flag entry. -/
 public lemma update_append_flag {α : Type*} (ws₀ : Fin k → α) (a b c : α) :

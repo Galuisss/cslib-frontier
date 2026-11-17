@@ -121,7 +121,7 @@ private theorem step_stop (input : List Bool) (n : ℕ) (q : Option Unit) :
 private theorem clockCfg_zero (input : List Bool) (n : ℕ)
     (q : Option (Clock.Control Unit)) :
     clockCfg input n 0 q = wordsCfg input q (fun _ => List.replicate n true) [] := by
-  tm_step [clockCfg, AuxiliaryTape.config, sourceCfg]
+  tm_step [clockCfg, AuxiliaryTape.config]
 
 private abbrev startCfg (input : List Bool) (n : ℕ) :=
   clockCfg input n 0 (some (false, some ()))

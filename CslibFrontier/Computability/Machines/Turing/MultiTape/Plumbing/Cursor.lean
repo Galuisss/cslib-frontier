@@ -247,7 +247,7 @@ lemma step_atPos (p : Fin (input.length + 2)) (c : Cfg k Symbol State []) :
       inputSymbol_eq_none_of_boundary (cfg := c)
         (by have := c.inputPos.isLt; simp only [List.length_nil] at this ⊢; omega),
       show (atPos (input := input) p c).workTapeSymbols = c.workTapeSymbols from rfl]
-    tm_step [freezeInput, atPos, moveInputPos_zero]
+    tm_step [freezeInput, atPos]
 
 lemma runFrom_atPos (p : Fin (input.length + 2)) (c : Cfg k Symbol State []) (n : ℕ) :
     tm.freezeInput.runFrom (atPos p c) n = atPos p (tm.runFrom c n) :=

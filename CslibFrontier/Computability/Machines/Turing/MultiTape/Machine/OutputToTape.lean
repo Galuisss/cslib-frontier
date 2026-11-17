@@ -90,8 +90,7 @@ def config (cfg : Config k Symbol State Oracle input) : Config (k + 1) Symbol St
 theorem step_config (cfg : Config k Symbol State Oracle input) (a : Turing.Action k Symbol State)
     (symbol : Oracle → Option Symbol) (move : Oracle → SignType) :
     (config cfg).step (action a) symbol move = config (cfg.step a symbol move) := by
-  tm_step [config, action, Config.step, MultiTapeTM.outCfg, tapeOfList_append_single,
-    SignType.cast]
+  tm_step [config, action, Config.step, MultiTapeTM.outCfg, tapeOfList_append_single]
 
 theorem receive_config [DecidableEq Oracle] (cfg : Config k Symbol State Oracle input)
     (oracle : Oracle) (next : State) (answer : List Symbol) :

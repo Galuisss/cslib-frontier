@@ -65,8 +65,7 @@ theorem acceptCount_acceptAll (input : List Bool) (n : ℕ) :
   · intro w _
     have hstep : (acceptAll.withCoin (w 0)).toTM.step (Cfg.init acceptAll.initial input) =
         ⟨none, 1, fun _ _ => none, fun _ => 0, [true]⟩ := by
-      tm_step [MultiTapeMachine.toTM, acceptAll, MultiTapeMachine.Action.emptyOracleEquiv,
-        withCoin]
+      tm_step [MultiTapeMachine.toTM]
     rw [List.ofFn_succ, runClosedCoins_eq_output_stepCoins, stepCoins_cons, hstep,
       stepCoins_of_halted _ rfl]
     simp

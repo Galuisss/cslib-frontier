@@ -276,7 +276,7 @@ private theorem start_eq (M : MultiTapePTM k Bool State) (input : List Bool) (τ
         (Function.update (fun _ => []) (Fin.last (k + r)) (List.replicate τ true)) []).withState
         (some (machine M r).initial) =
       config r (Cfg.init M.initial input) (tapeOfList (List.replicate τ true)) 0 := by
-  tm_step [config, tapeOfList_nil]
+  tm_step [config]
 
 /-- **Padded counts from a prepared clock.** If the preparation halts after `time` steps with
 exactly `τ` true cells on the last work tape, every other tape blank and nothing emitted, then

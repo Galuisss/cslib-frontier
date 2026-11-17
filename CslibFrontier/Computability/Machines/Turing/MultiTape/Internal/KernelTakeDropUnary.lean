@@ -447,7 +447,7 @@ private lemma seg_run (u : List Bool) (n : ℕ) :
   have hn := length_word u n
   have hinit : (toTM keep).initCfg (word u n) =
       cfgAt (word u n) (some .skip) (2 * 0 + 1) (tapeOfList []) 0 [] := by
-    tm_step [MultiTapeNTM.initCfg, Cfg.init, cfgAt, tapeOfList_nil]
+    tm_step [tapeOfList_nil]
   obtain ⟨h', hh₀, hh₁, hstream⟩ := seg_stream (keep := keep) (u := u) (n := n)
     (List.replicate n true) false (r := 0) (Nat.zero_le _) le_rfl []
   rw [List.drop_zero, List.nil_append] at hstream

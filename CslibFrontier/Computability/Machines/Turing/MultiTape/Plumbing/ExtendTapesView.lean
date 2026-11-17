@@ -102,6 +102,7 @@ theorem embed_castSucc (cfg : Cfg k Symbol State input)
         Fin.lastCases (heads (Fin.last k)) cfg.workTapePos, cfg.output⟩ := by
   change embed (Fin.castAddEmb 1) cfg tapes heads = _
   rw [embed_castAdd]
-  tm_step [Fin.append, Fin.addCases]
+  refine Cfg.ext rfl rfl ?_ ?_ rfl <;> funext i <;> induction i using Fin.lastCases <;>
+    simp [Fin.append, Fin.addCases]
 
 end Turing.MultiTapeTM
