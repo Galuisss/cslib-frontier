@@ -170,11 +170,9 @@ theorem IsProjective.charObs_mul (hM : M.IsProjective) (a a' : ι → Bool) :
 
 /-- The character observables of a projective measurement are unitary. -/
 theorem IsProjective.charObs_mem_unitary (hM : M.IsProjective) (a : ι → Bool) :
-    M.charObs a ∈ unitary A := by
-  have hsq : M.charObs a * M.charObs a = 1 := by
-    rw [hM.charObs_mul, BitString.add_self, charObs_zero]
-  rw [Unitary.mem_iff, (M.isSelfAdjoint_charObs a).star_eq]
-  exact ⟨hsq, hsq⟩
+    M.charObs a ∈ unitary A :=
+  (M.isSelfAdjoint_charObs a).mem_unitary_of_mul_self (by
+    rw [hM.charObs_mul, BitString.add_self, charObs_zero])
 
 end Measurement
 

@@ -45,6 +45,8 @@ need no C⋆-norm.
   real and nonnegative on nonnegative elements.
 * `Cslib.Quantum.AlgState.norm_apply_star_mul_le`: Cauchy–Schwarz for states.
 * `Cslib.Quantum.AlgState.norm_le_one`: a contraction, `a⋆a ≤ 1`, has state norm at most `1`.
+* `Cslib.Quantum.AlgState.norm_sub_sq_eq_of_commute`: for commuting involutions,
+  `‖U - V‖²_φ = 2 - 2 Re φ(U V)`.
 * `Cslib.Quantum.AlgState.comap`, `Cslib.Quantum.AlgState.norm_comap`: pulling a state back along
   a monotone star-algebra homomorphism, `‖a‖_{φ ∘ f} = ‖f a‖_φ`.
 -/
@@ -199,6 +201,17 @@ theorem norm_sq_le_of_star_mul_le (φ : AlgState A) {x y : A} (h : star x * x �
 theorem norm_le_one (φ : AlgState A) {a : A} (h : star a * a ≤ 1) : φ.norm a ≤ 1 := by
   rw [norm_eq_sqrt, Real.sqrt_le_one]
   exact φ.re_apply_le_one h
+
+/-- For commuting self-adjoint involutions `U`, `V`, the squared distance is linear in the
+correlation: `‖U - V‖²_φ = 2 - 2 Re φ(U V)`. -/
+theorem norm_sub_sq_eq_of_commute (φ : AlgState A) {U V : A} (hU : IsSelfAdjoint U)
+    (hV : IsSelfAdjoint V) (hU2 : U * U = 1) (hV2 : V * V = 1) (hc : Commute V U) :
+    φ.norm (U - V) ^ 2 = 2 - 2 * (φ (U * V)).re := by
+  have e : (U - V) * (U - V) = (1 + 1) - (U * V + U * V) := by
+    rw [sub_mul, mul_sub, mul_sub, hU2, hV2, hc.eq]; abel
+  rw [φ.norm_sq, star_sub, hU.star_eq, hV.star_eq, e, map_sub, map_add, map_add, φ.map_one,
+    Complex.sub_re, Complex.add_re, Complex.add_re, Complex.one_re]
+  ring
 
 omit [StarModule ℂ A] [SelfAdjointDecompose A] in
 /-- The **pullback** `φ ∘ f` of a state along a monotone star-algebra homomorphism `f`. -/

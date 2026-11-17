@@ -149,10 +149,22 @@ theorem Approx.mul_left (h : a ≈[φ; δ] b) {u : A} (hu : star u * u ≤ 1) :
   rw [approx_iff, ← mul_sub]
   exact (φ.norm_mul_le_of_star_mul_self_le_one hu _).trans h
 
+/-- Every pair is close up to its own distance: `a ≈[φ; ‖a - b‖_φ] b`. Names a step of a
+closeness chain whose error is left symbolic. -/
+theorem approx_norm_sub (φ : AlgState A) (a b : A) : a ≈[φ; φ.norm (a - b)] b :=
+  approx_iff.mpr le_rfl
+
 /-- Left multiplication by a unitary preserves closeness. -/
 theorem Approx.mul_left_unitary (h : a ≈[φ; δ] b) {u : A} (hu : u ∈ unitary A) :
     u * a ≈[φ; δ] u * b :=
   h.mul_left (by rw [Unitary.star_mul_self_of_mem hu])
+
+/-- `unitary_mem` closes a goal `u ∈ unitary A` for a product `u` of unitaries, of their stars and
+of `1`, using the local hypotheses, which may be quantified (`hX : ∀ a, X a ∈ unitary A`). It
+discharges the side goal of `Cslib.Quantum.AlgState.Approx.mul_left_unitary` in closeness
+chains. -/
+macro (name := unitaryMem) "unitary_mem" : tactic =>
+  `(tactic| solve_by_elim (maxDepth := 16) [mul_mem, one_mem, Unitary.star_mem])
 
 /-- Left multiplication by an operator that stretches the state norm by at most `k` turns
 `δ`-closeness into `kδ`-closeness. -/
