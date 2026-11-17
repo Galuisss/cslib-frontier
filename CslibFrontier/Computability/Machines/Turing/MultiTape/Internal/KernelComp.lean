@@ -109,8 +109,8 @@ theorem computesTidilyInTimeAndSpace_outputToWord
     simpa [hlast] using MultiTapeTM.space_map_outCfgHom_le machine.toTM path
   obtain ⟨second, hsecondHead, hsecondLast, hsecondTime, hsecondSpace⟩ :=
     OutputToWord.exists_runPath_rewindLast (k := k₁) (input := input) output
-  obtain ⟨combined, hcombinedHead, hcombinedLast, hcombinedTime, hcombinedSpace⟩ :=
-    MultiTapeTM.exists_runPath_seq_space_le (p₀ := first) (p₁ := second)
+  obtain ⟨combined, hcombinedHead, hcombinedLast, hcombinedTime, hcombinedSpace, -⟩ :=
+    MultiTapeTM.exists_runPath_seq (p₀ := first) (p₁ := second)
       (by rw [hfirstLast]; rfl) (by rw [hsecondHead, hfirstLast]; rfl)
   refine ⟨_, [], ⟨rfl, rfl⟩, combined, ?_, by simp [hcombinedLast, hsecondLast], ?_, by omega⟩
   · simp only [hcombinedHead, first, RelSeries.head_map, MultiTapeTM.outCfgHom_apply,
@@ -243,11 +243,11 @@ theorem transformsTapes_inputFromWord (mark : Symbol)
     MultiTapeTM.space_map_inCfgHom_le machine.toTM mark outer machinePath
   obtain ⟨eraseFlag, hEraseHead, hEraseLast, hEraseTime, hEraseSpace⟩ :=
     InputFromWord.exists_runPath_eraseFlag (State := S₂) mark tapes₁ word emitted outer
-  obtain ⟨tail, hTailHead, hTailLast, hTailTime, hTailSpace⟩ :=
-    MultiTapeTM.exists_runPath_seq_space_le (p₀ := virtualRun) (p₁ := eraseFlag)
+  obtain ⟨tail, hTailHead, hTailLast, hTailTime, hTailSpace, -⟩ :=
+    MultiTapeTM.exists_runPath_seq (p₀ := virtualRun) (p₁ := eraseFlag)
       (by rw [hVirtualLast]; rfl) (by rw [hEraseHead, hVirtualLast]; rfl)
-  obtain ⟨combined, hCombinedHead, hCombinedLast, hCombinedTime, hCombinedSpace⟩ :=
-    MultiTapeTM.exists_runPath_seq_space_le (p₀ := setFlag) (p₁ := tail)
+  obtain ⟨combined, hCombinedHead, hCombinedLast, hCombinedTime, hCombinedSpace, -⟩ :=
+    MultiTapeTM.exists_runPath_seq (p₀ := setFlag) (p₁ := tail)
       (by rw [hSetLast]; rfl)
       (by simp [hTailHead, virtualRun, hMachineHead, hSetLast]; rfl)
   refine ⟨_, emitted, ⟨rfl, rfl⟩, combined,

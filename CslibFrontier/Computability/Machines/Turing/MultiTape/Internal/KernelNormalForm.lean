@@ -306,7 +306,7 @@ private theorem exists_runPath_tidy_with_rewind
   obtain ⟨pB, hhB, hlB, htB⟩ := exists_runPath_clearList hm (List.finRange k)
     (List.nodup_finRange k) a b c (Shadow.visited tm c₀ u) C₁ hready
   rw [clearedCfg_finRange] at hlB
-  obtain ⟨pAB, hhAB, hlAB, htAB, hsAB⟩ := exists_runPath_seq_space_le
+  obtain ⟨pAB, hhAB, hlAB, htAB, hsAB, -⟩ := exists_runPath_seq
     (p₀ := .ofDeterministic (shadow m₀ m₁ tm) ((shadow m₀ m₁ tm).initCfg input) (u + 1))
     (p₁ := pB) (by rw [MultiTapeNTM.RunPath.last_ofDeterministic, hA]; exact hC₁)
     (by rw [hhB, MultiTapeNTM.RunPath.last_ofDeterministic, hA])
@@ -320,7 +320,7 @@ private theorem exists_runPath_tidy_with_rewind
     rw [runFrom_noTapes]
     simp only [R₀, noTapesCfg, Cfg.withState, Cfg.mapState, extendTapes_q₀,
       hrun]
-  obtain ⟨p, hh, hl, ht, hs⟩ := exists_runPath_seq_space_le (p₀ := pAB)
+  obtain ⟨p, hh, hl, ht, hs, -⟩ := exists_runPath_seq (p₀ := pAB)
     (p₁ := .ofDeterministic (rewind.extendTapes (noTapes (k + k))) R₀
       (C₁.inputPos.val - 1 + 2))
     (by rw [hlAB, hlB]; rfl) (by rw [hlAB, hlB]; rfl)

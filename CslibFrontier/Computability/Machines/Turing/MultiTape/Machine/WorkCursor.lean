@@ -311,7 +311,7 @@ theorem transformsTapes_clearWork (word : List Symbol) :
   have hfirst : first.last = _ := runFrom_forwardWork (Symbol := Symbol) 1 word out (zero_add _)
   have hsecond : second.last = _ :=
     runFrom_rewindWork_erase (Symbol := Symbol) 1 (Turing.tapeOfList word) out rfl
-  obtain ⟨path, hhead, hlast, htime, hvisited⟩ :=
+  obtain ⟨path, hhead, hlast, htime, -, hvisited⟩ :=
     MultiTapeTM.exists_runPath_seq (p₀ := first) (p₁ := second) (by rw [hfirst])
       (by rw [hfirst]; rfl)
   refine ⟨fun _ => [], [], ⟨rfl, rfl⟩, path, hhead,
