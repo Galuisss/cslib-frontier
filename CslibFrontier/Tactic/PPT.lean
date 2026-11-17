@@ -483,7 +483,7 @@ fields, then search with `[OraclePPT, PPT, PolyTime]` (preserving query syntax) 
     | `(tactic| ppt [$hints,*]) => hints.getElems
     | _ => #[]
   unfoldOracleParameter
-  Cslib.Tactic.PolyTime.Internal.prepareGoal hints
+  Cslib.Tactic.prepareCertificateGoal hints
   unfoldOracleParameter
   let oracle := hasOraclePPTGoal (← instantiateMVars (← getMainTarget))
   Cslib.Tactic.PolyTime.Internal.withFailureHint "ppt" <|
