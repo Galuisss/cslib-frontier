@@ -4263,6 +4263,7 @@ public import CslibFrontier.Computability.QueryComplexity.Quantum.SpectralAdvers
 public import CslibFrontier.Computability.QueryComplexity.Quantum.UnknownSearch
 public import CslibFrontier.Computability.QueryComplexity.Quantum.ValueAdversary
 public import CslibFrontier.Computability.QueryComplexity.Quantum.ValueQuery
+public import CslibFrontier.Computability.QueryComplexity.Quantum.ValueQueryUpdate
 public import CslibFrontier.Computability.QueryComplexity.Quantum.WeightedAdversary
 public import CslibFrontier.Computability.QueryComplexity.Randomized
 public import CslibFrontier.Computability.QueryComplexity.Randomized.Counting
