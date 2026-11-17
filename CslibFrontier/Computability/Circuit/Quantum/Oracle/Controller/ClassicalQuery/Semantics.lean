@@ -33,7 +33,8 @@ final comparison measurement with the native success experiment remain separate 
 * `Cslib.Quantum.ClassicalQueryLayout.matrix_copyHidden_zeroTarget_withReference`: the actual
   protected-hidden-bit copy is a coherent record while retaining every other wire and reference.
 * `Cslib.Quantum.ClassicalQueryLayout.Compatible.eval_initialPrefix`: the actual first six
-  blocks run F on its public input and coherently prepare the request and hidden-bit records.
+  blocks run the zero-oracle-erased first stage F on its public input and coherently prepare the
+  request and hidden-bit records.
 * `Cslib.Quantum.ClassicalQueryLayout.eval_requestHidden_embedState`: the actual request copy,
   Hadamard seed and protected-bit copy preserve the complete first-stage superposition.
 * `Cslib.Quantum.ClassicalQueryLayout.partialTraceLeft_copyRequest_zeroTarget_withReference`:
@@ -695,8 +696,8 @@ theorem eval_requestHidden_embedState (layout : ClassicalQueryLayout)
     eval_prepareHidden_ket layout recorded hh hr]
 
 
-/-- The actual first six controller blocks initialize and run F on exactly the public-key prefix,
-then coherently record its request and prepare matching hidden bits. Every first-stage basis
+/-- The actual first six controller blocks initialize and run the zero-oracle-erased first stage F
+on exactly the public-key prefix, then coherently record its request and prepare matching hidden bits. Every first-stage basis
 amplitude is retained; no measurement or dephasing has been inserted into the circuit. -/
 theorem Compatible.eval_initialPrefix {layout : ClassicalQueryLayout}
     (h : layout.Compatible) (sample : List Bool)
