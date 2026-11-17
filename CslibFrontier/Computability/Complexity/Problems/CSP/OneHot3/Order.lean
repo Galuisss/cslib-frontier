@@ -45,7 +45,7 @@ theorem swapTail3_perm (xs : List ℕ) : (swapTail3 xs).Perm xs := by
     | cons b xs =>
       cases xs with
       | nil => exact List.Perm.refl _
-      | cons c tail => exact (List.Perm.swap c b tail).cons a
+      | cons c tail => exact (List.Perm.swap b c tail).cons a
 
 /-- Test the literal first-to-second constraint-end step, using the exact six-dart row
 layout. Supplied indices are binary table data and never determine a loop bound. -/
@@ -116,7 +116,8 @@ The quotient, remainder and successor entries remain binary data on arbitrary ra
 @[expose] def dartReindex (c : RotationCertificate) (a : ℕ) : ℕ :=
   let row := a / 6
   let port := a / 2 % 3
-  let newPort := if forward c row then port else if port = 1 then 2 else if port = 2 then 1 else port
+  let newPort :=
+    if forward c row then port else if port = 1 then 2 else if port = 2 then 1 else port
   6 * row + 2 * newPort + a % 2
 
 /-- Dart reindexing retains the original constraint row. -/
@@ -124,7 +125,7 @@ theorem dartReindex_row (c : RotationCertificate) (a : ℕ) :
     dartReindex c a / 6 = a / 6 := by
   have hp : a / 2 % 3 < 3 := Nat.mod_lt _ (by decide)
   have hs : a % 2 < 2 := Nat.mod_lt _ (by decide)
-  unfold dartReindex
+  dsimp only [dartReindex]
   split_ifs <;> omega
 
 /-- Both ends of an edge retain their original end tag under scope reordering. -/
@@ -132,7 +133,7 @@ theorem dartReindex_side (c : RotationCertificate) (a : ℕ) :
     dartReindex c a % 2 = a % 2 := by
   have hp : a / 2 % 3 < 3 := Nat.mod_lt _ (by decide)
   have hs : a % 2 < 2 := Nat.mod_lt _ (by decide)
-  unfold dartReindex
+  dsimp only [dartReindex]
   split_ifs <;> omega
 
 /-- The native port index undergoes exactly the same exchange as the scope. -/
@@ -142,7 +143,7 @@ theorem dartReindex_port (c : RotationCertificate) (a : ℕ) :
       else if a / 2 % 3 = 1 then 2 else if a / 2 % 3 = 2 then 1 else a / 2 % 3 := by
   have hp : a / 2 % 3 < 3 := Nat.mod_lt _ (by decide)
   have hs : a % 2 < 2 := Nat.mod_lt _ (by decide)
-  unfold dartReindex
+  dsimp only [dartReindex]
   split_ifs <;> omega
 
 /-- The literal native reindexing is its own inverse, including malformed binary indices. -/

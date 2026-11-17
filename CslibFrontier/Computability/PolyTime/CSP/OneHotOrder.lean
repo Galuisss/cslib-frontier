@@ -12,6 +12,7 @@ public import CslibFrontier.Computability.PolyTime.Graph.RotationSystem
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat.BinaryDiv
 import CslibFrontier.Computability.PolyTime.Graph.RotationSystem.Reindex
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Captured
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat
 
 /-!
 # Native ternary scope alignment and certificate conjugation
@@ -51,8 +52,19 @@ private theorem swapTail3_tidy :
         | cons c tail => simp only [swapTail3, List.length_cons, List.getD_cons_zero,
             List.getD_cons_succ, List.drop_succ_cons, List.drop_zero,
             show 3 ≤ tail.length + 1 + 1 + 1 by omega, ↓reduceIte]
-  simp_rw [he]
-  fun_prop
+  have hid : ComputableTidilyInPolyTime (fun xs : List ℕ => xs)
+      (encList encNat) (encList encNat) := .id'
+  have hget (j : ℕ) := ComputableTidilyInPolyTime.listGetD_binary (encA := encNat) 0
+    hid (ComputableTidilyInPolyTime.const j)
+  have htail := ComputableTidilyInPolyTime.listDropWithInput hid
+    (ComputableTidilyInPolyTime.const 3)
+  have hbody := ComputableTidilyInPolyTime.cons' (hget 0)
+    (ComputableTidilyInPolyTime.cons' (hget 2)
+      (ComputableTidilyInPolyTime.cons' (hget 1) htail))
+  have hguard := ComputableTidilyInPolyTime.unary_le'
+    (ComputableTidilyInPolyTime.const 3) (ComputableTidilyInPolyTime.length_list encNat)
+  have hp := ComputableTidilyInPolyTime.ite_decide hguard hbody hid
+  simpa only [← he] using hp
 
 private theorem forward_tidy :
     ComputableTidilyInPolyTime (fun p : RotationCertificate × ℕ => forward p.1 p.2)
@@ -62,7 +74,7 @@ private theorem forward_tidy :
       encTableIndex encNat := by
     unfold encTableIndex
     fun_prop
-  have hlookup := ComputableTidilyInPolyTime.listGetD_binary 0
+  have hlookup := ComputableTidilyInPolyTime.listGetD_binary (encA := encNat) 0
     (hs.comp (ComputableTidilyInPolyTime.fst _ _)) hidx
   unfold forward encTableIndex at *
   fun_prop
@@ -77,25 +89,36 @@ theorem computableInPolyTime_orderedConstraints :
     (ComputableTidilyInPolyTime.zipIdx _).comp (ComputableTidilyInPolyTime.fst _ _)
   simp only [orderedConstraints, List.mapIdx_eq_zipIdx_map]
   apply ComputableTidilyInPolyTime.mapWithInput hz
+  let encRow := encPair (encConstraint encUnit encNat) encUnary
+  have hdata := ComputableTidilyInPolyTime.snd encOrderInput encRow
+  have hinput := ComputableTidilyInPolyTime.fst encOrderInput encRow
+  have hrow := (ComputableTidilyInPolyTime.fst (encConstraint encUnit encNat) encUnary).comp
+    hdata
   have hi := ComputableTidilyInPolyTime.unary_to_binary.comp
-    (g := fun p : (CSP Unit ℕ × RotationCertificate) × (Constraint Unit ℕ × ℕ) => p.2.2)
-    (by unfold encOrderInput; fun_prop)
-  have hf := forward_tidy.comp
-    ((by unfold encOrderInput; fun_prop).prod hi)
-  have hswap := swapTail3_tidy.comp
-    (g := fun p : (CSP Unit ℕ × RotationCertificate) × (Constraint Unit ℕ × ℕ) => p.2.1.scope)
-    (by unfold encOrderInput; fun_prop)
-  exact (encConstraint_mk_polyTime
-    (by unfold encOrderInput; fun_prop)
-    (ComputableInPolyTime.of_tidy (by fun_prop))).tidy
+    ((ComputableTidilyInPolyTime.snd (encConstraint encUnit encNat) encUnary).comp hdata)
+  have htable := (ComputableTidilyInPolyTime.snd (encCSP encUnit encNat)
+    encRotationCertificate).comp hinput
+  have hf := forward_tidy.comp (htable.prod hi)
+  have hscope := (encConstraint_scope_polyTime hrow.computableInPolyTime).tidy
+  have hswap := swapTail3_tidy.comp hscope
+  have hout := ComputableTidilyInPolyTime.cond hf hscope hswap
+  exact (encConstraint_mk_polyTime (encConstraint_rel_polyTime hrow.computableInPolyTime)
+    hout.computableInPolyTime).tidy
 
 private theorem dartReindex_tidy :
     ComputableTidilyInPolyTime (fun p : RotationCertificate × ℕ => dartReindex p.1 p.2)
       encTableIndex encNat := by
   have hrow : ComputableTidilyInPolyTime (fun p : RotationCertificate × ℕ => p.2 / 6)
       encTableIndex encNat := by unfold encTableIndex; fun_prop
-  have hf := forward_tidy.comp ((ComputableTidilyInPolyTime.fst _ _).prod hrow)
-  unfold dartReindex encTableIndex at *
+  have hf := forward_tidy.comp
+    ((ComputableTidilyInPolyTime.fst encRotationCertificate encNat).prod hrow)
+  have hi := ComputableTidilyInPolyTime.snd encRotationCertificate encNat
+  have hport := ComputableTidilyInPolyTime.binary_mod'
+    (ComputableTidilyInPolyTime.binary_div' hi (ComputableTidilyInPolyTime.const 2))
+    (ComputableTidilyInPolyTime.const 3)
+  have hside := ComputableTidilyInPolyTime.binary_mod' hi
+    (ComputableTidilyInPolyTime.const 2)
+  dsimp only [dartReindex]
   fun_prop
 
 /-- Conjugating the supplied binary table executes a polynomial-time program on all raw
@@ -103,19 +126,32 @@ inputs, even when lookups or table entries have enormous binary indices. -/
 theorem computableInPolyTime_orderedCertificate :
     ComputableInPolyTime (fun p : CSP Unit ℕ × RotationCertificate =>
       orderedCertificate p.1 p.2) encOrderInput encRotationCertificate := by
+  change ComputableInPolyTime (fun p : CSP Unit ℕ × RotationCertificate =>
+    RotationCertificate.reindex p.2 (2 * (incidenceGraph p.1).edges.length)
+      (dartReindex p.2) (dartReindex p.2)) encOrderInput encRotationCertificate
   have hg := (computableInPolyTime_incidenceGraph encUnit encNat).comp
     (ComputableInPolyTime.fst (encCSP encUnit encNat) encRotationCertificate)
   have hn : ComputableInPolyTime (fun p : CSP Unit ℕ × RotationCertificate =>
       2 * (incidenceGraph p.1).edges.length) encOrderInput encUnary := by
-    unfold encOrderInput encGraph
-    fun_prop
+    have he := encGraph_edges_polyTime hg
+    have hl := ((ComputableTidilyInPolyTime.length_list (encPair encNat encNat)).comp
+      he.tidy).computableInPolyTime
+    exact ComputableInPolyTime.unary_mul.comp ((ComputableInPolyTime.const 2).prod hl)
   have hc : ComputableInPolyTime (fun p : CSP Unit ℕ × RotationCertificate => p.2)
       encOrderInput encRotationCertificate := ComputableInPolyTime.snd _ _
+  have hi : ComputableInPolyTime (fun p : (CSP Unit ℕ × RotationCertificate) × ℕ =>
+      (p.1.2, p.2)) (encPair encOrderInput encNat) encTableIndex :=
+    ((ComputableInPolyTime.snd (encCSP encUnit encNat) encRotationCertificate).comp
+      (ComputableInPolyTime.fst encOrderInput encNat)).prod
+      (ComputableInPolyTime.snd encOrderInput encNat)
   have hr : ComputableInPolyTime (fun p : (CSP Unit ℕ × RotationCertificate) × ℕ =>
       dartReindex p.1.2 p.2) (encPair encOrderInput encNat) encNat :=
-    dartReindex_tidy.computableInPolyTime.comp (by
-      unfold encOrderInput encTableIndex
-      fun_prop)
-  exact RotationCertificate.computableInPolyTime_reindex hc hn hr hr
+    dartReindex_tidy.computableInPolyTime.comp hi
+  exact RotationCertificate.computableInPolyTime_reindex
+    (α := CSP Unit ℕ × RotationCertificate) (input := encOrderInput)
+    (table := fun p => p.2)
+    (count := fun p => 2 * (incidenceGraph p.1).edges.length)
+    (forward := fun p i => dartReindex p.2 i) (back := fun p i => dartReindex p.2 i)
+    hc hn hr hr
 
 end Cslib.Complexity.CSP.OneHot3

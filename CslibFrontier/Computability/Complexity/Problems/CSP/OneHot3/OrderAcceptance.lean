@@ -69,9 +69,15 @@ private theorem orderedOccurrence_var (F : CSP Unit ℕ) (c : RotationCertificat
   obtain ⟨⟨i, j⟩, rfl⟩ := (ternaryCoordinates F hw).symm.surjective o
   have hlen : F[i.val].scope.length = 3 := hw _ (List.getElem_mem i.isLt)
   obtain ⟨a, b, v, hscope⟩ := List.length_eq_three.mp hlen
+  let i' : Fin (orderedConstraints F c).length :=
+    ⟨i.val, by rw [length_orderedConstraints]; exact i.isLt⟩
+  have htarget : (orderedConstraints F c)[i'.val].scope.length = 3 :=
+    wellFormed_orderedConstraints F c hw _ (List.getElem_mem i'.isLt)
+  change (orderedConstraints F c)[i'.val].scope[(portPermutation c i j).val]'(by
+      rw [htarget]; exact (portPermutation c i j).isLt) =
+    F[i.val].scope[j.val]'(by rw [hlen]; exact j.isLt)
   cases hf : forward c i.val <;> fin_cases j <;>
-    simp [orderedOccurrenceEquiv, ternaryCoordinates, arityOccurrence, rowPortEquiv, portPermutation,
-      Cslib.Logic.PL.CSP.Occurrence.var, orderedConstraints, List.getElem_mapIdx,
+    simp [i', portPermutation, orderedConstraints, List.getElem_mapIdx,
       hf, hscope, swapTail3, Equiv.swap_apply_def]
 
 private theorem variable_fibers (F : CSP Unit ℕ) (c : RotationCertificate)
@@ -89,7 +95,7 @@ private theorem index_coordinates (F : CSP Unit ℕ) (hw : F.WellFormed arity)
     (p : Fin F.length × Fin 3) (side : Bool) :
     (incidenceDart ((ternaryCoordinates F hw).symm p) side).index =
       6 * p.1.val + 2 * p.2.val + side.toNat := by
-  unfold incidenceDart Dart.index
+  change 2 * incidenceEdgeIndex ((ternaryCoordinates F hw).symm p) + side.toNat = _
   rw [incidenceEdgeIndex_eq_mul_add 3 (fun row hrow => hw row hrow)]
   change 2 * (3 * p.1.val + p.2.val) + side.toNat = _
   omega
@@ -115,8 +121,8 @@ private theorem index_orderedOccurrence (F : CSP Unit ℕ) (c : RotationCertific
 private theorem index_orderedDart (F : CSP Unit ℕ) (c : RotationCertificate)
     (hw : F.WellFormed arity) (a : Dart (incidenceGraph F)) :
     (occurrenceDartEquiv (orderedOccurrenceEquiv F c hw) a).index = dartReindex c a.index := by
-  obtain ⟨o, rfl⟩ := exists_incidenceDart a
-  rw [occurrenceDartEquiv_apply]
+  obtain ⟨⟨o, side⟩, rfl⟩ := (incidenceDartEquiv F).surjective a
+  rw [incidenceDartEquiv_apply, occurrenceDartEquiv_apply]
   exact index_orderedOccurrence F c hw o _
 
 private noncomputable def orderedRotation (F : CSP Unit ℕ) (c : RotationCertificate)
@@ -163,7 +169,10 @@ private theorem constraint_cycle_step (F : CSP Unit ℕ) (c : RotationCertificat
     have hf := (vertex_incidenceDart_eq_iff o
       ((ternaryCoordinates F hw).symm (i, a)) (r.rotate (dart a)).2 true).mp hvertex
     have hside : (r.rotate (dart a)).2 = true := hf.1
-    have hrow : o.1 = i := by simpa only [hside, ite_true] using hf.2
+    have hrow : o.1 = i := by
+      have h : o.1 = ((ternaryCoordinates F hw).symm (i, a)).1 := by
+        simpa only [hside, ite_true] using hf.2
+      exact h
     let p := ternaryCoordinates F hw o
     refine ⟨p.2, ho.symm.trans ?_⟩
     rw [hside]
@@ -225,7 +234,9 @@ private theorem respectsArgumentOrder_orderedRotation (F : CSP Unit ℕ)
       (portPermutation c i ((portPermutation c i).symm (finRotate 3 (portPermutation c i j)))) =
     argumentSuccessor (arityOccurrence (orderedConstraints F c)
       (wellFormed_orderedConstraints F c hw) i' (portPermutation c i j))
-  rw [Equiv.apply_symm_apply, argumentSuccessor_arityOccurrence]
+  rw [Equiv.apply_symm_apply]
+  exact (argumentSuccessor_arityOccurrence (orderedConstraints F c)
+    (wellFormed_orderedConstraints F c hw) i' (portPermutation c i j)).symm
 
 /-- A well-formed ternary source with an accepted numerical rotation makes the actual
 scope permutation and conjugated binary table pass the full ordered target checker.

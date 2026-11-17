@@ -46,10 +46,10 @@ this total semantics also gives a defined answer to every raw scope length. -/
 
 /-- At its declared arity the source relation is the actual existing one-hot relation. -/
 theorem booleanRelation_eq : booleanRelation arity sem () = oneHotRelation (Fin 3) := by
-  ext a
-  cases h₀ : a 0 <;> cases h₁ : a 1 <;> cases h₂ : a 2 <;>
-    simp [booleanRelation, arity, sem, oneHotRelation, Set.mem_range,
-      List.ofFn_succ, Fin.exists_fin_succ, funext_iff, Fin.forall_fin_succ, h₀, h₁, h₂]
+  apply Set.ext
+  change ∀ a : Fin 3 → Bool, ((List.ofFn a).count true == 1) = true ↔
+    ∃ i : Fin 3, (fun j => decide (j = i)) = a
+  decide +kernel
 
 /-- The symmetric source relation permits clockwise reordering of its actual scope. -/
 theorem sem_eq_of_perm (a b : List Bool) (h : a.Perm b) : sem () a = sem () b := by
@@ -86,8 +86,10 @@ theorem wellFormed_ofCNF (φ : CNF ℕ) (hw : ∀ c ∈ φ, c.length = 3) :
 
 private theorem eval_eq_evalOne_varCNF (F : CSP Unit ℕ) (σ : ℕ → Bool) :
     F.eval sem σ = F.varCNF.evalOne σ := by
-  simp [Cslib.Logic.PL.CSP.eval, Cslib.Logic.PL.CSP.varCNF, Constraint.eval,
-    sem, CNF.evalOne, Clause.evalOne, List.count, List.countP_map, Literal.eval,
+  simp only [Cslib.Logic.PL.CSP.eval, Cslib.Logic.PL.CSP.varCNF, CNF.evalOne, List.all_map]
+  apply congrArg (fun f : Constraint Unit ℕ → Bool => F.all f)
+  funext c
+  simp [Constraint.eval, sem, Clause.evalOne, List.count, List.countP_map, Literal.eval,
     Function.comp_def]
 
 /-- Dropping positive polarity tags preserves exact-one evaluation under each original
