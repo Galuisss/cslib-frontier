@@ -29,6 +29,8 @@ final comparison measurement with the native success experiment remain separate 
   physical boundary blocks.
 * `Cslib.Quantum.ClassicalQueryLayout.matrix_copyHidden_zeroTarget_withReference`: the actual
   protected-hidden-bit copy is a coherent record while retaining every other wire and reference.
+* `Cslib.Quantum.ClassicalQueryLayout.eval_requestHidden_embedState`: the actual request copy,
+  Hadamard seed and protected-bit copy preserve the complete first-stage superposition.
 * `Cslib.Quantum.ClassicalQueryLayout.partialTraceLeft_copyRequest_zeroTarget_withReference`:
   discarding the actual copied request gives exactly the sum of request density branches,
   including an arbitrary inaccessible reference.
@@ -241,5 +243,189 @@ theorem partialTraceLeft_copyRequest_zeroTarget_withReference
     simp only [requestLabel, sourceLabel, targetEmbedding, Function.comp_apply, Nat.zero_add]
   change partialTraceLeft (densityConj physical ρ) = _
   rw [hphysical, partialTraceLeft_densityConj_coherentRecord]
+
+/-- The actual fresh Hadamard seed and protected CNOT record produce equal-amplitude branches
+with the same bit in both wires. This intermediate prefix identity retains all other wires. -/
+private theorem eval_prepareHidden_ket (layout : ClassicalQueryLayout)
+    (x : Fin layout.width → Bool)
+    (hhidden : readBit x layout.hiddenWire = false)
+    (hreply : readBit x layout.replyBase = false) :
+    let hsource : layout.hiddenWire + 1 ≤ layout.width := by
+      simp only [width, secondBase, replyBase, serviceBase]
+      omega
+    let htarget : layout.replyBase < layout.width := by
+      simp only [width, secondBase]
+      omega
+    Circuit.eval (Circuit.ofCodes layout.width
+        (hadamardCodes layout.hiddenWire 1 ++
+          blockCopyCodes layout.hiddenWire layout.replyBase 1)) (ket x) =
+      ∑ bit : Fin 1 → Bool, (((Real.sqrt 2)⁻¹ : ℝ) : ℂ) •
+        ket (Function.update (glue (blockEmb layout.hiddenWire hsource) bit x)
+          ⟨layout.replyBase, htarget⟩ (bit 0)) := by
+  classical
+  dsimp only
+  have hsource : layout.hiddenWire + 1 ≤ layout.width := by
+    simp only [width, secondBase, replyBase, serviceBase]
+    omega
+  have htarget : layout.replyBase + 1 ≤ layout.width := by
+    simp only [width, secondBase]
+    omega
+  have hdisjoint : layout.hiddenWire + 1 ≤ layout.replyBase := by
+    simp only [replyBase, serviceBase]
+    omega
+  have hhiddenlt : layout.hiddenWire < layout.width := by omega
+  have hreplylt : layout.replyBase < layout.width := by omega
+  have hemb : blockEmb layout.hiddenWire hsource (0 : Fin 1) =
+      ⟨layout.hiddenWire, hhiddenlt⟩ := by
+    apply Fin.ext
+    simp only [blockEmb_apply_val, Fin.val_zero, Nat.zero_add]
+  have hzero : ∀ i : Fin 1, x (blockEmb layout.hiddenWire hsource i) = false := by
+    intro i
+    have hi : i = 0 := Subsingleton.elim _ _
+    subst i
+    rw [hemb]
+    rwa [readBit_of_lt x hhiddenlt] at hhidden
+  have hclass := isClassical_blockCopyCodes (Or.inl hdisjoint) hsource htarget
+  rw [Circuit.ofCodes_append, Circuit.eval_append,
+    eval_hadamardCodes_ket hsource x hzero]
+  simp only [pow_one, map_sum, map_smul]
+  apply Finset.sum_congr rfl
+  intro bit _
+  rw [Circuit.eval_ofCodes_ket hclass]
+  congr 2
+  let y := glue (blockEmb layout.hiddenWire hsource) bit x
+  have hysource : readBit y layout.hiddenWire = bit 0 := by
+    rw [readBit_of_lt _ hhiddenlt]
+    dsimp only [y]
+    rw [← hemb]
+    exact glue_apply_emb _ _ _ _
+  have hytarget : y ⟨layout.replyBase, hreplylt⟩ = false := by
+    dsimp only [y]
+    rw [glue_of_not _ _ _ (fun i heq => by
+      have hv := congrArg Fin.val heq
+      simp only [blockEmb_apply_val] at hv
+      omega)]
+    rwa [readBit_of_lt x hreplylt] at hreply
+  change classicalRun (blockCopyCodes layout.hiddenWire layout.replyBase 1) y = _
+  simp only [classicalRun, blockCopyCodes, List.range_one, List.map_cons, List.map_nil,
+    Nat.add_zero, List.foldl_cons, List.foldl_nil, classicalStep, dite_eq_left hreplylt,
+    List.all_cons, List.all_nil, Bool.and_true, hytarget, hysource, Bool.false_xor]
+  rfl
+
+
+/-- The actual request copy and hidden-bit preparation preserve the complete first-stage
+superposition. Each basis branch records its request and gets the same fresh bit in the service
+seed and protected reply wire. The arbitrary state need not be normalized or classical. -/
+theorem eval_requestHidden_embedState (layout : ClassicalQueryLayout)
+    (houtput : layout.first.outputWidth ≤ layout.firstInputWidth)
+    (hfirstInput : layout.firstInputWidth ≤ layout.first.width)
+    (x : Fin layout.width → Bool)
+    (hrequest : ∀ i < layout.first.outputWidth,
+      readBit x (layout.requestBase + i) = false)
+    (hhidden : readBit x layout.hiddenWire = false)
+    (hreply : readBit x layout.replyBase = false)
+    (ψ : Qubits layout.first.width) :
+    let hrequestEnd : layout.requestBase + layout.first.outputWidth ≤ layout.width := by
+      simp only [width, secondBase, replyBase, serviceBase, hiddenWire]
+      omega
+    let hhiddenEnd : layout.hiddenWire + 1 ≤ layout.width := by
+      simp only [width, secondBase, replyBase, serviceBase]
+      omega
+    let hreplyEnd : layout.replyBase < layout.width := by
+      simp only [width, secondBase]
+      omega
+    Circuit.eval (Circuit.ofCodes layout.width
+      (blockCopyCodes 0 layout.requestBase layout.first.outputWidth ++
+        (hadamardCodes layout.hiddenWire 1 ++
+          blockCopyCodes layout.hiddenWire layout.replyBase 1)))
+        (embedState layout.firstEmbedding x ψ) =
+      ∑ z : Fin layout.first.width → Bool, ψ.ofLp z •
+        ∑ bit : Fin 1 → Bool, (((Real.sqrt 2)⁻¹ : ℝ) : ℂ) •
+          ket (Function.update
+            (glue (blockEmb layout.hiddenWire hhiddenEnd) bit
+              (glue (blockEmb layout.requestBase hrequestEnd)
+                (fun i => z ⟨i, lt_of_lt_of_le i.isLt (houtput.trans hfirstInput)⟩)
+                (glue layout.firstEmbedding z x)))
+            ⟨layout.replyBase, hreplyEnd⟩ (bit 0)) := by
+  classical
+  dsimp only
+  have hrequestEnd : layout.requestBase + layout.first.outputWidth ≤ layout.width := by
+    simp only [width, secondBase, replyBase, serviceBase, hiddenWire]
+    omega
+  have hfirstWidth : layout.first.width ≤ layout.width := by
+    simp only [width, secondBase, replyBase, serviceBase, hiddenWire, requestBase]
+    omega
+  have hsource : 0 + layout.first.outputWidth ≤ layout.width := by omega
+  have hdisjoint : 0 + layout.first.outputWidth ≤ layout.requestBase ∨
+      layout.requestBase + layout.first.outputWidth ≤ 0 := by
+    left
+    simp only [requestBase]
+    omega
+  have hclass := isClassical_blockCopyCodes hdisjoint hsource hrequestEnd
+  have hfresh (z : Fin layout.first.width → Bool) (q : Fin layout.width)
+      (hq : layout.requestBase ≤ q) : glue layout.firstEmbedding z x q = x q := by
+    apply glue_of_not
+    intro i heq
+    have hrange := firstWire_lt_requestBase layout i.isLt
+    have hv := congrArg Fin.val heq
+    change layout.firstWire i = q.val at hv
+    omega
+  rw [embedState_eq_sum, map_sum]
+  apply Finset.sum_congr rfl
+  intro z _
+  rw [map_smul]
+  congr 1
+  let y := glue layout.firstEmbedding z x
+  have hyzero : ∀ i : Fin layout.first.outputWidth,
+      y (blockEmb layout.requestBase hrequestEnd i) = false := by
+    intro i
+    change glue layout.firstEmbedding z x (blockEmb layout.requestBase hrequestEnd i) = _
+    rw [hfresh z _ (by simp only [blockEmb_apply_val]; omega)]
+    have hi : (blockEmb layout.requestBase hrequestEnd i : ℕ) =
+        layout.requestBase + i := by simp only [blockEmb_apply_val, Nat.add_comm]
+    have hz := hrequest i i.isLt
+    rw [← hi, readBit_fin] at hz
+    exact hz
+  have hread (i : Fin layout.first.outputWidth) :
+      readBit y (0 + i) = z ⟨i, lt_of_lt_of_le i.isLt (houtput.trans hfirstInput)⟩ := by
+    simp only [Nat.zero_add]
+    rw [readBit_of_lt _ (show i.val < layout.width from lt_of_lt_of_le i.isLt (by omega))]
+    have hemb : layout.firstEmbedding
+        ⟨i, lt_of_lt_of_le i.isLt (houtput.trans hfirstInput)⟩ =
+          (⟨i, lt_of_lt_of_le i.isLt (by omega)⟩ : Fin layout.width) := by
+      apply Fin.ext
+      change layout.firstWire i = i
+      exact ite_eq_left (lt_of_lt_of_le i.isLt houtput)
+    dsimp only [y]
+    rw [← hemb, glue_apply_emb]
+  let recorded := glue (blockEmb layout.requestBase hrequestEnd)
+    (fun i => z ⟨i, lt_of_lt_of_le i.isLt (houtput.trans hfirstInput)⟩) y
+  have hcopy : classicalRun (blockCopyCodes 0 layout.requestBase layout.first.outputWidth) y =
+      recorded := by
+    rw [classicalRun_blockCopyCodes_zeroTarget hdisjoint hsource hrequestEnd y hyzero]
+    simp only [hread, recorded]
+  have hrecordFresh (q : Fin layout.width) (hq : layout.hiddenWire ≤ q) :
+      recorded q = x q := by
+    dsimp only [recorded]
+    rw [glue_of_not _ _ _ (fun i heq => by
+      have hv := congrArg Fin.val heq
+      simp only [blockEmb_apply_val] at hv
+      simp only [hiddenWire] at hq
+      omega)]
+    exact hfresh z q (by simp only [hiddenWire] at hq; omega)
+  have hh : readBit recorded layout.hiddenWire = false := by
+    have hlt : layout.hiddenWire < layout.width := by
+      simp only [width, secondBase, replyBase, serviceBase]
+      omega
+    rw [readBit_of_lt _ hlt, hrecordFresh _ (le_refl _)]
+    rwa [readBit_of_lt _ hlt] at hhidden
+  have hr : readBit recorded layout.replyBase = false := by
+    have hlt : layout.replyBase < layout.width := by
+      simp only [width, secondBase]
+      omega
+    rw [readBit_of_lt _ hlt, hrecordFresh _ (by simp only [replyBase, serviceBase]; omega)]
+    rwa [readBit_of_lt _ hlt] at hreply
+  rw [Circuit.ofCodes_append, Circuit.eval_append, Circuit.eval_ofCodes_ket hclass, hcopy,
+    eval_prepareHidden_ket layout recorded hh hr]
 
 end Cslib.Quantum.ClassicalQueryLayout

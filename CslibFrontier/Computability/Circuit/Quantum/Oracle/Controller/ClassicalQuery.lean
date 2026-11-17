@@ -220,7 +220,8 @@ theorem secondWire_ne_replyBase (layout : ClassicalQueryLayout) (wire : ℕ) :
       simp only [secondBase, replyBase, serviceBase, hiddenWire, requestBase]
       omega
 
-private theorem firstWire_lt_requestBase (layout : ClassicalQueryLayout) {wire : ℕ}
+/-- Every embedded first-stage wire precedes the fresh request record. -/
+theorem firstWire_lt_requestBase (layout : ClassicalQueryLayout) {wire : ℕ}
     (hwire : wire < layout.first.width) : layout.firstWire wire < layout.requestBase := by
   by_cases hprefix : wire < layout.firstInputWidth
   · rw [firstWire, ite_eq_left hprefix]
