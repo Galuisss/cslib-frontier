@@ -4,6 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Christian Reitwiessner
 -/
 
+module
+-- upstream: local-only (tests)
+
 import CslibFrontier.Computability.PCP.TwoProverGame.Tsirelson
 
 /-! # States, measurements and commuting-operator strategies
@@ -13,6 +16,8 @@ matrices, measurements in an algebra and their bridge to matrix POVMs, the two i
 commuting-operator model (matrix algebras and arbitrary C⋆-algebras), and Tsirelson's bound in that
 model, which the optimal EPR strategy attains.
 -/
+
+set_option linter.privateModule false
 
 namespace CslibFrontierTests.QuantumAlgebra
 
