@@ -41,6 +41,9 @@ full native success-law equality, or a QPT security theorem.
 * `Cslib.Crypto.HQC.matrix_b2ServiceBlock_initializedInput_withReference`: the actual embedded
   service block, on its initialized input, coherently records its complete reversible environment
   while retaining every other controller wire and an arbitrary reference.
+* `Cslib.Crypto.HQC.matrix_b2ServiceReplyCopy_initializedInput`: the actual embedded service
+  followed by its physical ciphertext copy produces the retained hidden-bit-and-ciphertext reply
+  while preserving every other controller wire.
 * `Cslib.Crypto.HQC.partialTraceLeft_b2ServiceEnvironment_fullReply`: discarding the actual
   reversible service environment dephases exactly the complete hidden-bit-and-ciphertext reply,
   while retaining an arbitrary reference and a reply-controlled continuation.
@@ -228,6 +231,409 @@ theorem matrix_b2ServiceBlock_initializedInput_withReference (P : PKEParams)
       by_cases henvironment : environment =
         classicalRun (b2ServiceCodes P securityParameter encoder) (serviceInput restIn) <;>
         simp [hreference, hrest, henvironment]
+
+/-- **The physical service and ciphertext copy produce the complete retained reply.**  Split the
+controller register first along the service placement and then along the protected reply block.
+On columns where that reply contains the copied hidden bit and a zero ciphertext target, the
+product of the actual embedded service matrix and the actual service-to-reply CNOT block replaces
+the hidden input by the reversible service environment and records the complete `[hidden|u|v]`
+word.  Every other physical wire is retained as one arbitrary factor, so the equality can be
+used under a density matrix entangled with the saved first-stage state.
+
+This is the exact input-space contract for the still-separate prefix proof.  It does not yet
+include the ciphertext-to-second-input copy, second-stage execution or final comparison. -/
+theorem matrix_b2ServiceReplyCopy_initializedInput (P : PKEParams)
+    (securityParameter : ℕ)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen)
+    (sample : TruncatedSyndromeSample P.n P.codeLen)
+    (messages : MessagePair (PKEMessage P))
+    (first second : UniformOracleCircuitFamily) :
+    let layout := b2ClassicalQueryLayout P encoder first second securityParameter
+    let ServiceState := Fin layout.service.width → Bool
+    let replyEmbedding : Fin (1 + layout.ciphertextWidth) ↪
+        {j : Fin layout.width // ¬ ∃ i, layout.serviceEmbedding i = j} :=
+      { toFun := fun wire => ⟨⟨layout.replyBase + wire, by
+          simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
+          omega⟩, by
+            rintro ⟨serviceWire, hserviceWire⟩
+            have hlt := layout.serviceEmbedding_lt_replyBase serviceWire
+            have heq := congrArg Fin.val hserviceWire
+            change layout.serviceWire serviceWire = layout.replyBase + wire at heq
+            omega⟩
+        inj' := fun left right heq => Fin.ext <| by
+          have heq := congrArg (fun wire => ((wire.1 : Fin layout.width) : ℕ)) heq
+          change layout.replyBase + left = layout.replyBase + right at heq
+          omega }
+    let Saved := {j : {j : Fin layout.width //
+      ¬ ∃ i, layout.serviceEmbedding i = j} // ¬ ∃ i, replyEmbedding i = j}
+    let initialReply : Bool → Fin (1 + layout.ciphertextWidth) → Bool :=
+      fun hidden => Fin.append (fun _ : Fin 1 => hidden)
+        (fun _ : Fin layout.ciphertextWidth => false)
+    let physicalState :=
+      fun (service : ServiceState)
+          (reply : Fin (1 + layout.ciphertextWidth) → Bool)
+          (saved : Saved → Bool) =>
+        (splitEquiv layout.serviceEmbedding).symm
+          (service,
+            (splitEquiv replyEmbedding).symm (reply, saved))
+    let serviceInput : Bool → ServiceState :=
+      fun hidden =>
+        inputState layout.service.width
+          (encPair encUnary encBits (securityParameter, sample.toWord) ++
+            List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [hidden])
+    let serviceEnvironment : Bool → ServiceState :=
+      fun hidden => classicalRun (b2ServiceCodes P securityParameter encoder)
+        (serviceInput hidden)
+    let serviceReply : ServiceState → Bool →
+        Fin (1 + layout.ciphertextWidth) → Bool :=
+      fun environment hidden =>
+        Fin.append (fun _ : Fin 1 => hidden)
+          (fun i : Fin layout.ciphertextWidth => readBit environment i)
+    let serviceMatrix : Matrix (ServiceState × (Bool × (Saved → Bool)))
+        (Bool × (Saved → Bool)) ℂ :=
+      (Circuit.matrix
+        ((Circuit.ofPhaseCodes layout.service.width
+          layout.service.instructions.zeroOraclePhaseCodes).mapWires
+            layout.serviceEmbedding) : Matrix _ _ ℂ).submatrix
+        (fun p => physicalState p.1 (initialReply p.2.1) p.2.2)
+        (fun p => physicalState (serviceInput p.1) (initialReply p.1) p.2)
+    let replyCopyMatrix : Matrix
+        (ServiceState × ((Fin (1 + layout.ciphertextWidth) → Bool) × (Saved → Bool)))
+        (ServiceState × (Bool × (Saved → Bool))) ℂ :=
+      (Circuit.matrix (Circuit.ofCodes layout.width
+        (blockCopyCodes layout.serviceBase (layout.replyBase + 1)
+          layout.ciphertextWidth)) : Matrix _ _ ℂ).submatrix
+        (fun p => physicalState p.1 p.2.1 p.2.2)
+        (fun p => physicalState p.1 (initialReply p.2.1) p.2.2)
+    replyCopyMatrix * serviceMatrix =
+      coherentEnvironmentRecord serviceEnvironment
+        (fun hidden => serviceReply (serviceEnvironment hidden) hidden) := by
+  classical
+  let layout := b2ClassicalQueryLayout P encoder first second securityParameter
+  let ServiceState := Fin layout.service.width → Bool
+  let ServiceRest := {j : Fin layout.width //
+    ¬ ∃ i, layout.serviceEmbedding i = j}
+  let replyEmbedding : Fin (1 + layout.ciphertextWidth) ↪ ServiceRest :=
+    { toFun := fun wire => ⟨⟨layout.replyBase + wire, by
+        simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
+        omega⟩, by
+          rintro ⟨serviceWire, hserviceWire⟩
+          have hlt := layout.serviceEmbedding_lt_replyBase serviceWire
+          have heq := congrArg Fin.val hserviceWire
+          change layout.serviceWire serviceWire = layout.replyBase + wire at heq
+          omega⟩
+      inj' := fun left right heq => Fin.ext <| by
+        have heq := congrArg (fun wire => ((wire.1 : Fin layout.width) : ℕ)) heq
+        change layout.replyBase + left = layout.replyBase + right at heq
+        omega }
+  let Saved := {j : ServiceRest // ¬ ∃ i, replyEmbedding i = j}
+  let initialReply : Bool → Fin (1 + layout.ciphertextWidth) → Bool :=
+    fun hidden => Fin.append (fun _ : Fin 1 => hidden)
+      (fun _ : Fin layout.ciphertextWidth => false)
+  let physicalState :=
+    fun (service : ServiceState)
+        (reply : Fin (1 + layout.ciphertextWidth) → Bool)
+        (saved : Saved → Bool) =>
+      (splitEquiv layout.serviceEmbedding).symm
+        (service, (splitEquiv replyEmbedding).symm (reply, saved))
+  let serviceInput : Bool → ServiceState :=
+    fun hidden =>
+      inputState layout.service.width
+        (encPair encUnary encBits (securityParameter, sample.toWord) ++
+          List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [hidden])
+  let serviceEnvironment : Bool → ServiceState :=
+    fun hidden => classicalRun (b2ServiceCodes P securityParameter encoder)
+      (serviceInput hidden)
+  let serviceReply : ServiceState → Bool →
+      Fin (1 + layout.ciphertextWidth) → Bool :=
+    fun environment hidden =>
+      Fin.append (fun _ : Fin 1 => hidden)
+        (fun i : Fin layout.ciphertextWidth => readBit environment i)
+  let serviceMatrix : Matrix (ServiceState × (Bool × (Saved → Bool)))
+      (Bool × (Saved → Bool)) ℂ :=
+    (Circuit.matrix
+      ((Circuit.ofPhaseCodes layout.service.width
+        layout.service.instructions.zeroOraclePhaseCodes).mapWires
+          layout.serviceEmbedding) : Matrix _ _ ℂ).submatrix
+      (fun p => physicalState p.1 (initialReply p.2.1) p.2.2)
+      (fun p => physicalState (serviceInput p.1) (initialReply p.1) p.2)
+  let replyCopyMatrix : Matrix
+      (ServiceState × ((Fin (1 + layout.ciphertextWidth) → Bool) × (Saved → Bool)))
+      (ServiceState × (Bool × (Saved → Bool))) ℂ :=
+    (Circuit.matrix (Circuit.ofCodes layout.width
+      (blockCopyCodes layout.serviceBase (layout.replyBase + 1)
+        layout.ciphertextWidth)) : Matrix _ _ ℂ).submatrix
+      (fun p => physicalState p.1 p.2.1 p.2.2)
+      (fun p => physicalState p.1 (initialReply p.2.1) p.2.2)
+  change replyCopyMatrix * serviceMatrix =
+    coherentEnvironmentRecord serviceEnvironment
+      (fun hidden => serviceReply (serviceEnvironment hidden) hidden)
+  have hreplyBase : layout.replyBase < layout.width := by
+    simp only [layout, ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
+    omega
+  have hreadReplyBase (service : ServiceState)
+      (reply : Fin (1 + layout.ciphertextWidth) → Bool) (saved : Saved → Bool) :
+      readBit (physicalState service reply saved) layout.replyBase = reply 0 := by
+    rw [readBit_of_lt _ hreplyBase]
+    have hwire : (⟨layout.replyBase, hreplyBase⟩ : Fin layout.width) =
+        (replyEmbedding 0).1 := by
+      apply Fin.ext
+      change layout.replyBase = layout.replyBase + (0 : Fin (1 + layout.ciphertextWidth))
+      simp only [Fin.val_zero, Nat.add_zero]
+    rw [hwire]
+    change
+      (splitEquiv layout.serviceEmbedding).symm
+          (service, (splitEquiv replyEmbedding).symm (reply, saved))
+          (replyEmbedding 0).1 = reply 0
+    rw [splitEquiv_symm_apply_of_not]
+    exact splitEquiv_symm_apply_wire replyEmbedding reply saved 0
+  have hserviceMatrix : serviceMatrix =
+      coherentEnvironmentRecord serviceEnvironment (fun hidden : Bool => hidden) := by
+    ext ⟨environmentOut, hiddenOut, savedOut⟩ ⟨hiddenIn, savedIn⟩
+    have hservice := matrix_b2ServiceBlock_initializedInput_withReference P securityParameter
+      encoder sample messages first second (Reference := Unit)
+    dsimp only at hservice
+    have hentry := congrFun (congrFun hservice
+      (environmentOut,
+        (splitEquiv replyEmbedding).symm (initialReply hiddenOut, savedOut), ()))
+      ((splitEquiv replyEmbedding).symm (initialReply hiddenIn, savedIn), ())
+    simp only [Matrix.submatrix_apply, kroneckerMap_apply, Matrix.one_apply,
+      coherentRecord] at hentry
+    have hhidden :
+        readBit
+            ((splitEquiv layout.serviceEmbedding).symm
+              (fun _ => false,
+                (splitEquiv replyEmbedding).symm (initialReply hiddenIn, savedIn)))
+            layout.replyBase = hiddenIn := by
+      rw [hreadReplyBase]
+      exact Fin.append_left _ _ 0
+    have hinitialReply : Function.Injective initialReply := by
+      intro left right heq
+      have heq := congrFun heq (Fin.castAdd layout.ciphertextWidth (0 : Fin 1))
+      simpa only [initialReply, Fin.append_left] using heq
+    dsimp only [layout] at hentry hhidden
+    simpa only [serviceMatrix, physicalState, serviceInput, serviceEnvironment, layout,
+      Matrix.submatrix_apply, coherentEnvironmentRecord, hhidden,
+      Prod.mk.injEq, true_and, ite_true, mul_one, and_true,
+      hinitialReply.eq_iff,
+      Equiv.apply_eq_iff_eq] using hentry
+  rw [hserviceMatrix]
+  ext ⟨environmentOut, replyOut, savedOut⟩ ⟨hiddenIn, savedIn⟩
+  simp only [Matrix.mul_apply, coherentEnvironmentRecord, mul_ite, mul_one, mul_zero,
+    sum_ite_eq', mem_univ, reduceIte, Prod.mk.injEq]
+  let htarget : layout.replyBase + 1 + layout.ciphertextWidth ≤ layout.width := by
+    simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
+    omega
+  let targetEmbedding := blockEmb (layout.replyBase + 1) htarget
+  let TargetRest := {j : Fin layout.width // ¬ ∃ i, targetEmbedding i = j}
+  let inputPhysical := physicalState (serviceEnvironment hiddenIn)
+    (initialReply hiddenIn) savedIn
+  let inputRest : TargetRest → Bool := (splitEquiv targetEmbedding inputPhysical).2
+  have hciphertext : layout.ciphertextWidth = P.n + P.codeLen := by
+    simp only [layout, b2ClassicalQueryLayout, ClassicalQueryLayout.ciphertextWidth]
+    omega
+  have hserviceOutput : layout.ciphertextWidth ≤ layout.service.width := by
+    rw [hciphertext]
+    simpa only [layout, b2ClassicalQueryLayout, b2ServiceDescription_outputWidth] using
+      (wellFormed_b2ServiceDescription P securityParameter encoder).output_le
+  have hfullInput : layout.ciphertextWidth ≤ layout.fullInputWidth := by
+    simp only [layout, b2ClassicalQueryLayout, ClassicalQueryLayout.ciphertextWidth,
+      ClassicalQueryLayout.fullInputWidth]
+    omega
+  have htargetZero : (splitEquiv targetEmbedding inputPhysical).1 =
+      (fun _ : Fin layout.ciphertextWidth => false) := by
+    funext i
+    rw [splitEquiv_apply_fst]
+    have hwire : targetEmbedding i =
+        (replyEmbedding (Fin.natAdd 1 i)).1 := by
+      apply Fin.ext
+      change i + (layout.replyBase + 1) =
+        layout.replyBase + (Fin.natAdd 1 i : Fin (1 + layout.ciphertextWidth))
+      simp only [Fin.val_natAdd]
+      omega
+    change inputPhysical (targetEmbedding i) = false
+    rw [hwire]
+    change
+      (splitEquiv layout.serviceEmbedding).symm
+          (serviceEnvironment hiddenIn,
+            (splitEquiv replyEmbedding).symm (initialReply hiddenIn, savedIn))
+          (replyEmbedding (Fin.natAdd 1 i)).1 = false
+    have houtside := (replyEmbedding (Fin.natAdd 1 i)).2
+    rw [splitEquiv_symm_apply_of_not _ _ _ _ houtside,
+      splitEquiv_symm_apply_wire]
+    exact Fin.append_right _ _ i
+  have hinputPhysical :
+      (splitEquiv targetEmbedding).symm
+          (fun _ : Fin layout.ciphertextWidth => false, inputRest) = inputPhysical := by
+    apply (splitEquiv targetEmbedding).injective
+    rw [Equiv.apply_symm_apply]
+    exact Prod.ext htargetZero.symm rfl
+  let sourceLabel : (TargetRest → Bool) → Fin layout.ciphertextWidth → Bool :=
+    fun rest i =>
+      (splitEquiv targetEmbedding).symm (fun _ => false, rest)
+        ⟨layout.serviceBase + i, by
+          simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase,
+            ClassicalQueryLayout.replyBase]
+          omega⟩
+  have hsourceLabel : sourceLabel inputRest =
+      fun i : Fin layout.ciphertextWidth =>
+        readBit (serviceEnvironment hiddenIn) i := by
+    funext i
+    dsimp only [sourceLabel]
+    rw [hinputPhysical]
+    have hsourceWire :
+        (⟨layout.serviceBase + i, by
+          simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase,
+            ClassicalQueryLayout.replyBase]
+          omega⟩ : Fin layout.width) =
+          layout.serviceEmbedding ⟨i, i.isLt.trans_le hserviceOutput⟩ := by
+      apply Fin.ext
+      change layout.serviceBase + i =
+        layout.serviceWire i
+      rw [ClassicalQueryLayout.serviceWire, ite_eq_left (i.isLt.trans_le hfullInput)]
+    rw [hsourceWire]
+    change
+      (splitEquiv layout.serviceEmbedding).symm
+          (serviceEnvironment hiddenIn,
+            (splitEquiv replyEmbedding).symm (initialReply hiddenIn, savedIn))
+          (layout.serviceEmbedding ⟨i, i.isLt.trans_le hserviceOutput⟩) = _
+    rw [splitEquiv_symm_apply_wire]
+    rw [readBit_of_lt _ (i.isLt.trans_le hserviceOutput)]
+  have hcopy := Circuit.matrix_blockCopyCodes_zeroTarget
+    (source := layout.serviceBase) (target := layout.replyBase + 1)
+    (count := layout.ciphertextWidth) (width := layout.width)
+    (Or.inl (by
+      simp only [ClassicalQueryLayout.replyBase]
+      omega))
+    (by
+      simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase,
+        ClassicalQueryLayout.replyBase]
+      omega)
+    htarget
+  dsimp only at hcopy
+  let expectedReply := serviceReply (serviceEnvironment hiddenIn) hiddenIn
+  let expectedPhysical := physicalState (serviceEnvironment hiddenIn) expectedReply savedIn
+  have hsplitExpected :
+      splitEquiv targetEmbedding expectedPhysical = (sourceLabel inputRest, inputRest) := by
+    apply Prod.ext
+    · funext i
+      rw [splitEquiv_apply_fst]
+      have hwire : targetEmbedding i =
+          (replyEmbedding (Fin.natAdd 1 i)).1 := by
+        apply Fin.ext
+        change i + (layout.replyBase + 1) =
+          layout.replyBase + (Fin.natAdd 1 i : Fin (1 + layout.ciphertextWidth))
+        simp only [Fin.val_natAdd]
+        omega
+      change expectedPhysical (targetEmbedding i) = sourceLabel inputRest i
+      rw [hwire]
+      change
+        (splitEquiv layout.serviceEmbedding).symm
+            (serviceEnvironment hiddenIn,
+              (splitEquiv replyEmbedding).symm (expectedReply, savedIn))
+            (replyEmbedding (Fin.natAdd 1 i)).1 = _
+      rw [splitEquiv_symm_apply_of_not _ _ _ _
+          (replyEmbedding (Fin.natAdd 1 i)).2,
+        splitEquiv_symm_apply_wire]
+      dsimp only [expectedReply, serviceReply]
+      rw [Fin.append_right]
+      exact (congrFun hsourceLabel i).symm
+    · funext j
+      rw [splitEquiv_apply_snd]
+      change expectedPhysical j.1 = inputPhysical j.1
+      by_cases hservice : ∃ i, layout.serviceEmbedding i = j.1
+      · obtain ⟨i, hi⟩ := hservice
+        rw [← hi]
+        change
+          (splitEquiv layout.serviceEmbedding).symm
+              (serviceEnvironment hiddenIn,
+                (splitEquiv replyEmbedding).symm (expectedReply, savedIn))
+              (layout.serviceEmbedding i) =
+            (splitEquiv layout.serviceEmbedding).symm
+              (serviceEnvironment hiddenIn,
+                (splitEquiv replyEmbedding).symm (initialReply hiddenIn, savedIn))
+              (layout.serviceEmbedding i)
+        rw [splitEquiv_symm_apply_wire, splitEquiv_symm_apply_wire]
+      · let serviceRest : ServiceRest := ⟨j.1, hservice⟩
+        change
+          (splitEquiv layout.serviceEmbedding).symm
+              (serviceEnvironment hiddenIn,
+                (splitEquiv replyEmbedding).symm (expectedReply, savedIn)) j.1 =
+            (splitEquiv layout.serviceEmbedding).symm
+              (serviceEnvironment hiddenIn,
+                (splitEquiv replyEmbedding).symm (initialReply hiddenIn, savedIn)) j.1
+        rw [splitEquiv_symm_apply_of_not _ _ _ _ hservice,
+          splitEquiv_symm_apply_of_not _ _ _ _ hservice]
+        change
+          (splitEquiv replyEmbedding).symm (expectedReply, savedIn) serviceRest =
+            (splitEquiv replyEmbedding).symm (initialReply hiddenIn, savedIn) serviceRest
+        by_cases hreply : ∃ i, replyEmbedding i = serviceRest
+        · obtain ⟨i, hi⟩ := hreply
+          rw [← hi, splitEquiv_symm_apply_wire, splitEquiv_symm_apply_wire]
+          by_cases hi0 : i = 0
+          · subst i
+            dsimp only [expectedReply, serviceReply, initialReply]
+            change hiddenIn = hiddenIn
+            rfl
+          · exfalso
+            have hival : (i : ℕ) ≠ 0 := fun h => hi0 (Fin.ext h)
+            have hipos : 0 < (i : ℕ) := Nat.pos_of_ne_zero hival
+            let k : Fin layout.ciphertextWidth := ⟨i - 1, by omega⟩
+            apply j.2
+            refine ⟨k, ?_⟩
+            apply Fin.ext
+            have hi' := congrArg (fun wire => ((wire.1 : Fin layout.width) : ℕ)) hi
+            change layout.replyBase + i = j.1 at hi'
+            change k + (layout.replyBase + 1) = j.1
+            dsimp only [k]
+            omega
+        · rw [splitEquiv_symm_apply_of_not _ _ _ _ hreply,
+            splitEquiv_symm_apply_of_not _ _ _ _ hreply]
+  have hphysicalState_eq (serviceLeft serviceRight : ServiceState)
+      (replyLeft replyRight : Fin (1 + layout.ciphertextWidth) → Bool)
+      (savedLeft savedRight : Saved → Bool) :
+      physicalState serviceLeft replyLeft savedLeft =
+          physicalState serviceRight replyRight savedRight ↔
+        serviceLeft = serviceRight ∧ replyLeft = replyRight ∧ savedLeft = savedRight := by
+    constructor
+    · intro h
+      have houter := congrArg (splitEquiv layout.serviceEmbedding) h
+      simp only [physicalState, Equiv.apply_symm_apply, Prod.mk.injEq] at houter
+      have hinner := congrArg (splitEquiv replyEmbedding) houter.2
+      simp only [Equiv.apply_symm_apply, Prod.mk.injEq] at hinner
+      exact ⟨houter.1, hinner.1, hinner.2⟩
+    · rintro ⟨rfl, rfl, rfl⟩
+      rfl
+  have hcoordinates :
+      splitEquiv targetEmbedding (physicalState environmentOut replyOut savedOut) =
+          (sourceLabel inputRest, inputRest) ↔
+        environmentOut = serviceEnvironment hiddenIn ∧
+          replyOut = expectedReply ∧ savedOut = savedIn := by
+    constructor
+    · intro h
+      apply (hphysicalState_eq _ _ _ _ _ _).mp
+      apply (splitEquiv targetEmbedding).injective
+      exact h.trans hsplitExpected.symm
+    · intro h
+      have hphysical := (hphysicalState_eq _ _ _ _ _ _).mpr h
+      exact (congrArg (splitEquiv targetEmbedding) hphysical).trans hsplitExpected
+  have hentry := congrFun
+    (congrFun hcopy
+      (splitEquiv targetEmbedding (physicalState environmentOut replyOut savedOut))) inputRest
+  have hentry' :
+      replyCopyMatrix (environmentOut, replyOut, savedOut)
+          (serviceEnvironment hiddenIn, hiddenIn, savedIn) =
+        if splitEquiv targetEmbedding (physicalState environmentOut replyOut savedOut) =
+            (sourceLabel inputRest, inputRest) then 1 else 0 := by
+    change
+      (Circuit.matrix (Circuit.ofCodes layout.width
+        (blockCopyCodes layout.serviceBase (layout.replyBase + 1)
+          layout.ciphertextWidth)) : Matrix _ _ ℂ)
+          (physicalState environmentOut replyOut savedOut) inputPhysical = _
+    rw [← hinputPhysical]
+    simpa only [Matrix.submatrix_apply, Equiv.symm_apply_apply, coherentRecord,
+      targetEmbedding, sourceLabel] using hentry
+  rw [hentry', if_congr hcoordinates rfl rfl]
 
 /-- **The actual reversible B2 service dephases exactly its complete reply.**  For a fixed
 truncated-syndrome sample and measured message pair, the discarded service environment

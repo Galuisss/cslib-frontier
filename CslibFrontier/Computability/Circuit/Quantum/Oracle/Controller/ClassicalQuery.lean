@@ -244,18 +244,24 @@ placement used by the relabelled first-stage instruction block. -/
       by_cases hright : right < layout.firstInputWidth <;>
       simp [firstWire, hleft, hright] at heq <;> omega
 
+/-- Every service-register wire lies strictly before the retained full-reply record. -/
+theorem serviceEmbedding_lt_replyBase (layout : ClassicalQueryLayout)
+    (wire : Fin layout.service.width) :
+    layout.serviceWire wire < layout.replyBase := by
+  by_cases hinput : wire < layout.fullInputWidth
+  · simp [serviceWire, hinput, replyBase]
+  · by_cases hrequest :
+        wire - layout.fullInputWidth < layout.first.outputWidth + 1
+    · simp [serviceWire, hinput, hrequest, replyBase, serviceBase, hiddenWire]
+      omega
+    · simp [serviceWire, hinput, hrequest, replyBase]
+
 /-- Embed the service register into the complete controller register, sharing the saved sample,
 request and hidden-bit coordinates selected by `serviceWire`. -/
 @[expose] def serviceEmbedding (layout : ClassicalQueryLayout) :
     Fin layout.service.width ↪ Fin layout.width where
   toFun wire := ⟨layout.serviceWire wire, by
-    have hwire : layout.serviceWire wire < layout.replyBase := by
-      by_cases hinput : wire < layout.fullInputWidth
-      · simp [serviceWire, hinput, replyBase]
-      · by_cases hrequest : wire - layout.fullInputWidth < layout.first.outputWidth + 1
-        · simp [serviceWire, hinput, hrequest, replyBase, serviceBase, hiddenWire]
-          omega
-        · simp [serviceWire, hinput, hrequest, replyBase]
+    have hwire := layout.serviceEmbedding_lt_replyBase wire
     simp only [width, secondBase]
     omega⟩
   inj' := fun left right heq => Fin.ext <| by

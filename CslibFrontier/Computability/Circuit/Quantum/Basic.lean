@@ -127,30 +127,34 @@ structure PlacedGate (n : ℕ) where
   /-- The qubits it acts on, in order. -/
   wires : Fin arity ↪ Fin n
 
-/-- Splitting a bit string into its restriction `x ∘ A` to the qubits `A` and its values on the
-other qubits. -/
-noncomputable def splitEquiv (A : Fin k ↪ Fin n) :
-    (Fin n → Bool) ≃ (Fin k → Bool) × ({j // ¬∃ i, A i = j} → Bool) :=
+/-- Split a bit string into its restriction along an embedding and its values outside the
+embedding's range. -/
+noncomputable def splitEquiv {I J : Type*} [Fintype I] [DecidableEq J] (A : I ↪ J) :
+    (J → Bool) ≃ (I → Bool) × ({j // ¬∃ i, A i = j} → Bool) :=
   (Equiv.piEquivPiSubtypeProd (fun j => ∃ i, A i = j) fun _ => Bool).trans
     (Equiv.prodCongr (Equiv.arrowCongr (Equiv.ofInjective A A.injective).symm (Equiv.refl _))
       (Equiv.refl _))
 
-@[simp] theorem splitEquiv_apply_fst (A : Fin k ↪ Fin n) (x : Fin n → Bool) :
+@[simp] theorem splitEquiv_apply_fst {I J : Type*} [Fintype I] [DecidableEq J]
+    (A : I ↪ J) (x : J → Bool) :
     (splitEquiv A x).1 = x ∘ A :=
   rfl
 
-@[simp] theorem splitEquiv_apply_snd (A : Fin k ↪ Fin n) (x : Fin n → Bool) :
+@[simp] theorem splitEquiv_apply_snd {I J : Type*} [Fintype I] [DecidableEq J]
+    (A : I ↪ J) (x : J → Bool) :
     (splitEquiv A x).2 = fun j => x j.1 :=
   rfl
 
-/-- The first component of `splitEquiv A` determines the values on the qubits `A`. -/
-@[simp] theorem splitEquiv_symm_apply_wire (A : Fin k ↪ Fin n) (b : Fin k → Bool)
-    (r : {j // ¬∃ i, A i = j} → Bool) (i : Fin k) : (splitEquiv A).symm (b, r) (A i) = b i :=
+/-- The first component of `splitEquiv A` determines the values in the range of `A`. -/
+@[simp] theorem splitEquiv_symm_apply_wire {I J : Type*} [Fintype I] [DecidableEq J]
+    (A : I ↪ J) (b : I → Bool) (r : {j // ¬∃ i, A i = j} → Bool) (i : I) :
+    (splitEquiv A).symm (b, r) (A i) = b i :=
   congrFun (congrArg Prod.fst ((splitEquiv A).apply_symm_apply (b, r))) i
 
-/-- The second component of `splitEquiv A` determines the values off the qubits `A`. -/
-theorem splitEquiv_symm_apply_of_not (A : Fin k ↪ Fin n) (b : Fin k → Bool)
-    (r : {j // ¬∃ i, A i = j} → Bool) (j : Fin n) (hj : ¬∃ i, A i = j) :
+/-- The second component of `splitEquiv A` determines values outside its range. -/
+theorem splitEquiv_symm_apply_of_not {I J : Type*} [Fintype I] [DecidableEq J]
+    (A : I ↪ J) (b : I → Bool) (r : {j // ¬∃ i, A i = j} → Bool) (j : J)
+    (hj : ¬∃ i, A i = j) :
     (splitEquiv A).symm (b, r) j = r ⟨j, hj⟩ :=
   congrFun (congrArg Prod.snd ((splitEquiv A).apply_symm_apply (b, r))) ⟨j, hj⟩
 
