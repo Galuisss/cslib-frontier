@@ -257,7 +257,8 @@ This is the final readout law for a classical-query controller, not a complete g
 theorem: composing it with the controller prefix, service and controlled second-stage identities
 remains separate. -/
 theorem measureDensity_finalComparison (layout : ClassicalQueryLayout)
-    (hsecondWidth : 1 ≤ layout.second.width)
+    (hsecondOutput : 1 ≤ layout.second.outputWidth)
+    (hsecondOutputFits : layout.second.outputWidth ≤ layout.second.width)
     {Reference : Type*} [Fintype Reference] [DecidableEq Reference]
     (rho : Matrix ((Fin layout.width → Bool) × Reference)
       ((Fin layout.width → Bool) × Reference) ℂ)
@@ -281,6 +282,8 @@ theorem measureDensity_finalComparison (layout : ClassicalQueryLayout)
   let finalCodes :=
     prefixSwapCodes layout.secondBase 1 ++ compareBits layout.replyBase 0
   let finalCircuit := Circuit.ofCodes layout.width finalCodes
+  have hsecondWidth : 1 ≤ layout.second.width :=
+    hsecondOutput.trans hsecondOutputFits
   have hsourceDisjoint : 1 ≤ layout.secondBase := by
     simp only [ClassicalQueryLayout.secondBase, ClassicalQueryLayout.replyBase,
       ClassicalQueryLayout.serviceBase, ClassicalQueryLayout.hiddenWire]
