@@ -3975,6 +3975,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSH
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSHRigidity
 public import CslibFrontier.Computability.PCP.TwoProverGame.Commuting
+public import CslibFrontier.Computability.PCP.TwoProverGame.MagicSquare
 public import CslibFrontier.Computability.PCP.TwoProverGame.Quantum
 public import CslibFrontier.Computability.PCP.TwoProverGame.RotationStrategy
 public import CslibFrontier.Computability.PCP.TwoProverGame.Tsirelson
@@ -6794,6 +6795,8 @@ public import CslibFrontier.Foundations.Quantum.Algebra.AlgState
 public import CslibFrontier.Foundations.Quantum.Algebra.Approx
 public import CslibFrontier.Foundations.Quantum.Algebra.CHSHRigidity
 public import CslibFrontier.Foundations.Quantum.Algebra.Consistency
+public import CslibFrontier.Foundations.Quantum.Algebra.Involution
+public import CslibFrontier.Foundations.Quantum.Algebra.MaxEntangled
 public import CslibFrontier.Foundations.Quantum.Algebra.Measurement
 public import CslibFrontier.Foundations.Quantum.Algebra.Tsirelson
 public import CslibFrontier.Foundations.Quantum.Bell
