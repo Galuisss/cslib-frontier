@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Halting.SMN
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Length
+import CslibFrontier.Tactic.EncLen
 
 /-!
 # Encoded size of the s-m-n construction
@@ -90,9 +91,10 @@ theorem descLen_hardwire_eq (d : Desc) (p : List Bool) :
         (rewindEntries 2 none (List.replicate d.tapes none) (2 * d.q₀ + 1))).length +
       (encList (encPair eKey eAct)
         (redirect (fun q => 2 * q + 1) none [] 0 id d.table)).length := by
-  simp only [descLen, hardwire, eDesc_apply, length_encPair, encUnary_apply,
-    List.length_replicate, encList_append, List.length_append]
-  omega
+  enc_len [descLen, hardwire, eDesc_apply, encList_append]
+
+private theorem length_encSign_le (m : SignType) : (encSign m).length ≤ 1 := by
+  cases m <;> decide
 
 private theorem length_redirectEntry_le (e : Key × Act) (s : Option ℕ)
     (hs : s ∈ vlift e.1.input) :
@@ -124,8 +126,7 @@ private theorem length_encList_redirect_le (d : Desc) :
     obtain ⟨e, he, s, hs, rfl⟩ := he'
     have hentry := length_le_encList_of_mem (encPair eKey eAct) he
     have htable : (encList (encPair eKey eAct) d.table).length ≤ descLen d := by
-      simp only [descLen, eDesc_apply, length_encPair]
-      omega
+      enc_len [descLen, eDesc_apply]
     exact (length_redirectEntry_le e s hs).trans
       (Nat.mul_le_mul_left 50 (Nat.add_le_add_right (hentry.trans htable) 1))
   · exact Nat.mul_le_mul_right _ (length_redirect_le d.table)
@@ -189,9 +190,7 @@ theorem descLen_hardwire_le (d : Desc) (p : List Bool) :
   have htapes := tapes_le d
   have htable := table_le d
   have hinput : descLen d + p.length + 1 ≤ (encPair eDesc encBits (d, p)).length := by
-    change (eDesc d).length + p.length + 1 ≤ _
-    simp only [length_encPair, encBits_apply]
-    omega
+    enc_len [descLen]
   rw [descLen_hardwire_eq]
   simp only [prep, encList_append, List.length_append] at hprep
   nlinarith [sq_nonneg (descLen d + p.length + 1),
