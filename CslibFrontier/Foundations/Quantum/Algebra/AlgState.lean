@@ -7,6 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: candidate
 
+public import CslibFrontier.Init
 public import Mathlib.Analysis.CStarAlgebra.GelfandNaimarkSegal
 public import Mathlib.Analysis.Matrix.Order
 import CslibFrontier.Foundations.Analysis.InnerProductSpace.PiL2

@@ -36,7 +36,7 @@ sum of squares.
 * [B. S. Cirel'son, *Quantum generalizations of Bell's inequality*][Cirelson1980]
 -/
 
-@[expose] public section
+public section
 
 namespace Cslib.Quantum.AlgState
 
