@@ -14,6 +14,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Ker
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Pair
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Bit
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Bound
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step
 import Mathlib.Data.Finset.Sort
 import Mathlib.Data.List.Lex
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Correct
@@ -357,22 +358,14 @@ same machine and resource maps are retained. -/
       table.toTM.step (cfg input n hn.le) = cfg input (n + 1) hn := by
     rw [MultiTapeTM.step_of_state rfl]
     simp only [table, MultiTapeMachine.toTM_ofTr, MultiTapeTM.tr_ofTr, dite_eq_left hn]
-    apply Cfg.ext_zero_tapes
-    · rfl
-    · rfl
-    · simp only [cfg, Action.apply_output, Option.toList_some]
-      rw [List.take_add_one, List.getElem?_eq_getElem hn]
-      rfl
+    tm_step [cfg, List.take_add_one, List.getElem?_eq_getElem hn]
   have step_cfg_halt (input : List Bool) :
       table.toTM.step (cfg input (encOut b).length le_rfl) =
         wordsCfg input none (fun _ => []) (encOut b) := by
     rw [MultiTapeTM.step_of_state rfl]
     simp only [table, MultiTapeMachine.toTM_ofTr, MultiTapeTM.tr_ofTr,
       dite_eq_right (Nat.not_lt.mpr le_rfl)]
-    apply Cfg.ext_zero_tapes
-    · rfl
-    · rfl
-    · simp [cfg, Action.apply_output]
+    tm_step [cfg]
   have runFrom_cfg (input : List Bool) (n : ℕ) (hn : n ≤ (encOut b).length) :
       table.toTM.runFrom (table.toTM.initCfg input) n = cfg input n hn := by
     induction n with

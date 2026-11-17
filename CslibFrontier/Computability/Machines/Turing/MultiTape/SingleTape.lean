@@ -232,7 +232,7 @@ lemma runFrom_walk {y : List Symbol} {contents : ℤ → Option Symbol} {head : 
       have hread := (hrep n).symm
       rw [BiTape.read_mk₁] at hread
       simpa [List.getElem?_eq_getElem hlt] using hread
-    rw [runFrom, Function.iterate_succ_apply', ← runFrom, ih (by omega)]
+    rw [runFrom_succ, ih (by omega)]
     tm_step [emitWork, hsym]
 
 end EmitWork
@@ -256,7 +256,7 @@ theorem runFrom_emitWork {input y : List Symbol} (mcfg : Cfg 1 Symbol Unit input
       (y.length + 1) =
     ⟨none, mcfg.inputPos, fun _ => mcfg.workTapes 0, fun _ => mcfg.workTapePos 0 + y.length,
       mcfg.output ++ y⟩ := by
-    rw [runFrom, Function.iterate_succ_apply', ← runFrom, hwalk]
+    rw [runFrom_succ, hwalk]
     tm_step [emitWork, hblank]
   rw [← hmcfg] at htotal
   rw [htotal]

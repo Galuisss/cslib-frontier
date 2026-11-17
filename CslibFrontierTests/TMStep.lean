@@ -12,9 +12,11 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step
 /-!
 # Steps and equalities of configurations with `tm_step`
 
-One test for each way `tm_step` reads a goal: the step of a running and of a halted machine, each
-split of the index of the work tapes, a machine without work tapes, a move of the input head, a
-configuration with oracle channels, the goals it leaves, and its two errors.
+The tests cover the step of a running and of a halted machine; the splits of the index of the work
+tapes (`Function.update`, also at the last tape, `Fin.lastCases`, `Fin.addCases`, `Fin.append`, a
+numeral number of tapes, also as the index of a vector `![a, b]`, `if` and `match`); a condition
+that does not mention the index, split on only when that closes the case; a machine without work
+tapes; a move of the input head; a configuration with oracle channels; and the three errors.
 -/
 
 public section
@@ -50,6 +52,15 @@ example (j : Fin k) (c : Cfg k Bool State input) (q : State) :
         Function.update c.workTapePos j (c.workTapePos j + 1), c.output⟩ := by
   tm_step
 
+-- `Function.update` at the last tape: the index is split with `Fin.lastCases`.
+example (c : Cfg (k + 1) Bool State input) :
+    (⟨0, Function.update (fun _ => (none, 0)) (Fin.last k) (none, 1), none, c.state⟩ :
+        Action (k + 1) Bool State).apply c =
+      ⟨c.state, c.inputPos, c.workTapes,
+        Function.update c.workTapePos (Fin.last k) (c.workTapePos (Fin.last k) + 1),
+        c.output⟩ := by
+  tm_step
+
 -- `Fin.lastCases` and `Fin.addCases`: the index is split with the same eliminators.
 example (c : Cfg (k + 2 + 1) Bool State input) :
     (⟨0, Fin.lastCases (none, 1) (Fin.addCases (fun _ => (none, 0)) fun _ => (none, -1)), none,
@@ -58,6 +69,22 @@ example (c : Cfg (k + 2 + 1) Bool State input) :
         Fin.lastCases (c.workTapePos (Fin.last _) + 1) (Fin.addCases
           (fun i => c.workTapePos (Fin.castAdd 2 i).castSucc)
           fun i => c.workTapePos (Fin.natAdd k i).castSucc - 1), c.output⟩ := by
+  tm_step
+
+-- `Fin.append`: the index is split with `Fin.addCases`.
+example (c : Cfg (k + 2) Bool State input) :
+    (⟨0, Fin.append (fun _ : Fin k => (none, 1)) (fun _ : Fin 2 => (none, -1)), none, c.state⟩ :
+        Action (k + 2) Bool State).apply c =
+      ⟨c.state, c.inputPos, c.workTapes,
+        Fin.append (fun i => c.workTapePos (Fin.castAdd 2 i) + 1)
+          (fun i => c.workTapePos (Fin.natAdd k i) - 1), c.output⟩ := by
+  tm_step
+
+-- A vector `![a, b]` appended to other tapes: its index, in `Fin (Nat.succ 1)`, takes two values.
+example (ws : Fin k → List Bool) (w out : List Bool) (q : Option State) :
+    wordsCfg input q (Fin.append ws ![w, []]) out =
+      ⟨q, 1, Fin.append (fun j => tapeOfList (ws j)) ![tapeOfList w, fun _ => none],
+        fun _ => 0, out⟩ := by
   tm_step
 
 -- A numeral number of tapes: one case for each tape.
@@ -75,6 +102,43 @@ example (j : Fin k) (c : Cfg k Bool State input) :
         fun i => if i = j then c.workTapePos i + 1 else c.workTapePos i, c.output⟩ := by
   tm_step
 
+-- `match`: the cases of a `match` on a term that mentions the index.
+example (f : Fin k → Option Unit) (c : Cfg k Bool State input) :
+    (⟨0, fun i => match f i with | some _ => (none, 1) | none => (none, 0), none, c.state⟩ :
+        Action k Bool State).apply c =
+      ⟨c.state, c.inputPos, c.workTapes,
+        fun i => match f i with | some _ => c.workTapePos i + 1 | none => c.workTapePos i,
+        c.output⟩ := by
+  tm_step
+
+-- A condition that does not mention the index is split on when that closes the case, which
+-- `simp` does not do here without the split.
+example (b : Bool) (c : Cfg k Bool State input) :
+    (⟨0, fun _ => (none, if b then 1 else 0), none, c.state⟩ : Action k Bool State).apply c =
+      ⟨c.state, c.inputPos, c.workTapes,
+        fun i => if b then c.workTapePos i + 1 else c.workTapePos i, c.output⟩ := by
+  tm_step
+
+-- When the split does not close the case, it is not made: the case shown keeps its `if`.
+/--
+error: tm_step: `simp` with `tm_step_simps` and the arguments does not close this case:
+
+case refine_4
+k : ℕ
+State : Type
+input : List Bool
+b : Bool
+c : Cfg k Bool State input
+pos : Fin k → ℤ
+x✝ : Fin k
+⊢ c.workTapePos x✝ + ↑(if b = true then 1 else 0) = pos x✝
+-/
+#guard_msgs in
+example (b : Bool) (c : Cfg k Bool State input) (pos : Fin k → ℤ) :
+    (⟨0, fun _ => (none, if b then 1 else 0), none, c.state⟩ : Action k Bool State).apply c =
+      ⟨c.state, c.inputPos, c.workTapes, pos, c.output⟩ := by
+  tm_step
+
 -- No work tapes, and a move of the input head away from the right end, compared as integers.
 example (c : Cfg 0 Bool State input) (n : ℕ) (hn : n < input.length + 1)
     (hc : c.inputPos = ⟨n, by omega⟩) :
@@ -89,15 +153,44 @@ example (c : Cfg k Bool State input) (q : State) :
       ⟨c.withState (some q), fun _ => {}⟩ := by
   tm_step [MultiTapeMachine.Config.step]
 
--- What `simp` does not close is left as a goal, with the hypothesis of its case in context.
+-- A fact that closes a case goes among the arguments.
 example (j : Fin k) (c : Cfg k Bool State input) (pos : Fin k → ℤ)
     (hj : c.workTapePos j + 1 = pos j) (hpos : ∀ i, ¬i = j → c.workTapePos i = pos i) :
     (⟨0, Function.update (fun _ => (none, 0)) j (none, 1), none, c.state⟩ :
         Action k Bool State).apply c =
       ⟨c.state, c.inputPos, c.workTapes, pos, c.output⟩ := by
+  tm_step [hj, hpos]
+
+-- Without it `tm_step` fails and shows the cases left, each with the hypothesis of its case.
+/--
+error: tm_step: `simp` with `tm_step_simps` and the arguments does not close these cases:
+
+case refine_4.isTrue
+k : ℕ
+State : Type
+input : List Bool
+j : Fin k
+c : Cfg k Bool State input
+pos : Fin k → ℤ
+⊢ c.workTapePos j + 1 = pos j
+
+case refine_4.isFalse
+k : ℕ
+State : Type
+input : List Bool
+j : Fin k
+c : Cfg k Bool State input
+pos : Fin k → ℤ
+x✝ : Fin k
+h✝ : ¬x✝ = j
+⊢ c.workTapePos x✝ = pos x✝
+-/
+#guard_msgs in
+example (j : Fin k) (c : Cfg k Bool State input) (pos : Fin k → ℤ) :
+    (⟨0, Function.update (fun _ => (none, 0)) j (none, 1), none, c.state⟩ :
+        Action k Bool State).apply c =
+      ⟨c.state, c.inputPos, c.workTapes, pos, c.output⟩ := by
   tm_step
-  · exact hj
-  · exact hpos _ ‹_›
 
 -- A field is split into at most eight cases.
 /--

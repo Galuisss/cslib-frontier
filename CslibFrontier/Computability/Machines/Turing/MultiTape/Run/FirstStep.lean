@@ -14,12 +14,9 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Deterministi
 # The first step of a run
 
 `Turing.MultiTapeTM.runFrom_succ` splits a run of `t + 1` steps after its first `t` steps. A proof
-that follows a machine from a given configuration needs the other split, after the first step.
-
-## Main results
-
-* `Turing.MultiTapeTM.runFrom_succ_eq_step`: a run of `n + 1` steps is the first step followed by a
-  run of `n` steps.
+that follows a machine from a given configuration needs the other split, after the first step:
+`Turing.MultiTapeTM.runFrom_succ_eq_step`, which is `Function.iterate_succ_apply` read through
+`runFrom`.
 -/
 
 public section

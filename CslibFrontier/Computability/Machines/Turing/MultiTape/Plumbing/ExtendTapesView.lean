@@ -47,7 +47,10 @@ def viewCfg (e : Fin k ↪ Fin k') (cfg : Cfg k' Symbol State input) : Cfg k Sym
 /-- A configuration is its view through `e`, placed back on the tapes `e j`. -/
 theorem embed_viewCfg (e : Fin k ↪ Fin k') (cfg : Cfg k' Symbol State input) :
     embed e (viewCfg e cfg) cfg.workTapes cfg.workTapePos = cfg := by
-  tm_step [embed, viewCfg] <;> exact congrArg _ (partialInv_eq_some e ‹_›)
+  refine Cfg.ext rfl rfl ?_ ?_ rfl <;> funext l <;> simp only [embed, viewCfg] <;>
+    · cases h : partialInv e l with
+      | none => rfl
+      | some j => rw [← partialInv_eq_some e h]
 
 /-- **Running a machine on the tapes selected by an embedding.** The run is the run on the view of
 the configuration, placed back on the selected tapes; every other tape and head keeps its starting

@@ -13,7 +13,7 @@ public import Cslib.Computability.Machines.Turing.MultiTape.Deterministic
 public import Cslib.Computability.Machines.Turing.MultiTape.Plumbing.WordsCfg
 public import Mathlib.Data.Fin.Tuple.Basic
 public import Mathlib.Tactic.FinCases
-public meta import Lean.Elab.Tactic
+public meta import Lean.Elab.Tactic.Basic
 
 /-!
 # Steps and equalities of multi-tape configurations
@@ -30,7 +30,7 @@ the table among its arguments.
 ## Main definitions
 
 * `tm_step`, `tm_step [defs, facts]`: prove an equality of configurations (`Turing.Cfg`,
-  `Turing.MultiTapeMachine.Config`), leaving the cases that `simp` does not close as goals.
+  `Turing.MultiTapeMachine.Config`), or fail showing the cases that `simp` does not close.
 * `tm_step_simps`: the simp set with which `tm_step` computes the fields of a configuration after
   an action, and the values of a family of tapes at the indices it splits on. It is declared in
   `CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step.Init` and filled here.
@@ -148,10 +148,11 @@ private def eliminators : List (Name × Nat × Name × List Nat) :=
   [(``Fin.lastCases, 4, ``Fin.lastCases, [0, 1]), (``Fin.addCases, 5, ``Fin.addCases, [1, 1]),
     (``Fin.append, 5, ``Fin.addCases, [1, 1])]
 
-/-- The numeral `n` of a type `Fin n`. -/
-private def finLit? (ty : Lean.Expr) : Option Nat := do
-  guard (ty.isAppOfArity ``Fin 1)
-  (ty.getArg! 0).nat?
+/-- The numeral `n` of a type `Fin n`, also when it is written with `Nat.succ`, as in the type of
+the index of a vector `![a, b]`. -/
+private def finLit? (ty : Lean.Expr) : MetaM (Option Nat) := do
+  unless ty.isAppOfArity ``Fin 1 do return none
+  (evalNat (ty.getArg! 0)).run
 
 /-- The split the target `tgt` calls for on one of the index variables `vars`: `fin_cases` for an
 index in `Fin n` with `n` a numeral, the eliminator of `Fin.lastCases`, `Fin.addCases` or
@@ -171,7 +172,7 @@ private def findSplit (tgt : Lean.Expr) (vars hyps : Array FVarId) (anyCond := f
     (anyCond || p.hasAnyFVar vars.contains) && !p.hasLooseBVars && !known.contains p
   if hyps.isEmpty then
     for x in vars do
-      if (finLit? (← whnfR (← x.getType))).isSome && tgt.containsFVar x then
+      if (← finLit? (← whnfR (← x.getType))).isSome && tgt.containsFVar x then
         return some (.finCases x)
   for (fn, pos, elim, binders) in eliminators do
     let found := tgt.find? fun e =>
@@ -254,7 +255,7 @@ case with `simp`. Returns the cases left. -/
 private partial def solve (g : MVarId) (vars hyps : Array FVarId) : M (List MVarId) := do
   -- A case with an index in `Fin 0` is vacuous.
   for x in vars do
-    if finLit? (← g.withContext do whnfR (← x.getType)) == some 0 then
+    if (← g.withContext do finLit? (← whnfR (← x.getType))) == some 0 then
       g.assign (← g.withContext do mkAppOptM ``Fin.elim0 #[some (← g.getType), some (mkFVar x)])
       return []
   let some g ← simpOnly g hyps | return []
@@ -362,9 +363,10 @@ the machine and the builders of the two configurations, and uses the `facts`, as
   an `if` or the cases of a `match` that mentions `i`. Other conditions and `match`es are split
   on only when that closes the case.
 * Each case is closed with `simp`, using the simp set `tm_step_simps` and the arguments, and then
-  `omega`; an input head position is also compared as an integer. A case this does not close is
-  left as a goal, simplified with `tm_step_simps` and the arguments only, and with the hypothesis
-  of its case in context.
+  `omega`; an input head position is also compared as an integer. When a case stays open,
+  `tm_step` fails and shows the cases left, each simplified with `tm_step_simps` and the
+  arguments only and with the hypothesis of its case in context: the fact that closes a case
+  goes among the arguments.
 
 One field is split into at most eight cases; beyond that `tm_step` fails.
 
@@ -389,7 +391,11 @@ elab_rules : tactic
       let some fields ← extConfig g
         | throwError "tm_step: the goal is not an equality of configurations{indentExpr
             (← g.getType)}"
-      replaceMainGoal (← fields.mapM field).flatten
+      let left := (← fields.mapM field).flatten
+      unless left.isEmpty do
+        throwError "tm_step: `simp` with `tm_step_simps` and the arguments does not close \
+          {if left.length == 1 then "this case" else "these cases"}:\n\n{goalsToMessageData left}"
+      replaceMainGoal []
     -- A failure inside a step of the search is a failure of that step, not a logged error.
     withoutRecover <| (run.run lemmas).run' 1
 

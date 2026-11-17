@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.Shadow
 public import Mathlib.Data.Fin.VecNotation
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step
 import Mathlib.Tactic.FinCases
 
 /-!
@@ -106,11 +107,7 @@ private theorem step_cfg {q : ClearShadowedState} {ip : Fin (input.length + 2)}
     funext j
     fin_cases j <;> rfl
   rw [step_of_state rfl, hsym, h]
-  refine Cfg.ext rfl (by simp) ?_ ?_ (by simp)
-  · funext j
-    fin_cases j <;> cases w₀ <;> cases w₁ <;> rfl
-  · funext j
-    fin_cases j <;> rfl
+  tm_step
 
 variable {ip : Fin (input.length + 2)} {out : List Symbol}
 
