@@ -1621,7 +1621,7 @@ theorem isOraclePPTOn_recoverProgram :
       exact h1.of_enc_eq fun ⟨⟨_, v⟩, ⟨u, _⟩⟩ => by
         dsimp only [Function.comp]
         exact congrArg encBool (Bool.eq_iff_iff.mpr (by simp))
-    have hfnd := findWithInput
+    have hfnd := findWithInput (encO := encOption (encPair encNat encBool))
       (test := fun (x : (MaxSATQuery × List (Literal ℕ)) × ℕ) (l : Literal ℕ) => l.1 == x.2)
       (list := fun x : (MaxSATQuery × List (Literal ℕ)) × ℕ => x.1.2)
       ((snd _ _).comp (fst _ _)) heq_var

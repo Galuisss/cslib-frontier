@@ -180,7 +180,7 @@ private theorem iterate_stepS (L V P : α × List Bool → Bool) (k : ℕ) (x : 
 private theorem length_encList_encBool (w : List Bool) :
     (encList encBool w).length = 3 * w.length := by
   simp only [length_encList, encBool_apply, List.length_singleton]
-  simp
+  simp [Nat.mul_comm]
 
 /-- A step of the evaluation is computable within the space of the state and of the tests. -/
 private theorem stepS_inSpace {L V P : α × List Bool → Bool} {SL SV SP : α × List Bool → ℕ}

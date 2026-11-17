@@ -194,7 +194,7 @@ theorem computableInPolyTime_writeEntries :
           (⟨.zero, [(some (some (eBit p.2.1)), .pos)], none,
             some (2 * p.2.2 + 4)⟩ : Act))
         (encPair (encPair eDesc encBits) (encPair encBool encUnary)) eAct :=
-      eAct_mk_polyTime (const .zero) htape (const none) hstate
+      eAct_mk_polyTime (const SignType.zero) htape (const none) hstate
     exact hkey.prod hact
   exact listAppend' h1 h2
 
