@@ -45,6 +45,8 @@ success experiment remain separate obligations.
 * `Cslib.Quantum.ClassicalQueryLayout.Compatible.initialPrefixBranch_registers`: each branch
   supplies the exact service input, preserves the complete first-stage register, initializes
   the hidden-bit/zero-ciphertext reply, and prepares the second-stage input and ancillas.
+* `Cslib.Quantum.ClassicalQueryLayout.Compatible.initialPrefixBranch_apply_of_not_mem`: every
+  wire outside the service, second stage and protected hidden bit retains its original input bit.
 * `Cslib.Quantum.ClassicalQueryLayout.eval_requestHidden_embedState`: the actual request copy,
   Hadamard seed and protected-bit copy preserve the complete first-stage superposition.
 * `Cslib.Quantum.ClassicalQueryLayout.partialTraceLeft_copyRequest_zeroTarget_withReference`:
@@ -1057,6 +1059,94 @@ theorem Compatible.initialPrefixBranch_registers {layout : ClassicalQueryLayout}
           List.getD_eq_default header false (by simp only [secondInputWidth] at hi; omega),
           List.getD_eq_default (List.ofFn z) false (by simp only [List.length_ofFn]; omega)]
 
+
+
+/-- Outside the service and second-stage registers, and away from the protected hidden-bit
+wire, every actual prefix branch retains the original input bit. In particular the common
+physical complement is independent of the first-stage basis branch and fresh hidden bit. -/
+theorem Compatible.initialPrefixBranch_apply_of_not_mem {layout : ClassicalQueryLayout}
+    (h : layout.Compatible) (sample : List Bool)
+    (z : Fin layout.first.width → Bool) (bit : Fin 1 → Bool) (q : Fin layout.width)
+    (hservice : ∀ i, layout.serviceEmbedding i ≠ q)
+    (hsecond : ∀ i, layout.secondEmbedding i ≠ q)
+    (hreply : q.val ≠ layout.replyBase) :
+    h.initialPrefixBranch sample z bit q =
+      inputState layout.width (encPair encUnary encBits (layout.input.securityParameter, sample))
+        q := by
+  classical
+  have hserviceWidth : layout.fullInputWidth + (layout.first.outputWidth + 1) ≤
+      layout.service.width := by
+    have hi := h.service_wellFormed.input_le
+    rw [h.service_quantumInputWidth] at hi
+    exact hi
+  have hsecondWidth : layout.secondInputWidth + layout.first.width ≤
+      layout.second.width := by
+    have hi := h.second_wellFormed.input_le
+    rw [h.second_quantumInputWidth] at hi
+    exact hi
+  have hservicePrefix (i : ℕ) (hi : i < layout.fullInputWidth) :
+      layout.serviceBase + i ≠ q.val := by
+    intro heq
+    apply hservice ⟨i, by omega⟩
+    apply Fin.ext
+    change layout.serviceWire i = q.val
+    simpa only [serviceWire, hi, ↓reduceIte] using heq
+  have hserviceRequest (i : ℕ) (hi : i < layout.first.outputWidth + 1) :
+      layout.requestBase + i ≠ q.val := by
+    intro heq
+    apply hservice ⟨layout.fullInputWidth + i, by omega⟩
+    apply Fin.ext
+    change layout.serviceWire (layout.fullInputWidth + i) = q.val
+    simpa only [serviceWire, show ¬layout.fullInputWidth + i < layout.fullInputWidth by omega,
+      ↓reduceIte, Nat.add_sub_cancel_left, hi] using heq
+  have hfirst (i : Fin layout.first.width) : layout.firstEmbedding i ≠ q := by
+    intro heq
+    apply hsecond ⟨layout.secondInputWidth + i, by omega⟩
+    apply Fin.ext
+    change layout.secondWire (layout.secondInputWidth + i) = q.val
+    have heq := congrArg Fin.val heq
+    change layout.firstWire i = q.val at heq
+    simpa only [secondWire,
+      show ¬layout.secondInputWidth + i.val < layout.secondInputWidth by omega,
+      ↓reduceIte, Nat.add_sub_cancel_left, i.isLt] using heq
+  have hsecondHeader (i : ℕ) (hi : i < 2 * layout.input.securityParameter + 1) :
+      layout.secondBase + i ≠ q.val := by
+    have hinput : i < layout.secondInputWidth := by
+      simp only [secondInputWidth]
+      omega
+    intro heq
+    apply hsecond ⟨i, by omega⟩
+    apply Fin.ext
+    change layout.secondWire i = q.val
+    simpa only [secondWire, hinput, ↓reduceIte] using heq
+  dsimp only [Compatible.initialPrefixBranch]
+  rw [Function.update_of_ne (fun heq => hreply (congrArg Fin.val heq))]
+  rw [glue_of_not _ _ _ (fun i heq => by
+    have heq := congrArg Fin.val heq
+    simp only [blockEmb_apply_val] at heq
+    have hi : i.val = 0 := by omega
+    apply hserviceRequest layout.first.outputWidth (by omega)
+    simp only [hiddenWire] at heq
+    omega)]
+  rw [glue_of_not _ _ _ (fun i heq => by
+    have heq := congrArg Fin.val heq
+    simp only [blockEmb_apply_val] at heq
+    exact hserviceRequest i (by omega) (by omega))]
+  rw [glue_of_not _ _ _ hfirst]
+  let initial := inputState layout.width
+    (encPair encUnary encBits (layout.input.securityParameter, sample))
+  have hheader := readBit_classicalRun_of_forall_ne
+    (gs := blockCopyCodes 0 layout.secondBase (2 * layout.input.securityParameter + 1))
+    (x := classicalRun (blockCopyCodes 0 layout.serviceBase layout.fullInputWidth) initial)
+    (q := q.val) (fun gate hgate heq => by
+      obtain ⟨offset, hoffset, rfl⟩ := List.mem_map.mp hgate
+      exact hsecondHeader offset (List.mem_range.mp hoffset) heq)
+  have hsample := readBit_classicalRun_of_forall_ne
+    (gs := blockCopyCodes 0 layout.serviceBase layout.fullInputWidth) (x := initial)
+    (q := q.val) (fun gate hgate heq => by
+      obtain ⟨offset, hoffset, rfl⟩ := List.mem_map.mp hgate
+      exact hservicePrefix offset (List.mem_range.mp hoffset) heq)
+  simpa only [readBit_fin] using hheader.trans hsample
 
 
 /-- **The final physical suffix accepts exactly when the second-stage guess equals the protected
