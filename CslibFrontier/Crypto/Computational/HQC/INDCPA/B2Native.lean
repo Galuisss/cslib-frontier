@@ -44,6 +44,9 @@ full native success-law equality, or a QPT security theorem.
 * `Cslib.Crypto.HQC.matrix_b2ServiceReplyCopy_initializedInput`: the actual embedded service
   followed by its physical ciphertext copy produces the retained hidden-bit-and-ciphertext reply
   while preserving every other controller wire.
+* `Cslib.Crypto.HQC.matrix_b2ReplyCopySecondStage_withReference`: the actual reply-to-input copy
+  and erased second stage run on the retained ciphertext and saved first-stage memory while
+  acting as the identity on the protected hidden bit and an arbitrary external reference.
 * `Cslib.Crypto.HQC.partialTraceLeft_b2ServiceEnvironment_fullReply`: discarding the actual
   reversible service environment dephases exactly the complete hidden-bit-and-ciphertext reply,
   while retaining an arbitrary reference and a reply-controlled continuation.
@@ -635,6 +638,349 @@ theorem matrix_b2ServiceReplyCopy_initializedInput (P : PKEParams)
       targetEmbedding, sourceLabel] using hentry
   rw [hentry', if_congr hcoordinates rfl rfl]
 
+/-- **The physical reply copy and second stage are controlled by the complete retained reply.**
+Split the physical register into the second-stage placement, the complete hidden-bit-and-
+ciphertext reply, and an arbitrary saved complement.  Copying the ciphertext suffix into the
+fresh second-stage input and then running the actual erased second-stage circuit is block diagonal
+in the complete reply.  Its reply block is exactly that circuit on the standard
+`(security parameter, ciphertext, saved memory)` input, tensored with the identity on the saved
+complement and an arbitrary external reference.
+
+Thus cross-reply matrix entries are zero, the hidden bit is retained outside the second-stage
+input, and the equality applies to states entangled across the complete reply, saved first-stage
+memory, other physical wires and external reference.  It makes no product-state assumption and
+stops before moving the guess to wire zero or comparing it with the hidden bit. -/
+theorem matrix_b2ReplyCopySecondStage_withReference (P : PKEParams)
+    (securityParameter : ℕ)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen)
+    (first second : UniformOracleCircuitFamily)
+    {Reference : Type*} [DecidableEq Reference] :
+    let layout := b2ClassicalQueryLayout P encoder first second securityParameter
+    let SecondState := Fin layout.second.width → Bool
+    let FullReply := Fin (1 + layout.ciphertextWidth) → Bool
+    let SecondRest := {j : Fin layout.width //
+      ¬ ∃ i, layout.secondEmbedding i = j}
+    let replyEmbedding : Fin (1 + layout.ciphertextWidth) ↪ SecondRest :=
+      { toFun := fun wire => ⟨⟨layout.replyBase + wire, by
+          simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
+          omega⟩, by
+            rintro ⟨secondWire, hsecondWire⟩
+            exact layout.secondWire_ne_replyBlock secondWire wire
+              (congrArg Fin.val hsecondWire)⟩
+        inj' := fun left right heq => Fin.ext <| by
+          have heq := congrArg (fun wire => ((wire.1 : Fin layout.width) : ℕ)) heq
+          change layout.replyBase + left = layout.replyBase + right at heq
+          omega }
+    let Saved := {j : SecondRest // ¬ ∃ i, replyEmbedding i = j}
+    let secondInput (ciphertext : Fin layout.ciphertextWidth → Bool)
+        (memory : Fin layout.second.quantumInputWidth → Bool) : SecondState :=
+      inputState layout.second.width
+        (encPair encUnary encBits
+          (securityParameter, List.ofFn ciphertext) ++ List.ofFn memory)
+    let physicalState (secondState : SecondState)
+        (fullReply : FullReply)
+        (saved : Saved → Bool) : Fin layout.width → Bool :=
+      (splitEquiv layout.secondEmbedding).symm
+        (secondState, (splitEquiv replyEmbedding).symm (fullReply, saved))
+    let secondCircuit := Circuit.ofPhaseCodes layout.second.width
+      layout.second.instructions.zeroOraclePhaseCodes
+    let suffixCircuit :=
+      Circuit.ofCodes layout.width
+          (blockCopyCodes (layout.replyBase + 1)
+            (layout.secondBase + (2 * securityParameter + 1))
+            layout.ciphertextWidth) ++
+        secondCircuit.mapWires layout.secondEmbedding
+    let physical :=
+      ((Circuit.matrix suffixCircuit : Matrix _ _ ℂ) ⊗ₖ
+        (1 : Matrix Reference Reference ℂ)).submatrix
+        (fun p : (SecondState × ((Saved → Bool) × Reference)) × FullReply =>
+          (physicalState p.1.1 p.2 p.1.2.1, p.1.2.2))
+        (fun p : ((Fin layout.second.quantumInputWidth → Bool) ×
+            ((Saved → Bool) × Reference)) × FullReply =>
+          (physicalState (secondInput (fun _ => false) p.1.1) p.2 p.1.2.1, p.1.2.2))
+    let ciphertext (reply : FullReply) : Fin layout.ciphertextWidth → Bool :=
+      fun i => reply (Fin.natAdd 1 i)
+    let block : FullReply → Matrix
+        (SecondState × ((Saved → Bool) × Reference))
+        ((Fin layout.second.quantumInputWidth → Bool) ×
+          ((Saved → Bool) × Reference)) ℂ :=
+      fun reply =>
+        ((Circuit.matrix secondCircuit : Matrix _ _ ℂ).submatrix id
+            (fun memory => secondInput (ciphertext reply) memory)) ⊗ₖ
+          (1 : Matrix ((Saved → Bool) × Reference)
+            ((Saved → Bool) × Reference) ℂ)
+    physical = Matrix.blockDiagonal block := by
+  classical
+  let layout := b2ClassicalQueryLayout P encoder first second securityParameter
+  let SecondState := Fin layout.second.width → Bool
+  let FullReply := Fin (1 + layout.ciphertextWidth) → Bool
+  let SecondRest := {j : Fin layout.width //
+    ¬ ∃ i, layout.secondEmbedding i = j}
+  let replyEmbedding : Fin (1 + layout.ciphertextWidth) ↪ SecondRest :=
+    { toFun := fun wire => ⟨⟨layout.replyBase + wire, by
+        simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
+        omega⟩, by
+          rintro ⟨secondWire, hsecondWire⟩
+          exact layout.secondWire_ne_replyBlock secondWire wire
+            (congrArg Fin.val hsecondWire)⟩
+      inj' := fun left right heq => Fin.ext <| by
+        have heq := congrArg (fun wire => ((wire.1 : Fin layout.width) : ℕ)) heq
+        change layout.replyBase + left = layout.replyBase + right at heq
+        omega }
+  let Saved := {j : SecondRest // ¬ ∃ i, replyEmbedding i = j}
+  let secondInput (ciphertext : Fin layout.ciphertextWidth → Bool)
+      (memory : Fin layout.second.quantumInputWidth → Bool) : SecondState :=
+    inputState layout.second.width
+      (encPair encUnary encBits
+        (securityParameter, List.ofFn ciphertext) ++ List.ofFn memory)
+  let physicalState (secondState : SecondState)
+      (fullReply : FullReply)
+      (saved : Saved → Bool) : Fin layout.width → Bool :=
+    (splitEquiv layout.secondEmbedding).symm
+      (secondState, (splitEquiv replyEmbedding).symm (fullReply, saved))
+  let secondCircuit := Circuit.ofPhaseCodes layout.second.width
+    layout.second.instructions.zeroOraclePhaseCodes
+  let suffixCircuit :=
+    Circuit.ofCodes layout.width
+        (blockCopyCodes (layout.replyBase + 1)
+          (layout.secondBase + (2 * securityParameter + 1))
+          layout.ciphertextWidth) ++
+      secondCircuit.mapWires layout.secondEmbedding
+  let physical :=
+    ((Circuit.matrix suffixCircuit : Matrix _ _ ℂ) ⊗ₖ
+      (1 : Matrix Reference Reference ℂ)).submatrix
+      (fun p : (SecondState × ((Saved → Bool) × Reference)) × FullReply =>
+        (physicalState p.1.1 p.2 p.1.2.1, p.1.2.2))
+      (fun p : ((Fin layout.second.quantumInputWidth → Bool) ×
+          ((Saved → Bool) × Reference)) × FullReply =>
+        (physicalState (secondInput (fun _ => false) p.1.1) p.2 p.1.2.1, p.1.2.2))
+  let ciphertext (reply : FullReply) : Fin layout.ciphertextWidth → Bool :=
+    fun i => reply (Fin.natAdd 1 i)
+  let block : FullReply → Matrix
+      (SecondState × ((Saved → Bool) × Reference))
+      ((Fin layout.second.quantumInputWidth → Bool) ×
+        ((Saved → Bool) × Reference)) ℂ :=
+    fun reply =>
+      ((Circuit.matrix secondCircuit : Matrix _ _ ℂ).submatrix id
+          (fun memory => secondInput (ciphertext reply) memory)) ⊗ₖ
+        (1 : Matrix ((Saved → Bool) × Reference)
+          ((Saved → Bool) × Reference) ℂ)
+  change physical = Matrix.blockDiagonal block
+  ext ⟨⟨secondOut, savedOut, referenceOut⟩, replyOut⟩
+    ⟨⟨memoryIn, savedIn, referenceIn⟩, replyIn⟩
+  have hsecondInput := (second.wellFormed securityParameter (P.n + P.codeLen)).input_le
+  change 2 * securityParameter + 1 + (P.n + P.codeLen) +
+      layout.second.quantumInputWidth ≤ layout.second.width at hsecondInput
+  have hciphertextWidth : layout.ciphertextWidth = P.n + P.codeLen := by
+    simp only [layout, b2ClassicalQueryLayout, ClassicalQueryLayout.ciphertextWidth]
+    omega
+  rw [← hciphertextWidth] at hsecondInput
+  have hsecondInputBit (bits : Fin layout.ciphertextWidth → Bool)
+      (memory : Fin layout.second.quantumInputWidth → Bool)
+      (i : Fin layout.ciphertextWidth) :
+      secondInput bits memory
+          ⟨2 * securityParameter + 1 + i, by omega⟩ = bits i := by
+    simp only [secondInput, inputState, encPair_apply, encUnary_apply, encBits_apply]
+    rw [List.getD_append _ _ _ _ (by
+      simp only [List.length_append, length_frame, List.length_replicate, List.length_ofFn]
+      omega)]
+    rw [List.getD_append_right _ _ _ _ (by
+      simp only [length_frame, List.length_replicate]
+      omega), length_frame, List.length_replicate]
+    have hindex : 2 * securityParameter + 1 + i - (2 * securityParameter + 1) = i := by
+      omega
+    rw [hindex]
+    exact (List.getD_eq_getElem (l := List.ofFn bits)
+      (d := false) (n := i) (by simp)).trans (by simp)
+  let htarget : layout.secondBase + (2 * securityParameter + 1) +
+      layout.ciphertextWidth ≤ layout.width := by
+    simp only [ClassicalQueryLayout.width]
+    omega
+  let targetEmbedding :=
+    blockEmb (layout.secondBase + (2 * securityParameter + 1)) htarget
+  let TargetRest := {j : Fin layout.width // ¬ ∃ i, targetEmbedding i = j}
+  let inputPhysical :=
+    physicalState (secondInput (fun _ => false) memoryIn) replyIn savedIn
+  let inputRest : TargetRest → Bool := (splitEquiv targetEmbedding inputPhysical).2
+  have htargetWire (i : Fin layout.ciphertextWidth) :
+      targetEmbedding i = layout.secondEmbedding
+        ⟨2 * securityParameter + 1 + i, by omega⟩ := by
+    apply Fin.ext
+    dsimp only [targetEmbedding, blockEmb_apply_val,
+      ClassicalQueryLayout.secondEmbedding, Function.Embedding.coeFn_mk]
+    change i + (layout.secondBase + (2 * securityParameter + 1)) =
+      layout.secondWire (2 * securityParameter + 1 + i)
+    rw [ClassicalQueryLayout.secondWire, ite_eq_left]
+    · omega
+    · simp only [ClassicalQueryLayout.secondInputWidth]
+      simp only [layout, b2ClassicalQueryLayout]
+      omega
+  have htargetZero : (splitEquiv targetEmbedding inputPhysical).1 =
+      (fun _ : Fin layout.ciphertextWidth => false) := by
+    funext i
+    rw [splitEquiv_apply_fst, Function.comp_apply, htargetWire]
+    simp only [inputPhysical, physicalState, splitEquiv_symm_apply_wire]
+    exact hsecondInputBit (fun _ => false) memoryIn i
+  have hinputPhysical :
+      (splitEquiv targetEmbedding).symm
+          (fun _ : Fin layout.ciphertextWidth => false, inputRest) = inputPhysical := by
+    apply (splitEquiv targetEmbedding).injective
+    rw [Equiv.apply_symm_apply]
+    exact Prod.ext htargetZero.symm rfl
+  let sourceLabel : (TargetRest → Bool) → Fin layout.ciphertextWidth → Bool :=
+    fun rest i =>
+      (splitEquiv targetEmbedding).symm (fun _ => false, rest)
+        ⟨layout.replyBase + 1 + i, by
+          simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
+          omega⟩
+  have hsourceLabel : sourceLabel inputRest = ciphertext replyIn := by
+    funext i
+    dsimp only [sourceLabel]
+    rw [hinputPhysical]
+    have hwire :
+        (⟨layout.replyBase + 1 + i, by
+          simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
+          omega⟩ : Fin layout.width) =
+          (replyEmbedding (Fin.natAdd 1 i)).1 := by
+      apply Fin.ext
+      change layout.replyBase + 1 + i =
+        layout.replyBase + (Fin.natAdd 1 i : Fin (1 + layout.ciphertextWidth))
+      simp only [Fin.val_natAdd]
+      omega
+    rw [hwire]
+    simp only [inputPhysical, physicalState]
+    rw [splitEquiv_symm_apply_of_not _ _ _ _
+        (replyEmbedding (Fin.natAdd 1 i)).2,
+      splitEquiv_symm_apply_wire]
+  have hsecondInputOutside (bitsLeft bitsRight : Fin layout.ciphertextWidth → Bool)
+      (memory : Fin layout.second.quantumInputWidth → Bool)
+      (i : Fin layout.second.width)
+      (hi : i < 2 * securityParameter + 1 ∨
+        2 * securityParameter + 1 + layout.ciphertextWidth ≤ i) :
+      secondInput bitsLeft memory i = secondInput bitsRight memory i := by
+    simp only [secondInput, inputState, encPair_apply, encUnary_apply, encBits_apply]
+    rcases hi with hi | hi
+    · rw [List.getD_append _ _ _ _ (by
+          simp only [List.length_append, length_frame, List.length_replicate,
+            List.length_ofFn]
+          omega),
+        List.getD_append _ _ _ _ (by
+          simp only [length_frame, List.length_replicate]
+          omega),
+        List.getD_append _ _ _ _ (by
+          simp only [List.length_append, length_frame, List.length_replicate,
+            List.length_ofFn]
+          omega),
+        List.getD_append _ _ _ _ (by
+          simp only [length_frame, List.length_replicate]
+          omega)]
+    · rw [List.getD_append_right _ _ _ _ (by
+          simp only [List.length_append, length_frame, List.length_replicate,
+            List.length_ofFn]
+          omega),
+        List.getD_append_right _ _ _ _ (by
+          simp only [List.length_append, length_frame, List.length_replicate,
+            List.length_ofFn]
+          omega)]
+      simp only [List.length_append, length_frame, List.length_replicate,
+        List.length_ofFn]
+  let expectedPhysical :=
+    physicalState (secondInput (ciphertext replyIn) memoryIn) replyIn savedIn
+  have hsplitExpected :
+      splitEquiv targetEmbedding expectedPhysical = (sourceLabel inputRest, inputRest) := by
+    apply Prod.ext
+    · funext i
+      rw [splitEquiv_apply_fst, Function.comp_apply, htargetWire]
+      simp only [expectedPhysical, physicalState, splitEquiv_symm_apply_wire]
+      rw [hsecondInputBit, hsourceLabel]
+    · funext j
+      rw [splitEquiv_apply_snd]
+      change expectedPhysical j.1 = inputPhysical j.1
+      by_cases hsecond : ∃ i, layout.secondEmbedding i = j.1
+      · obtain ⟨i, hi⟩ := hsecond
+        rw [← hi]
+        simp only [expectedPhysical, inputPhysical, physicalState,
+          splitEquiv_symm_apply_wire]
+        apply hsecondInputOutside
+        by_contra houtside
+        push Not at houtside
+        let k : Fin layout.ciphertextWidth :=
+          ⟨i - (2 * securityParameter + 1), by omega⟩
+        apply j.2
+        refine ⟨k, ?_⟩
+        rw [htargetWire, ← hi]
+        apply congrArg layout.secondEmbedding
+        apply Fin.ext
+        dsimp only [k]
+        omega
+      · simp only [expectedPhysical, inputPhysical, physicalState]
+        rw [splitEquiv_symm_apply_of_not _ _ _ _ hsecond,
+          splitEquiv_symm_apply_of_not _ _ _ _ hsecond]
+  have hcopy := Circuit.matrix_blockCopyCodes_zeroTarget
+    (source := layout.replyBase + 1)
+    (target := layout.secondBase + (2 * securityParameter + 1))
+    (count := layout.ciphertextWidth) (width := layout.width)
+    (Or.inl (by
+      simp only [ClassicalQueryLayout.secondBase]
+      omega))
+    (by
+      simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
+      omega)
+    htarget
+  dsimp only at hcopy
+  have hcopyEntry (middle : Fin layout.width → Bool) :
+      (Circuit.matrix (Circuit.ofCodes layout.width
+        (blockCopyCodes (layout.replyBase + 1)
+          (layout.secondBase + (2 * securityParameter + 1))
+          layout.ciphertextWidth)) : Matrix _ _ ℂ) middle inputPhysical =
+        if middle = expectedPhysical then 1 else 0 := by
+    have hentry := congrFun (congrFun hcopy
+      (splitEquiv targetEmbedding middle)) inputRest
+    have hcoordinates :
+        splitEquiv targetEmbedding middle = (sourceLabel inputRest, inputRest) ↔
+          middle = expectedPhysical := by
+      constructor
+      · intro hm
+        apply (splitEquiv targetEmbedding).injective
+        exact hm.trans hsplitExpected.symm
+      · intro hm
+        exact congrArg (splitEquiv targetEmbedding) hm |>.trans hsplitExpected
+    have hentry' :
+        (Circuit.matrix (Circuit.ofCodes layout.width
+          (blockCopyCodes (layout.replyBase + 1)
+            (layout.secondBase + (2 * securityParameter + 1))
+            layout.ciphertextWidth)) : Matrix _ _ ℂ) middle inputPhysical =
+          if splitEquiv targetEmbedding middle =
+            (sourceLabel inputRest, inputRest) then 1 else 0 := by
+      simpa only [Matrix.submatrix_apply, Equiv.symm_apply_apply, coherentRecord,
+        hinputPhysical, targetEmbedding, sourceLabel] using hentry
+    rw [hentry', if_congr hcoordinates rfl rfl]
+  have hmapEntry :
+      (Circuit.matrix (secondCircuit.mapWires layout.secondEmbedding) : Matrix _ _ ℂ)
+          (physicalState secondOut replyOut savedOut) expectedPhysical =
+        (Circuit.matrix secondCircuit : Matrix _ _ ℂ)
+            secondOut (secondInput (ciphertext replyIn) memoryIn) *
+          if replyOut = replyIn ∧ savedOut = savedIn then 1 else 0 := by
+    have hsplit := Circuit.matrix_mapWires_splitEquiv layout.secondEmbedding secondCircuit
+    have hentry := congrFun (congrFun hsplit
+      (secondOut, (splitEquiv replyEmbedding).symm (replyOut, savedOut)))
+      (secondInput (ciphertext replyIn) memoryIn,
+        (splitEquiv replyEmbedding).symm (replyIn, savedIn))
+    simpa only [Matrix.submatrix_apply, kroneckerMap_apply, Matrix.one_apply,
+      physicalState, expectedPhysical, Equiv.apply_eq_iff_eq, Prod.mk.injEq,
+      true_and] using hentry
+  simp only [physical, Matrix.submatrix_apply, kroneckerMap_apply, Matrix.one_apply,
+    suffixCircuit, Circuit.matrix_append, Submonoid.coe_mul, Matrix.mul_apply]
+  rw [show physicalState (secondInput (fun _ => false) memoryIn) replyIn savedIn =
+      inputPhysical from rfl]
+  simp only [hcopyEntry, mul_ite, mul_one, mul_zero, sum_ite_eq', mem_univ,
+    reduceIte, hmapEntry, Matrix.blockDiagonal_apply, block,
+    Matrix.submatrix_apply, kroneckerMap_apply, Matrix.one_apply]
+  by_cases hreply : replyOut = replyIn <;>
+    by_cases hsaved : savedOut = savedIn <;>
+      by_cases hreference : referenceOut = referenceIn <;>
+        simp [hreply, hsaved, hreference]
+
 /-- **The actual reversible B2 service dephases exactly its complete reply.**  For a fixed
 truncated-syndrome sample and measured message pair, the discarded service environment
 distinguishes precisely the complete `[hidden bit | u | v]` labels emitted by the service.  The
@@ -647,9 +993,10 @@ The original hidden register is part of the discarded service environment, rathe
 duplicated in the output. The continuation acts only on the saved reference factor; in the B2
 controller this is where the saved first-stage state and inaccessible reference live. The
 preceding `matrix_b2ServiceReplyCopy_initializedInput` supplies the physical service-and-reply-copy
-bridge. Composing it with the controller prefix, the reply-to-second-stage copy, the actual second
-stage and final comparison remains open; this is not the native B2 success-law or a security
-theorem. -/
+bridge, and `matrix_b2ReplyCopySecondStage_withReference` supplies the subsequent complete-reply-
+controlled copy-and-second-stage identity. Composing those identities through the controller
+prefix and complete reply mixture, then moving and comparing the guess, remains open; this is not
+the native B2 success-law or a security theorem. -/
 theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
     (securityParameter : ℕ)
     (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen)

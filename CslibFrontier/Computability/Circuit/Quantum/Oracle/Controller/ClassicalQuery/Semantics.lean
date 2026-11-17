@@ -19,9 +19,10 @@ protected reply record.  After splitting out that fresh target wire, the actual 
 existing `coherentRecord` isometry.  The equality below includes an arbitrary finite reference
 factor and therefore does not assume a product input or quantum advice.
 
-This is the first physical boundary in the controller correspondence.  Dephasing the complete
-hidden-bit-and-ciphertext label, running the ciphertext-only second stage, and identifying the
-final comparison measurement with the native success experiment remain separate obligations.
+This module also identifies the controller's final comparison measurement with equality of the
+second-stage guess and protected hidden bit.  Dephasing the complete hidden-bit-and-ciphertext
+label, running the ciphertext-only second stage, and composing these boundaries with the native
+success experiment remain separate obligations.
 
 ## Main results
 
@@ -40,6 +41,9 @@ final comparison measurement with the native success experiment remain separate 
 * `Cslib.Quantum.ClassicalQueryLayout.partialTraceLeft_copyRequest_zeroTarget_withReference`:
   discarding the actual copied request gives exactly the sum of request density branches,
   including an arbitrary inaccessible reference.
+* `Cslib.Quantum.ClassicalQueryLayout.measureDensity_finalComparison`: the actual guess
+  relocation and hidden-bit comparison measure exactly whether the second-stage guess equals the
+  protected hidden bit, for arbitrary mixed states with an external reference.
 
 ## References
 
@@ -696,9 +700,10 @@ theorem eval_requestHidden_embedState (layout : ClassicalQueryLayout)
     eval_prepareHidden_ket layout recorded hh hr]
 
 
-/-- The actual first six controller blocks initialize and run the zero-oracle-erased first stage F
-on exactly the public-key prefix, then coherently record its request and prepare matching hidden bits. Every first-stage basis
-amplitude is retained; no measurement or dephasing has been inserted into the circuit. -/
+/-- The actual first six controller blocks initialize and run the zero-oracle-erased first stage
+F on exactly the public-key prefix, then coherently record its request and prepare matching
+hidden bits. Every first-stage basis amplitude is retained; no measurement or dephasing has been
+inserted into the circuit. -/
 theorem Compatible.eval_initialPrefix {layout : ClassicalQueryLayout}
     (h : layout.Compatible) (sample : List Bool)
     (hsample : sample.length = layout.input.classicalInputLength) :
@@ -797,5 +802,78 @@ theorem Compatible.eval_initialPrefix {layout : ClassicalQueryLayout}
   rw [← hemb, Circuit.eval_mapWires_embedState]
   exact eval_requestHidden_embedState layout h.first_output_le hfirstInput prepared hrequest
     hhidden (by simpa only [Nat.add_zero] using hreply 0 (by omega)) _
+
+
+/-- **The final physical suffix accepts exactly when the second-stage guess equals the protected
+hidden bit.**  The actual one-wire prefix swap moves the second-stage output at `secondBase` to
+wire zero, and the actual comparison gates replace it by its equality with the retained hidden
+bit at `replyBase`.  For every mixed physical state, including one entangled with an arbitrary
+finite reference, measuring wire zero after this suffix is therefore exactly the original joint
+event `guess = hidden`.
+
+This is the final readout law for a classical-query controller, not a complete game or security
+theorem: composing it with the controller prefix, service and controlled second-stage identities
+remains separate. -/
+theorem measureDensity_finalComparison (layout : ClassicalQueryLayout)
+    (hsecondOutput : 1 ≤ layout.second.outputWidth)
+    (hsecondOutputFits : layout.second.outputWidth ≤ layout.second.width)
+    {Reference : Type*} [Fintype Reference] [DecidableEq Reference]
+    (rho : Matrix ((Fin layout.width → Bool) × Reference)
+      ((Fin layout.width → Bool) × Reference) ℂ)
+    (hrho : IsDensityMatrix rho) :
+    let finalCodes :=
+      prefixSwapCodes layout.secondBase 1 ++ compareBits layout.replyBase 0
+    let finalCircuit := Circuit.ofCodes layout.width finalCodes
+    let finalMatrix : Matrix (Fin layout.width → Bool) (Fin layout.width → Bool) ℂ :=
+      Circuit.matrix finalCircuit
+    (POVM.basis.measureDensity
+      (densityConj
+        (finalMatrix ⊗ₖ (1 : Matrix Reference Reference ℂ)) rho)
+      (hrho.densityConj_kronecker
+        (V := finalMatrix)
+        (by exact UnitaryGroup.star_mul_self (Circuit.matrix finalCircuit)))).map
+        (fun p => readBit p.1 0) =
+      (POVM.basis.measureDensity rho hrho).map
+        (fun p => readBit p.1 layout.secondBase == readBit p.1 layout.replyBase) := by
+  classical
+  dsimp only
+  let finalCodes :=
+    prefixSwapCodes layout.secondBase 1 ++ compareBits layout.replyBase 0
+  let finalCircuit := Circuit.ofCodes layout.width finalCodes
+  have hsecondWidth : 1 ≤ layout.second.width :=
+    hsecondOutput.trans hsecondOutputFits
+  have hsourceDisjoint : 1 ≤ layout.secondBase := by
+    simp only [ClassicalQueryLayout.secondBase, ClassicalQueryLayout.replyBase,
+      ClassicalQueryLayout.serviceBase, ClassicalQueryLayout.hiddenWire]
+    omega
+  have hsourceFit : layout.secondBase + 1 ≤ layout.width := by
+    simp only [ClassicalQueryLayout.width]
+    omega
+  have hhiddenFit : layout.replyBase < layout.width := by
+    simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
+    omega
+  have hzeroFit : 0 < layout.width := by omega
+  have hhiddenZero : layout.replyBase ≠ 0 := by
+    simp only [ClassicalQueryLayout.replyBase, ClassicalQueryLayout.serviceBase,
+      ClassicalQueryLayout.hiddenWire]
+    omega
+  have hhiddenSource : layout.replyBase ≠ layout.secondBase := by
+    simp only [ClassicalQueryLayout.secondBase]
+    omega
+  have hclass : IsClassical layout.width finalCodes :=
+    IsClassical.append.mpr ⟨
+      isClassical_prefixSwapCodes hsourceDisjoint hsourceFit,
+      isClassical_compareBits hhiddenZero hhiddenFit hzeroFit⟩
+  rw [Circuit.measureDensity_basis_ofCodes hclass rho hrho, PMF.map_comp]
+  congr 1
+  funext p
+  simp only [Function.comp_apply, finalCodes, classicalRun_append]
+  rw [readBit_classicalRun_compareBits hzeroFit]
+  have hone : prefixSwapCodes layout.secondBase 1 =
+      swapWireCodes 0 layout.secondBase := by
+    simp [prefixSwapCodes]
+  rw [hone,
+    readBit_classicalRun_swapWireCodes (by omega) (by omega) (by omega),
+    readBit_classicalRun_swapWireCodes_of_ne hhiddenZero hhiddenSource]
 
 end Cslib.Quantum.ClassicalQueryLayout

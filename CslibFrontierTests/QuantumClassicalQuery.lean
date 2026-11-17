@@ -118,12 +118,16 @@ example : (compileClassicalQuery fixtureLayout).WellFormed fixtureInput ∧
     queryCount_compileClassicalQuery fixtureLayout⟩
 
 -- The second stage's logical wire 15 is saved-F wire 8 (zero-based). It maps to physical wire 10,
--- after the hidden two-bit sample suffix, and cannot map to the protected hidden-bit record.
+-- after the hidden two-bit sample suffix, and cannot map to either end of the three-bit retained
+-- reply record.
 example : fixtureLayout.secondWire 15 = 10 ∧
-    fixtureLayout.secondWire 15 ≠ fixtureLayout.replyBase := by
-  constructor
-  · decide
-  · exact fixtureLayout.secondWire_ne_replyBase 15
+    fixtureLayout.secondWire 15 ≠ fixtureLayout.replyBase ∧
+    fixtureLayout.secondWire 15 ≠ fixtureLayout.replyBase + 2 := by
+  refine ⟨by decide, ?_, ?_⟩
+  · simpa only [Fin.val_zero, Nat.add_zero] using
+      fixtureLayout.secondWire_ne_replyBlock 15 0
+  · simpa only using fixtureLayout.secondWire_ne_replyBlock 15
+      (⟨2, by decide⟩ : Fin (1 + fixtureLayout.ciphertextWidth))
 
 private def fixtureCompiler : NativeCompiler
     (fun input : OracleInputSize =>
