@@ -30,8 +30,9 @@ ranges.
 
 Inputs encode the source arities in their types: `F` and `PRF` consume one `n`-byte payload, `H`
 consumes two consecutive `n`-byte blocks, and `T_l` consumes exactly `l * n` bytes. All outputs are
-exactly `n` bytes. The SHA2 input-domain proof for an arbitrary `T_l` call remains explicit;
-`validTInput_of_blocks_le_67` discharges it for every standardized WOTS+ or FORS call.
+exactly `n` bytes. The hash calls use the total SHA2 functions, while `ValidTInput` separately
+records the standard's SHA-2 input domain; `validTInput_of_blocks_le_67` proves that fact for every
+standardized WOTS+ or FORS call.
 
 This is executable hash plumbing, not a constant-time or machine-costed implementation, a NIST
 validation, a security proof, or an asymptotic parameter family. It does not define `H_msg`,
@@ -50,8 +51,6 @@ validation, a security proof, or an asymptotic parameter family. It does not def
 ## Main results
 
 * `Cslib.Crypto.SLHDSA.validTInput_of_blocks_le_67`: every standardized block count is valid.
-* `Cslib.Crypto.SLHDSA.prf_eq_f`: `PRF` and `F` have the same concrete call shape.
-* `Cslib.Crypto.SLHDSA.h_eq_tL_two`: `H` is the two-block instance of `T_l`.
 
 ## References
 
@@ -135,21 +134,17 @@ private def shakeFixed (input : List Byte) (outputBytes : ℕ) : FixedBytes outp
   FixedBytes.ofListExact (Keccak.shake256 input outputBytes)
     (Keccak.length_shake256 input outputBytes)
 
-private def sha256Truncated {p : SecurityBytes} (input : List Byte)
-    (_hinput : SHA2.ValidSHA256Input input) : NBytes p :=
+private def sha256Truncated {p : SecurityBytes} (input : List Byte) : NBytes p :=
   fun i => SHA2.sha256 input (Fin.castLE p.count_le_32 i)
 
-private def sha512Truncated {p : SecurityBytes} (input : List Byte)
-    (_hinput : SHA2.ValidSHA512Input input) : NBytes p :=
+private def sha512Truncated {p : SecurityBytes} (input : List Byte) : NBytes p :=
   fun i => SHA2.sha512 input (Fin.castLE (p.count_le_32.trans (by decide)) i)
 
 private def addressedOneBlock (family : HashFamily) {p : SecurityBytes}
     (publicSeed : NBytes p) (address : Address) (message : NBytes p) : NBytes p :=
   match family with
   | .shake => shakeFixed (shakeInput publicSeed address message) p.count
-  | .sha2 =>
-      sha256Truncated (sha256Input publicSeed address message) (by
-        cases p <;> norm_num [SecurityBytes.count, SHA2.ValidSHA256Input])
+  | .sha2 => sha256Truncated (sha256Input publicSeed address message)
 
 /-- FIPS 205 `PRF(PK.seed, SK.seed, ADRS)` from Sections 11.1--11.2.2. -/
 def prf (family : HashFamily) {p : SecurityBytes} (publicSeed secretSeed : NBytes p)
@@ -162,17 +157,12 @@ def f (family : HashFamily) {p : SecurityBytes} (publicSeed : NBytes p)
     (address : Address) (message : NBytes p) : NBytes p :=
   prf family publicSeed message address
 
-/-- `PRF` and `F` use the same concrete hash call when their final `n`-byte inputs agree. -/
-theorem prf_eq_f (family : HashFamily) {p : SecurityBytes}
-    (publicSeed secretSeed : NBytes p) (address : Address) :
-    prf family publicSeed secretSeed address = f family publicSeed address secretSeed :=
-  rfl
+/-- The standard's source-domain predicate for an arbitrary `T_l` call.
 
-/-- The source-domain obligation for an arbitrary `T_l` call.
-
-SHAKE256 accepts every finite byte string. For SHA2, the obligation is exactly the input predicate
-of the SHA-256 or SHA-512 branch selected by FIPS 205. It is a proof precondition, not a new
-runtime failure in the standard. -/
+SHAKE256 accepts every finite byte string. For SHA2, this is exactly the input predicate of the
+SHA-256 or SHA-512 branch selected by FIPS 205. The executable hash functions are total outside
+this domain; this predicate records that a call is within the source domain rather than imposing a
+runtime precondition. -/
 @[expose] def ValidTInput (family : HashFamily) {p : SecurityBytes} {l : ℕ}
     (publicSeed : NBytes p) (address : Address) (message : LBlocksBytes p l) : Prop :=
   match family, p with
@@ -198,37 +188,22 @@ theorem validTInput_of_blocks_le_67 (family : HashFamily) {p : SecurityBytes} {l
       SHA2.ValidSHA512Input] at * <;>
     omega
 
-/-- FIPS 205 `T_l(PK.seed, ADRS, M_l)` from Sections 11.1--11.2.2. -/
+/-- FIPS 205 `T_l(PK.seed, ADRS, M_l)` from Sections 11.1--11.2.2, extended totally through the
+total SHA2 functions. `ValidTInput` separately records the standard's source domain. -/
 def tL (family : HashFamily) {p : SecurityBytes} (l : ℕ) (publicSeed : NBytes p)
-    (address : Address) (message : LBlocksBytes p l)
-    (hinput : ValidTInput family publicSeed address message) : NBytes p :=
+    (address : Address) (message : LBlocksBytes p l) : NBytes p :=
   match family with
   | .shake => shakeFixed (shakeInput publicSeed address message) p.count
   | .sha2 =>
       match p with
-      | .bytes16 =>
-          sha256Truncated (sha256Input publicSeed address message) (by
-            simpa [ValidTInput] using hinput)
-      | .bytes24 =>
-          sha512Truncated (sha512Input publicSeed address message) (by
-            simpa [ValidTInput] using hinput)
-      | .bytes32 =>
-          sha512Truncated (sha512Input publicSeed address message) (by
-            simpa [ValidTInput] using hinput)
+      | .bytes16 => sha256Truncated (sha256Input publicSeed address message)
+      | .bytes24 => sha512Truncated (sha512Input publicSeed address message)
+      | .bytes32 => sha512Truncated (sha512Input publicSeed address message)
 
 /-- FIPS 205 `H(PK.seed, ADRS, M_2)` from Sections 11.1--11.2.2. -/
 @[expose]
 def h (family : HashFamily) {p : SecurityBytes} (publicSeed : NBytes p)
     (address : Address) (message : TwoNBytes p) : NBytes p :=
   tL family 2 publicSeed address message
-    (validTInput_of_blocks_le_67 family publicSeed address message (by decide))
-
-/-- `H` is exactly the two-block instance of `T_l`. -/
-theorem h_eq_tL_two (family : HashFamily) {p : SecurityBytes} (publicSeed : NBytes p)
-    (address : Address) (message : TwoNBytes p) :
-    h family publicSeed address message =
-      tL family 2 publicSeed address message
-        (validTInput_of_blocks_le_67 family publicSeed address message (by decide)) := by
-  cases family <;> cases p <;> rfl
 
 end Cslib.Crypto.SLHDSA
