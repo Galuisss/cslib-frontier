@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.ClassicalQuery
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.BlockCopy.Deferred
+import Mathlib.Data.List.GetD
 
 /-!
 # Physical semantics of the classical-query controller
@@ -27,8 +28,12 @@ final comparison measurement with the native success experiment remain separate 
 * `Cslib.Quantum.ClassicalQueryLayout.Compatible.ofPhaseCodes_compileClassicalQuery`: the
   erased compiled circuit is the exact sequence of its three embedded component circuits and
   physical boundary blocks.
+* `Cslib.Quantum.ClassicalQueryLayout.Compatible.classicalRun_initialCopies`: the actual input
+  copies initialize the canonical first-stage input and retain fresh request/reply registers.
 * `Cslib.Quantum.ClassicalQueryLayout.matrix_copyHidden_zeroTarget_withReference`: the actual
   protected-hidden-bit copy is a coherent record while retaining every other wire and reference.
+* `Cslib.Quantum.ClassicalQueryLayout.Compatible.eval_initialPrefix`: the actual first six
+  blocks run F on its public input and coherently prepare the request and hidden-bit records.
 * `Cslib.Quantum.ClassicalQueryLayout.eval_requestHidden_embedState`: the actual request copy,
   Hadamard seed and protected-bit copy preserve the complete first-stage superposition.
 * `Cslib.Quantum.ClassicalQueryLayout.partialTraceLeft_copyRequest_zeroTarget_withReference`:
@@ -46,6 +51,7 @@ public section
 namespace Cslib.Quantum.ClassicalQueryLayout
 
 open Matrix Circuit GateCode
+open Turing.MultiTapeTM
 open scoped Kronecker
 
 /-- The erased compiled controller is exactly the sequence of its three component circuits,
@@ -97,6 +103,255 @@ theorem Compatible.ofPhaseCodes_compileClassicalQuery {layout : ClassicalQueryLa
   simp only [compileClassicalQuery, OracleCircuit.zeroOraclePhaseCodes,
     List.filterMap_append, List.filterMap_map, Function.comp_apply, List.filterMap_eq_map',
     ofPhaseCodes_append, Circuit.ofPhaseCodes_map, hfirst, hservice, hsecond]
+
+/-- The first two physical blocks of the compiled controller save the complete input for the
+service and its security header for the second stage.  The sparse first-stage view is exactly the
+canonical encoding of the public-key prefix, while the request, hidden-bit and retained-reply
+registers remain fresh. -/
+theorem Compatible.classicalRun_initialCopies {layout : ClassicalQueryLayout}
+    (h : layout.Compatible) (sample : List Bool)
+    (hsample : sample.length = layout.input.classicalInputLength) :
+    let κ := layout.input.securityParameter
+    let encoded := encPair encUnary encBits (κ, sample)
+    let initial := inputState layout.width encoded
+    let prepared := classicalRun
+      (blockCopyCodes 0 layout.secondBase (2 * κ + 1))
+      (classicalRun
+        (blockCopyCodes 0 layout.serviceBase layout.fullInputWidth) initial)
+    prepared ∘ layout.firstEmbedding =
+        inputState layout.first.width
+          (encPair encUnary encBits (κ, sample.take layout.publicKeyWidth)) ∧
+      (∀ i < layout.fullInputWidth, readBit prepared i = encoded.getD i false) ∧
+      (∀ i < layout.fullInputWidth,
+        readBit prepared (layout.serviceBase + i) = encoded.getD i false) ∧
+      (∀ i < 2 * κ + 1,
+        readBit prepared (layout.secondBase + i) = encoded.getD i false) ∧
+      (∀ i < layout.first.outputWidth,
+        readBit prepared (layout.requestBase + i) = false) ∧
+      readBit prepared layout.hiddenWire = false ∧
+      (∀ i < 1 + layout.ciphertextWidth,
+        readBit prepared (layout.replyBase + i) = false) := by
+  let κ := layout.input.securityParameter
+  let encoded := encPair encUnary encBits (κ, sample)
+  let firstEncoded := encPair encUnary encBits (κ, sample.take layout.publicKeyWidth)
+  let initial := inputState layout.width encoded
+  let serviceCopied := classicalRun
+    (blockCopyCodes 0 layout.serviceBase layout.fullInputWidth) initial
+  let prepared := classicalRun
+    (blockCopyCodes 0 layout.secondBase (2 * κ + 1)) serviceCopied
+  change prepared ∘ layout.firstEmbedding = inputState layout.first.width firstEncoded ∧
+    (∀ i < layout.fullInputWidth, readBit prepared i = encoded.getD i false) ∧
+    (∀ i < layout.fullInputWidth,
+      readBit prepared (layout.serviceBase + i) = encoded.getD i false) ∧
+    (∀ i < 2 * κ + 1,
+      readBit prepared (layout.secondBase + i) = encoded.getD i false) ∧
+    (∀ i < layout.first.outputWidth,
+      readBit prepared (layout.requestBase + i) = false) ∧
+    readBit prepared layout.hiddenWire = false ∧
+    (∀ i < 1 + layout.ciphertextWidth,
+      readBit prepared (layout.replyBase + i) = false)
+  have hpublicKey := h.publicKey_le
+  have hencodedLength : encoded.length = layout.fullInputWidth := by
+    simp only [encoded, encPair_apply, encUnary_apply, encBits_apply, List.length_append,
+      length_frame, List.length_replicate, fullInputWidth, κ, hsample]
+  have hfirstEncodedLength : firstEncoded.length = layout.firstInputWidth := by
+    simp only [firstEncoded, encPair_apply, encUnary_apply, encBits_apply, List.length_append,
+      length_frame, List.length_replicate, List.length_take, firstInputWidth, κ, hsample]
+    rw [Nat.min_eq_left hpublicKey]
+  have hfirstWidth : layout.firstInputWidth ≤ layout.first.width := by
+    have hinput := h.first_wellFormed.input_le
+    rw [h.first_quantumInputWidth, Nat.add_zero] at hinput
+    exact hinput
+  have hserviceWidth : layout.fullInputWidth ≤ layout.service.width := by
+    have hinput := h.service_wellFormed.input_le
+    simp only [fullInputWidth]
+    omega
+  have hsecondHeaderWidth : 2 * κ + 1 ≤ layout.second.width := by
+    have hinput := h.second_wellFormed.input_le
+    simp only [κ, ciphertextWidth] at hinput ⊢
+    omega
+  have hinputBeforeRequest : layout.fullInputWidth ≤ layout.requestBase := by
+    simp only [firstInputWidth] at hfirstWidth
+    simp only [fullInputWidth, requestBase, ciphertextWidth]
+    omega
+  have hfullBeforeService : layout.fullInputWidth ≤ layout.serviceBase := by
+    simp only [serviceBase, hiddenWire]
+    omega
+  have hfullBeforeSecond : layout.fullInputWidth ≤ layout.secondBase := by
+    simp only [secondBase, replyBase, serviceBase]
+    omega
+  have hheaderBeforeSecond : 2 * κ + 1 ≤ layout.secondBase := by
+    simp only [fullInputWidth] at hfullBeforeSecond
+    omega
+  have hheaderBeforeService : 2 * κ + 1 ≤ layout.serviceBase := by
+    simp only [fullInputWidth] at hfullBeforeService
+    omega
+  have hfullFits : layout.fullInputWidth ≤ layout.width := by
+    exact hfullBeforeSecond.trans (by simp only [width]; omega)
+  have hserviceTargetFits : layout.serviceBase + layout.fullInputWidth ≤ layout.width := by
+    simp only [width, secondBase, replyBase]
+    omega
+  have hsecondTargetFits : layout.secondBase + (2 * κ + 1) ≤ layout.width := by
+    simp only [width]
+    omega
+  have hencodedFits : encoded.length ≤ layout.width := hencodedLength.le.trans hfullFits
+  have hfirstEncodedFits : firstEncoded.length ≤ layout.first.width :=
+    hfirstEncodedLength.le.trans hfirstWidth
+  have hinitial (q : ℕ) : readBit initial q = encoded.getD q false :=
+    readBit_inputState hencodedFits q
+  have hserviceTargetBeforeSecond :
+      layout.serviceBase + layout.fullInputWidth ≤ layout.secondBase := by
+    simp only [secondBase, replyBase]
+    omega
+  have hglueOff (target count : ℕ) (htarget : target + count ≤ layout.width)
+      (z : Fin count → Bool) (x : Fin layout.width → Bool) (q : ℕ)
+      (hq : q < target ∨ target + count ≤ q) :
+      readBit (glue (blockEmb target htarget) z x) q = readBit x q := by
+    apply readBit_glue_of_forall_ne
+    intro i heq
+    simp only [blockEmb_apply_val] at heq
+    rcases hq with hq | hq <;> omega
+  have hserviceTargetZero : ∀ i : Fin layout.fullInputWidth,
+      initial (blockEmb layout.serviceBase hserviceTargetFits i) = false := by
+    intro i
+    rw [← readBit_fin initial (blockEmb layout.serviceBase hserviceTargetFits i), hinitial,
+      List.getD_eq_default encoded false (by
+        rw [hencodedLength]
+        simp only [blockEmb_apply_val]
+        omega)]
+  have hserviceCopiedEq : serviceCopied =
+      glue (blockEmb layout.serviceBase hserviceTargetFits)
+        (fun i => readBit initial (0 + i)) initial :=
+    classicalRun_blockCopyCodes_zeroTarget
+      (Or.inl (by simpa only [Nat.zero_add] using hfullBeforeService))
+      (by simpa only [Nat.zero_add] using hfullFits) hserviceTargetFits initial
+      hserviceTargetZero
+  have hserviceOff (q : ℕ)
+      (hq : q < layout.serviceBase ∨ layout.serviceBase + layout.fullInputWidth ≤ q) :
+      readBit serviceCopied q = readBit initial q := by
+    rw [hserviceCopiedEq]
+    exact hglueOff layout.serviceBase layout.fullInputWidth hserviceTargetFits _ _ q hq
+  have hsecondTargetZero : ∀ i : Fin (2 * κ + 1),
+      serviceCopied (blockEmb layout.secondBase hsecondTargetFits i) = false := by
+    intro i
+    rw [← readBit_fin serviceCopied (blockEmb layout.secondBase hsecondTargetFits i),
+      hserviceOff _ (Or.inr (by
+        simp only [blockEmb_apply_val]
+        omega)), hinitial,
+      List.getD_eq_default encoded false (by
+        rw [hencodedLength]
+        simp only [blockEmb_apply_val]
+        omega)]
+  have hpreparedEq : prepared =
+      glue (blockEmb layout.secondBase hsecondTargetFits)
+        (fun i => readBit serviceCopied (0 + i)) serviceCopied :=
+    classicalRun_blockCopyCodes_zeroTarget
+      (Or.inl (by simpa only [Nat.zero_add] using hheaderBeforeSecond))
+      (by simpa only [Nat.zero_add] using hheaderBeforeSecond.trans (by
+        simp only [width]
+        omega)) hsecondTargetFits serviceCopied hsecondTargetZero
+  have hsecondOff (q : ℕ)
+      (hq : q < layout.secondBase ∨ layout.secondBase + (2 * κ + 1) ≤ q) :
+      readBit prepared q = readBit serviceCopied q := by
+    rw [hpreparedEq]
+    exact hglueOff layout.secondBase (2 * κ + 1) hsecondTargetFits _ _ q hq
+  have hreadOriginal (i : ℕ) (hi : i < layout.fullInputWidth) :
+      readBit prepared i = encoded.getD i false := by
+    rw [hsecondOff i (Or.inl (hi.trans_le hfullBeforeSecond)),
+      hserviceOff i (Or.inl (hi.trans_le hfullBeforeService)), hinitial]
+  have hreadService (i : ℕ) (hi : i < layout.fullInputWidth) :
+      readBit prepared (layout.serviceBase + i) = encoded.getD i false := by
+    rw [hsecondOff _ (Or.inl (by omega)), hserviceCopiedEq]
+    let offset : Fin layout.fullInputWidth := ⟨i, hi⟩
+    have hemb : (blockEmb layout.serviceBase hserviceTargetFits offset : ℕ) =
+        layout.serviceBase + i := by
+      simp only [blockEmb_apply_val, offset, Nat.add_comm]
+    rw [← hemb, readBit_fin, glue_apply_emb, Nat.zero_add, hinitial]
+  have hreadSecond (i : ℕ) (hi : i < 2 * κ + 1) :
+      readBit prepared (layout.secondBase + i) = encoded.getD i false := by
+    rw [hpreparedEq]
+    let offset : Fin (2 * κ + 1) := ⟨i, hi⟩
+    have hemb : (blockEmb layout.secondBase hsecondTargetFits offset : ℕ) =
+        layout.secondBase + i := by
+      simp only [blockEmb_apply_val, offset, Nat.add_comm]
+    rw [← hemb, readBit_fin, glue_apply_emb, Nat.zero_add,
+      hserviceOff i (Or.inl (hi.trans_le hheaderBeforeService)), hinitial]
+  have hzero (q : ℕ) (hinput : layout.fullInputWidth ≤ q)
+      (hservice : q < layout.serviceBase ∨
+        layout.serviceBase + layout.fullInputWidth ≤ q)
+      (hsecond : q < layout.secondBase ∨ layout.secondBase + (2 * κ + 1) ≤ q) :
+      readBit prepared q = false := by
+    rw [hsecondOff q hsecond, hserviceOff q hservice, hinitial,
+      List.getD_eq_default encoded false (by rw [hencodedLength]; exact hinput)]
+  have hprefix (i : ℕ) (hi : i < layout.firstInputWidth) :
+      firstEncoded.getD i false = encoded.getD i false := by
+    change
+      (frame (encUnary κ) ++ sample.take layout.publicKeyWidth).getD i false =
+        (frame (encUnary κ) ++ sample).getD i false
+    have hframe : (frame (encUnary κ)).length = 2 * κ + 1 := by
+      simp only [encUnary_apply, length_frame, List.length_replicate]
+    by_cases hheader : i < 2 * κ + 1
+    · rw [List.getD_append _ _ _ _ (hframe.symm ▸ hheader),
+        List.getD_append _ _ _ _ (hframe.symm ▸ hheader)]
+    · have hoffset : i - (frame (encUnary κ)).length < layout.publicKeyWidth := by
+        simp only [firstInputWidth] at hi
+        omega
+      rw [List.getD_append_right _ _ _ _ (by omega),
+        List.getD_append_right _ _ _ _ (by omega)]
+      simp only [List.getD_eq_getElem?_getD, List.getElem?_take_of_lt hoffset]
+  constructor
+  · funext wire
+    simp only [Function.comp_apply]
+    rw [← readBit_fin prepared (layout.firstEmbedding wire),
+      ← readBit_fin (inputState layout.first.width firstEncoded) wire]
+    change readBit prepared (layout.firstWire wire) =
+      readBit (inputState layout.first.width firstEncoded) wire
+    rw [readBit_inputState hfirstEncodedFits]
+    by_cases hwire : (wire : ℕ) < layout.firstInputWidth
+    · rw [firstWire, ite_eq_left hwire, hreadOriginal wire (by
+          simp only [fullInputWidth, firstInputWidth] at hwire ⊢
+          omega)]
+      exact (hprefix wire hwire).symm
+    · rw [firstWire, ite_eq_right hwire,
+        hzero _ (by
+          simp only [fullInputWidth, firstInputWidth, ciphertextWidth] at *
+          omega) (Or.inl (by
+            simp only [serviceBase, hiddenWire, requestBase]
+            omega)) (Or.inl (by
+              simp only [secondBase, replyBase, serviceBase, hiddenWire, requestBase]
+              omega)),
+        List.getD_eq_default firstEncoded false (by
+          rw [hfirstEncodedLength]
+          omega)]
+  refine ⟨hreadOriginal, hreadService, hreadSecond, ?_, ?_, ?_⟩
+  · intro i hi
+    apply hzero
+    · exact hinputBeforeRequest.trans (Nat.le_add_right _ _)
+    · left
+      simp only [serviceBase, hiddenWire]
+      omega
+    · left
+      simp only [secondBase, replyBase, serviceBase, hiddenWire]
+      omega
+  · apply hzero
+    · exact hinputBeforeRequest.trans (by simp only [hiddenWire]; omega)
+    · left
+      simp only [serviceBase]
+      omega
+    · left
+      simp only [secondBase, replyBase, serviceBase]
+      omega
+  · intro i hi
+    apply hzero
+    · exact hinputBeforeRequest.trans (by
+        simp only [replyBase, serviceBase, hiddenWire]
+        omega)
+    · right
+      simp only [replyBase]
+      omega
+    · left
+      simp only [secondBase]
+      omega
 
 /-- The controller's physical hidden-bit copy, restricted to a zero protected target, is exactly
 a coherent record.  Reassociation exposes the copied bit as the first factor while retaining all
@@ -438,5 +693,108 @@ theorem eval_requestHidden_embedState (layout : ClassicalQueryLayout)
     rwa [readBit_of_lt _ hlt] at hreply
   rw [Circuit.ofCodes_append, Circuit.eval_append, Circuit.eval_ofCodes_ket hclass, hcopy,
     eval_prepareHidden_ket layout recorded hh hr]
+
+
+/-- The actual first six controller blocks initialize and run F on exactly the public-key prefix,
+then coherently record its request and prepare matching hidden bits. Every first-stage basis
+amplitude is retained; no measurement or dephasing has been inserted into the circuit. -/
+theorem Compatible.eval_initialPrefix {layout : ClassicalQueryLayout}
+    (h : layout.Compatible) (sample : List Bool)
+    (hsample : sample.length = layout.input.classicalInputLength) :
+    let κ := layout.input.securityParameter
+    let initial := inputState layout.width (encPair encUnary encBits (κ, sample))
+    let prepared := classicalRun (blockCopyCodes 0 layout.secondBase (2 * κ + 1))
+      (classicalRun (blockCopyCodes 0 layout.serviceBase layout.fullInputWidth) initial)
+    let firstCircuit := Circuit.ofPhaseCodes layout.first.width
+      layout.first.instructions.zeroOraclePhaseCodes
+    let ψ := firstCircuit.eval (ket (inputState layout.first.width
+      (encPair encUnary encBits (κ, sample.take layout.publicKeyWidth))))
+    let hfirstInput : layout.firstInputWidth ≤ layout.first.width := by
+      have hi := h.first_wellFormed.input_le
+      rw [h.first_quantumInputWidth, Nat.add_zero] at hi
+      exact hi
+    let hrequestEnd : layout.requestBase + layout.first.outputWidth ≤ layout.width := by
+      simp only [width, secondBase, replyBase, serviceBase, hiddenWire]
+      omega
+    let hhiddenEnd : layout.hiddenWire + 1 ≤ layout.width := by
+      simp only [width, secondBase, replyBase, serviceBase]
+      omega
+    let hreplyEnd : layout.replyBase < layout.width := by
+      simp only [width, secondBase]
+      omega
+    Circuit.eval
+      ((Circuit.ofCodes layout.width (blockCopyCodes 0 layout.serviceBase layout.fullInputWidth) ++
+        Circuit.ofCodes layout.width (blockCopyCodes 0 layout.secondBase (2 * κ + 1)) ++
+        firstCircuit.mapWires layout.firstEmbedding) ++
+        Circuit.ofCodes layout.width
+          (blockCopyCodes 0 layout.requestBase layout.first.outputWidth ++
+            (hadamardCodes layout.hiddenWire 1 ++
+              blockCopyCodes layout.hiddenWire layout.replyBase 1))) (ket initial) =
+      ∑ z : Fin layout.first.width → Bool, ψ.ofLp z •
+        ∑ bit : Fin 1 → Bool, (((Real.sqrt 2)⁻¹ : ℝ) : ℂ) •
+          ket (Function.update
+            (glue (blockEmb layout.hiddenWire hhiddenEnd) bit
+              (glue (blockEmb layout.requestBase hrequestEnd)
+                (fun i => z ⟨i, lt_of_lt_of_le i.isLt (h.first_output_le.trans hfirstInput)⟩)
+                (glue layout.firstEmbedding z prepared)))
+            ⟨layout.replyBase, hreplyEnd⟩ (bit 0)) := by
+  classical
+  dsimp only
+  let κ := layout.input.securityParameter
+  let initial := inputState layout.width (encPair encUnary encBits (κ, sample))
+  let prepared := classicalRun (blockCopyCodes 0 layout.secondBase (2 * κ + 1))
+    (classicalRun (blockCopyCodes 0 layout.serviceBase layout.fullInputWidth) initial)
+  let firstInput := inputState layout.first.width
+    (encPair encUnary encBits (κ, sample.take layout.publicKeyWidth))
+  have hfirstInput : layout.firstInputWidth ≤ layout.first.width := by
+    have hi := h.first_wellFormed.input_le
+    rw [h.first_quantumInputWidth, Nat.add_zero] at hi
+    exact hi
+  have hserviceWidth : layout.fullInputWidth ≤ layout.service.width := by
+    have hi := h.service_wellFormed.input_le
+    change layout.fullInputWidth + layout.service.quantumInputWidth ≤ layout.service.width at hi
+    omega
+  have hsecondWidth : 2 * κ + 1 ≤ layout.second.width := by
+    have hi := h.second_wellFormed.input_le
+    change 2 * κ + 1 + layout.ciphertextWidth + layout.second.quantumInputWidth ≤
+      layout.second.width at hi
+    omega
+  have hinputBeforeRequest : layout.fullInputWidth ≤ layout.requestBase := by
+    have hp := h.publicKey_le
+    simp only [fullInputWidth, firstInputWidth, requestBase, ciphertextWidth] at *
+    omega
+  have hcopyService : IsClassical layout.width
+      (blockCopyCodes 0 layout.serviceBase layout.fullInputWidth) := by
+    apply isClassical_blockCopyCodes
+    · left
+      simp only [Nat.zero_add, serviceBase, hiddenWire]
+      omega
+    · simp only [Nat.zero_add, width, secondBase, replyBase]
+      omega
+    · simp only [width, secondBase, replyBase]
+      omega
+  have hcopyHeader : IsClassical layout.width
+      (blockCopyCodes 0 layout.secondBase (2 * κ + 1)) := by
+    apply isClassical_blockCopyCodes
+    · left
+      simp only [Nat.zero_add, secondBase, replyBase, serviceBase, hiddenWire,
+        fullInputWidth, κ] at *
+      omega
+    · simp only [Nat.zero_add, width]
+      omega
+    · simp only [width]
+      omega
+  have hinitial := h.classicalRun_initialCopies sample hsample
+  change prepared ∘ layout.firstEmbedding = firstInput ∧ _ at hinitial
+  obtain ⟨hfirst, _, _, _, hrequest, hhidden, hreply⟩ := hinitial
+  have hemb : embedState layout.firstEmbedding prepared (ket firstInput) = ket prepared := by
+    rw [← hfirst, embedState_ket,
+      glue_comp_of_agreeOff (AgreeOff.refl layout.firstEmbedding prepared)]
+  rw [Circuit.eval_append, Circuit.eval_append, Circuit.eval_append,
+    Circuit.eval_ofCodes_ket hcopyService, Circuit.eval_ofCodes_ket hcopyHeader]
+  change Circuit.eval _ (Circuit.eval _ (ket prepared)) = _
+  rw [← hemb, Circuit.eval_mapWires_embedState]
+  exact eval_requestHidden_embedState layout h.first_output_le hfirstInput prepared hrequest
+    hhidden (by simpa only [Nat.add_zero] using hreply 0 (by omega)) _
 
 end Cslib.Quantum.ClassicalQueryLayout
