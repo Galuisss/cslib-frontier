@@ -48,7 +48,7 @@ The proof composes three steps:
 ## Main definitions
 
 * `Cslib.Quantum.pauliFamily`: `(s, a, b) ↦ (-1)^s X(a) Z(b)`.
-* `Cslib.Quantum.signProj`: the projection onto the `-1` eigenspace of `g(-1)`.
+* `Cslib.Quantum.negOneProj`: the projection onto the `-1` eigenspace of `g(-1)`.
 * `Cslib.Quantum.codeRep`: the compressed regular representation, satisfying the Pauli relations.
 
 ## Main results
@@ -89,47 +89,48 @@ theorem commute_regularRep_negOne (y : PauliGroup ι) : reg negOne * reg y = reg
   rw [regularRep_mul, regularRep_mul, commute_negOne]
 
 /-- The projection `(1 - g(-1))/2` onto the `-1` eigenspace of the central element. -/
-noncomputable def signProj : Matrix (κ × PauliGroup ι) (κ × PauliGroup ι) ℂ :=
+noncomputable def negOneProj : Matrix (κ × PauliGroup ι) (κ × PauliGroup ι) ℂ :=
   (2⁻¹ : ℂ) • (1 - reg negOne)
 
 omit [Fintype κ] [DecidableEq ι] in
-theorem isHermitian_signProj : (signProj (ι := ι) (κ := κ)).IsHermitian := by
-  rw [signProj, IsHermitian, conjTranspose_smul, conjTranspose_sub, conjTranspose_one,
+theorem isHermitian_negOneProj : (negOneProj (ι := ι) (κ := κ)).IsHermitian := by
+  rw [negOneProj, IsHermitian, conjTranspose_smul, conjTranspose_sub, conjTranspose_one,
     (isHermitian_regularRep_of_inv negOne_inv).eq]
   simp
 
-theorem signProj_mul_self : signProj (ι := ι) (κ := κ) * signProj = signProj := by
-  rw [signProj, smul_mul_smul_comm, sub_mul, one_mul, mul_sub, mul_one,
+theorem negOneProj_mul_self : negOneProj (ι := ι) (κ := κ) * negOneProj = negOneProj := by
+  rw [negOneProj, smul_mul_smul_comm, sub_mul, one_mul, mul_sub, mul_one,
     regularRep_negOne_mul_self]
   rw [show (1 : Matrix (κ × PauliGroup ι) (κ × PauliGroup ι) ℂ) - reg negOne - (reg negOne - 1) =
     (2 : ℂ) • (1 - reg negOne) by rw [two_smul]; abel, smul_smul]
   norm_num
 
-theorem regularRep_negOne_mul_signProj :
-    reg negOne * signProj (ι := ι) (κ := κ) = -signProj := by
-  rw [signProj, Matrix.mul_smul, mul_sub, mul_one, regularRep_negOne_mul_self, ← smul_neg,
+theorem regularRep_negOne_mul_negOneProj :
+    reg negOne * negOneProj (ι := ι) (κ := κ) = -negOneProj := by
+  rw [negOneProj, Matrix.mul_smul, mul_sub, mul_one, regularRep_negOne_mul_self, ← smul_neg,
     neg_sub]
 
-theorem commute_regularRep_signProj (y : PauliGroup ι) :
-    reg y * signProj (ι := ι) (κ := κ) = signProj * reg y := by
-  rw [signProj, Matrix.mul_smul, Matrix.smul_mul, mul_sub, sub_mul, mul_one, one_mul,
+theorem commute_regularRep_negOneProj (y : PauliGroup ι) :
+    reg y * negOneProj (ι := ι) (κ := κ) = negOneProj * reg y := by
+  rw [negOneProj, Matrix.mul_smul, Matrix.smul_mul, mul_sub, sub_mul, mul_one, one_mul,
     commute_regularRep_negOne]
 
 variable {L : Type*} [Fintype L] [DecidableEq L] {E : Matrix (κ × PauliGroup ι) L ℂ}
 
-private theorem compress_mul (hEE : Eᴴ * E = 1) (hEP : E * Eᴴ = signProj) (y y' : PauliGroup ι) :
+private theorem compress_mul (hEE : Eᴴ * E = 1) (hEP : E * Eᴴ = negOneProj) (y y' : PauliGroup ι) :
     Eᴴ * reg y * E * (Eᴴ * reg y' * E) = Eᴴ * reg (y * y') * E := by
-  have hPE : signProj * E = E := by rw [← hEP, Matrix.mul_assoc, hEE, Matrix.mul_one]
+  have hPE : negOneProj * E = E := by rw [← hEP, Matrix.mul_assoc, hEE, Matrix.mul_one]
   rw [show Eᴴ * reg y * E * (Eᴴ * reg y' * E) = Eᴴ * reg y * (E * Eᴴ) * reg y' * E by
-    simp only [Matrix.mul_assoc], hEP, Matrix.mul_assoc (Eᴴ * reg y), ← commute_regularRep_signProj,
+    simp only [Matrix.mul_assoc], hEP, Matrix.mul_assoc (Eᴴ * reg y),
+    ← commute_regularRep_negOneProj,
     ← Matrix.mul_assoc, Matrix.mul_assoc _ _ E, hPE, ← regularRep_mul]
   simp only [Matrix.mul_assoc]
 
-private theorem compress_negOne_mul (hEE : Eᴴ * E = 1) (hEP : E * Eᴴ = signProj)
+private theorem compress_negOne_mul (hEE : Eᴴ * E = 1) (hEP : E * Eᴴ = negOneProj)
     (y : PauliGroup ι) : Eᴴ * reg (negOne * y) * E = -(Eᴴ * reg y * E) := by
-  have hPE : signProj * E = E := by rw [← hEP, Matrix.mul_assoc, hEE, Matrix.mul_one]
+  have hPE : negOneProj * E = E := by rw [← hEP, Matrix.mul_assoc, hEE, Matrix.mul_one]
   have hJE : reg negOne * E = -E := by
-    rw [← hPE, ← Matrix.mul_assoc, regularRep_negOne_mul_signProj, Matrix.neg_mul]
+    rw [← hPE, ← Matrix.mul_assoc, regularRep_negOne_mul_negOneProj, Matrix.neg_mul]
   rw [← regularRep_mul, commute_regularRep_negOne]
   simp only [Matrix.mul_assoc]
   rw [hJE]
@@ -137,7 +138,7 @@ private theorem compress_negOne_mul (hEE : Eᴴ * E = 1) (hEP : E * Eᴴ = signP
 
 /-- The regular representation compressed to the `-1` eigenspace of the central element satisfies
 the Pauli relations. -/
-noncomputable def codeRep (hEE : Eᴴ * E = 1) (hEP : E * Eᴴ = signProj) : PauliRep ι L where
+noncomputable def codeRep (hEE : Eᴴ * E = 1) (hEP : E * Eᴴ = negOneProj) : PauliRep ι L where
   X a := Eᴴ * reg (ofX a) * E
   Z b := Eᴴ * reg (ofZ b) * E
   isHermitian_X a := by
@@ -212,9 +213,9 @@ theorem regularRep_negOne_mul_regularIsometry :
   rw [regularRep_apply, ite_eq_left rfl, one_mul, Matrix.neg_apply, regularIsometry_apply,
     regularIsometry_apply, ← commute_negOne, pauliFamily_negOne_mul, Matrix.neg_apply, mul_neg]
 
-theorem signProj_mul_regularIsometry :
-    signProj * regularIsometry (pauliFamily X Z) = regularIsometry (pauliFamily X Z) := by
-  rw [signProj, Matrix.smul_mul, Matrix.sub_mul, Matrix.one_mul,
+theorem negOneProj_mul_regularIsometry :
+    negOneProj * regularIsometry (pauliFamily X Z) = regularIsometry (pauliFamily X Z) := by
+  rw [negOneProj, Matrix.smul_mul, Matrix.sub_mul, Matrix.one_mul,
     regularRep_negOne_mul_regularIsometry, sub_neg_eq_add, ← two_smul ℂ, smul_smul]
   norm_num
 
@@ -255,12 +256,12 @@ theorem exists_isometry_compress_pauliFamily (X Z : (ι → Bool) → Matrix κ 
   have hf := conjTranspose_pauliFamily_mul X Z hX hZ
   have hcomp := sum_norm_sub_compress_le f hf ψ
   obtain ⟨L₁, E, hEE, hEP⟩ :=
-    (isHermitian_signProj (ι := ι) (κ := κ)).exists_isometry_of_mul_self signProj_mul_self
+    (isHermitian_negOneProj (ι := ι) (κ := κ)).exists_isometry_of_mul_self negOneProj_mul_self
   let R := codeRep hEE hEP
   obtain ⟨L₂, Φ, hΦ1, hΦ2, hXΦ, hZΦ⟩ := R.exists_unitary_eq_pauli
   set W : Matrix ((ι → Bool) × L₂) κ ℂ := Φᴴ * (Eᴴ * V)
   have hEV : E * (Eᴴ * V) = V := by
-    rw [← Matrix.mul_assoc, hEP, signProj_mul_regularIsometry]
+    rw [← Matrix.mul_assoc, hEP, negOneProj_mul_regularIsometry]
   have hWW : Wᴴ * W = 1 := by
     simp only [W, conjTranspose_mul, conjTranspose_conjTranspose]
     rw [show Vᴴ * E * Φ * (Φᴴ * (Eᴴ * V)) = Vᴴ * (E * (Φ * Φᴴ) * (Eᴴ * V)) by
