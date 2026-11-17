@@ -14,8 +14,9 @@ public import CslibFrontier.Foundations.Quantum.LinearityRounding
 /-!
 # Soundness of the linearity test for tensor-product strategies
 
-Every tensor-product strategy that wins the two-player linearity test (`Cslib.PCP.linearityTest`)
-with probability `1 - ε` has, on the point player's factor, exactly linear unitary observables
+Every tensor-product strategy that the linearity-test verifier accepts with probability `1 - ε`
+(`Cslib.PCP.CommutingStrategy.linearityTestProb`, through `Cslib.PCP.QuantumStrategy.toCommuting`)
+has, on the point player's factor, exactly linear unitary observables
 close to its own (`Cslib.PCP.QuantumStrategy.exists_isProjective_charObs_of_linearityTest`):
 
 `E_c ‖(A(c) - χ(c)) ⊗ 1‖²_ψ ≤ 40 (6ε + 2√(12ε))`,
@@ -26,8 +27,8 @@ observables of a projective measurement on the point player's dilated space.
 The proof composes three steps:
 
 * the Naimark dilation (`Cslib.PCP.QuantumStrategy.dilate`) makes the strategy projective without
-  changing its winning probability;
-* winning the test makes the point player's observables linear on average
+  changing its acceptance probability (`Cslib.PCP.QuantumStrategy.linearityTestProb_dilate`);
+* passing the test makes the point player's observables linear on average
   (`Cslib.PCP.CommutingStrategy.one_sub_le_expect_re_apply_mul_mul_of_linearityTest`);
 * the same-space rounding (`Cslib.Quantum.exists_isProjective_charObs_kroneckerOne_of_linear`)
   gives exactly linear observables on the point player's factor.
@@ -42,6 +43,8 @@ cslib-community/cslib-frontier#6149.
 
 ## Main results
 
+* `Cslib.PCP.QuantumStrategy.linearityTestProb_dilate`: the dilation is accepted with the same
+  probability.
 * `Cslib.PCP.QuantumStrategy.exists_isProjective_charObs_of_linearityTest`: soundness of the
   linearity test for tensor-product strategies.
 
@@ -63,13 +66,21 @@ namespace QuantumStrategy
 variable {n ι κ : Type*} [Fintype n] [DecidableEq n] [Fintype ι] [DecidableEq ι] [Fintype κ]
   [DecidableEq κ]
 
-/-- **Soundness of the linearity test** for tensor-product strategies. If `S` wins the linearity
-test with probability at least `1 - ε`, then after Naimark dilation a projective measurement `P` on
-the point player's space has unitary, exactly linear character observables with
+/-- The Naimark dilation of a strategy is accepted by the linearity-test verifier with the same
+probability. -/
+theorem linearityTestProb_dilate
+    (S : QuantumStrategy (n → Bool) ((n → Bool) × (n → Bool)) Bool (Bool × Bool) ι κ) (a₀ : Bool)
+    (b₀ : Bool × Bool) :
+    (S.dilate a₀ b₀).toCommuting.linearityTestProb = S.toCommuting.linearityTestProb := by
+  simp only [CommutingStrategy.linearityTestProb, prob_toCommuting, prob_dilate]
+
+/-- **Soundness of the linearity test** for tensor-product strategies. If the linearity-test
+verifier accepts `S` with probability at least `1 - ε`, then after Naimark dilation a projective
+measurement `P` on the point player's space has unitary, exactly linear character observables with
 `E_c ‖(A(c) - χ_P(c)) ⊗ 1‖²_ψ ≤ 40 (6ε + 2√(12ε))` for the point player's observables `A(c)`. -/
 theorem exists_isProjective_charObs_of_linearityTest
     (S : QuantumStrategy (n → Bool) ((n → Bool) × (n → Bool)) Bool (Bool × Bool) ι κ) {ε : ℝ}
-    (hε : 1 - ε ≤ (linearityTest n).quantumWinProb S) :
+    (hε : 1 - ε ≤ S.toCommuting.linearityTestProb) :
     ∃ P : Measurement (n → Bool) (Matrix (ι × Bool) (ι × Bool) ℂ), P.IsProjective ∧
       (∀ a, P.charObs a ∈ unitary (Matrix (ι × Bool) (ι × Bool) ℂ)) ∧
       (∀ a a', P.charObs a * P.charObs a' = P.charObs (a + a')) ∧
@@ -81,8 +92,8 @@ theorem exists_isProjective_charObs_of_linearityTest
   classical
   set S' := S.dilate false (false, false)
   set T := S'.toCommuting
-  have hwin : 1 - ε ≤ (linearityTest n).commutingWinProb T := by
-    rw [TwoProverGame.commutingWinProb_toCommuting, TwoProverGame.quantumWinProb_dilate]
+  have hwin : 1 - ε ≤ T.linearityTestProb := by
+    rw [linearityTestProb_dilate]
     exact hε
   have hA : ∀ c, (T.alice c).IsProjective := fun c a => by
     change (S'.alice c).effect a ⊗ₖ 1 * (S'.alice c).effect a ⊗ₖ 1 = (S'.alice c).effect a ⊗ₖ 1

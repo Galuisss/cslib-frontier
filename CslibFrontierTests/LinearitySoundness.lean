@@ -12,7 +12,7 @@ import CslibFrontier.Computability.PCP.TwoProverGame.LinearitySoundness
 /-! # Soundness of the linearity test for tensor-product strategies
 
 Checked client: every tensor-product strategy, projective or not, that wins the linearity test
-with probability `1 - ε` has exactly linear unitaries on the point player's dilated factor, close
+with probability `1 - ε` by the linearity-test verifier has exactly linear unitaries on the point player's dilated factor, close
 to its observables. A concrete instance: with `ε = 0`, the bound is `0`.
 -/
 
@@ -27,7 +27,7 @@ open scoped Kronecker MatrixOrder ComplexOrder BigOperators Matrix.Norms.L2Opera
 example {n ι κ : Type} [Fintype n] [DecidableEq n] [Fintype ι] [DecidableEq ι] [Fintype κ]
     [DecidableEq κ]
     (S : QuantumStrategy (n → Bool) ((n → Bool) × (n → Bool)) Bool (Bool × Bool) ι κ) {ε : ℝ}
-    (hε : 1 - ε ≤ (linearityTest n).quantumWinProb S) :
+    (hε : 1 - ε ≤ S.toCommuting.linearityTestProb) :
     ∃ P : Measurement (n → Bool) (Matrix (ι × Bool) (ι × Bool) ℂ), P.IsProjective ∧
       (∀ a, P.charObs a ∈ unitary (Matrix (ι × Bool) (ι × Bool) ℂ)) ∧
       (∀ a a', P.charObs a * P.charObs a' = P.charObs (a + a')) ∧
@@ -42,7 +42,7 @@ example {n ι κ : Type} [Fintype n] [DecidableEq n] [Fintype ι] [DecidableEq �
 example {n ι κ : Type} [Fintype n] [DecidableEq n] [Fintype ι] [DecidableEq ι] [Fintype κ]
     [DecidableEq κ]
     (S : QuantumStrategy (n → Bool) ((n → Bool) × (n → Bool)) Bool (Bool × Bool) ι κ)
-    (h : (linearityTest n).quantumWinProb S = 1) :
+    (h : S.toCommuting.linearityTestProb = 1) :
     ∃ P : Measurement (n → Bool) (Matrix (ι × Bool) (ι × Bool) ℂ), P.IsProjective ∧
       𝔼 c, (AlgState.vector (S.dilate false (false, false)).state
           (S.dilate false (false, false)).norm_state).norm
