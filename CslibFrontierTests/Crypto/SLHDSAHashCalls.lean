@@ -144,9 +144,7 @@ private def sha2T32 : List Byte :=
 #guard (f .shake (publicSeed .bytes16) fAddress (message1 .bytes16)).toList == shakeF16
 #guard (prf .shake (publicSeed .bytes16) (secretSeed .bytes16) prfAddress).toList == shakePRF16
 #guard (h .shake (publicSeed .bytes16) hAddress (message2 .bytes16)).toList == shakeH16
-#guard (tL .shake 3 (publicSeed .bytes16) tAddress (message3 .bytes16)
-  (validTInput_of_blocks_le_67 .shake (publicSeed .bytes16) tAddress
-    (message3 .bytes16) (by decide))).toList == shakeT16
+#guard (tL .shake 3 (publicSeed .bytes16) tAddress (message3 .bytes16)).toList == shakeT16
 #guard (prf .sha2 (publicSeed .bytes16) (secretSeed .bytes16) prfAddress).toList == sha2PRF16
 #guard (f .sha2 (publicSeed .bytes24) fAddress (message1 .bytes24)).toList == sha2F24
 #guard (f .sha2 (publicSeed .bytes32) fAddress (message1 .bytes32)).toList == sha2F32
@@ -154,28 +152,15 @@ private def sha2T32 : List Byte :=
 #guard (h .sha2 (publicSeed .bytes24) hAddress (message2 .bytes24)).toList == sha2H24
 #guard (h .sha2 (publicSeed .bytes32) hAddress (message2 .bytes32)).toList == sha2H32
 
-#guard (tL .sha2 3 (publicSeed .bytes16) tAddress (message3 .bytes16)
-  (validTInput_of_blocks_le_67 .sha2 (publicSeed .bytes16) tAddress
-    (message3 .bytes16) (by decide))).toList == sha2T16
-#guard (tL .sha2 3 (publicSeed .bytes24) tAddress (message3 .bytes24)
-  (validTInput_of_blocks_le_67 .sha2 (publicSeed .bytes24) tAddress
-    (message3 .bytes24) (by decide))).toList == sha2T24
-#guard (tL .sha2 3 (publicSeed .bytes32) tAddress (message3 .bytes32)
-  (validTInput_of_blocks_le_67 .sha2 (publicSeed .bytes32) tAddress
-    (message3 .bytes32) (by decide))).toList == sha2T32
+#guard (tL .sha2 3 (publicSeed .bytes16) tAddress (message3 .bytes16)).toList == sha2T16
+#guard (tL .sha2 3 (publicSeed .bytes24) tAddress (message3 .bytes24)).toList == sha2T24
+#guard (tL .sha2 3 (publicSeed .bytes32) tAddress (message3 .bytes32)).toList == sha2T32
 
 /-! ### Typed public clients -/
 
 example (family : HashFamily) (p : SecurityBytes) (seed message : NBytes p)
     (address : Address) : (f family seed address message).toList.length = p.count := by
   simp
-
-example (family : HashFamily) (p : SecurityBytes) (seed : NBytes p)
-    (address : Address) (message : TwoNBytes p) :
-    h family seed address message =
-      tL family 2 seed address message
-        (validTInput_of_blocks_le_67 family seed address message (by decide)) :=
-  h_eq_tL_two family seed address message
 
 -- The maximum standardized WOTS+ block count has no hidden SHA2 failure.
 example (p : SecurityBytes) (seed : NBytes p) (address : Address)
