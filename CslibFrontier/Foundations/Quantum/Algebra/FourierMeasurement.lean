@@ -17,9 +17,9 @@ Let `A(a)`, for `a ∈ {0,1}ⁿ`, be `±1` observables: self-adjoint with `A(a)�
 **Fourier coefficients** `Â(u) = E_a (-1)^{u·a} A(a)` (`Cslib.Quantum.fourierCoeff`) are
 self-adjoint, and by Parseval their squares sum to `1`. So the squares form a measurement with
 outcomes `u ∈ {0,1}ⁿ`, the **Fourier measurement** `B_u = Â(u)²`
-(`Cslib.Quantum.fourierMeasurement`). It is the measurement used by
-[Natarajan and Vidick, §3][NatarajanVidick2017] (arXiv:1610.03574v1) to round approximately
-linear observables to exactly linear ones, in the proof of the first result of that section.
+(`Cslib.Quantum.fourierMeasurement`). It is the measurement in the proof of
+[Natarajan and Vidick, §3, Theorem 10][NatarajanVidick2017] (arXiv:1610.03574v1), which rounds
+approximately linear observables to exactly linear ones.
 
 The sum `∑_u Â(u)³` is the average `E_{a,b} A(a) A(b) A(a + b)`
 (`Cslib.Quantum.sum_fourierCoeff_cube`). So if this average is at least `1 - δ` in a state `φ`,
@@ -67,14 +67,6 @@ variable {ι : Type*} [Fintype ι] [DecidableEq ι]
 section Ring
 
 variable {R : Type*} [Ring R] [Algebra ℂ R]
-
-private theorem sum_signVal_mul_signVal (x y : ι → Bool) :
-    ∑ u : ι → Bool, ((signVal (u ⬝ᵥ x) * signVal (u ⬝ᵥ y) : ℝ) : ℂ) =
-      if x = y then (2 : ℂ) ^ Fintype.card ι else 0 := by
-  have h := sum_signVal_dotProduct_mul_signVal_dotProduct x y
-  simp only [dotProduct_comm x, dotProduct_comm y] at h
-  rw [← Complex.ofReal_sum, h]
-  split_ifs <;> push_cast <;> rfl
 
 /-- **Parseval for products of Walsh sums**:
 `∑_u (∑_x (-1)^{u·x} f(x)) (∑_y (-1)^{u·y} g(y)) = 2ⁿ ∑_x f(x) g(x)`. -/
@@ -184,15 +176,12 @@ theorem fourierMeasurement_effect (u : ι → Bool) :
   rfl
 
 /-- The Fourier measurement satisfies `B_u² ≤ B_u`: `B_u - B_u² = Â(u) (1 - B_u) Â(u)`, and
-`1 - B_u` is the sum of the other effects. -/
+`B_u ≤ 1`. -/
 theorem fourierMeasurement_mul_self_le (u : ι → Bool) :
     (fourierMeasurement A hA hA2).effect u * (fourierMeasurement A hA hA2).effect u ≤
       (fourierMeasurement A hA hA2).effect u := by
   set B := fourierMeasurement A hA hA2
-  have h1 : 0 ≤ 1 - B.effect u := by
-    rw [← B.sum_effect, ← add_sum_erase _ _ (mem_univ u), add_sub_cancel_left]
-    exact sum_nonneg fun v _ => B.nonneg v
-  have h := star_left_conjugate_nonneg h1 (fourierCoeff A u)
+  have h := star_left_conjugate_nonneg (sub_nonneg.mpr (B.effect_le_one u)) (fourierCoeff A u)
   rw [(isSelfAdjoint_fourierCoeff hA u).star_eq] at h
   rw [← sub_nonneg]
   convert h using 1

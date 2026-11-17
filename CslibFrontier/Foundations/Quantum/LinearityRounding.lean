@@ -19,17 +19,19 @@ space that are unitary and **exactly linear**, `χ(a) χ(a') = χ(a + a')`, and 
 `E_a ‖A(a) - χ(a)‖²_φ ≤ 40δ` (`Cslib.Quantum.exists_isProjective_charObs_of_linear`). They are the
 character observables of a projective measurement with outcomes in `{0,1}ⁿ`.
 
-This is the rounding theorem that opens [Natarajan and Vidick, §3][NatarajanVidick2017]
-(arXiv:1610.03574v1), whose bound, in our normalization, is `2δ`. The source dilates the Fourier
-measurement of `A` (`Cslib.Quantum.fourierMeasurement`) to a projective measurement on a larger
-space (Naimark), so its rounded observables act on `ℂ^ι ⊗ ℂ^{ι'}` with an ancilla. Here the
-Fourier measurement, which is almost projective, is orthogonalized in place by de la Salle's
+This is a **same-space variant with constant `40`** of
+[Natarajan and Vidick, §3, Theorem 10][NatarajanVidick2017] (arXiv:1610.03574v1), not that theorem
+itself. The source's conclusion is `E_a ‖A(a) - χ(a)‖² ≤ 2δ` in our normalization, for observables
+on a dilated space `ℂ^ι ⊗ ℂ^{ι'}`: it dilates the Fourier measurement of `A`
+(`Cslib.Quantum.fourierMeasurement`) to a projective measurement with an ancilla (Naimark). Here
+the Fourier measurement, which is almost projective, is orthogonalized in place by de la Salle's
 theorem, at the cost of the constant. So the rounded observables stay on `ℂ^ι`, and since the
 estimate holds in every state, they stay on one party's factor in a tensor-product strategy
 (`Cslib.Quantum.exists_isProjective_charObs_kroneckerOne_of_linear`).
 
 Bounding the linearity defect `δ` of a strategy's averaged marginals by its winning probability in
-the linearity test is tracked in cslib-community/cslib-frontier#6149.
+the linearity test ([Natarajan and Vidick, §3, Theorem 11][NatarajanVidick2017]) is tracked in
+cslib-community/cslib-frontier#6149.
 
 ## Main results
 
@@ -54,9 +56,11 @@ open scoped Kronecker MatrixOrder ComplexOrder BigOperators Matrix.Norms.L2Opera
 variable {ι κ n : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ] [Fintype n]
   [DecidableEq n]
 
-/-- **Rounding approximately linear observables.** If the `±1` observables `A(a)` on `ℂ^ι` satisfy
-`E_{a,b} Re φ(A(a) A(b) A(a + b)) ≥ 1 - δ`, then a projective measurement `P` on `ℂ^ι` has unitary,
-exactly linear character observables with `E_a ‖A(a) - χ_P(a)‖²_φ ≤ 40δ`. -/
+/-- **Rounding approximately linear observables**, a same-space variant of
+[Natarajan and Vidick, §3, Theorem 10][NatarajanVidick2017] with constant `40`. If the `±1`
+observables `A(a)` on `ℂ^ι` satisfy `E_{a,b} Re φ(A(a) A(b) A(a + b)) ≥ 1 - δ`, then a projective
+measurement `P` on `ℂ^ι` has unitary, exactly linear character observables with
+`E_a ‖A(a) - χ_P(a)‖²_φ ≤ 40δ`. -/
 theorem exists_isProjective_charObs_of_linear (φ : AlgState (Matrix ι ι ℂ))
     (A : (n → Bool) → Matrix ι ι ℂ) (hA : ∀ a, IsSelfAdjoint (A a)) (hA2 : ∀ a, A a * A a = 1)
     {δ : ℝ} (hδ : 1 - δ ≤ 𝔼 a, 𝔼 b, (φ (A a * A b * A (a + b))).re) :
