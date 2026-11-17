@@ -66,8 +66,8 @@ private theorem relocated_step {code : List (Instr M L)}
       | (cases h
          simp only [step, shift, hi, Instr.relocate]
          simp only [Instr.effect, Instr.next,
-           State.setPtr, State.setData, State.modify, State.deref, Option.elim, Nat.add_assoc]
-         all_goals split <;> simp_all only)
+           State.setPtr, State.setData, State.modify, State.deref, Option.elim, Nat.add_assoc])
+    all_goals split <;> simp_all only
 
 /-- A halting block runs inside any prefix and suffix, with the same instruction count.
 Each former halt jumps to the absolute continuation label `next`. The resulting state

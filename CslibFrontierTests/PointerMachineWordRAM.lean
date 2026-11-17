@@ -111,7 +111,7 @@ private abbrev layout : Layout := ⟨2, 2, 1, 1⟩
 private abbrev S := State model layout
 private def initial : S := State.empty
 
-private def code : List (Instr model layout) :=
+private def sampleCode : List (Instr model layout) :=
   [.create 0, .create 1, .storePtr 0 0 1, .op (.constant 3) 0 0 0,
    .storeData 0 1 0, .loadData 1 0 1, .op .add 0 0 1,
    .ifTest .eq 1 1 9, .goto 99, .ifTest .lt 1 0 11, .goto 99, .null 1,
@@ -119,17 +119,17 @@ private def code : List (Instr model layout) :=
 
 private def state : ℕ → S
   | 0 => initial
-  | n + 1 => (step code (state n)).getD (state n)
+  | n + 1 => (step sampleCode (state n)).getD (state n)
 
-private theorem transition (n : Fin 17) : step code (state n) = some (state (n + 1)) := by
+private theorem transition (n : Fin 17) : step sampleCode (state n) = some (state (n + 1)) := by
   fin_cases n <;> rfl
 
-private theorem run (n : ℕ) (hn : n ≤ 17) : Runs code initial (state n) n := by
+private theorem run (n : ℕ) (hn : n ≤ 17) : Runs sampleCode initial (state n) n := by
   induction n with
   | zero => exact .refl _
   | succ n ih => exact .tail _ _ _ _ (ih (by omega)) (transition ⟨n, by omega⟩)
 
-private theorem execution : Executes code initial (state 17) 18 :=
+private theorem execution : Executes sampleCode initial (state 17) 18 :=
   ⟨17, run 17 le_rfl, rfl, rfl⟩
 
 private theorem traceFits (n : Fin 18) : Fits (scalars layout).encode 4 (state n) := by
@@ -140,12 +140,12 @@ example : (state 17).data 0 = 6 ∧ (state 17).data 1 = 3 ∧ (state 17).ptr 0 =
 
 -- The actual compiler transfers the complete state, with a concrete target instruction bound.
 example : ∃ z k, k + 1 ≤ 252 ∧
-    Cslib.WordRAM.Runs 4 ((scalars layout).compile code)
+    Cslib.WordRAM.Runs 4 ((scalars layout).compile sampleCode)
       ⟨0, encodeState (scalars layout).encode initial⟩
-      ⟨(scalars layout).blockSize code * 15, z⟩ k ∧
+      ⟨(scalars layout).blockSize sampleCode * 15, z⟩ k ∧
     z.regs (dataReg layout 0) = 6 ∧
-    Cslib.WordRAM.step 4 ((scalars layout).compile code)
-      ⟨(scalars layout).blockSize code * 15, z⟩ = .halt 0 := by
+    Cslib.WordRAM.step 4 ((scalars layout).compile sampleCode)
+      ⟨(scalars layout).blockSize sampleCode * 15, z⟩ = .halt 0 := by
   obtain ⟨z, k, hk, hr, hz, hh⟩ := (scalars layout).executes_compile
     State.empty_valid execution
     (fun z m hm htime => by
@@ -165,7 +165,7 @@ example : ∃ z, ExecWithin 2 ((scalars emptyLayout).effect (.create 0))
     constructor <;> simp [Instr.effect, emptyInput, State.empty, Record.blank, scalars, model,
       nodeAddr, stride, emptyLayout, Cslib.WordRAM.Fits])
 
--- One bit cannot hold the post-allocation next-free address. The emitted code really faults.
+-- One bit cannot hold the post-allocation next-free address. The emitted sampleCode really faults.
 example : ((scalars emptyLayout).effect (.create 0)).eval 1 0
     (encodeState (scalars emptyLayout).encode emptyInput) = none := rfl
 

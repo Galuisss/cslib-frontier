@@ -62,16 +62,16 @@ private def initial (c : Fin 5) : State model (layout 2 2) where
       (label 2 (if c = 0 ∨ c = 2 then 3 else if c = 1 then 1 else 2) 1),
     record none none none (label 3 55 55)]
 
-private def code : List (Instr model (layout 2 2)) :=
+private def sampleCode : List (Instr model (layout 2 2)) :=
   AVLTree.PointerMachine.balance false true false true 1
 
 private def after (c : Fin 5) : State model (layout 2 2) :=
-  (fun x => (step code x).getD x)^[121] (initial c)
+  (fun x => (step sampleCode x).getD x)^[121] (initial c)
 
 -- The same valid primitive contracts and representation hypotheses satisfy the general theorem
 -- in all five branches; this also checks that payload and client-frame conclusions are usable.
 example (c : Fin 5) : ∃ t, ∃ (tree : BinaryTree (Label model 2)), ∃ time,
-    Executes code (initial c) t time ∧ time ≤ 121 ∧
+    Executes sampleCode (initial c) t time ∧ time ≤ 121 ∧
     Matches id 1 tree (AVLTree.balance ((rootLabel c).data 0) (avl (left c)) (avl (right c))) ∧
     t.ptr 6 = some 0 ∧ t.data 3 = 77 ∧
     (t.heap[2]?).map (fun n => n.data 2) = some 1002 := by

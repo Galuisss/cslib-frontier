@@ -22,7 +22,7 @@ private abbrev L := layout 2 2
 private def initial : State model L :=
   { State.empty with data := fun i => if i = 0 then 5 else if i = 3 then 17 else 0 }
 private def source (_ : Fin 3) : Fin 4 := 3
-private def code : List (Instr model L) :=
+private def sampleCode : List (Instr model L) :=
   AVLTree.PointerMachine.insert .zero .maxSucc .lt .heavy .le 1 source
 
 -- All semantic, validity, source-register and width hypotheses are discharged concretely.
@@ -30,10 +30,11 @@ example : ∃ (t : State model L) (tree : BinaryTree (Label model 2))
     (z : Cslib.WordRAM.Data (regCount L)) (k : ℕ),
     AVLTree.PointerMachine.InsertResult id 1 source initial t .nil tree .nil ∧
     k + 1 ≤ 990 ∧
-    Cslib.WordRAM.Runs 8 ((scalars L).compile code) ⟨0, encodeState (scalars L).encode initial⟩
-      ⟨(scalars L).blockSize code * t.pc, z⟩ k ∧ Repr (scalars L).encode t z ∧
-    Cslib.WordRAM.step 8 ((scalars L).compile code)
-      ⟨(scalars L).blockSize code * t.pc, z⟩ = .halt 0 := by
+    Cslib.WordRAM.Runs 8 ((scalars L).compile sampleCode)
+        ⟨0, encodeState (scalars L).encode initial⟩
+      ⟨(scalars L).blockSize sampleCode * t.pc, z⟩ k ∧ Repr (scalars L).encode t z ∧
+    Cslib.WordRAM.step 8 ((scalars L).compile sampleCode)
+      ⟨(scalars L).blockSize sampleCode * t.pc, z⟩ = .halt 0 := by
   have initialBound : initial.DataValid (· ≤ 17) := by
     constructor
     · intro i
