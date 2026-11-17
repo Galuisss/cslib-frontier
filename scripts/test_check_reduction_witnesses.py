@@ -20,7 +20,7 @@ import check_reduction_witnesses as c  # noqa: E402
 
 CERTIFIED = "Cslib.Crypto.ElGamal.toDDHDistinguisher"
 UNCERTIFIED = "Cslib.Crypto.Schnorr.forkingReduction"
-EXEMPT = "Cslib.Crypto.Signature.toScheme"
+SCHEME = "Cslib.Crypto.Signature.toScheme"
 ELGAMAL_PATH = "CslibFrontier/Crypto/ElGamal.lean"
 SCHNORR_PATH = "CslibFrontier/Crypto/Schnorr.lean"
 SIGNATURE_PATH = "CslibFrontier/Crypto/Signature.lean"
@@ -40,7 +40,7 @@ OUTPUT = "\n".join([
     row(UNCERTIFIED, "CslibFrontier.Crypto.Schnorr", 20,
         ["Cslib.Crypto.Schnorr.succProbability_le", "Cslib.Crypto.SchnorrClient.bound"],
         ["CslibFrontier.Crypto.Schnorr", "CslibFrontier.Crypto.SchnorrClient"]),
-    row(EXEMPT, "CslibFrontier.Crypto.Signature", 30, ["Cslib.Crypto.Signature.advantage_eq"],
+    row(SCHEME, "CslibFrontier.Crypto.Signature", 30, ["Cslib.Crypto.Signature.advantage_eq"],
         ["CslibFrontier.Crypto.Signature"]),
     json.dumps({"theorems": 4, "modules": 4, "missing": []}),
 ])
@@ -51,7 +51,7 @@ def entry(path: str, kind: str = "gap", why: str = "tracked in #5293 section 2")
 
 
 BASELINE = {UNCERTIFIED: entry(SCHNORR_PATH),
-            EXEMPT: entry(SIGNATURE_PATH, "exempt", "not a reduction: a typed scheme")}
+            SCHEME: entry(SIGNATURE_PATH, c.NOT_A_REDUCTION, "scheme: a typed scheme")}
 
 # A typed reduction that a certified program runs, and the modules of the declarations it names.
 VIA_REDUCTION = "Cslib.Crypto.Garbling.stepReduction"
@@ -105,7 +105,7 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(reductions[CERTIFIED].certificate, "direct")
         self.assertEqual(reductions[UNCERTIFIED].line, 20)
         self.assertEqual(reductions[UNCERTIFIED].paths(), {SCHNORR_PATH, CLIENT_PATH})
-        self.assertEqual(set(c.uncertified(reductions)), {UNCERTIFIED, EXEMPT})
+        self.assertEqual(set(c.uncertified(reductions)), {UNCERTIFIED, SCHEME})
 
 
 class CompareTests(unittest.TestCase):
@@ -116,18 +116,18 @@ class CompareTests(unittest.TestCase):
         self.assertFalse(c.compare(self.reductions, BASELINE, None))
 
     def test_an_uncertified_reduction_fails_only_in_scope(self) -> None:
-        problems = c.compare(self.reductions, {EXEMPT: BASELINE[EXEMPT]}, None)
+        problems = c.compare(self.reductions, {SCHEME: BASELINE[SCHEME]}, None)
         self.assertEqual([r.name for r in problems.new], [UNCERTIFIED])
-        self.assertFalse(c.compare(self.reductions, {EXEMPT: BASELINE[EXEMPT]}, {ELGAMAL_PATH}))
+        self.assertFalse(c.compare(self.reductions, {SCHEME: BASELINE[SCHEME]}, {ELGAMAL_PATH}))
 
     def test_a_reduction_belongs_to_the_modules_that_state_its_bounds(self) -> None:
         # A change to a client that states a bound with the reduction enforces it too.
-        problems = c.compare(self.reductions, {EXEMPT: BASELINE[EXEMPT]}, {CLIENT_PATH})
+        problems = c.compare(self.reductions, {SCHEME: BASELINE[SCHEME]}, {CLIENT_PATH})
         self.assertEqual([r.name for r in problems.new], [UNCERTIFIED])
 
-    def test_an_exempt_reduction_needs_its_entry(self) -> None:
+    def test_a_scheme_needs_its_entry(self) -> None:
         problems = c.compare(self.reductions, {UNCERTIFIED: BASELINE[UNCERTIFIED]}, None)
-        self.assertEqual([r.name for r in problems.new], [EXEMPT])
+        self.assertEqual([r.name for r in problems.new], [SCHEME])
 
     def test_stale_entries_fail_in_their_module(self) -> None:
         # A reduction that gained its witness, and one that no theorem bounds any more.
@@ -158,13 +158,13 @@ class ViaTests(unittest.TestCase):
         self.reductions, _ = c.parse(VIA_OUTPUT)
         self.baseline = {**BASELINE, VIA_REDUCTION: VIA_ENTRY}
 
-    def checks(self, *problems: str, missing: list[str] | None = None) -> dict[str, c.ViaCheck]:
+    def checks(self, *problems: str, missing: list[str] | None = None) -> dict[str, c.EntryCheck]:
         return c.parse_checks(check_row(list(problems), missing))
 
     def test_parse_reads_verdicts_apart_from_reductions(self) -> None:
-        self.assertEqual(c.parse_checks(VIA_OUTPUT), {VIA_REDUCTION: c.ViaCheck(
+        self.assertEqual(c.parse_checks(VIA_OUTPUT), {VIA_REDUCTION: c.EntryCheck(
             (), "proof", (GARBLING_PATH, WORD_PATH), WORD_PATH, ())})
-        self.assertEqual(set(c.uncertified(self.reductions)), {UNCERTIFIED, EXEMPT, VIA_REDUCTION})
+        self.assertEqual(set(c.uncertified(self.reductions)), {UNCERTIFIED, SCHEME, VIA_REDUCTION})
 
     def test_requests_name_the_declarations_and_where_to_find_private_ones(self) -> None:
         self.assertEqual(c.via_requests(self.baseline), ["\t".join([
@@ -253,11 +253,11 @@ class ViaTests(unittest.TestCase):
         problems = c.compare(self.reductions, baseline, None, checks)
         self.assertEqual([(name, reason) for name, _, reason in problems.invalid], [
             (VIA_REDUCTION, f"`{WRAPPER}` is a definition that uses `{VIA_REDUCTION}` without an "
-                            "efficiency witness of its own but has no baseline entry; record it (a "
-                            "`gap` or `exempt` entry), or make this entry a `gap`")])
-        # Recorded, as a `gap` or an `exempt` entry, it passes completely: the entry is not stale
-        # although no theorem states a bound with the wrapper.
-        for kind in ("gap", "exempt"):
+                            "efficiency witness of its own but has no baseline entry; record it "
+                            "with an entry of its own, or make this entry a `gap`")])
+        # Recorded, as a `gap` or a `not_a_reduction` entry, it passes completely: the entry is not
+        # stale although no theorem states a bound with the wrapper.
+        for kind in ("gap", c.NOT_A_REDUCTION):
             recorded = {**baseline, WRAPPER: entry(WORD_PATH, kind)}
             self.assertFalse(c.compare(self.reductions, recorded, None, checks), kind)
         # The same entry is stale once nothing needs it, or when the wrapper has moved.
@@ -285,7 +285,7 @@ class ViaTests(unittest.TestCase):
                           checks).stale
         self.assertEqual([(name, reason) for name, _, reason in stale], [
             (WRAPPER, "has an efficiency witness of its own, as a definition that uses an "
-                      "instance-scoped reduction; it needs no entry")])
+                      "instance-scoped or `concrete_only` reduction; it needs no entry")])
 
     def test_a_reduction_certified_only_through_another_definition_keeps_its_entry(self) -> None:
         # Mentioned in a certified program's body but without a witness of its own, it is still
@@ -307,18 +307,99 @@ class ViaTests(unittest.TestCase):
         tracked = c.tracked_definitions(checks)
         added = c.update(self.reductions, baseline, None, tracked)
         self.assertEqual(added[WRAPPER], entry(WORD_PATH, "gap", ""))
-        kept = c.update(self.reductions, {**baseline, WRAPPER: entry(WORD_PATH, "exempt")}, None,
-                        tracked)
-        self.assertEqual(kept[WRAPPER], entry(WORD_PATH, "exempt"))
+        kept = c.update(self.reductions, {**baseline, WRAPPER: entry(WORD_PATH, c.NOT_A_REDUCTION)},
+                        None, tracked)
+        self.assertEqual(kept[WRAPPER], entry(WORD_PATH, c.NOT_A_REDUCTION))
         # Without an instance-scoped entry that needs it, the entry is dropped.
         self.assertNotIn(WRAPPER, c.update(self.reductions, kept, None, {}))
 
     def test_an_entry_stays_stale_once_the_reduction_is_certified(self) -> None:
         reductions, _ = c.parse(OUTPUT)
         baseline = {**BASELINE, CERTIFIED: {**VIA_ENTRY, "module": ELGAMAL_PATH}}
-        checks = {CERTIFIED: c.ViaCheck((), "proof", (ELGAMAL_PATH,), WORD_PATH, ())}
+        checks = {CERTIFIED: c.EntryCheck((), "proof", (ELGAMAL_PATH,), WORD_PATH, ())}
         stale = c.compare(reductions, baseline, None, checks).stale
         self.assertEqual([name for name, _, _ in stale], [CERTIFIED])
+
+
+def concrete_row(problems: list[str] | None = None,
+                 definitions: list[tuple[str, str]] | None = None,
+                 modules: tuple[str, ...] = ("CslibFrontier.Crypto.Schnorr",
+                                             "CslibFrontier.Crypto.SchnorrClient")) -> str:
+    """A line of the reader's output for the `concrete_only` request of `UNCERTIFIED`, whose
+    referrers are in `modules`."""
+    return json.dumps({"v": UNCERTIFIED, "p": problems or [], "at": "", "vm": list(modules),
+                       "em": "", "missing": [], "refs": ["Cslib.Crypto.SchnorrClient.bound"],
+                       "defs": [{"n": n, "m": m} for n, m in definitions or []], "cdefs": []})
+
+
+class ConcreteOnlyTests(unittest.TestCase):
+    """`concrete_only` entries, on synthetic verdicts of the Lean pass."""
+
+    def setUp(self) -> None:
+        self.reductions, _ = c.parse(OUTPUT)
+        self.baseline = {**BASELINE, UNCERTIFIED: entry(SCHNORR_PATH, c.CONCRETE_ONLY,
+                                                        "exact-bound step at one instance")}
+
+    def test_requests_name_the_reduction_and_its_module(self) -> None:
+        self.assertEqual(c.concrete_requests(self.baseline),
+                         [f"concrete\t{UNCERTIFIED}\tCslibFrontier.Crypto.Schnorr"])
+        self.assertEqual(c.concrete_requests(BASELINE), [])
+
+    def test_a_verified_entry_passes(self) -> None:
+        checks = c.parse_checks(concrete_row())
+        self.assertFalse(c.compare(self.reductions, self.baseline, None, checks))
+
+    def test_a_referrer_that_is_not_concrete_fails(self) -> None:
+        problem = ("`Cslib.Crypto.SchnorrClient.bound` refers to `Cslib.Crypto.Schnorr."
+                   "forkingReduction` and is not concrete (its conclusion makes a negligibility "
+                   "claim)")
+        problems = c.compare(self.reductions, self.baseline, None,
+                             c.parse_checks(concrete_row([problem])))
+        self.assertEqual([(name, reason) for name, _, reason in problems.invalid],
+                         [(UNCERTIFIED, problem)])
+        self.assertIn("`concrete_only` entries that the Lean pass does not verify",
+                      c.report(problems))
+        self.assertNotIn(f"`{c.VIA}` entries", c.report(problems))
+
+    def test_a_failing_entry_is_enforced_in_the_modules_of_its_referrers(self) -> None:
+        problem = "`X` refers to `R` and is not concrete (a premise makes a negligibility claim)"
+        other = "CslibFrontier/Crypto/Other.lean"
+        checks = c.parse_checks(concrete_row([problem], modules=("CslibFrontier.Crypto.Schnorr",
+                                                                 "CslibFrontier.Crypto.Other")))
+        for paths in ({SCHNORR_PATH}, {other}):
+            self.assertTrue(c.compare(self.reductions, self.baseline, paths, checks).invalid)
+        self.assertFalse(c.compare(self.reductions, self.baseline, {SIGNATURE_PATH}, checks))
+
+    def test_an_entry_the_pass_did_not_verify_fails_everywhere(self) -> None:
+        invalid = c.compare(self.reductions, self.baseline, {SIGNATURE_PATH}).invalid
+        self.assertEqual([(name, reason) for name, _, reason in invalid],
+                         [(UNCERTIFIED, "the Lean pass did not verify it")])
+
+    def test_a_referring_definition_needs_an_entry_of_its_own(self) -> None:
+        checks = c.parse_checks(concrete_row(definitions=[(WRAPPER, WORD_MODULE)]))
+        problems = c.compare(self.reductions, self.baseline, None, checks)
+        self.assertEqual([(name, reason) for name, _, reason in problems.invalid], [
+            (UNCERTIFIED, f"`{WRAPPER}` is a definition that uses `{UNCERTIFIED}` without an "
+                          "efficiency witness of its own but has no baseline entry; record it with "
+                          "an entry of its own, or make this entry a `gap`")])
+        # Recorded, it passes, and its entry is not stale although it states no bound.
+        recorded = {**self.baseline, WRAPPER: entry(WORD_PATH, c.NOT_A_REDUCTION)}
+        self.assertFalse(c.compare(self.reductions, recorded, None, checks))
+        self.assertEqual(c.update(self.reductions, recorded, None, c.tracked_definitions(checks)),
+                         recorded)
+
+    def test_main_counts_the_kinds_apart(self) -> None:
+        checks = c.parse_checks(concrete_row())
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "baseline.json"
+            path.write_text(c.baseline_text(self.baseline))
+            out = io.StringIO()
+            with mock.patch.object(c, "scan", return_value=(self.reductions, checks)), \
+                    contextlib.redirect_stdout(out):
+                code = c.main(["--no-build-check", "--baseline", str(path), "--all"])
+        self.assertEqual(code, 0)
+        self.assertIn("2 baseline entries (0 gap(s), 0 via certified program, 0 instance-scoped "
+                      "via, 1 not a reduction, 1 concrete only)", out.getvalue())
 
 
 class BaselineTests(unittest.TestCase):
@@ -366,13 +447,15 @@ class BaselineTests(unittest.TestCase):
                 path.write_text(json.dumps({UNCERTIFIED: value}))
                 self.assertEqual(c.load_baseline(path), {UNCERTIFIED: value})
 
-    def test_kind_is_gap_via_certified_program_or_exempt(self) -> None:
+    def test_kind_is_one_of_the_four(self) -> None:
         bad = (entry(SCHNORR_PATH, "later"),
                {key: value for key, value in VIA_ENTRY.items() if key != "headline"},
                {**VIA_ENTRY, "program": " "},
                {**VIA_ENTRY, "equality_module": ""},
                {**entry(SCHNORR_PATH), "program": VIA_ENTRY["program"]},
-               {**entry(SCHNORR_PATH), "equality_module": WORD_PATH})
+               {**entry(SCHNORR_PATH), "equality_module": WORD_PATH},
+               {**entry(SCHNORR_PATH, c.CONCRETE_ONLY), "headline": VIA_ENTRY["headline"]},
+               {**entry(SCHNORR_PATH, c.NOT_A_REDUCTION), "scope": "instance", "consumers": {}})
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / "baseline.json"
             for value in bad:
@@ -381,16 +464,27 @@ class BaselineTests(unittest.TestCase):
                     c.load_baseline(path)
             unrecorded = {key: value for key, value in VIA_ENTRY.items()
                           if key != "equality_module"}
-            for value in (VIA_ENTRY, unrecorded):
+            for value in (VIA_ENTRY, unrecorded, entry(SCHNORR_PATH, c.NOT_A_REDUCTION),
+                          entry(SCHNORR_PATH, c.CONCRETE_ONLY)):
                 path.write_text(json.dumps({UNCERTIFIED: value}))
                 self.assertEqual(c.load_baseline(path), {UNCERTIFIED: value})
 
+    def test_the_exempt_kind_is_retired(self) -> None:
+        # An `exempt` entry is rejected by name, so that it is migrated rather than kept.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "baseline.json"
+            path.write_text(json.dumps({SCHEME: entry(SIGNATURE_PATH, "exempt")}))
+            with self.assertRaises(SystemExit) as raised:
+                c.load_baseline(path)
+        self.assertIn(f"the `exempt` kind is retired; record {SCHEME} as `not_a_reduction`",
+                      str(raised.exception))
+
     def test_update_keeps_justifications_and_drops_stale_entries(self) -> None:
         reductions, _ = c.parse(OUTPUT)
-        baseline = {EXEMPT: BASELINE[EXEMPT], CERTIFIED: entry(ELGAMAL_PATH),
+        baseline = {SCHEME: BASELINE[SCHEME], CERTIFIED: entry(ELGAMAL_PATH),
                     "Cslib.Crypto.Gone.reduction": entry("CslibFrontier/Crypto/Gone.lean")}
         updated = c.update(reductions, baseline, None)
-        self.assertEqual(updated, {EXEMPT: BASELINE[EXEMPT],
+        self.assertEqual(updated, {SCHEME: BASELINE[SCHEME],
                                    UNCERTIFIED: entry(SCHNORR_PATH, "gap", "")})
         # Outside the changed modules, entries stay as they are.
         self.assertEqual(c.update(reductions, baseline, {SCHNORR_PATH}),
@@ -435,19 +529,20 @@ class MainTests(unittest.TestCase):
         return code, out.getvalue(), err.getvalue()
 
     def test_pull_request_that_adds_an_uncertified_reduction_fails(self) -> None:
-        code, _, err = self.run_main({EXEMPT: BASELINE[EXEMPT]})
+        code, _, err = self.run_main({SCHEME: BASELINE[SCHEME]})
         self.assertEqual(code, 1)
         self.assertIn(f"{SCHNORR_PATH}:20: {UNCERTIFIED}", err)
         self.assertIn("bound stated by `Cslib.Crypto.Schnorr.succProbability_le`", err)
         self.assertIn("isPPT_", err)
-        self.assertNotIn(EXEMPT, err)
+        self.assertNotIn(SCHEME, err)
         self.assertNotIn(CERTIFIED, err)
 
     def test_pull_request_mode_passes_with_the_baseline(self) -> None:
         code, out, err = self.run_main(BASELINE)
         self.assertEqual((code, err), (0, ""))
         self.assertIn("3 reduction(s), 2 without an efficiency witness; 2 baseline entries "
-                      "(1 gap(s), 0 via certified program, 0 instance-scoped via, 1 exempt), "
+                      "(1 gap(s), 0 via certified program, 0 instance-scoped via, 1 not a "
+                      "reduction, 0 concrete only), "
                       "checking 1 changed module(s)", out)
 
     def test_main_counts_and_checks_via_entries(self) -> None:
@@ -457,7 +552,7 @@ class MainTests(unittest.TestCase):
             code, out, err = self.run_main(baseline, "--all")
         self.assertEqual((code, err), (0, ""))
         self.assertIn("3 baseline entries (1 gap(s), 1 via certified program, 0 instance-scoped "
-                      "via, 1 exempt)", out)
+                      "via, 1 not a reduction, 0 concrete only)", out)
         problem = "headline `H` mentions neither `X` nor `Y` in its statement or proof"
         with mock.patch.object(c, "scan", return_value=(reductions,
                                                         c.parse_checks(check_row([problem])))):
@@ -472,7 +567,7 @@ class MainTests(unittest.TestCase):
             code, out, err = self.run_main(baseline, "--all")
             self.assertEqual((code, err), (0, ""))
             self.assertIn("3 baseline entries (1 gap(s), 0 via certified program, 1 "
-                          "instance-scoped via, 1 exempt)", out)
+                          "instance-scoped via, 1 not a reduction, 0 concrete only)", out)
             out = self.run_main(baseline, "--report")[1]
         self.assertIn(f"{GARBLING_PATH}: {VIA_REDUCTION}: headline `{VIA_ENTRY['headline']}` uses "
                       "the program in its proof; scoped to one instance, with 3 pinned "
@@ -491,7 +586,7 @@ class MainTests(unittest.TestCase):
         code, out, err = self.run_main({UNCERTIFIED: BASELINE[UNCERTIFIED]})
         self.assertEqual(code, 0)
         self.assertIn("Not enforced", out)
-        self.assertIn(f"{SIGNATURE_PATH}:30: {EXEMPT}", out)
+        self.assertIn(f"{SIGNATURE_PATH}:30: {SCHEME}", out)
         self.assertEqual(err, "")
         with mock.patch.dict(c.os.environ, {"GITHUB_ACTIONS": "true"}):
             out = self.run_main(None)[1]
@@ -508,13 +603,13 @@ class MainTests(unittest.TestCase):
             code, out, err = self.run_main({UNCERTIFIED: BASELINE[UNCERTIFIED]})
         self.assertEqual(code, 1)
         self.assertIn("every module is enforced", out)
-        self.assertIn(f"{SIGNATURE_PATH}:30: {EXEMPT}", err)
+        self.assertIn(f"{SIGNATURE_PATH}:30: {SCHEME}", err)
 
     def test_report_mode_succeeds(self) -> None:
         code, out, _ = self.run_main({}, "--report")
         self.assertEqual(code, 0)
         self.assertIn(UNCERTIFIED, out)
-        self.assertIn(EXEMPT, out)
+        self.assertIn(SCHEME, out)
         self.assertIn("report only", out)
 
     def test_list_shows_certificates(self) -> None:
@@ -634,7 +729,7 @@ theorem abbreviatedUncertified_le :
     schemeAdvantage S A n ≤ advantage G (abbreviatedUncertified A) n := Nat.le_refl _
 
 /-- Reported, though not a reduction: a scheme built from the scheme, on the bounding side only.
-The baseline exempts such a definition. -/
+The baseline records such a definition as `not_a_reduction`. -/
 def typedScheme (S : Scheme) : Scheme := S
 theorem typedScheme_eq :
     schemeAdvantage S A n = schemeAdvantage (typedScheme S) (certified A) n :=
@@ -724,6 +819,12 @@ private theorem privateHeadline (h : IsPPT A) : Negligible fun n => schemeAdvant
 theorem eval_otherStep : stepProgram A = otherStep A := rfl
 /-- A theorem of the step's own module whose conclusion is a negligibility claim. -/
 theorem otherStep_secure (h : IsPPT A) : Secure (otherStep (stepProgram A)) := stepNotion A h
+
+/-! A reduction whose every use is an exact bound (`concrete` requests). -/
+
+/-- An exact-bound step, uncertified. -/
+@[expose] def exactStep (A : Adversary) : Adversary := A
+theorem exactStep_le : schemeAdvantage S A n ≤ advantage G (exactStep A) n := Nat.le_refl _
 
 end Cslib.Crypto.Fixture
 """
@@ -826,6 +927,18 @@ def WrappedType (G : Group) (A : Adversary) : Prop := Wrapped G → otherStep A 
 /-- Rests on the assumption through the alias of its statement. -/
 theorem aliasOther : WrappedType G A := fun _ => rfl
 
+/-! Consumers of `exactStep`, all concrete. -/
+
+/-- An exact bound outside the step's module. -/
+theorem exactStep_twice :
+    schemeAdvantage S (exactStep A) n ≤ advantage G (exactStep (exactStep A)) n :=
+  exactStep_le G S (exactStep A) n
+/-- A notion stated with the step that is not an assumption: it needs no entry. -/
+def ExactlyRuns (A : Adversary) : Prop := exactStep A = A
+theorem exactlyRuns (A : Adversary) : ExactlyRuns A := show exactStep A = A from rfl
+/-- A definition that wraps the step, without a witness of its own: it needs an entry. -/
+def exactWrapper (A : Adversary) : Adversary := exactStep A
+
 end Cslib.Crypto.Fixture
 """
 
@@ -891,6 +1004,19 @@ def via_request(changes: dict[str, str], consumers: dict[str, str] | None = None
                       PREFIX + r["headline"], *scope])
 
 
+# `concrete_only` requests, by label: the reduction and its module.
+CONCRETE_REQUESTS = {
+    "concrete": ("exactStep", FIXTURE_MODULE),
+    "concrete negative": ("otherStep", FIXTURE_MODULE),
+    "concrete missing": ("exactStepRenamed", FIXTURE_MODULE),
+}
+
+
+def concrete_request(reduction: str, module: str) -> str:
+    """The reader's input line for a `concrete_only` request."""
+    return "\t".join(["concrete", PREFIX + reduction, module])
+
+
 def scoped_requests() -> dict[str, str]:
     """The reader's input lines for the requests scoped to one instance, by label."""
     out = {}
@@ -928,7 +1054,7 @@ class CompiledFixtureTests(unittest.TestCase):
                            cwd=c.ROOT, check=True, capture_output=True)
         scoped = scoped_requests()
         requests = [via_request(changes) for changes in VIA_REQUESTS.values()] + list(
-            scoped.values())
+            scoped.values()) + [concrete_request(*r) for r in CONCRETE_REQUESTS.values()]
         out = subprocess.run(["lake", "env", "lean", "--run", c.csp.TOOL, str(root / "build"),
                               "--reductions"], cwd=c.ROOT,
                              input="\n".join([*(module for module, _ in modules),
@@ -940,7 +1066,8 @@ class CompiledFixtureTests(unittest.TestCase):
         # keep only the last.
         verdicts = [next(iter(c.parse_checks(line).values())) for line in out.splitlines()
                     if '"v"' in line]
-        cls.verdicts = dict(zip([*VIA_REQUESTS, *scoped], verdicts, strict=True))
+        cls.verdicts = dict(zip([*VIA_REQUESTS, *scoped, *CONCRETE_REQUESTS], verdicts,
+                                strict=True))
 
     def certificate(self, name: str) -> tuple[str, tuple[str, ...]]:
         r = self.reductions[name]
@@ -968,7 +1095,7 @@ class CompiledFixtureTests(unittest.TestCase):
             self.assertEqual(self.certificate(name), ("", ()), name)
 
     def test_a_scheme_on_the_bounding_side_only_is_reported(self) -> None:
-        # A known false positive, which the baseline exempts.
+        # A known false positive, which the baseline records as `not_a_reduction`.
         self.assertEqual(self.certificate("typedScheme"), ("", ()))
 
     def test_schemes_laws_numbers_and_attacks_are_not_reductions(self) -> None:
@@ -983,14 +1110,14 @@ class CompiledFixtureTests(unittest.TestCase):
                          [t for r in self.reductions.values() for t in r.theorems])
 
     def test_exactly_the_expected_reductions(self) -> None:
-        self.assertEqual(len(self.reductions), 14)
-        self.assertEqual(len(c.uncertified(self.reductions)), 9)
+        self.assertEqual(len(self.reductions), 15)
+        self.assertEqual(len(c.uncertified(self.reductions)), 10)
         self.assertEqual(self.summary["missing"], [])
 
     def test_a_valid_via_request_passes(self) -> None:
         self.assertEqual(self.certificate("typedStep"), ("", ()))
         self.assertEqual(self.verdicts["valid"],
-                         c.ViaCheck((), "proof", (FIXTURE_PATH,), FIXTURE_PATH, ()))
+                         c.EntryCheck((), "proof", (FIXTURE_PATH,), FIXTURE_PATH, ()))
         # A headline may mention the program in its statement, and state a notion that unfolds
         # to a negligibility claim.
         for label in ("statement", "notion"):
@@ -1001,7 +1128,7 @@ class CompiledFixtureTests(unittest.TestCase):
         # Another module has a private declaration of the same name, and a third a public one;
         # the entry's recorded module decides.
         self.assertEqual(self.verdicts["private"],
-                         c.ViaCheck((), "proof", (FIXTURE_PATH,), FIXTURE_PATH, ()))
+                         c.EntryCheck((), "proof", (FIXTURE_PATH,), FIXTURE_PATH, ()))
         for label, module in (("private elsewhere", OTHER_MODULE),
                               ("public elsewhere", PUBLIC_MODULE)):
             elsewhere = self.verdicts[label]
@@ -1115,6 +1242,67 @@ class CompiledFixtureTests(unittest.TestCase):
         self.assertEqual(verdict.certified_definitions, (PREFIX + "certifiedOther",))
         self.assertEqual(self.verdicts["scoped"].definitions,
                          ((PREFIX + "wrappedStep", CONSUMERS_PATH),))
+
+
+    def test_a_concrete_request_passes_when_every_referrer_is_concrete(self) -> None:
+        # Every referrer, in the step's module or outside it, is an exact bound; a notion stated
+        # with the step that is no assumption needs no entry, and a wrapping definition is
+        # reported for one.
+        verdict = self.verdicts["concrete"]
+        self.assertEqual(verdict.problems, ())
+        self.assertEqual(set(verdict.referrers), {PREFIX + name for name in (
+            "exactStep_le", "exactStep_twice", "ExactlyRuns", "exactlyRuns", "exactWrapper")})
+        self.assertEqual(verdict.definitions, ((PREFIX + "exactWrapper", CONSUMERS_PATH),))
+        self.assertEqual(verdict.certified_definitions, ())
+        self.assertEqual(set(verdict.paths), {FIXTURE_PATH, CONSUMERS_PATH})
+        self.assertEqual((verdict.headline_at, verdict.equality_path), ("", ""))
+
+    def test_a_concrete_request_fails_on_a_referrer_that_is_not_concrete(self) -> None:
+        # The regression: `otherStep` has referrers that rest on an assumption, so it cannot be
+        # `concrete_only`. Unlike an instance-scoped entry, no headline is set apart, and a notion
+        # stated with the step fails when it is a named assumption.
+        verdict = self.verdicts["concrete negative"]
+        step = f"`{PREFIX}otherStep`"
+        expected = [
+            f"`{PREFIX}WrappedType` refers to {step} and is a named assumption",
+            f"`{PREFIX}aliasOther` refers to {step} and is not concrete (a premise rests on the "
+            f"named assumption `{PREFIX}Wrapped`",
+            f"`{PREFIX}classOther` refers to {step} and is not concrete (a premise rests on the "
+            f"named assumption `{PREFIX}WrappedClass`",
+            f"`{PREFIX}otherHeadline` refers to {step} and is not concrete (a premise rests on the "
+            f"named assumption `{PREFIX}Wrapped`",
+            f"`{PREFIX}otherStep_secure` refers to {step} in its module and is not concrete (its "
+            "conclusion makes a negligibility claim)",
+            f"`{PREFIX}wrappedOther` refers to {step} and is not concrete (a premise rests on the "
+            f"named assumption `{PREFIX}Wrapped`",
+        ]
+        self.assertEqual(len(verdict.problems), len(expected), verdict.problems)
+        for problem in expected:
+            self.assertTrue(any(problem in p for p in verdict.problems), problem)
+        # The Prop-valued alias is not reported as a definition that needs an entry.
+        self.assertEqual(verdict.definitions, ((PREFIX + "genericOther", CONSUMERS_PATH),
+                                               (PREFIX + "otherWrapper", CONSUMERS_PATH)))
+        self.assertEqual(verdict.certified_definitions, (PREFIX + "certifiedOther",))
+
+    def test_a_concrete_request_for_a_missing_reduction_fails(self) -> None:
+        verdict = self.verdicts["concrete missing"]
+        self.assertEqual(verdict.problems, (f"reduction `{PREFIX}exactStepRenamed` does not exist, "
+                                            "publicly or as a private declaration of "
+                                            f"{FIXTURE_MODULE}",))
+        self.assertEqual(verdict.missing, (PREFIX + "exactStepRenamed",))
+
+    def test_a_concrete_only_entry_with_a_non_concrete_referrer_fails_the_check(self) -> None:
+        # End to end: the verdict on the compiled module fails the comparison.
+        name = PREFIX + "otherStep"
+        reductions = {name: c.Reduction(name, FIXTURE_PATH, 1, (), (), "", ())}
+        baseline = {name: entry(FIXTURE_PATH, c.CONCRETE_ONLY, "exact-bound step")}
+        for d, path in self.verdicts["concrete negative"].definitions:
+            baseline[d] = entry(path, c.NOT_A_REDUCTION, "wrapper")
+        invalid = c.compare(reductions, baseline, None,
+                            {name: self.verdicts["concrete negative"]}).invalid
+        self.assertEqual([n for n, _, _ in invalid], [name])
+        self.assertIn(f"`{PREFIX}otherHeadline` refers to `{name}` and is not concrete",
+                      invalid[0][2])
 
 
 class CommittedFilesTests(unittest.TestCase):

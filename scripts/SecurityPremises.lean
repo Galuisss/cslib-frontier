@@ -144,7 +144,8 @@ arguments when none of them is a structure, which the constructed-constant rule 
 (first gap above). A witness is recognized by the constants its conclusion mentions, so a
 certificate about a larger program that merely contains the reduction counts. Conversely a
 scheme or protocol built from a component on the bounding side only, such as
-`Adv(A) = Adv(toScheme S, B A)`, is reported as a reduction: the baseline exempts it.
+`Adv(A) = Adv(toScheme S, B A)`, is reported as a reduction: the baseline records it as
+`not_a_reduction`.
 
 **Reductions run by a certified program.** An input line
 `via\t<reduction>\t<its module>\t<program>\t<certificate>\t<equality>\t<its module>\t<headline>`
@@ -200,15 +201,35 @@ that have. Unlike a reduction, such a definition is not certified by being menti
 definition's body (`certificate?`'s `wrapper` kind): a generic wrapper of `R` run inside one
 certified program at one instance would otherwise need no entry. `vm` includes the referrers'
 modules. `scripts/check_reduction_witnesses.py` requires each definition in `defs` to have a
-baseline entry of its own, a `gap` or `exempt` entry, which it keeps even when no theorem states a
-bound with the definition; a definition with a witness of its own needs none. So the baseline
-accounts for every definition that uses `R`. That does not establish that every headline downstream
-of such a definition has its own certificate or via entry: a referrer is found by name, and a public
-declaration stops the search, so a theorem that reaches `R` only through another public declaration
-(a theorem that consumes `H`, or one about a definition that wraps `R`) is not a referrer.
+baseline entry of its own, which it keeps even when no theorem states a bound with the definition;
+a definition with a witness of its own needs none. So the baseline accounts for every definition
+that uses `R`. That does not establish that every headline downstream of such a definition has its
+own certificate or via entry: a referrer is found by name, and a public declaration stops the
+search, so a theorem that reaches `R` only through another public declaration (a theorem that
+consumes `H`, or one about a definition that wraps `R`) is not a referrer.
 Concreteness is recognized as above, so a premise that assumes a bound without `Negligible` or a
 named assumption, such as `Adv ≤ ε`, or reaches one only after more than five unfoldings, is not
 seen. Whether a `headline` consumer uses `R` at the instance that `E` covers is for the reviewer.
+
+**Reductions whose every use is concrete.** An input line `concrete\t<reduction>\t<its module>`
+asks this mode to verify a `concrete_only` baseline entry (`checkConcrete`): a reduction that needs
+no efficiency witness because no theorem applies an assumption through it. `R` is resolved as for a
+`via` request, and its referrers are computed as above (`referrersOf`). The checks are:
+
+* every referring theorem, in `R`'s module or outside it, is concrete (`notConcrete`, as above);
+* no Prop-valued referring definition, such as a privacy or correctness notion stated with `R`, is
+  a named assumption (`namedAssumption`); one that is not needs no entry;
+* every other referring definition is reported, in `"defs"` when it has no efficiency witness of its
+  own and in `"cdefs"` when it has one, so that `scripts/check_reduction_witnesses.py` requires a
+  baseline entry for each one in `defs`, as for an instance-scoped `via` request.
+
+It prints the verdict in the shape of a `via` request's, with `at` and `em` empty, `refs` listing
+every referrer and `vm` the modules of `R` and its referrers. The limits are those of the
+instance-scoped check: a public declaration stops the search, so a theorem that applies an
+assumption to a definition that wraps `R` is not a referrer of `R` (that definition has an entry or
+a witness of its own instead), and the concrete test does not see a premise that assumes a bound
+without `Negligible` or a named assumption. Nor can it tell an information-theoretic negligibility
+premise, one over all adversaries without an efficiency bound, from a hardness assumption.
 
 **Named assumptions.** With `--assumptions` (`lake env lean --run scripts/SecurityPremises.lean
 <lib-dir> --assumptions`), for `scripts/check_hardness_assumptions.py`, it reports the named
@@ -658,7 +679,8 @@ unsafe def reducibles (entries : Array (Name × Array EnvExtensionEntry)) : Arra
 /-- Read the modules listed on standard input, one per line. A line `<dir>\t<module>` reads a
 *context* module from another build directory, such as CSLib's: its constants are in the
 environment, so definitions can be followed into it, but its theorems are not scanned. A line
-that starts with `via\t` is a request of the `--reductions` mode (`checkVia`), not a module.
+that starts with `via\t` or `concrete\t` is a request of the `--reductions` mode (`checkVia`,
+`checkConcrete`), not a module; it is kept with its first field.
 Returns the environment, the scanned modules, the compacted regions (to keep reachable while their
 expressions are used), the modules without build outputs and the requests. -/
 unsafe def load (libDir : System.FilePath) :
@@ -675,10 +697,11 @@ unsafe def load (libDir : System.FilePath) :
     if line.isEmpty then break
     let raw := line.trimAscii.toString
     if raw.isEmpty then continue
-    if let "via" :: fields := raw.splitOn "\t" then
+    let fields := raw.splitOn "\t"
+    if fields.head? == some "via" || fields.head? == some "concrete" then
       requests := requests.push fields.toArray
       continue
-    let (dir, mod, scan) := match raw.splitOn "\t" with
+    let (dir, mod, scan) := match fields with
       | [dir, mod] => ((dir : System.FilePath), mod, false)
       | _ => (libDir, raw, true)
     let base := (dir / System.FilePath.mk (mod.replace "." "/")).addExtension "olean"
@@ -1247,6 +1270,58 @@ def checkVia (env : Env) (privateNames : NameSet) (mods : Array (Name × ModuleD
         it `headline`"
   return result problems at_ em modules absent (outside.map (·.toString)) defs cdefs
 
+/-- Verify a request `#[reduction, its module]` for a `concrete_only` baseline entry (see the module
+docstring): every referring theorem of the reduction (`referrersOf`), in its module or outside it,
+is concrete (`notConcrete`), and no Prop-valued referring definition is a named assumption
+(`namedAssumption`). The other referring definitions are reported with whether they have an
+efficiency witness of their own (`witnessed`, as for `checkVia`), so that the Python checker can
+require a baseline entry for each one that does not. Returns the verdict in the shape of
+`checkVia`'s, with `at` and `em` empty, `refs` listing every referrer and `vm` the modules of the
+reduction and its referrers. -/
+def checkConcrete (env : Env) (mods : Array (Name × ModuleData)) (witnessed : Name → Bool)
+    (fields : Array String) : Json := Id.run do
+  let result (problems modules absent refs : Array String) (defs : Array Json)
+      (cdefs : Array String) : Json :=
+    Json.mkObj [("v", toJson (fields[0]?.getD "")), ("p", toJson problems), ("at", toJson ""),
+      ("vm", toJson modules), ("em", toJson ""), ("missing", toJson absent),
+      ("refs", toJson refs), ("defs", Json.arr defs), ("cdefs", toJson cdefs)]
+  let #[sr, rmod] := fields |
+    return result #[s!"malformed request with {fields.size} fields"] #[] #[] #[] #[] #[]
+  -- A private reduction is looked up in its recorded module first, as for `checkVia`.
+  let priv := mkPrivateNameCore rmod.toName sr.toName
+  let r := if env.consts.contains priv then priv else sr.toName
+  let some rm := env.moduleOf[r]? |
+    return result #[s!"reduction `{sr}` does not exist, publicly or as a private declaration of \
+      {rmod}"] #[] #[sr] #[] #[] #[]
+  let refs := (referrersOf mods r rm).toArray.qsort Name.lt
+  let mut problems : Array String := #[]
+  let mut modules : Array String := #[rm.toString]
+  let mut defs : Array Json := #[]
+  let mut cdefs : Array String := #[]
+  for c in refs do
+    let m := (env.moduleOf[c]?).getD .anonymous
+    unless modules.contains m.toString do modules := modules.push m.toString
+    let here := if m == rm then " in its module" else ""
+    match env.consts[c]? with
+    | some (.thmInfo v) =>
+      let reasons := notConcrete env v.type
+      unless reasons.isEmpty do
+        problems := problems.push s!"`{c}` refers to `{sr}`{here} and is not concrete \
+          ({"; ".intercalate reasons.toList}): it may apply an assumption through `{sr}`"
+    | some info@(.defnInfo _) | some info@(.opaqueInfo _) =>
+      if stripForall info.type matches .sort .zero then
+        -- A notion stated with the reduction, such as a privacy or correctness predicate, is
+        -- not a program; it matters only when it is an assumption.
+        if namedAssumption env c then
+          problems := problems.push s!"`{c}` refers to `{sr}`{here} and is a named assumption: \
+            a theorem that rests on it may apply an assumption through `{sr}`"
+      else if witnessed c then cdefs := cdefs.push c.toString
+      else defs := defs.push <| Json.mkObj [("n", toJson c.toString), ("m", toJson m.toString)]
+    | _ =>
+      problems := problems.push s!"`{c}` refers to `{sr}` and is neither a theorem nor a \
+        definition"
+  return result problems modules #[] (refs.map (·.toString)) defs cdefs
+
 /-- The `--reductions` mode (see the module docstring): every reduction that a public theorem
 states an advantage bound with, and how it is certified. -/
 unsafe def runReductions (libDir : System.FilePath) : IO Unit := do
@@ -1323,8 +1398,11 @@ unsafe def runReductions (libDir : System.FilePath) : IO Unit := do
   unless requests.isEmpty do
     for (c, _) in env.consts do
       if isPrivateName c then privateNames := privateNames.insert (privateToUserName c)
-  for fields in requests do
-    stdout.putStrLn <| Json.compress <| checkVia env privateNames mods witnessed fields
+  for request in requests do
+    let fields := request.extract 1
+    stdout.putStrLn <| Json.compress <| if request[0]? == some "concrete" then
+      checkConcrete env mods witnessed fields
+    else checkVia env privateNames mods witnessed fields
   stdout.putStrLn <| Json.compress <| Json.mkObj [("theorems", toJson scanned),
     ("modules", toJson mods.size), ("missing", toJson missing)]
   if regions.isEmpty then stdout.flush

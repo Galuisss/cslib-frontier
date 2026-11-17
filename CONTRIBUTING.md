@@ -237,10 +237,13 @@ of the bounded side, as `B` in `Adv(scheme, A) ≤ Adv(problem, B A)`. A reducti
 theorem concludes an efficiency certificate that mentions it (`IsPPT…`, `IsOraclePPT…`,
 `ComputableIn…` and similar; a query bound does not count), when it is an `abbrev` of certified
 reductions, or when a certified definition such as its word-level program applies it.
-`scripts/reduction_witnesses_baseline.json` records the uncertified ones, one per line: a `gap`
-names the issue that tracks the missing witness, and an `exempt` entry says why none is needed (an
-information-theoretic bound, or a definition that is not a reduction, such as a scheme built from a
-component). A `via_certified_program` entry records a typed reduction that a certified program runs:
+`scripts/reduction_witnesses_baseline.json` records the uncertified ones, one per line, each with a
+`why`. A `gap` names the issue that tracks the missing witness. A `not_a_reduction` entry records a
+definition that the check reports but that is a scheme, game or law, such as a scheme built from a
+component or a protocol's view distribution; review judges it, and the check does not verify it. A
+`concrete_only` entry records a reduction that needs no witness because no theorem applies an
+assumption through it, which the check verifies (below). The former `exempt` kind is rejected. A
+`via_certified_program` entry records a typed reduction that a certified program runs:
 it names the program, the program's efficiency witness, a theorem whose conclusion is an equation
 between the program's law and the reduction's (a bound, or an equation for one world only, does not
 count) with the file that holds it, and the asymptotic headline that applies the hardness assumption
@@ -267,20 +270,29 @@ concrete, because a premise (instance arguments included) is headed by a named a
 (recognized as for the named-assumption check below) or a premise or the conclusion makes a
 negligibility claim, directly or through Prop-valued definitions unfolded at most five times (as for
 the headline; an alias for the whole statement is unfolded too); and when a referring definition has
-neither an efficiency witness of its own nor a baseline entry. That entry is a `gap` or `exempt`
-entry, kept even when no theorem states a bound with the definition. Here, unlike for a reduction,
-being mentioned in a certified definition's body is not a witness, so a generic wrapper run inside
-one certified program still needs its entry. So the baseline accounts for every definition that uses
+neither an efficiency witness of its own nor a baseline entry. That entry, of any kind, is kept even
+when no theorem states a bound with the definition. Here, unlike for a reduction, being mentioned in
+a certified definition's body is not a witness, so a generic wrapper run inside one certified
+program still needs its entry. So the baseline accounts for every definition that uses
 the reduction, but this does not establish that every headline downstream of such a definition has
 its own certificate or via entry: a referrer is found by name, and a public declaration stops the
 search, so a theorem that reaches the reduction only through another public declaration (one that
 consumes the headline, or one about a wrapping definition) is not a referrer. The recognizers also
 miss a premise that assumes a bound without `Negligible` or a named assumption (`Adv ≤ ε`, say) or
 reaches one only after more than five unfoldings; whether a `headline` consumer uses the reduction
-at the equality's instance is for review. The summary counts these entries apart from the other via
-entries. CI treats it as it treats the premise check: a pull request fails when a changed module has
-an unrecorded uncertified reduction or a baseline entry that no longer matches, so the baseline only
-shrinks; merge groups only report. `--list` shows every reduction with its certificate, and
+at the equality's instance is for review. A `concrete_only` entry is checked against the same
+referrers with no headline set apart: every referring theorem, in the reduction's module or outside
+it, must be concrete as above; a Prop-valued referring definition, such as a privacy or correctness
+notion stated with the reduction, fails only when it is a named assumption and otherwise needs no
+entry; and every other referring definition needs an efficiency witness or a baseline entry of its
+own. So a theorem that applies an assumption through the reduction fails the check, and the entry
+becomes a `gap`, or `not_a_reduction` if the definition is a scheme, game or law. The referrers'
+modules join the modules where the entry is enforced. The limits are those above, and the concrete
+test cannot tell an information-theoretic negligibility premise over all adversaries from a
+hardness assumption, so a reduction used under one stays a `gap`. The summary counts each kind, and
+the instance-scoped via entries apart from the others. CI treats it as it treats the premise check:
+a pull request fails when a changed module has an unrecorded uncertified reduction or a baseline
+entry that no longer matches, so the baseline only shrinks; merge groups only report. `--list` shows every reduction with its certificate, and
 `--update-baseline` adds entries whose `why` you then fill in. The check does not see a reduction
 written inline in a bound, a bound without an advantage-named constant, a simulator or extractor on
 the bounded side, or an attack, and it does not judge whether a witness assumes only the adversary's

@@ -26,12 +26,20 @@ known gaps.
 
 `scripts/reduction_witnesses_baseline.json` records the uncertified reductions that are allowed,
 one per line, as `{reduction: {"module": source path, "kind": "gap" | "via_certified_program" |
-"exempt", "why": justification}}`. A `gap` is a reduction that still needs its witness; its `why`
-names the issue that tracks it. An `exempt` entry needs none, and its `why` says which case it is:
-the bound is information-theoretic (it holds for unbounded adversaries and no computational
-theorem applies an assumption to the reduction), or the definition is not a reduction, such as a
-scheme or protocol built from a component, which the checker cannot tell apart. Every entry needs
-a one-line justification.
+"not_a_reduction" | "concrete_only", "why": justification}}`. A `gap` is a reduction that still
+needs its witness; its `why` names the issue that tracks it. The other kinds need none:
+
+* A `not_a_reduction` entry records a definition that the checker reports but that is not a
+  reduction: a scheme, game or law, such as a scheme or protocol built from a component or the
+  view distribution of a protocol, which the checker cannot tell apart from a reduction. Its `why`
+  says which it is. Review judges it; the checker does not verify it.
+* A `concrete_only` entry records a reduction that needs no witness because no theorem applies an
+  assumption through it: every theorem that refers to it, in its module or outside it, is an exact
+  bound, such as an information-theoretic step or the bound of a finite instance.
+  `scripts/SecurityPremises.lean --reductions` verifies this on every run (below).
+
+There is no other kind: the former `exempt` kind is rejected. Every entry needs a one-line
+justification.
 
 A `via_certified_program` entry records a typed reduction, often a per-instance step, that a
 certified program runs. Between `kind` and `why` it names four declarations: `"program"` X, the
@@ -80,8 +88,8 @@ referring theorem other than the headline, in the reduction's module or outside 
 the conclusion makes a negligibility claim, directly or through Prop-valued definitions unfolded at
 most five times, an alias for the whole statement included. This checker fails when a definition
 among the referrers, tagged or in the reduction's module, has no efficiency witness of its own and
-no baseline entry: a `gap` or `exempt` entry, which it keeps even when no theorem states a bound
-with the definition, or when the definition is a reduction certified only through another definition
+no baseline entry of its own, which it keeps even when no theorem states a bound with the
+definition, or when the definition is a reduction certified only through another definition
 (`tracked_definitions`). Being mentioned in a certified definition's body, which certifies a
 reduction, does not count as a witness here. A definition with a witness of its own needs no entry,
 and an entry for it is stale. So the baseline accounts for every definition that uses the reduction;
@@ -92,8 +100,21 @@ reaches the reduction only through another public declaration (a theorem that co
 or one about a definition that wraps the reduction), nor a premise that assumes a bound without
 `Negligible` or a named assumption, and it does not judge whether a `headline` consumer uses the
 reduction at the instance that the equality covers; review does. `--update-baseline` also adds `gap`
-entries for the unrecorded uncertified definitions and keeps the recorded ones. The summary prints
-the gap, via, instance-scoped via and exempt counts separately.
+entries for the unrecorded uncertified definitions and keeps the recorded ones.
+
+A `concrete_only` entry is verified by the same pass (`checkConcrete`) against the same referrers,
+with no headline: every referring theorem, in the reduction's module or outside it, must be
+concrete as above, so a theorem that applies an assumption through the reduction fails the check,
+and the entry must become a `gap` (or a `not_a_reduction` entry, if the definition is a scheme, game
+or law). A Prop-valued referring definition, such as a privacy or correctness notion stated with
+the reduction, fails only when it is a named assumption, and otherwise needs no entry; every other
+referring definition needs an efficiency witness of its own or a baseline entry of its own, as for
+an instance-scoped entry. The referrers' modules join the modules where the entry is enforced. The
+limits are those above: a public declaration stops the search, and the concrete test sees only
+`Negligible` claims and named assumptions, so it cannot tell an information-theoretic premise over
+all adversaries from a hardness assumption; such a reduction stays a `gap` until the test can. The
+summary prints the gap, via, instance-scoped via, not-a-reduction and concrete-only counts
+separately.
 
 In a module that the change touches (adds, modifies or deletes, against the merge base of
 `--base`, default `origin/main`, and the working tree, as `scripts/check_changed_files.py`
@@ -149,8 +170,11 @@ CHECKER_FILES = frozenset({csp.TOOL, "scripts/check_reduction_witnesses.py",
                            "scripts/reduction_witnesses_baseline.json"})
 UPDATE = "python3 scripts/check_reduction_witnesses.py --update-baseline"
 RULE = "AGENTS.md, Security theorems"
-KINDS = ("gap", "via_certified_program", "exempt")
 VIA = "via_certified_program"
+NOT_A_REDUCTION, CONCRETE_ONLY = "not_a_reduction", "concrete_only"
+KINDS = ("gap", VIA, NOT_A_REDUCTION, CONCRETE_ONLY)
+# The kinds that `scripts/SecurityPremises.lean --reductions` verifies.
+CHECKED = (VIA, CONCRETE_ONLY)
 # The declarations that a `via_certified_program` entry names.
 VIA_FIELDS = ("program", "certificate", "equality", "headline")
 # The file that holds the equality, when it is not the entry's `module`.
@@ -161,7 +185,8 @@ SCOPE, INSTANCE, CONSUMERS = "scope", "instance", "consumers"
 TAGS = ("headline", "concrete", "reduction")
 # The fields of an entry of each kind, in the order they are written; `EQUALITY_MODULE` is
 # optional, and so are `SCOPE` and `CONSUMERS`, which come together.
-FIELDS = {"gap": ("module", "kind", "why"), "exempt": ("module", "kind", "why"),
+FIELDS = {"gap": ("module", "kind", "why"), NOT_A_REDUCTION: ("module", "kind", "why"),
+          CONCRETE_ONLY: ("module", "kind", "why"),
           VIA: ("module", "kind", "program", "certificate", "equality", EQUALITY_MODULE,
                 "headline", SCOPE, CONSUMERS, "why")}
 OPTIONAL = frozenset({EQUALITY_MODULE, SCOPE, CONSUMERS})
@@ -185,14 +210,16 @@ class Reduction:
 
 
 @dataclass(frozen=True)
-class ViaCheck:
-    """The Lean pass's verdict on a `via_certified_program` entry: its problems, where the
-    headline mentions the program or its certificate (`statement`, `proof`, or the empty string),
-    the paths of the modules of the declarations it found (for an entry scoped to one instance,
-    those of the reduction's referrers too), the path of the equality's module (or the empty
-    string), and the names it did not find. For an entry scoped to one instance, also the
-    reduction's referrers outside its module, the uncertified definitions among all its referrers
-    with their paths, and the certified ones."""
+class EntryCheck:
+    """The Lean pass's verdict on a `via_certified_program` or `concrete_only` entry: its problems,
+    where the headline mentions the program or its certificate (`statement`, `proof`, or the empty
+    string), the paths of the modules of the declarations it found (for an entry scoped to one
+    instance or a `concrete_only` entry, those of the reduction's referrers too), the path of the
+    equality's module (or the empty string), and the names it did not find. For an entry scoped to
+    one instance, also the reduction's referrers outside its module (for a `concrete_only` entry,
+    all of them), the uncertified definitions among all its referrers with their paths, and the
+    certified ones. A `concrete_only` entry has no headline or equality, so those fields are
+    empty."""
     problems: tuple[str, ...]
     headline_at: str
     paths: tuple[str, ...]
@@ -219,20 +246,20 @@ def parse(output: str) -> tuple[dict[str, Reduction], dict]:
     return reductions, summary
 
 
-def parse_checks(output: str) -> dict[str, ViaCheck]:
-    """The verdicts of `scripts/SecurityPremises.lean --reductions` on `via_certified_program`
-    entries, by reduction."""
+def parse_checks(output: str) -> dict[str, EntryCheck]:
+    """The verdicts of `scripts/SecurityPremises.lean --reductions` on `via_certified_program` and
+    `concrete_only` entries, by reduction."""
     checks = {}
     for line in output.splitlines():
         row = json.loads(line)
         if "v" in row:
-            checks[row["v"]] = ViaCheck(tuple(row["p"]), row["at"],
-                                        tuple(csp.module_path(m) for m in row["vm"]),
-                                        csp.module_path(row["em"]) if row["em"] else "",
-                                        tuple(row["missing"]), tuple(row.get("refs", ())),
-                                        tuple((d["n"], csp.module_path(d["m"]))
-                                              for d in row.get("defs", ())),
-                                        tuple(row.get("cdefs", ())))
+            checks[row["v"]] = EntryCheck(tuple(row["p"]), row["at"],
+                                          tuple(csp.module_path(m) for m in row["vm"]),
+                                          csp.module_path(row["em"]) if row["em"] else "",
+                                          tuple(row["missing"]), tuple(row.get("refs", ())),
+                                          tuple((d["n"], csp.module_path(d["m"]))
+                                                for d in row.get("defs", ())),
+                                          tuple(row.get("cdefs", ())))
     return checks
 
 
@@ -255,12 +282,19 @@ def via_requests(baseline: dict[str, dict]) -> list[str]:
             for name, entry in sorted(baseline.items()) if entry["kind"] == VIA]
 
 
+def concrete_requests(baseline: dict[str, dict]) -> list[str]:
+    """The reader's input lines that ask it to verify the `concrete_only` entries: the reduction
+    and its module."""
+    return ["\t".join(["concrete", name, module_name(entry["module"])])
+            for name, entry in sorted(baseline.items()) if entry["kind"] == CONCRETE_ONLY]
+
+
 def scan(root: Path, build_dir: Path, upstream: Path, baseline: dict[str, dict] | None = None
-         ) -> tuple[dict[str, Reduction], dict[str, ViaCheck]]:
+         ) -> tuple[dict[str, Reduction], dict[str, EntryCheck]]:
     """Run the Lean reader over every library module, with CSLib as context, and have it verify
-    the `via_certified_program` entries of `baseline`."""
+    the `via_certified_program` and `concrete_only` entries of `baseline`."""
     lines = (cha.context_modules(upstream) + csp.library_modules(root)
-             + via_requests(baseline or {}))
+             + via_requests(baseline or {}) + concrete_requests(baseline or {}))
     out = subprocess.run(["lake", "env", "lean", "--run", csp.TOOL, str(build_dir),
                           "--reductions"], cwd=root, input="\n".join(lines) + "\n",
                          capture_output=True, text=True)
@@ -296,9 +330,17 @@ def valid_entry(value: object) -> bool:
 
 def load_baseline(path: Path) -> dict[str, dict]:
     data = json.loads(path.read_text(encoding="utf-8"))
+    retired = (sorted(n for n, v in data.items()
+                      if isinstance(v, dict) and v.get("kind") == "exempt")
+               if isinstance(data, dict) else [])
+    if retired:
+        sys.exit(f"{path}: the `exempt` kind is retired; record {', '.join(retired)} as "
+                 f"`{NOT_A_REDUCTION}` (a scheme, game or law), as `{CONCRETE_ONLY}` (every "
+                 "referring theorem is concrete, which the check verifies) or as a `gap`")
     if not (isinstance(data, dict) and all(valid_entry(v) for v in data.values())):
         sys.exit(f"{path}: expected a JSON object from reduction names to "
-                 '{"module": path, "kind": "gap" or "exempt", "why": justification} or '
+                 f'{{"module": path, "kind": "gap", "{NOT_A_REDUCTION}" or "{CONCRETE_ONLY}", '
+                 '"why": justification} or '
                  f'{{"module": path, "kind": "{VIA}", "program": declaration, '
                  '"certificate": declaration, "equality": declaration, '
                  f'optionally "{EQUALITY_MODULE}": path, "headline": declaration, '
@@ -319,11 +361,11 @@ def baseline_text(entries: dict[str, dict]) -> str:
     return "{\n" + ",\n".join(lines) + ("\n" if lines else "") + "}\n"
 
 
-def tracked_definitions(checks: dict[str, ViaCheck]) -> dict[str, str]:
-    """The definitions without a witness of their own that use a reduction of an instance-scoped
-    entry, with their paths. Each needs a baseline entry of its own, which stands even when no
-    theorem states an advantage bound with the definition, or when the definition is a reduction
-    certified only through another definition."""
+def tracked_definitions(checks: dict[str, EntryCheck]) -> dict[str, str]:
+    """The definitions without a witness of their own that use a reduction of an instance-scoped or
+    `concrete_only` entry, with their paths. Each needs a baseline entry of its own, which stands
+    even when no theorem states an advantage bound with the definition, or when the definition is a
+    reduction certified only through another definition."""
     return {name: path for check in checks.values() for name, path in check.definitions}
 
 
@@ -331,8 +373,8 @@ def tracked_definitions(checks: dict[str, ViaCheck]) -> dict[str, str]:
 class Problems:
     """Differences from the baseline: unrecorded uncertified reductions, entries that no longer
     match as `(reduction, entry, reason)`, entries without a justification, and
-    `via_certified_program` entries that the Lean pass does not verify as `(reduction, entry,
-    reasons)`."""
+    `via_certified_program` and `concrete_only` entries that the Lean pass does not verify as
+    `(reduction, entry, reasons)`."""
     new: list[Reduction]
     stale: list[tuple[str, dict, str]]
     unjustified: list[str]
@@ -343,9 +385,9 @@ class Problems:
 
 
 def compare(reductions: dict[str, Reduction], baseline: dict[str, dict],
-            paths: set[str] | None, checks: dict[str, ViaCheck] | None = None) -> Problems:
+            paths: set[str] | None, checks: dict[str, EntryCheck] | None = None) -> Problems:
     """The differences in the modules `paths` (every module when `None`), with the Lean pass's
-    verdicts `checks` on the `via_certified_program` entries."""
+    verdicts `checks` on the `via_certified_program` and `concrete_only` entries."""
     def scoped(*candidates: str) -> bool:
         return paths is None or bool(paths.intersection(candidates))
     checks = checks or {}
@@ -359,9 +401,10 @@ def compare(reductions: dict[str, Reduction], baseline: dict[str, dict],
     for name, entry in sorted(baseline.items(), key=lambda i: (i[1]["module"], i[0])):
         r = reductions.get(name)
         via = entry["kind"] == VIA
-        check = checks.get(name) if via else None
+        checked = entry["kind"] in CHECKED
+        check = checks.get(name) if checked else None
         # A declaration the pass cannot find may have been renamed or deleted in any module.
-        everywhere = via and (check is None or bool(check.missing))
+        everywhere = (checked and check is None) or (via and bool(check.missing))
         if not (everywhere or scoped(entry["module"], entry.get(EQUALITY_MODULE, ""),
                                      *(r.paths() if r else ()),
                                      *(check.paths if check else ()))):
@@ -369,8 +412,8 @@ def compare(reductions: dict[str, Reduction], baseline: dict[str, dict],
         if r is None:
             if name in certified_definitions:
                 stale.append((name, entry, "has an efficiency witness of its own, as a definition "
-                                           "that uses an instance-scoped reduction; it needs no "
-                                           "entry"))
+                                           "that uses an instance-scoped or `concrete_only` "
+                                           "reduction; it needs no entry"))
             elif name not in tracked:
                 stale.append((name, entry, "no theorem states an advantage bound with it"))
             elif tracked[name] != entry["module"]:
@@ -383,7 +426,7 @@ def compare(reductions: dict[str, Reduction], baseline: dict[str, dict],
             stale.append((name, entry, f"now defined in {r.path}"))
         if not entry["why"].strip():
             unjustified.append(name)
-        if via and check is None:
+        if checked and check is None:
             invalid.append((name, entry, "the Lean pass did not verify it"))
         elif check is not None:
             reasons = list(check.problems)
@@ -395,8 +438,8 @@ def compare(reductions: dict[str, Reduction], baseline: dict[str, dict],
             # A definition that uses the reduction is recorded unless it has a witness of its own,
             # so that the baseline accounts for every definition that runs it.
             reasons += [f"`{d}` is a definition that uses `{name}` without an efficiency witness "
-                        "of its own but has no baseline entry; record it (a `gap` or `exempt` "
-                        "entry), or make this entry a `gap`"
+                        "of its own but has no baseline entry; record it with an entry of its own, "
+                        "or make this entry a `gap`"
                         for d, _ in check.definitions if d not in baseline]
             if reasons:
                 invalid.append((name, entry, "; ".join(reasons)))
@@ -430,10 +473,12 @@ def report(problems: Problems) -> str:
                 f"certificate proved from the adversary's ({RULE}): prove `isPPT_…` or "
                 "`isOraclePPT_…` for it (as `isPPT_elGamalMsgToDDHDistinguisher` does), or for the "
                 "word-level program that runs it, and apply the hardness assumption through that "
-                "lemma. If the bound is information-theoretic, or the definition is not a "
-                "reduction (a scheme or protocol built from a component), add a baseline entry "
-                f"with `\"kind\": \"exempt\"` and a justification (`{UPDATE}`, then fill in "
-                "`why`).", ""]
+                "lemma. If the definition is not a reduction (a scheme, game or law, such as a "
+                "scheme built from a component), record it with `\"kind\": "
+                f"\"{NOT_A_REDUCTION}\"`; if no theorem applies an assumption through it (every "
+                "theorem that refers to it is an exact bound), with `\"kind\": "
+                f"\"{CONCRETE_ONLY}\"`, which the check verifies. `{UPDATE}` adds a `gap` "
+                "entry; set its `kind` and fill in its `why`.", ""]
         for r in problems.new:
             out += describe(r)
     if problems.stale:
@@ -444,18 +489,26 @@ def report(problems: Problems) -> str:
     if problems.unjustified:
         out += ([""] if out else []) + ["Baseline entries without a justification (`why`):"]
         out += [f"  {name}" for name in problems.unjustified]
-    if problems.invalid:
+    vias = [p for p in problems.invalid if p[1]["kind"] == VIA]
+    concretes = [p for p in problems.invalid if p[1]["kind"] == CONCRETE_ONLY]
+    if vias:
         out += ([""] if out else []) + [
             f"`{VIA}` entries that the Lean pass does not verify. Fix the entry, or make it a "
             "`gap` until the certified program, its certificate, an equation between the "
             "program's law and the reduction's, and a headline that consumes the program all "
             "exist:"]
-        out += [f"  {entry['module']}: {name}: {reasons}"
-                for name, entry, reasons in problems.invalid]
+        out += [f"  {entry['module']}: {name}: {reasons}" for name, entry, reasons in vias]
+    if concretes:
+        out += ([""] if out else []) + [
+            f"`{CONCRETE_ONLY}` entries that the Lean pass does not verify. A theorem that applies "
+            "an assumption through the reduction needs its efficiency witness: make the entry a "
+            f"`gap` (or `{NOT_A_REDUCTION}`, if the definition is a scheme, game or law), or "
+            "record the definitions that use it:"]
+        out += [f"  {entry['module']}: {name}: {reasons}" for name, entry, reasons in concretes]
     return "\n".join(out)
 
 
-def via_listing(baseline: dict[str, dict], checks: dict[str, ViaCheck]) -> str:
+def via_listing(baseline: dict[str, dict], checks: dict[str, EntryCheck]) -> str:
     """For each `via_certified_program` entry, where its headline mentions the program or the
     certificate."""
     out = []
@@ -522,7 +575,8 @@ def status(reductions: dict[str, Reduction], baseline: dict[str, dict], scope_te
     return (f"{len(reductions)} reduction(s), {len(uncertified(reductions))} without an efficiency "
             f"witness; {len(baseline)} baseline entries ({kinds['gap']} gap(s), "
             f"{kinds[VIA] - scoped} via certified program, {scoped} instance-scoped via, "
-            f"{kinds['exempt']} exempt), checking {scope_text}")
+            f"{kinds[NOT_A_REDUCTION]} not a reduction, {kinds[CONCRETE_ONLY]} concrete only), "
+            f"checking {scope_text}")
 
 
 def main(argv: list[str] | None = None) -> int:
