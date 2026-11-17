@@ -91,9 +91,7 @@ theorem eval_orderedConstraints (F : CSP Unit ℕ) (c : RotationCertificate) (σ
     change sem row.rel ((if forward c i then row.scope else swapTail3 row.scope).map σ) = _
     split
     · rfl
-    · change (((swapTail3 row.scope).map σ).count true == 1) =
-        ((row.scope.map σ).count true == 1)
-      rw [((swapTail3_perm row.scope).map σ).count_eq]
+    · exact sem_eq_of_perm _ _ ((swapTail3_perm row.scope).map σ)
   apply Bool.eq_iff_iff.mpr
   simp only [orderedConstraints, Cslib.Logic.PL.CSP.eval, List.all_eq_true, List.mem_mapIdx]
   constructor

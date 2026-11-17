@@ -18,6 +18,16 @@ The actual total ThreeSAT drawing compiler supplies every source drawing interna
 The executed cardinal table is genus zero, and the ternary scope permutation transports
 it to the original ordered CSP checker. Thus all raw ThreeSAT inputs have an accepting
 syntax/geometry output whose satisfiability is exactly the original guarded language.
+
+This native reduction is an original composition of the existing actual drawing compiler
+and the internally verified clockwise table. It is a reduction from raw ThreeSAT formulas;
+it does not assert a reduction from arbitrary raw supplied-drawing records.
+
+## Main results
+
+* `verifyRotationCertificate_compileThreeSAT`: full checker acceptance on every raw input.
+* `polyTimeReducible_ThreeSAT`: the actual native reduction to the guarded target language.
+* `npHard`: native NP-hardness of supplied ordered OneHot3 rotation certificates.
 -/
 
 public section

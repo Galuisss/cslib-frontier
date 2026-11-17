@@ -23,6 +23,19 @@ No source embedding generator, target rotation, or geometric rank is supplied as
 This module proves native runtime, exact target width, and the satisfiability equivalence
 including malformed ordinary ThreeSAT inputs. The separate hardness module combines these
 facts with acceptance of the emitted table by the full target genus/order checker.
+
+The program is an original composition of the actual compiler in
+`CslibFrontier/Computability/Complexity/Problems/PlanarPositiveOneInThreeSAT.lean`
+with the native orthogonal scan and ternary occurrence transport.
+
+## Main definitions
+
+* `compileThreeSAT`: the actual output constraints and supplied binary rotation table.
+
+## Main results
+
+* `computableInPolyTime_compileThreeSAT`: native runtime on every raw source formula.
+* `satisfiable_compileThreeSAT_iff`: exact equivalence with the guarded ThreeSAT language.
 -/
 
 public section
@@ -43,6 +56,7 @@ and binary successor-table conjugation. Every raw formula has a concrete output 
 runtime proof includes the actual drawing generator and the literal binary table. -/
 theorem computableInPolyTime_compileThreeSAT :
     ComputableInPolyTime compileThreeSAT encCNF (encRotationInstance encUnit) := by
+  unfold compileThreeSAT
   have hd := computableInPolyTime_toDrawnPlanarPositiveOneInExactThreeSATThree
   have hf := computableInPolyTime_ofCNF.comp
     (encDrawnPlanarPositiveOneInExactThreeSATThree_formula_polyTime hd)
@@ -50,9 +64,10 @@ theorem computableInPolyTime_compileThreeSAT :
   have hc := OrthogonalDrawing.computableInPolyTime_rotationCertificate.comp
     (hg.prod (encDrawnPlanarPositiveOneInExactThreeSATThree_drawing_polyTime hd))
   have hi := hf.prod hc
-  exact encRotationInstance_mk_polyTime encUnit
+  have hp := encRotationInstance_mk_polyTime encUnit
     (computableInPolyTime_orderedConstraints.comp hi)
     (computableInPolyTime_orderedCertificate.comp hi)
+  simpa only [Function.comp_def] using hp
 
 /-- Every raw source formula produces scopes of exactly the fixed OneHot3 arity. -/
 theorem wellFormed_compileThreeSAT (φ : CNF ℕ) :

@@ -24,6 +24,11 @@ the original source plane model is a separate obligation.
 
 This is the no-common-complement branch. Languages with common complement require the
 separate actual CROSS planarization argument; the OneHot3 gadget is not asserted for them.
+
+## Main results
+
+* `npHard_of_not_hasSchaeferPolymorphism_of_not_hasComplement`:
+  native original-language hardness for arbitrary encoded target alphabets and arities.
 -/
 
 public section
@@ -31,6 +36,7 @@ public section
 namespace Cslib.Complexity.RotationCSPSAT
 
 open Cslib.Logic.PL Cslib.Logic.PL.CSP Cslib.Complexity.CSP Turing.MultiTapeTM
+open OrderedBoundary
 
 /-- Outside the six Schaefer operations and common complement, the original supplied
 ordered-certificate problem is native NP-hard. Target relations have arbitrary arity and
