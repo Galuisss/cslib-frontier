@@ -148,15 +148,15 @@ private def eliminators : List (Name × Nat × Name × List Nat) :=
   [(``Fin.lastCases, 4, ``Fin.lastCases, [0, 1]), (``Fin.addCases, 5, ``Fin.addCases, [1, 1]),
     (``Fin.append, 5, ``Fin.addCases, [1, 1])]
 
-/-- The numeral `n` of a type `Fin n`, also when it is written with `Nat.succ`, as in the type of
-the index of a vector `![a, b]`. -/
+/-- The number `n` of a type `Fin n` when `n` is a numeral or evaluates to one, as `Nat.succ 1`
+does, the number of entries of a vector `![a, b]`. -/
 private def finLit? (ty : Lean.Expr) : MetaM (Option Nat) := do
   unless ty.isAppOfArity ``Fin 1 do return none
   (evalNat (ty.getArg! 0)).run
 
-/-- The split the target `tgt` calls for on one of the index variables `vars`: `fin_cases` for an
-index in `Fin n` with `n` a numeral, the eliminator of `Fin.lastCases`, `Fin.addCases` or
-`Fin.append` applied to an index, the comparison `x = a` for `Function.update f a v x`
+/-- The split the target `tgt` calls for on one of the index variables `vars`, the first of: the
+eliminator of `Fin.lastCases`, `Fin.addCases` or `Fin.append` applied to an index, `fin_cases` for
+an index in `Fin n` with `n` a numeral, the comparison `x = a` for `Function.update f a v x`
 (`Fin.lastCases` when `a` is `Fin.last _`), the condition of an `if` that mentions an index, and
 the cases of a `match` on a term that mentions an index. With `anyCond`, conditions and matched
 terms need not mention an index. -/
@@ -170,14 +170,16 @@ private def findSplit (tgt : Lean.Expr) (vars hyps : Array FVarId) (anyCond := f
     return if t.isAppOfArity ``Not 1 then t.getArg! 0 else t
   let splittable (p : Lean.Expr) : Bool :=
     (anyCond || p.hasAnyFVar vars.contains) && !p.hasLooseBVars && !known.contains p
-  if hyps.isEmpty then
-    for x in vars do
-      if (← finLit? (← whnfR (← x.getType))).isSome && tgt.containsFVar x then
-        return some (.finCases x)
+  -- An eliminator applied to an index comes before its values: `simp` evaluates the eliminator
+  -- at `Fin.last _` and `Fin.castSucc _`, not at a numeral.
   for (fn, pos, elim, binders) in eliminators do
     let found := tgt.find? fun e =>
       e.isAppOf fn && e.getAppNumArgs > pos && isVar (e.getArg! pos)
     if let some e := found then return some (.elim (e.getArg! pos).fvarId! elim binders)
+  if hyps.isEmpty then
+    for x in vars do
+      if (← finLit? (← whnfR (← x.getType))).isSome && tgt.containsFVar x then
+        return some (.finCases x)
   let update := tgt.find? fun e =>
     e.isAppOf ``Function.update && e.getAppNumArgs ≥ 7 && isVar (e.getArg! 6) &&
       !(e.getArg! 4).hasLooseBVars && !(e.getArg! 4).containsFVar (e.getArg! 6).fvarId! &&
@@ -357,11 +359,11 @@ the machine and the builders of the two configurations, and uses the `facts`, as
 * A step `tm.step cfg` is rewritten to the action of the transition function when the state of
   `cfg` is `some q` by `rfl`. For a halted configuration, give the hypothesis `cfg.state = none`.
 * The two configurations are compared field by field. A field of work tapes or of their heads is
-  compared at an index `i`, which is split as the goal requires: into the values of `Fin n` for a
-  numeral `n`; with `Fin.lastCases` or `Fin.addCases` where that function, or `Fin.append`, is
-  applied to `i`; into `i = j` and `i ≠ j` for `Function.update f j v i`; and on the condition of
-  an `if` or the cases of a `match` that mentions `i`. Other conditions and `match`es are split
-  on only when that closes the case.
+  compared at an index `i`, which is split as the goal requires: with `Fin.lastCases` or
+  `Fin.addCases` where that function, or `Fin.append`, is applied to `i`; into the values of
+  `Fin n` for a numeral `n`; into `i = j` and `i ≠ j` for `Function.update f j v i`; and on the
+  condition of an `if` or the cases of a `match` that mentions `i`. Other conditions and `match`es
+  are split on only when that closes the case.
 * Each case is closed with `simp`, using the simp set `tm_step_simps` and the arguments, and then
   `omega`; an input head position is also compared as an integer. When a case stays open,
   `tm_step` fails and shows the cases left, each simplified with `tm_step_simps` and the

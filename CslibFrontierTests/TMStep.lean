@@ -13,10 +13,11 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step
 # Steps and equalities of configurations with `tm_step`
 
 The tests cover the step of a running and of a halted machine; the splits of the index of the work
-tapes (`Function.update`, also at the last tape, `Fin.lastCases`, `Fin.addCases`, `Fin.append`, a
-numeral number of tapes, also as the index of a vector `![a, b]`, `if` and `match`); a condition
-that does not mention the index, split on only when that closes the case; a machine without work
-tapes; a move of the input head; a configuration with oracle channels; and the three errors.
+tapes (`Function.update`, also at the last tape, `Fin.lastCases`, also over a numeral number of
+tapes, `Fin.addCases`, `Fin.append`, a numeral number of tapes, also as the index of a vector
+`![a, b]`, `if` and `match`); a condition that does not mention the index, split on only when that
+closes the case; a machine without work tapes; a move of the input head; a configuration with
+oracle channels; and the three errors.
 -/
 
 public section
@@ -85,6 +86,15 @@ example (ws : Fin k → List Bool) (w out : List Bool) (q : Option State) :
     wordsCfg input q (Fin.append ws ![w, []]) out =
       ⟨q, 1, Fin.append (fun j => tapeOfList (ws j)) ![tapeOfList w, fun _ => none],
         fun _ => 0, out⟩ := by
+  tm_step
+
+-- An eliminator applied to the index comes before the values of a numeral `Fin n`: the one tape
+-- of `Fin (0 + 1)` is taken as `Fin.last 0`, where `Fin.lastCases` computes.
+example (c : Cfg (0 + 1) Bool State input) :
+    (⟨0, Fin.lastCases (none, 1) fun i => i.elim0, none, c.state⟩ :
+        Action (0 + 1) Bool State).apply c =
+      ⟨c.state, c.inputPos, c.workTapes,
+        Fin.lastCases (c.workTapePos (Fin.last 0) + 1) fun i => i.elim0, c.output⟩ := by
   tm_step
 
 -- A numeral number of tapes: one case for each tape.
