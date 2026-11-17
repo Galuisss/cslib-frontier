@@ -8,7 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Foundations.Quantum.PauliTwirl
-import CslibFrontier.Foundations.Quantum.Orthogonalization
+import CslibFrontier.Foundations.LinearAlgebra.Matrix.Polar
 import CslibFrontier.Foundations.BooleanAnalysis.HadamardRectangles
 
 /-!
@@ -207,45 +207,8 @@ private theorem isometry_X_mul_X {L : Type*} [DecidableEq L] {E : Matrix κ L �
           Matrix.zero_mul]
 /-- The code space has an isometry: `E` with `Eᴴ E = 1` and `E Eᴴ = Π`. -/
 theorem exists_isometry_codeProj : ∃ L : Finset κ, ∃ E : Matrix κ L ℂ,
-    Eᴴ * E = 1 ∧ E * Eᴴ = R.codeProj := by
-  obtain ⟨U, hU1, hU2, hUd⟩ := exists_unitary_eq_diagonal R.isHermitian_codeProj
-  set lam := R.isHermitian_codeProj.eigenvalues
-  have hD : Uᴴ * R.codeProj * U = diagonal fun k => (lam k : ℂ) := by
-    rw [hUd]
-    simp only [← Matrix.mul_assoc, hU1, Matrix.one_mul]
-    rw [Matrix.mul_assoc, hU1, Matrix.mul_one]
-  have hlam : ∀ k, lam k * lam k = lam k := fun k => by
-    have h := congrArg (fun M => Uᴴ * M * U) R.codeProj_mul_self
-    have e : Uᴴ * (R.codeProj * R.codeProj) * U =
-        (Uᴴ * R.codeProj * U) * (Uᴴ * R.codeProj * U) := by
-      simp only [Matrix.mul_assoc]
-      rw [← Matrix.mul_assoc U Uᴴ, hU2, Matrix.one_mul]
-    rw [e, hD, diagonal_mul_diagonal] at h
-    have := congrFun (congrFun h k) k
-    simp only [diagonal_apply_eq] at this
-    exact_mod_cast this
-  have hl01 : ∀ k, lam k ≠ 1 → lam k = 0 := fun k hk => by
-    have := hlam k
-    have : lam k * (lam k - 1) = 0 := by linarith
-    rcases mul_eq_zero.mp this with h | h
-    · exact h
-    · exact absurd (by linarith) hk
-  refine ⟨univ.filter fun k => lam k = 1, Matrix.of fun i k => U i k.1, ?_, ?_⟩
-  · ext k k'
-    have := congrFun (congrFun hU1 k.1) k'.1
-    simp only [Matrix.mul_apply, conjTranspose_apply, Matrix.of_apply, Matrix.one_apply] at this ⊢
-    rw [this]
-    exact if_congr Subtype.ext_iff.symm rfl rfl
-  · ext i j
-    rw [hUd]
-    simp only [Matrix.mul_apply, conjTranspose_apply, Matrix.of_apply, diagonal_apply,
-      mul_ite, mul_zero, sum_ite_eq', mem_univ, ite_true]
-    rw [Finset.sum_coe_sort (univ.filter fun k => lam k = 1)
-      (fun k => U i k * star (U j k)), Finset.sum_filter]
-    refine sum_congr rfl fun k _ => ?_
-    split_ifs with hk
-    · rw [hk]; push_cast; ring
-    · rw [hl01 k hk]; push_cast; ring
+    Eᴴ * E = 1 ∧ E * Eᴴ = R.codeProj :=
+  R.isHermitian_codeProj.exists_isometry_of_mul_self R.codeProj_mul_self
 
 /-- **Stone–von Neumann for the Pauli relations**: Hermitian matrices satisfying the Pauli
 relations are unitarily equivalent to the Pauli strings on `n` qubits tensored with the identity:
