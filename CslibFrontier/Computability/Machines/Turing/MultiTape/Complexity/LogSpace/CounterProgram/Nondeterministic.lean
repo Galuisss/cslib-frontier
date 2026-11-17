@@ -174,7 +174,7 @@ theorem trans (h : Branches (P := P) (w := w) s s') (h' : Branches (P := P) (w :
   exact ⟨c ++ c', NondeterministicQueryMachine.replay_append _ _ _ _ _⟩
 
 /-- One step from a running configuration, with either choice. -/
-theorem single (hs : P.halted s = false) (choice : Bool)
+theorem single (hs : P.halted s = false) (choice : Bool) :
     Branches (P := P) (w := w) s (withChoice (P.step w s) choice) :=
   ⟨[choice], by
     rw [NondeterministicQueryMachine.replay_cons, step_toNondeterministicQueryMachine]
