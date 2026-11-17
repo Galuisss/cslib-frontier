@@ -368,7 +368,8 @@ def blockDownload (n ℓ : ℕ) : InteractiveScheme (Fin n) Unit Unit (BitString
 theorem isCorrect_blockDownload (n ℓ : ℕ) : (blockDownload n ℓ).IsCorrect :=
   (blockDownload n ℓ).isCorrect_iff.mpr fun x i _ _ _ _ => by
     rw [← Protocol.run_eq_leafOutput_leaf]
-    simp only [blockDownload, Protocol.run_aliceSend, Protocol.run_output, Equiv.symm_apply_apply]
+    simp only [blockDownload, Protocol.run_aliceSend, Protocol.run_output]
+    exact congrFun (Cslib.BitString.blocksEquiv.apply_symm_apply x) i
 
 theorem isPrivate_blockDownload (n ℓ : ℕ) : (blockDownload n ℓ).IsPrivate :=
   (blockDownload n ℓ).isPrivate_iff.mpr fun x i i' => by
