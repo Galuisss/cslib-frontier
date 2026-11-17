@@ -23,17 +23,18 @@ open scoped Real MatrixOrder ComplexOrder
 
 /-- A vector state gives the identity norm `1`. -/
 example {ι : Type} [Fintype ι] [DecidableEq ι] (ψ : EuclideanSpace ℂ ι) (hψ : ‖ψ‖ = 1) :
-    (State.vector ψ hψ).norm 1 = 1 :=
-  State.norm_one _
+    (AlgState.vector ψ hψ).norm 1 = 1 :=
+  AlgState.norm_one _
 
 /-- Cauchy–Schwarz in a vector state. -/
 example {ι : Type} [Fintype ι] [DecidableEq ι] (ψ : EuclideanSpace ℂ ι) (hψ : ‖ψ‖ = 1)
     (a b : Matrix ι ι ℂ) :
-    ‖State.vector ψ hψ (star a * b)‖ ≤ (State.vector ψ hψ).norm a * (State.vector ψ hψ).norm b :=
-  State.norm_apply_star_mul_le _ a b
+    ‖AlgState.vector ψ hψ (star a * b)‖ ≤
+      (AlgState.vector ψ hψ).norm a * (AlgState.vector ψ hψ).norm b :=
+  AlgState.norm_apply_star_mul_le _ a b
 
 /-- Tsirelson's inequality holds in every state of a C⋆-algebra. -/
-example {𝒜 : Type} [CStarAlgebra 𝒜] [PartialOrder 𝒜] [StarOrderedRing 𝒜] (φ : State 𝒜)
+example {𝒜 : Type} [CStarAlgebra 𝒜] [PartialOrder 𝒜] [StarOrderedRing 𝒜] (φ : AlgState 𝒜)
     {A₀ A₁ B₀ B₁ : 𝒜} (hA₀ : IsSelfAdjoint A₀) (hA₁ : IsSelfAdjoint A₁)
     (hA₀' : star A₀ * A₀ ≤ 1) (hA₁' : star A₁ * A₁ ≤ 1) (hB₀ : star B₀ * B₀ ≤ 1)
     (hB₁ : star B₁ * B₁ ≤ 1) :
@@ -43,7 +44,7 @@ example {𝒜 : Type} [CStarAlgebra 𝒜] [PartialOrder 𝒜] [StarOrderedRing �
 /-! ### Measurements -/
 
 /-- The trivial measurement is projective and reports its outcome with certainty. -/
-example (φ : State (Matrix (Fin 2) (Fin 2) ℂ)) :
+example (φ : AlgState (Matrix (Fin 2) (Fin 2) ℂ)) :
     (Measurement.const true : Measurement Bool (Matrix (Fin 2) (Fin 2) ℂ)).prob φ true = 1 := by
   simp [Measurement.prob_const]
 
@@ -53,11 +54,12 @@ example : (Measurement.const true : Measurement Bool (Matrix (Fin 2) (Fin 2) ℂ
 /-- In a vector state, a POVM measured as an algebraic measurement has its Born-rule
 distribution. -/
 example {ι : Type} [Fintype ι] [DecidableEq ι] (M : POVM Bool ι) (ψ : EuclideanSpace ℂ ι)
-    (hψ : ‖ψ‖ = 1) : M.toMeasurement.distribution (State.vector ψ hψ) = M.measure ψ hψ :=
+    (hψ : ‖ψ‖ = 1) : M.toMeasurement.distribution (AlgState.vector ψ hψ) = M.measure ψ hψ :=
   POVM.distribution_toMeasurement M ψ hψ
 
 /-- Post-processing pushes the outcome distribution forward. -/
-example (φ : State (Matrix (Fin 2) (Fin 2) ℂ)) (M : Measurement Bool (Matrix (Fin 2) (Fin 2) ℂ)) :
+example (φ : AlgState (Matrix (Fin 2) (Fin 2) ℂ))
+    (M : Measurement Bool (Matrix (Fin 2) (Fin 2) ℂ)) :
     (M.map not).distribution φ = (M.distribution φ).map not :=
   Measurement.distribution_map φ not M
 

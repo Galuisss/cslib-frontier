@@ -12,7 +12,6 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.Quantum
 public import CslibFrontier.Foundations.Quantum.Algebra.Measurement
 public import CslibFrontier.Foundations.Quantum.Algebra.Tsirelson
 import CslibFrontier.Foundations.Analysis.SpecialFunctions.Trigonometric.Basic
-import CslibFrontier.Probability.PMF.Event
 
 /-!
 # Commuting-operator strategies
@@ -36,7 +35,7 @@ strategies therefore applies to both models.
 
 **Tsirelson's bound** holds in this model: every commuting-operator strategy wins CHSH with
 probability at most `cos²(π/8)` (`Cslib.PCP.TwoProverGame.commutingWinProb_chsh_le`), as a
-consequence of Tsirelson's inequality for states (`Cslib.Quantum.State.re_chsh_le`)
+consequence of Tsirelson's inequality for states (`Cslib.Quantum.AlgState.re_chsh_le`)
 [Cirel'son][Cirelson1980].
 
 ## Main definitions
@@ -73,7 +72,7 @@ every effect of Alice commutes with every effect of Bob. -/
 structure CommutingStrategy (X Y A B 𝒜 : Type*) [Fintype A] [Fintype B] [Ring 𝒜]
     [PartialOrder 𝒜] [Algebra ℂ 𝒜] where
   /-- The shared state. -/
-  state : State 𝒜
+  state : AlgState 𝒜
   /-- Alice's measurement on question `x`. -/
   alice : X → Measurement A 𝒜
   /-- Bob's measurement on question `y`. -/
@@ -96,7 +95,7 @@ noncomputable def prob (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) (a :
 theorem sum_prob (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) :
     ∑ a, ∑ b, S.prob x y a b = 1 := by
   simp only [prob, ← Complex.re_sum, ← map_sum, ← mul_sum, (S.bob y).sum_effect, mul_one,
-    (S.alice x).sum_effect, State.map_one, Complex.one_re]
+    (S.alice x).sum_effect, AlgState.map_one, Complex.one_re]
 
 end Ring
 
@@ -159,37 +158,22 @@ variable {X Y A B 𝒜 : Type*} (G : TwoProverGame X Y A B) [Fintype A] [Fintype
 
 /-- The probability that the commuting-operator strategy `S` wins `G`. -/
 noncomputable def commutingWinProb (S : CommutingStrategy X Y A B 𝒜) : ℝ :=
-  ((G.questions.bind fun q => (S.answers q.1 q.2).map fun ab => (q, ab)).toOuterMeasure
-    {z | G.accepts z.1.1 z.1.2 z.2.1 z.2.2}).toReal
+  G.answersWinProb S.answers
 
 theorem commutingWinProb_nonneg (S : CommutingStrategy X Y A B 𝒜) : 0 ≤ G.commutingWinProb S :=
-  ENNReal.toReal_nonneg
+  G.answersWinProb_nonneg _
 
 theorem commutingWinProb_le_one (S : CommutingStrategy X Y A B 𝒜) :
     G.commutingWinProb S ≤ 1 :=
-  (ENNReal.toReal_mono ENNReal.one_ne_top
-    (Cslib.Probability.PMF.toOuterMeasure_le_one _ _)).trans_eq ENNReal.toReal_one
+  G.answersWinProb_le_one _
 
 /-- The winning probability of a commuting-operator strategy:
 `∑_{x,y} π(x,y) ∑_{a,b} V(a,b|x,y) Re φ(P_x^a Q_y^b)`. -/
 theorem commutingWinProb_eq_sum [Fintype X] [Fintype Y]
     [∀ x y a b, Decidable (G.accepts x y a b)] (S : CommutingStrategy X Y A B 𝒜) :
     G.commutingWinProb S = ∑ x, ∑ y, (G.questions (x, y)).toReal * ∑ a, ∑ b,
-      if G.accepts x y a b then S.prob x y a b else 0 := by
-  rw [commutingWinProb, PMF.toOuterMeasure_bind_apply, tsum_fintype, ENNReal.toReal_sum
-    fun q _ => ENNReal.mul_ne_top (PMF.apply_ne_top _ _)
-      (Cslib.Probability.PMF.toOuterMeasure_ne_top _ _), ← Finset.univ_product_univ,
-    Finset.sum_product]
-  refine Finset.sum_congr rfl fun x _ => Finset.sum_congr rfl fun y _ => ?_
-  rw [ENNReal.toReal_mul, PMF.toOuterMeasure_map_apply,
-    Cslib.Probability.PMF.toOuterMeasure_apply_toReal, ← Finset.univ_product_univ,
-    Finset.sum_product]
-  congr 1
-  refine Finset.sum_congr rfl fun a _ => Finset.sum_congr rfl fun b _ => ?_
-  simp only [Set.mem_preimage, Set.mem_ofPred_eq]
-  split_ifs
-  · rw [CommutingStrategy.answers_apply, ENNReal.toReal_ofReal (S.prob_nonneg x y a b)]
-  · rfl
+      if G.accepts x y a b then S.prob x y a b else 0 :=
+  G.answersWinProb_eq_sum_of_ofReal _ _ S.prob_nonneg S.answers_apply
 
 /-- The winning probability of a commuting-operator strategy for CHSH in terms of its
 correlations. -/
@@ -272,7 +256,7 @@ noncomputable def rightMeasurement (N : POVM B κ) : Measurement B (Matrix (ι �
 `ℂ^ι ⊗ ℂ^κ`: the effects `E ⊗ 1` and `1 ⊗ F` and the vector state of the shared state. -/
 noncomputable def toCommuting (S : QuantumStrategy X Y A B ι κ) :
     CommutingStrategy X Y A B (Matrix (ι × κ) (ι × κ) ℂ) where
-  state := State.vector S.state S.norm_state
+  state := AlgState.vector S.state S.norm_state
   alice x := leftMeasurement (S.alice x)
   bob y := rightMeasurement (S.bob y)
   commute x y a b := by
@@ -305,7 +289,10 @@ variable {X Y A B ι κ : Type*} (G : TwoProverGame X Y A B) [Fintype A] [Fintyp
 commuting-operator form win with the same probability. -/
 theorem commutingWinProb_toCommuting (S : QuantumStrategy X Y A B ι κ) :
     G.commutingWinProb S.toCommuting = G.quantumWinProb S := by
-  simp only [commutingWinProb, quantumWinProb, QuantumStrategy.answers_toCommuting]
+  rw [commutingWinProb, quantumWinProb]
+  congr 1
+  funext x y
+  exact QuantumStrategy.answers_toCommuting S x y
 
 end TwoProverGame
 

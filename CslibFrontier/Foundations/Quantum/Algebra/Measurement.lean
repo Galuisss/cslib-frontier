@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: candidate
 
-public import CslibFrontier.Foundations.Quantum.Algebra.State
+public import CslibFrontier.Foundations.Quantum.Algebra.AlgState
 public import CslibFrontier.Foundations.Quantum.POVM
 public import Mathlib.Probability.ProbabilityMassFunction.Constructions
 
@@ -101,45 +101,45 @@ def IsProjective (M : Measurement α A) : Prop :=
 
 end Ring
 
-section State
+section AlgState
 
 variable [Ring A] [PartialOrder A] [Algebra ℂ A]
 
 /-- The probability `Re φ(E_a)` of the outcome `a` in the state `φ`. -/
-noncomputable def prob (φ : State A) (M : Measurement α A) (a : α) : ℝ :=
+noncomputable def prob (φ : AlgState A) (M : Measurement α A) (a : α) : ℝ :=
   (φ (M.effect a)).re
 
-theorem prob_nonneg (φ : State A) (M : Measurement α A) (a : α) : 0 ≤ M.prob φ a :=
+theorem prob_nonneg (φ : AlgState A) (M : Measurement α A) (a : α) : 0 ≤ M.prob φ a :=
   φ.re_apply_nonneg (M.nonneg a)
 
-theorem ofReal_prob (φ : State A) (M : Measurement α A) (a : α) :
+theorem ofReal_prob (φ : AlgState A) (M : Measurement α A) (a : α) :
     (M.prob φ a : ℂ) = φ (M.effect a) :=
   φ.ofReal_re_apply (M.nonneg a)
 
 /-- The outcome probabilities sum to `1`. -/
 @[simp]
-theorem sum_prob (φ : State A) (M : Measurement α A) : ∑ a, M.prob φ a = 1 := by
-  simp only [prob, ← Complex.re_sum, ← map_sum, M.sum_effect, State.map_one, Complex.one_re]
+theorem sum_prob (φ : AlgState A) (M : Measurement α A) : ∑ a, M.prob φ a = 1 := by
+  simp only [prob, ← Complex.re_sum, ← map_sum, M.sum_effect, AlgState.map_one, Complex.one_re]
 
 /-- The outcome distribution of `M` in the state `φ`. -/
-noncomputable def distribution (φ : State A) (M : Measurement α A) : PMF α :=
+noncomputable def distribution (φ : AlgState A) (M : Measurement α A) : PMF α :=
   PMF.ofFintype (fun a => ENNReal.ofReal (M.prob φ a)) <| by
     rw [← ENNReal.ofReal_sum_of_nonneg fun a _ => M.prob_nonneg φ a, sum_prob,
       ENNReal.ofReal_one]
 
 @[simp]
-theorem distribution_apply (φ : State A) (M : Measurement α A) (a : α) :
+theorem distribution_apply (φ : AlgState A) (M : Measurement α A) (a : α) :
     M.distribution φ a = ENNReal.ofReal (M.prob φ a) := by
   rw [distribution, PMF.ofFintype_apply]
 
 variable [IsOrderedAddMonoid A]
 
-theorem prob_map [DecidableEq β] (φ : State A) (f : α → β) (M : Measurement α A) (b : β) :
+theorem prob_map [DecidableEq β] (φ : AlgState A) (f : α → β) (M : Measurement α A) (b : β) :
     (M.map f).prob φ b = ∑ a with f a = b, M.prob φ a := by
   simp only [prob, map_effect, map_sum, Complex.re_sum]
 
 /-- Post-processing pushes the outcome distribution forward. -/
-theorem distribution_map [DecidableEq β] (φ : State A) (f : α → β) (M : Measurement α A) :
+theorem distribution_map [DecidableEq β] (φ : AlgState A) (f : α → β) (M : Measurement α A) :
     (M.map f).distribution φ = (M.distribution φ).map f := by
   ext b
   rw [distribution_apply, PMF.map_apply, tsum_fintype, prob_map,
@@ -150,7 +150,7 @@ theorem distribution_map [DecidableEq β] (φ : State A) (f : α → β) (M : Me
   · simp [h]
   · simp [h, Ne.symm h]
 
-end State
+end AlgState
 
 section Const
 
@@ -168,7 +168,7 @@ def const [DecidableEq α] (a : α) : Measurement α A where
 theorem isProjective_const [DecidableEq α] (a : α) : (const a : Measurement α A).IsProjective :=
   fun a' => by simp only [const]; split_ifs <;> simp
 
-theorem prob_const [Algebra ℂ A] [DecidableEq α] (φ : State A) (a a' : α) :
+theorem prob_const [Algebra ℂ A] [DecidableEq α] (φ : AlgState A) (a a' : α) :
     (const a : Measurement α A).prob φ a' = if a' = a then 1 else 0 := by
   simp only [prob, const]; split_ifs <;> simp
 
@@ -240,11 +240,11 @@ theorem toMeasurement_effect (M : POVM α ι) (a : α) : M.toMeasurement.effect 
 
 /-- In a vector state, a POVM measures with the Born rule. -/
 theorem prob_toMeasurement (M : POVM α ι) (ψ : EuclideanSpace ℂ ι) (hψ : ‖ψ‖ = 1) (a : α) :
-    M.toMeasurement.prob (State.vector ψ hψ) a = M.prob ψ a :=
+    M.toMeasurement.prob (AlgState.vector ψ hψ) a = M.prob ψ a :=
   rfl
 
 theorem distribution_toMeasurement (M : POVM α ι) (ψ : EuclideanSpace ℂ ι) (hψ : ‖ψ‖ = 1) :
-    M.toMeasurement.distribution (State.vector ψ hψ) = M.measure ψ hψ := by
+    M.toMeasurement.distribution (AlgState.vector ψ hψ) = M.measure ψ hψ := by
   ext a
   rw [Measurement.distribution_apply, measure_apply, prob_toMeasurement]
 

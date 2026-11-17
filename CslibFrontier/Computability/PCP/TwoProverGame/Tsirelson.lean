@@ -28,8 +28,8 @@ by `2√2` (`Cslib.PCP.QuantumStrategy.chsh_correlation_le`). It comes from the 
 model: a tensor-product strategy is an instance of that model
 (`Cslib.PCP.QuantumStrategy.toCommuting`) with the same correlations
 (`Cslib.PCP.QuantumStrategy.correlation_toCommuting`), and there the inequality holds for every
-state on any star-ordered algebra (`Cslib.Quantum.State.re_chsh_le`). In the GNS pre-inner product
-space of the state the observables `A_x` and `B_y` are vectors of norm at most `1`, and
+state on any star-ordered algebra (`Cslib.Quantum.AlgState.re_chsh_le`). In the GNS pre-inner
+product space of the state the observables `A_x` and `B_y` are vectors of norm at most `1`, and
 `Re⟨u₀, v₀ + v₁⟩ + Re⟨u₁, v₀ - v₁⟩ ≤ ‖v₀ + v₁‖ + ‖v₀ - v₁‖ ≤ 2√2` by Cauchy–Schwarz and the
 parallelogram law (`chsh_re_inner_le`). Hence every quantum strategy wins
 CHSH with probability at most `1/2 + √2/4 = cos²(π/8)`
