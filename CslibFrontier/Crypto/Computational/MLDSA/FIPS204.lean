@@ -76,13 +76,12 @@ private def asPoly (coeffs : List (ZMod 8380417)) : Option Poly :=
 
 /-- The coefficient of degree `j` in the inverse NTT, using the evaluation points
 `ζ^(2 BitRev8(i)+1)` (FIPS 204 §2.5, equation (2.1)). The inverse of 256 modulo q is 8347681. -/
-private def fromNTT (values : Poly) : Poly :=
+private def fromNTT (values : Poly) : Vector (ZMod 8380417) 256 :=
   let roots := Vector.ofFn fun a : Fin 512 => (1753 : ZMod 8380417) ^ a.val
   let inversePowers := Vector.ofFn fun i : Fin 256 =>
     511 - 2 * BitString.lsbValue (BitString.lowBits 8 i.val).reverse
-  let coeffs := Vector.ofFn fun j : Fin 256 =>
+  Vector.ofFn fun j : Fin 256 =>
     8347681 * ∑ i, values i * roots.get (Fin.ofNat 512 (inversePowers.get i * j.val))
-  coeffs.get
 
 private def tabulate {α : Type} (n : ℕ) (f : Fin n → Option α) : Option (Fin n → α) :=
   (fun v : Vector α n => v.get) <$> Vector.ofFnM f
@@ -90,10 +89,12 @@ private def tabulate {α : Type} (n : ℕ) (f : Fin n → Option α) : Option (F
 /-- Algorithms 30 and 32, returning the matrix in coefficient representation. Each SHAKE128
 stream absorbs `ρ || column || row` and may consume 894 bytes (Appendix C, Table 3). -/
 def expandA (s : Level) (rho : List Byte) :
-    Option (Matrix (Fin s.params.k) (Fin s.params.ℓ) Poly) :=
-  tabulate _ fun row => tabulate _ fun col =>
-    fromNTT <$> asPoly (uniformCoeffs (Keccak.shake128
-      (rho ++ [Fin.ofNat 256 col.val, Fin.ofNat 256 row.val]) 894))
+    Option (Matrix (Fin s.params.k) (Fin s.params.ℓ) Poly) := do
+  let matrix ← Vector.ofFnM fun row : Fin s.params.k =>
+    Vector.ofFnM fun col : Fin s.params.ℓ =>
+      fromNTT <$> asPoly (uniformCoeffs (Keccak.shake128
+        (rho ++ [Fin.ofNat 256 col.val, Fin.ofNat 256 row.val]) 894))
+  return fun i j => ((matrix.get i).get j).get
 
 private def boundedCoeff (η halfByte : ℕ) : Option (ZMod 8380417) :=
   if η = 2 then
