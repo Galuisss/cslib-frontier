@@ -199,10 +199,12 @@ theorem serviceWire_hidden (layout : ClassicalQueryLayout) :
       layout.hiddenWire := by
   simp [serviceWire, fullInputWidth, hiddenWire, requestBase]
 
-/-- No logical wire of the second stage maps to the retained hidden-bit record. Thus the guess
-stage receives the ciphertext and saved first-stage register but cannot access the challenge bit. -/
-theorem secondWire_ne_replyBase (layout : ClassicalQueryLayout) (wire : ℕ) :
-    layout.secondWire wire ≠ layout.replyBase := by
+/-- No logical wire of the second stage maps into the retained full-reply record. Thus the guess
+stage receives the copied ciphertext and saved first-stage register, while the complete reply
+remains outside its image. -/
+theorem secondWire_ne_replyBlock (layout : ClassicalQueryLayout) (wire : ℕ)
+    (replyWire : Fin (1 + layout.ciphertextWidth)) :
+    layout.secondWire wire ≠ layout.replyBase + replyWire := by
   by_cases hinput : wire < layout.secondInputWidth
   · rw [secondWire, ite_eq_left hinput]
     simp only [secondBase, replyBase, serviceBase, hiddenWire, requestBase]
