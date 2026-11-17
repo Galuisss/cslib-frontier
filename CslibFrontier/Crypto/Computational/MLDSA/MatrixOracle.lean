@@ -12,6 +12,7 @@ public import CslibFrontier.Languages.Probabilistic.Oracle.Interaction
 import CslibFrontier.Languages.Probabilistic.RandomOracle.Probabilistic
 import CslibFrontier.Languages.Probabilistic.Vector
 import CslibFrontier.Probability.PMF.Bind
+import CslibFrontier.Crypto.Game.Order
 
 /-!
 # The Module-LWE key switch for ML-DSA with a public matrix oracle
@@ -23,6 +24,10 @@ The short secret and error are independent, uniform coefficientwise on
 `[-η,η]`. This is the short-secret MLWE law in §§6.1–6.2.1 of the Dilithium v3.1
 specification [BaiEtAl2021Dilithium]. Public-key rounding, encoding and the digest check
 use FIPS 204, Algorithms 3, 6 and 8 [NISTFIPS204].
+
+The self-target solver receives the full independent uniform matrix and vector, publishes their
+rounded byte key, and corrects its witness by the product of the challenge and the discarded
+low vector. Its success and the MLWE advantage bound key-only forgery in this experiment.
 
 The reduction starts its lazy oracle cache with the challenge matrix at the public seed.
 The advantage for replacing the unrounded public vector by uniform is exactly the standard
@@ -94,14 +99,18 @@ noncomputable def uniformVectorGame (s : Level) (adv : Forger s) : Game := do
   let t ← PMF.uniformOfFintype (Fin s.params.k → Poly)
   withVector s adv fun _ => t
 
+private def runAtSeed {α : Type} (s : Level) (rho : FixedBytes 32) (A : PublicMatrix s)
+    (client : ProbOracleComp (fun _ : FixedBytes 32 => PublicMatrix s) α) : ProbComp α :=
+  Prod.fst <$> (OracleComp.interpret
+    (sumHandler (fun n => StateT.lift (ProbComp.unifFin n)) (memoize fun _ => sampleMatrix s))
+    client).run [(rho, A)]
+
 /-- The Module-LWE distinguisher on a challenge `(A,t)`. It samples a fresh public seed,
 initializes its cache with `(ρ,A)`, and generates each new queried matrix coefficientwise. -/
 def distinguisher (s : Level) (adv : Forger s) (A : PublicMatrix s)
     (t : Fin s.params.k → Poly) : ProbComp Bool := do
   let rho ← sampleSeed
-  Prod.fst <$> (OracleComp.interpret
-    (sumHandler (fun n => StateT.lift (ProbComp.unifFin n)) (memoize fun _ => sampleMatrix s))
-    (trial s adv rho A t)).run [(rho, A)]
+  runAtSeed s rho A (trial s adv rho A t)
 
 private theorem withVector_eq (s : Level) (adv : Forger s)
     (vector : PublicMatrix s → Fin s.params.k → Poly) :
@@ -109,7 +118,7 @@ private theorem withVector_eq (s : Level) (adv : Forger s)
       (distinguisher s adv A (vector A)).eval := by
   simp only [withVector, PMF.monad_bind_eq_bind, ProbOracleComp.runWith_bind,
     ProbOracleComp.runWith_query, memoize_of_none _ _ [] rfl, PMF.monad_pure_eq_pure,
-    PMF.map_bind, PMF.bind_bind, PMF.pure_bind, distinguisher, ProbComp.eval_bind,
+    PMF.map_bind, PMF.bind_bind, PMF.pure_bind, distinguisher, runAtSeed, ProbComp.eval_bind,
     sampleSeed, ProbComp.eval_replicateFin, ProbComp.eval_unifFin, PMF.pi_uniformOfFintype,
     ProbComp.eval_map, ProbOracleComp.eval_run_interpret_eq_runWith, ProbComp.eval_memoize,
     eval_sampleMatrix]
@@ -130,5 +139,65 @@ theorem advantage_eq_moduleLWE (s : Level) (adv : Forger s) :
   · simp only [uniformVectorGame, withVector_eq, ModuleLWE.randomGame,
       ModuleLWE.eval_randomExperiment, PMF.monad_bind_eq_bind]
     exact PMF.bind_comm _ _ _
+
+
+/-- On a full challenge `(A,t)`, publish the seed and rounded vector, run the byte forger
+using a shared matrix oracle initialized at `(ρ,A)`, and return the corrected self-target
+candidate. A parsing failure produces the all-zero candidate. -/
+def selfTargetSolver (s : Level) (adv : Forger s) (pk : MLDSA.PublicKey s.params) :
+    ProbComp (SelfTargetCandidate s.params) := do
+  let rho ← sampleSeed
+  let f ← runAtSeed s rho pk.A (adv (encodePublic s rho.toList pk.t))
+  return (extractFull s rho pk.A pk.t f).getD ⟨[], 0, 0, 0⟩
+
+private theorem fixed_le (s : Level) (adv : Forger s) (A : PublicMatrix s)
+    (t : Fin s.params.k → Poly) :
+    (distinguisher s adv A t).eval true ≤
+      (selfTargetExperiment s.params (selfTargetHash s.params (algebraicHash s))
+        (compressedSelfTargetRadius s.params 13) ⟨A, t⟩ (selfTargetSolver s adv)).eval true := by
+  simp only [distinguisher, selfTargetExperiment, selfTargetSolver, runAtSeed, trial,
+    ProbComp.eval_bind,
+    ProbComp.eval_pure, ProbComp.eval_map, ProbOracleComp.eval_run_interpret_eq_runWith,
+    ProbOracleComp.runWith_bind, ProbOracleComp.runWith_pure, PMF.map_bind, PMF.pure_map,
+    PMF.bind_bind, PMF.pure_bind, PMF.bind_map, Function.comp_apply]
+  refine Probability.PMF.bind_apply_mono_on_support _ _ fun rho _ => ?_
+  refine Probability.PMF.bind_apply_mono_on_support _ _ fun ⟨f, _⟩ _ => ?_
+  cases hv : verifyWithExpansion s (fun _ => some A) (encodePublic s rho.toList t)
+    f.message f.context f.signature with
+  | none => simp
+  | some b =>
+    cases b with
+    | false => simp
+    | true =>
+      obtain ⟨y, hy, hw⟩ := extractFull_of_verifyWithExpansion (rho := rho) rfl hv
+      simp [hy, hw]
+
+/-- A byte forgery under a uniform unrounded vector yields a candidate in the original
+self-target experiment with independent uniform `A,t`. The target hashes the same message
+representative and commitment with concrete SHAKE. -/
+theorem uniformVectorGame_le_selfTarget (s : Level) (adv : Forger s) :
+    (uniformVectorGame s adv).succProbability ≤
+      (selfTargetGame s.params (uniformKeyLaw s.params) (selfTargetHash s.params (algebraicHash s))
+        (compressedSelfTargetRadius s.params 13) (selfTargetSolver s adv)).succProbability := by
+  apply Game.succProbability_mono
+  simp only [uniformVectorGame, withVector_eq, selfTargetGame, uniformKeyLaw,
+    PMF.monad_bind_eq_bind,
+    PMF.monad_pure_eq_pure, PMF.bind_bind, PMF.pure_bind]
+  rw [PMF.bind_comm (PMF.uniformOfFintype (Fin s.params.k → Poly))]
+  exact Probability.PMF.bind_apply_mono_on_support _ _ fun A _ =>
+    Probability.PMF.bind_apply_mono_on_support _ _ fun t _ => fixed_le s adv A t
+
+/-- Finite key-only bound in the public-matrix-oracle game: the cost of replacing the genuine
+short-law Module-LWE vector plus the success of the constructed solver against the actual
+full uniform challenge. Both terms use the same byte-key forger. -/
+theorem keyOnlyGame_le_moduleLWE_add_selfTarget (s : Level) (adv : Forger s) :
+    (keyOnlyGame s adv).succProbability ≤
+      ModuleLWE.advantage (shortVectorLaw s s.params.ℓ) (shortVectorLaw s s.params.k)
+        (distinguisher s adv) +
+      (selfTargetGame s.params (uniformKeyLaw s.params) (selfTargetHash s.params (algebraicHash s))
+        (compressedSelfTargetRadius s.params 13) (selfTargetSolver s adv)).succProbability := by
+  rw [add_comm]
+  exact (Game.succProbability_le_add_of_advantage_le (advantage_eq_moduleLWE s adv).le).trans
+    (add_le_add_left (uniformVectorGame_le_selfTarget s adv) _)
 
 end Cslib.Crypto.MLDSA.FIPS204.MatrixOracle
