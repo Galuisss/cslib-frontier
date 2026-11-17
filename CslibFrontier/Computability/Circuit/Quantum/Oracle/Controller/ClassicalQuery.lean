@@ -936,7 +936,7 @@ copies assembled above; callers do not supply a separate adapter program or effi
                   value.1.input.securityParameter + 1 +
                     (value.1.input.classicalInputLength - value.1.publicKeyWidth)) <
                       value.1.first.width
-            · simp [hinput, hsaved]
+            · simp only [Function.const_apply, hinput, hsaved, ↓reduceIte]
               rfl
             · simp [hinput, hsaved]
     let firstInstructions := oracleDescriptionInstructionsCompiler.comp firstDescription

@@ -25,47 +25,11 @@ needed.
 
 ## Main results
 
-* `Cslib.Quantum.GateCode.classicalRun_blockCopyCodes_zeroTarget`: the exact basis-state copy.
 * `Cslib.Quantum.Circuit.matrix_blockCopyCodes_zeroTarget`: a physical CNOT copy into a zero
   target is exactly `coherentRecord` after the target-register split.
 -/
 
 public section
-
-namespace Cslib.Quantum.GateCode
-
-/-- A disjoint copy into an all-zero target writes exactly the source block there, preserving
-all other bits. This basis-state form is also used by the coherent-record matrix identity. -/
-theorem classicalRun_blockCopyCodes_zeroTarget {source target count width : ℕ}
-    (hdisjoint : source + count ≤ target ∨ target + count ≤ source)
-    (hsource : source + count ≤ width) (htarget : target + count ≤ width)
-    (x : Fin width → Bool)
-    (hzero : ∀ i : Fin count, x (blockEmb target htarget i) = false) :
-    classicalRun (blockCopyCodes source target count) x =
-      glue (blockEmb target htarget) (fun i => readBit x (source + i)) x := by
-  classical
-  funext j
-  by_cases hj : ∃ i : Fin count, blockEmb target htarget i = j
-  · obtain ⟨i, rfl⟩ := hj
-    rw [glue_apply_emb]
-    have hread := readBit_classicalRun_blockCopyCodes hdisjoint hsource htarget x i.isLt
-    have hi : (blockEmb target htarget i : ℕ) = target + i := by
-      simp only [blockEmb_apply_val, Nat.add_comm]
-    rw [← hi, readBit_fin, readBit_fin, hzero, Bool.false_xor] at hread
-    exact hread
-  · have hout : ∀ i : Fin count, blockEmb target htarget i ≠ j := not_exists.mp hj
-    rw [glue_of_not _ _ _ hout]
-    have hread := readBit_classicalRun_of_forall_ne
-      (gs := blockCopyCodes source target count) (x := x) (q := (j : ℕ))
-      (fun gate hgate heq => by
-        obtain ⟨offset, hoffset, rfl⟩ := List.mem_map.mp hgate
-        have hoffset' := List.mem_range.mp hoffset
-        apply hout ⟨offset, hoffset'⟩
-        apply Fin.ext
-        simpa only [blockEmb_apply_val, Nat.add_comm] using heq)
-    simpa only [readBit_fin] using hread
-
-end Cslib.Quantum.GateCode
 
 namespace Cslib.Quantum.Circuit
 

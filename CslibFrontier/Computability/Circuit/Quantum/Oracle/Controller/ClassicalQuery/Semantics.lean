@@ -306,11 +306,25 @@ private theorem eval_prepareHidden_ket (layout : ClassicalQueryLayout)
       simp only [blockEmb_apply_val] at hv
       omega)]
     rwa [readBit_of_lt x hreplylt] at hreply
-  change classicalRun (blockCopyCodes layout.hiddenWire layout.replyBase 1) y = _
-  simp only [classicalRun, blockCopyCodes, List.range_one, List.map_cons, List.map_nil,
-    Nat.add_zero, List.foldl_cons, List.foldl_nil, classicalStep, dite_eq_left hreplylt,
-    List.all_cons, List.all_nil, Bool.and_true, hytarget, hysource, Bool.false_xor]
-  rfl
+  change classicalRun (blockCopyCodes layout.hiddenWire layout.replyBase 1) y =
+    Function.update y ⟨layout.replyBase, hreplylt⟩ (bit 0)
+  have hembReply : blockEmb layout.replyBase htarget (0 : Fin 1) =
+      ⟨layout.replyBase, hreplylt⟩ := by
+    apply Fin.ext
+    simp only [blockEmb_apply_val, Fin.val_zero, Nat.zero_add]
+  have hcopyZero : ∀ i : Fin 1, y (blockEmb layout.replyBase htarget i) = false := by
+    intro i
+    rw [Subsingleton.elim i 0, hembReply]
+    exact hytarget
+  rw [classicalRun_blockCopyCodes_zeroTarget (Or.inl hdisjoint) hsource htarget y hcopyZero]
+  funext j
+  by_cases hj : j = blockEmb layout.replyBase htarget 0
+  · subst j
+    rw [glue_apply_emb, hembReply, Function.update_self]
+    simpa only [Fin.val_zero, Nat.add_zero] using hysource
+  · rw [glue_of_not _ _ _ (fun i heq => hj (by
+      rw [Subsingleton.elim i 0] at heq
+      exact heq.symm)), Function.update_of_ne (by simpa only [hembReply] using hj)]
 
 
 /-- The actual request copy and hidden-bit preparation preserve the complete first-stage
@@ -351,9 +365,6 @@ theorem eval_requestHidden_embedState (layout : ClassicalQueryLayout)
   dsimp only
   have hrequestEnd : layout.requestBase + layout.first.outputWidth ≤ layout.width := by
     simp only [width, secondBase, replyBase, serviceBase, hiddenWire]
-    omega
-  have hfirstWidth : layout.first.width ≤ layout.width := by
-    simp only [width, secondBase, replyBase, serviceBase, hiddenWire, requestBase]
     omega
   have hsource : 0 + layout.first.outputWidth ≤ layout.width := by omega
   have hdisjoint : 0 + layout.first.outputWidth ≤ layout.requestBase ∨
