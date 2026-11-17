@@ -18,15 +18,21 @@ import CslibFrontier.Foundations.BooleanAnalysis.HadamardRectangles
 
 A measurement `M` with outcomes `x ∈ {0,1}ⁿ` defines the **character observables**
 `χ_M(a) = ∑_x (-1)^{a·x} M_x` (`Cslib.Quantum.Measurement.charObs`), its Walsh–Fourier
-transform. In nonlocal games these are the observables built from a prover's answers, the
-averaged marginals of [Natarajan and Vidick, §4.1, eq. (11)][NatarajanVidick2017]
-(arXiv:1610.03574v1, p. 18).
+transform, for a supplied measurement with full-bit-string outcomes.
+
+These are *not* the averaged marginals of a strategy in
+[Natarajan and Vidick, §4.1, eq. (11)][NatarajanVidick2017] (arXiv:1610.03574v1, p. 18). Those
+average a query-dependent measurement over the other query and the other answer. For example, a
+strategy that always answers `-1` has marginal `-1` at `a = 0`, while `χ_M(0) = 1` for every `M`.
+Constructing such a measurement from a strategy's query-dependent measurements, comparing its
+characters with the strategy's marginals, and bounding the defect by the winning probability are
+tracked in [#6149](https://github.com/cslib-community/cslib-frontier/issues/6149) (milestone M3).
 
 * For a **projective** measurement they are self-adjoint unitaries and *exactly* linear,
   `χ(a) χ(a') = χ(a + a')` (`Cslib.Quantum.Measurement.IsProjective.charObs_mul`,
-  `Cslib.Quantum.Measurement.IsProjective.charObs_mem_unitary`), so they satisfy the hypotheses of
-  the Pauli-family defect bound (`Cslib.Quantum.expect_norm_pauliFamily_sub_sq_le`) with linearity
-  defect `0`.
+  `Cslib.Quantum.Measurement.IsProjective.charObs_mem_unitary`). So, as families `X` or `Z`, they
+  satisfy the unitarity hypotheses of the Pauli-family defect bound
+  (`Cslib.Quantum.expect_norm_pauliFamily_sub_sq_le`) with linearity defect `0`.
 * **Parseval in a state** (`Cslib.Quantum.expect_norm_walshSum_sq`):
   `E_a ‖∑_x (-1)^{a·x} D(x)‖²_φ = ∑_x ‖D(x)‖²_φ` for any family `D`, by orthogonality of the
   characters. So closeness of two measurements, `∑_x ‖M_x - P_x‖²_φ`, is exactly the average
