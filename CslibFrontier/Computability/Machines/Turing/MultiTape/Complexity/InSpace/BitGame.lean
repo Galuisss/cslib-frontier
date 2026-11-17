@@ -179,9 +179,8 @@ private theorem iterate_stepS (L V P : α × List Bool → Bool) (k : ℕ) (x : 
 
 private theorem length_encList_encBool (w : List Bool) :
     (encList encBool w).length = 3 * w.length := by
-  simp only [length_encList, encBool_apply, List.length_singleton, List.map_const,
-    List.sum_replicate]
-  omega
+  simp only [length_encList, encBool_apply, List.length_singleton]
+  simp
 
 /-- A step of the evaluation is computable within the space of the state and of the tests. -/
 private theorem stepS_inSpace {L V P : α × List Bool → Bool} {SL SV SP : α × List Bool → ℕ}
@@ -214,7 +213,7 @@ private theorem stepS_inSpace {L V P : α × List Bool → Bool} {SL SV SP : α 
   have hpush := budget_prod (budget_cons (budget_const true hl) (budget_tail hw))
     (budget_const (encB := encOption encBool) none hl)
   have hpop := budget_prod (budget_tail hw) ho
-  have hret := budget_prod hw (budget_optionSome hVx)
+  have hret := budget_prod hw (budget_optionSome (encO := encOption encBool) hVx)
   have hdown := budget_prod (budget_cons (budget_const false hl) hw)
     (budget_const (encB := encOption encBool) none hl)
   have hinner := budget_ite hsome (budget_ite hempty (budget_prod hw ho)
@@ -242,7 +241,8 @@ theorem bitGame_value {L V P : α × List Bool → Bool} {SL SV SP : α × List 
   have hdone : ComputableInSpace done encS encBool fun s => (encS s).length := by
     have hid := budget_id (enc := encS) (S := fun s => (encS s).length) (.refl _)
     exact budget_finite (encC := encBool) (fun p : Bool × Bool => p.1 && p.2)
-      (budget_prod (budget_isEmpty hid.snd'.fst') (budget_optionIsSome (encB := encBool) hid.snd'.snd'))
+      (budget_prod (budget_isEmpty hid.snd'.fst') (budget_optionIsSome (encB := encBool)
+        hid.snd'.snd'))
   have hinit : ComputableInSpace (fun x : α => (x, ([] : List Bool), (none : Option Bool)))
       encIn encS fun x => (encIn x).length := by
     have hl : (fun x => (encIn x).length) ≼ fun x => (encIn x).length := .refl _

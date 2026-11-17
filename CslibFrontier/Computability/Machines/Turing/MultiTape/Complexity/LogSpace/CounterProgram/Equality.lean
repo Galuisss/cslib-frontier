@@ -89,7 +89,7 @@ private theorem equality_run (u v : List Bool) {B : ℕ}
           rw [List.getElem?_eq_getElem hv]
           cases v[u.length] <;> exact Reaches.refl _
         · have : v.drop u.length ≠ [] := by simp [List.drop_eq_nil_iff, hv.not_ge]
-          simp [List.drop_length, this, equalityProgram, instr, Instr.reject, encBool_apply]
+          simp [List.drop_length, this, equalityProgram, instr, Instr.reject]
       · refine ⟨(8, [u.length, u.length]), ?_, ?_, hregs⟩
         · apply Reaches.read (by rfl) hregs
           simp only [eval_mul, eval_const, eval_reg, List.getD_cons_succ, List.getD_cons_zero,
@@ -100,7 +100,7 @@ private theorem equality_run (u v : List Bool) {B : ℕ}
             using (Reaches.refl (P := equalityProgram) (w := frame u ++ v)
               (Q := equalityProgram.Running B) (8, [u.length, u.length]))
         · simp [List.drop_eq_nil_iff.mpr (by omega : v.length ≤ u.length), equalityProgram,
-            instr, Instr.accept, encBool_apply]
+            instr, Instr.accept]
     | succ n ih =>
       have hiu : i < u.length := by omega
       have hregs := bounded (B := B) (a := u.length) (b := i) (by omega) (by omega)
@@ -149,7 +149,7 @@ private theorem equality_run (u v : List Bool) {B : ℕ}
                 ← List.cons_getElem_drop_succ (l := v) (n := i) (h := hv)]
               intro hdrop
               exact heq (List.cons.inj hdrop).1
-            simp [hd, equalityProgram, instr, Instr.reject, encBool_apply]
+            simp [hd, equalityProgram, instr, Instr.reject]
       · refine ⟨(9, [u.length, i]), hstep.trans ?_, ?_, hregs⟩
         · cases hu : u[i] <;> simp only [Bool.false_eq_true, ↓reduceIte]
           all_goals
@@ -161,7 +161,7 @@ private theorem equality_run (u v : List Bool) {B : ℕ}
         · have hd : u.drop i ≠ v.drop i := by
             rw [List.drop_eq_nil_iff.mpr (by omega : v.length ≤ i)]
             simp [List.drop_eq_nil_iff, hiu.not_ge]
-          simp [hd, equalityProgram, instr, Instr.reject, encBool_apply]
+          simp [hd, equalityProgram, instr, Instr.reject]
   obtain ⟨s, hs, hout, hb⟩ := loop 0 (Nat.zero_le _)
   exact ⟨s, (scan 0 (Nat.zero_le _)).trans hs, by simpa using hout, hb⟩
 

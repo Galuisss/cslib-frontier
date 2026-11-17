@@ -70,7 +70,7 @@ private theorem encPair_bits_unary :
 
 private theorem length_input :
     (frame w ++ List.replicate k true).length = 2 * w.length + 1 + k := by
-  simp [length_frame]
+  simp
 
 private theorem input_marker {i : ℕ} (hi : i < w.length) :
     (frame w ++ List.replicate k true)[2 * i]? = some true := by
@@ -86,7 +86,7 @@ private theorem input_bit {i : ℕ} (hi : i < w.length) :
 private theorem input_unary {j : ℕ} (hj : j < k) :
     (frame w ++ List.replicate k true)[2 * w.length + 1 + j]? = some true := by
   rw [List.getElem?_append_right (by rw [length_frame]; omega)]
-  simp [length_frame, hj]
+  simp [hj]
 
 private theorem input_after :
     (frame w ++ List.replicate k true)[2 * w.length + 1 + k]? = none := by
@@ -340,22 +340,21 @@ private theorem getElem?_marker (l : List α) {t j : ℕ} (ht : t < l.length)
     (hj : j < (enc l[t]).length) :
     (encList enc l)[off enc l t + 2 * j]? = some true := by
   rw [encList_split enc l ht, List.getElem?_append_right (by simp [off]),
-    List.getElem?_append_left (by simp [off, length_frame]; omega)]
+    List.getElem?_append_left (by simp [off]; omega)]
   simpa [off] using getElem?_frame_two_mul hj
 
 private theorem getElem?_end (l : List α) {t : ℕ} (ht : t < l.length) :
     (encList enc l)[off enc l t + 2 * (enc l[t]).length]? = some false := by
   rw [encList_split enc l ht, List.getElem?_append_right (by simp [off]),
-    List.getElem?_append_left (by simp [off, length_frame])]
+    List.getElem?_append_left (by simp [off])]
   simpa [off] using getElem?_frame_two_mul_length (enc l[t])
 
 private theorem getElem?_bit (l : List α) {t j : ℕ} (ht : t < l.length)
     (hj : j < (enc l[t]).length) :
     (encList enc l)[off enc l t + 2 * j + 1]? = (enc l[t])[j]? := by
   rw [encList_split enc l ht, List.getElem?_append_right (by simp [off]; omega),
-    List.getElem?_append_left (by simp [off, length_frame]; omega)]
-  have := getElem?_frame_two_mul_add_one hj
-  convert this using 1 <;> congr 1 <;> omega
+    List.getElem?_append_left (by simp [off]; omega)]
+  simpa only [off, Nat.add_assoc, Nat.add_sub_cancel_left] using getElem?_frame_two_mul_add_one hj
 
 end Offsets
 
@@ -501,7 +500,8 @@ private theorem reachesOut_lookupProgram :
     ∃ s fin, lookupProgram.ReachesOut X
       (lookupProgram.Active (((frame (encList enc l) ++ List.replicate k true).length + 1) ^ 1))
       lookupProgram.init s
-      ((l[k]?).elim [false] fun a => true :: enc a) ∧ lookupProgram.instr s.1 = .halt fin ∧ fin = [] ∧
+      ((l[k]?).elim [false] fun a => true :: enc a) ∧ lookupProgram.instr s.1 = .halt fin ∧
+        fin = [] ∧
       ∀ r ∈ s.2, r ≤ ((frame (encList enc l) ++ List.replicate k true).length + 1) ^ 1 := by
   set n := (encList enc l).length
   have hlen : (frame (encList enc l) ++ List.replicate k true).length = 2 * n + 1 + k :=
@@ -594,7 +594,7 @@ theorem getElem? {α : Type} (enc : α ↪ List Bool) :
       (encOption enc) := by
   refine lookupProgram.computableInLogSpace_of_reachesOut 1 fun ⟨l, k⟩ => ?_
   obtain ⟨s, fin, h, hhalt, rfl, hs⟩ := reachesOut_lookupProgram (enc := enc) (l := l) (k := k)
-  exact ⟨s, _, [], h, hhalt, by cases hopt : l[k]? <;> simp [hopt], hs⟩
+  exact ⟨s, _, [], h, hhalt, by cases l[k]? <;> simp, hs⟩
 
 /-! ### Automation -/
 

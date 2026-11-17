@@ -162,7 +162,40 @@ theorem computableInPolyTime_writeEntries :
       (encA := encPair encBool encUnary) (encB := encPair eKey eAct) hz ?_
     apply mapConst
     intro r hr
-    fun_prop
+    have htapes : ComputableInPolyTime
+        (fun p : (Desc × List Bool) × (Bool × ℕ) => p.1.1.tapes)
+        (encPair (encPair eDesc encBits) (encPair encBool encUnary)) encUnary := by
+      fun_prop
+    have hindex : ComputableInPolyTime
+        (fun p : (Desc × List Bool) × (Bool × ℕ) => p.2.2)
+        (encPair (encPair eDesc encBits) (encPair encBool encUnary)) encUnary := by
+      fun_prop
+    have hkey : ComputableInPolyTime
+        (fun p : (Desc × List Bool) × (Bool × ℕ) =>
+          (⟨2 * p.2.2 + 6, r, none :: List.replicate p.1.1.tapes none⟩ : Key))
+        (encPair (encPair eDesc encBits) (encPair encBool encUnary)) eKey :=
+      eKey_mk_polyTime (unary_add' (unary_mul' (const 2) hindex) (const 6))
+        (const r) (by fun_prop)
+    have hbit : ComputableInPolyTime
+        (fun p : (Desc × List Bool) × (Bool × ℕ) => eBit p.2.1)
+        (encPair (encPair eDesc encBits) (encPair encBool encUnary)) encUnary := by
+      fun_prop
+    have hsymbol := (optionSome eSym (encO := encOption eSym)).comp
+      ((optionSome encUnary (encO := eSym)).comp hbit)
+    have htape : ComputableInPolyTime
+        (fun p : (Desc × List Bool) × (Bool × ℕ) =>
+          [(some (some (eBit p.2.1)), SignType.pos)])
+        (encPair (encPair eDesc encBits) (encPair encBool encUnary)) (encList eTA) := by
+      fun_prop
+    have hstate := (optionSome encUnary (encO := eSym)).comp
+      (unary_add' (unary_mul' (const 2) hindex) (const 4))
+    have hact : ComputableInPolyTime
+        (fun p : (Desc × List Bool) × (Bool × ℕ) =>
+          (⟨.zero, [(some (some (eBit p.2.1)), .pos)], none,
+            some (2 * p.2.2 + 4)⟩ : Act))
+        (encPair (encPair eDesc encBits) (encPair encBool encUnary)) eAct :=
+      eAct_mk_polyTime (const .zero) htape (const none) hstate
+    exact hkey.prod hact
   exact listAppend' h1 h2
 
 theorem computableInPolyTime_redirect :

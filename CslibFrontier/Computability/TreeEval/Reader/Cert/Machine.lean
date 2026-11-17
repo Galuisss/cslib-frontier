@@ -94,7 +94,7 @@ def stateBudget (s : State) : ℕ := stepBudget (s.toTuple, false)
 
 private theorem stepBudget_bool (x : Tuple) (b : Bool) : stepBudget (x, b) = stepBudget
     (x, false) := by
-  simp [stepBudget, encBool_apply]
+  simp [stepBudget]
 
 private theorem halt_inSpace : ComputableInSpace machine.halt encState encBool stateBudget :=
   (haltT_inSpace.of_encIn_eq State.toTuple fun _ => rfl).of_enc_eq fun s => by

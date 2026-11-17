@@ -648,7 +648,7 @@ private theorem computableInPolyTime_mitoticQuery {s : α → Bool} {r₀ : α �
   unfold mitoticQuery mitoticKeptIndices
   apply ComputableInPolyTime.optionGetDWithInput (encB := encA)
     (encO := encOption encA)
-  · apply ComputableInPolyTime.getElem? (encA := encA)
+  · apply ComputableInPolyTime.getElem? (encA := encA) (encL := encList encA)
     · fun_prop
     · exact ComputableInPolyTime.snd encA encUnary
   · exact ComputableInPolyTime.fst encA encUnary

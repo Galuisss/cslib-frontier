@@ -173,7 +173,8 @@ theorem union_halted_inSpace
     ComputableInSpace (union M N).halted (eUnion σ τ encS encT) encBool
       fun s => (eUnion σ τ encS encT s).length :=
   have hside := eUnion_side_budget σ τ encS encT union_id
-  budget_boolAnd (budget_optionIsSome (encB := encBool) hside) (budget_ite (budget_optionGetD (encB := encBool) false hside)
+  budget_boolAnd (budget_optionIsSome (encB := encBool) hside)
+    (budget_ite (budget_optionGetD (encB := encBool) false hside)
     (budget_comp_linear (f := fun s : UnionState σ τ => s.right) hN
       (eUnion_right_budget σ τ encS encT union_id))
     (budget_comp_linear (f := fun s : UnionState σ τ => s.left) hM
@@ -206,9 +207,10 @@ theorem union_next_inSpace
   have hnN := budget_comp_linear hN (budget_prod hr hq)
   have hnM := budget_comp_linear hM (budget_prod hl hq)
   exact budget_ite (budget_optionIsSome (encB := encBool) hside)
-    (budget_ite (budget_optionGetD (encB := encBool) false hside) (eUnion_mk_budget σ τ encS encT hl hnN hside)
+    (budget_ite (budget_optionGetD (encB := encBool) false hside)
+      (eUnion_mk_budget σ τ encS encT hl hnN hside)
       (eUnion_mk_budget σ τ encS encT hnM hr hside))
-    (eUnion_mk_budget σ τ encS encT hl hr (budget_optionSome hq.snd'))
+    (eUnion_mk_budget σ τ encS encT hl hr (budget_optionSome (encO := encOption encBool) hq.snd'))
 
 end Certificates
 

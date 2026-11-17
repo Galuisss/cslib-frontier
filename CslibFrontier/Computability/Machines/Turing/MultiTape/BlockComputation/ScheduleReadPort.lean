@@ -80,7 +80,7 @@ theorem providerPort_inSpace (k c : ℕ) :
   have hsome := budget_finite (encC := encOption (encFinite (Fin 3))) some hp
   have hnone := budget_const (encB := encOption (encFinite (Fin 3))) none
     (show (fun a => (encSearchArgs a).length) ≼ fun a => (encSearchArgs a).length from .refl _)
-  refine (budget_ite (budget_optionIsSome hsearch) hsome hnone).of_enc_eq ?_
+  refine (budget_ite (budget_optionIsSome (encB := encNat) hsearch) hsome hnone).of_enc_eq ?_
   rintro ⟨σ, i, δ⟩
   cases ht : search k c (σ, i, δ) <;> simp [providerPort, ht]
 

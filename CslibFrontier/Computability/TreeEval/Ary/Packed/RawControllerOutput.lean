@@ -172,9 +172,8 @@ theorem decode_inSpace :
     have hc := length_encNat_le_self i
     have hout : (encList encBool ((List.range i).map (fun j => bit q j))).length =
         3 * i := by
-      simp only [length_encList, encBool_apply, List.length_singleton, List.map_const,
-        List.sum_replicate, List.length_map, List.length_range]
-      omega
+      simp only [length_encList, encBool_apply, List.length_singleton]
+      simp
     simp only [encWork, length_encPair, Nat.zero_add, List.nil_append] at ⊢
     rw [hout]
     enc_len at hl
