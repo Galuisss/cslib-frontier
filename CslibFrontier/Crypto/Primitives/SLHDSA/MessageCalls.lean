@@ -319,10 +319,9 @@ def mgfCounterBytes : ℕ := 4
 def digestLengthTableEntries : ℕ := 6
 
 /-- Oracle handlers installed by either pure executable message call. -/
-@[expose]
 def oracleHandlerCount : ℕ := 0
 
 /-- These pure executable message calls install no oracle handler. -/
-theorem oracleHandlerCount_eq : oracleHandlerCount = 0 := rfl
+theorem oracleHandlerCount_eq : oracleHandlerCount = 0 := (rfl)
 
 end Cslib.Crypto.SLHDSA

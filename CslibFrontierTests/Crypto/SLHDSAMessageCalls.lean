@@ -267,7 +267,7 @@ private def sha2H16SmallEmpty : List Byte :=
 #guard hmacPadConstants == 2
 #guard mgfCounterBytes == 4
 #guard digestLengthTableEntries == 6
-#guard oracleHandlerCount == 0
+example : oracleHandlerCount = 0 := oracleHandlerCount_eq
 
 example (family : HashFamily) (p : SecurityBytes) (shape : ParameterShape)
     (secret optional R seed root : NBytes p) (M : List Byte)
