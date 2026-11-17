@@ -53,6 +53,8 @@ arbitrary-state zero-oracle theorem justifies that erasure when this constructio
   compiler.
 * `Cslib.Quantum.ClassicalQueryLayout.firstEmbedding`, `serviceEmbedding`, `secondEmbedding`:
   actual component-register placements used by relabelling and semantic composition.
+* `Cslib.Quantum.ClassicalQueryLayout.serviceReplyEmbedding`: the retained reply register inside
+  the service complement.
 * `Cslib.Quantum.ClassicalQueryLayout.Compatible`: the one shape contract shared by
   well-formedness and the pending semantic theorem.
 * `Cslib.Quantum.compileClassicalQuery`: the complete query-free finite description.
@@ -305,6 +307,24 @@ request and hidden-bit coordinates selected by `serviceWire`. -/
           · simp only [serviceWire, hleftInput, hleftRequest, hrightInput, hrightRequest,
               ↓reduceIte] at heq
             omega
+
+/-- The complete reply register, hidden bit followed by ciphertext, inside the complement of
+the service register. The service cannot overwrite any of these retained reply coordinates. -/
+@[expose] def serviceReplyEmbedding (layout : ClassicalQueryLayout) :
+    Fin (1 + layout.ciphertextWidth) ↪
+      {j : Fin layout.width // ¬ ∃ i, layout.serviceEmbedding i = j} :=
+  { toFun := fun wire => ⟨⟨layout.replyBase + wire, by
+      simp only [width, secondBase]
+      omega⟩, by
+        rintro ⟨serviceWire, hserviceWire⟩
+        have hlt := layout.serviceEmbedding_lt_replyBase serviceWire
+        have heq := congrArg Fin.val hserviceWire
+        change layout.serviceWire serviceWire = layout.replyBase + wire at heq
+        omega⟩
+    inj' := fun left right heq => Fin.ext <| by
+      have heq := congrArg (fun wire => ((wire.1 : Fin layout.width) : ℕ)) heq
+      change layout.replyBase + left = layout.replyBase + right at heq
+      omega }
 
 /-- Embed the second-stage register into the complete controller register, sharing the saved
 first-stage state while keeping the retained reply record outside its image. -/

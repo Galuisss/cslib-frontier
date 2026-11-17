@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.ClassicalQuery.Semantics
 public import CslibFrontier.Crypto.Computational.HQC.INDCPA.B2Service
 import Mathlib.Data.List.GetD
+import Mathlib.Data.List.OfFn
 
 /-!
 # Native query-free controller for the HQC B2 reduction
@@ -38,6 +39,9 @@ full native success-law equality, or a QPT security theorem.
 
 * `Cslib.Crypto.HQC.compatible_b2ClassicalQueryLayout`: the actual HQC service and admitted native
   stage shapes satisfy every shared controller compatibility condition.
+* `Cslib.Crypto.HQC.initialPrefixBranch_b2ServiceInput`: every actual prefix branch is the
+  service input for its own two messages and hidden bit, the initialized reply, and the retained
+  physical complement.
 * `Cslib.Crypto.HQC.matrix_b2ServiceBlock_initializedInput_withReference`: the actual embedded
   service block, on its initialized input, coherently records its complete reversible environment
   while retaining every other controller wire and an arbitrary reference.
@@ -129,6 +133,102 @@ theorem compatible_b2ClassicalQueryLayout (P : PKEParams)
         exact hciphertext.symm
       second_quantumInputWidth := hsecondInput
       second_outputWidth := hsecondOutput }
+
+/-- Each coherent prefix branch is an actual initialized HQC service input, the matching
+hidden-bit/zero-ciphertext reply, and the untouched physical complement. The two messages are
+read from this branch's first-stage output, so this identity also applies across distinct
+message requests when the branch sum is converted to a density matrix. -/
+theorem initialPrefixBranch_b2ServiceInput (P : PKEParams)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen)
+    (first second : UniformOracleCircuitFamily) (securityParameter : ℕ)
+    (h : (b2ClassicalQueryLayout P encoder first second securityParameter).Compatible)
+    (houtput : (first.description securityParameter (2 * P.n)).outputWidth = 2 * P.k)
+    (sample : TruncatedSyndromeSample P.n P.codeLen)
+    (z : Fin (first.description securityParameter (2 * P.n)).width → Bool)
+    (bit : Fin 1 → Bool) :
+    let layout := b2ClassicalQueryLayout P encoder first second securityParameter
+    let hwidth : 2 * P.k ≤ (first.description securityParameter (2 * P.n)).width := by
+      have hi := h.first_wellFormed.input_le
+      have ho := h.first_output_le
+      rw [h.first_quantumInputWidth, Nat.add_zero] at hi
+      change (first.description securityParameter (2 * P.n)).outputWidth ≤ _ at ho
+      rw [houtput] at ho
+      exact ho.trans hi
+    let messages : MessagePair (PKEMessage P) :=
+      { msg₀ := fun i => z ⟨i, by omega⟩
+        msg₁ := fun i => z ⟨P.k + i, by omega⟩ }
+    let branch := h.initialPrefixBranch sample.toWord z bit
+    let rest := (splitEquiv layout.serviceEmbedding branch).2
+    let saved := (splitEquiv layout.serviceReplyEmbedding rest).2
+    branch = (splitEquiv layout.serviceEmbedding).symm
+      (inputState layout.service.width
+        (encPair encUnary encBits (securityParameter, sample.toWord) ++
+          List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [bit 0]),
+        (splitEquiv layout.serviceReplyEmbedding).symm
+          (Fin.append (fun _ : Fin 1 => bit 0)
+            (fun _ : Fin layout.ciphertextWidth => false), saved)) := by
+  classical
+  dsimp only
+  let layout := b2ClassicalQueryLayout P encoder first second securityParameter
+  have hfirstInput : layout.firstInputWidth ≤ layout.first.width := by
+    have hi := h.first_wellFormed.input_le
+    rw [h.first_quantumInputWidth, Nat.add_zero] at hi
+    exact hi
+  have hwidth : 2 * P.k ≤ (first.description securityParameter (2 * P.n)).width := by
+    have ho := h.first_output_le
+    change (first.description securityParameter (2 * P.n)).outputWidth ≤ _ at ho
+    rw [houtput] at ho
+    exact ho.trans hfirstInput
+  let messages : MessagePair (PKEMessage P) :=
+    { msg₀ := fun i => z ⟨i, by omega⟩
+      msg₁ := fun i => z ⟨P.k + i, by omega⟩ }
+  let request : Fin layout.first.outputWidth → Bool :=
+    fun i => z ⟨i, lt_of_lt_of_le i.isLt (h.first_output_le.trans hfirstInput)⟩
+  let branch := h.initialPrefixBranch sample.toWord z bit
+  let rest := (splitEquiv layout.serviceEmbedding branch).2
+  let saved := (splitEquiv layout.serviceReplyEmbedding rest).2
+  have hregisters := h.initialPrefixBranch_registers sample.toWord
+    (TruncatedSyndromeSample.length_toWord sample) z bit
+  have hrequest : List.ofFn request = List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ := by
+    have hout : layout.first.outputWidth = P.k + P.k := by
+      change (first.description securityParameter (2 * P.n)).outputWidth = _
+      omega
+    rw [List.ofFn_congr hout request, List.ofFn_add]
+    rfl
+  change branch = (splitEquiv layout.serviceEmbedding).symm
+    (inputState layout.service.width
+      (encPair encUnary encBits (securityParameter, sample.toWord) ++
+        List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [bit 0]),
+      (splitEquiv layout.serviceReplyEmbedding).symm
+        (Fin.append (fun _ : Fin 1 => bit 0)
+          (fun _ : Fin layout.ciphertextWidth => false), saved))
+  apply (splitEquiv layout.serviceEmbedding).injective
+  rw [Equiv.apply_symm_apply]
+  apply Prod.ext
+  · rw [splitEquiv_apply_fst]
+    have hs := hregisters.1
+    change branch ∘ layout.serviceEmbedding = inputState layout.service.width
+      (encPair encUnary encBits (securityParameter, sample.toWord) ++
+        List.ofFn request ++ [bit 0]) at hs
+    rw [hs, hrequest]
+    simp only [List.append_assoc]
+  · apply (splitEquiv layout.serviceReplyEmbedding).injective
+    rw [Equiv.apply_symm_apply]
+    apply Prod.ext
+    · funext i
+      simp only [splitEquiv_apply_fst, splitEquiv_apply_snd, Function.comp_apply]
+      rw [← readBit_fin branch (layout.serviceReplyEmbedding i).val]
+      change readBit branch (layout.replyBase + i) = _
+      rw [hregisters.2.2 i i.isLt]
+      refine Fin.addCases ?_ ?_ i
+      · intro j
+        have hj : j = 0 := Subsingleton.elim _ _
+        subst j
+        simp
+      · intro j
+        simp
+    · rfl
+
 
 /-- **The embedded B2 service block coherently records its actual reversible environment.**
 Reindexing the physical controller register by its service embedding exposes the actual erased
@@ -253,20 +353,7 @@ theorem matrix_b2ServiceReplyCopy_initializedInput (P : PKEParams)
     (first second : UniformOracleCircuitFamily) :
     let layout := b2ClassicalQueryLayout P encoder first second securityParameter
     let ServiceState := Fin layout.service.width → Bool
-    let replyEmbedding : Fin (1 + layout.ciphertextWidth) ↪
-        {j : Fin layout.width // ¬ ∃ i, layout.serviceEmbedding i = j} :=
-      { toFun := fun wire => ⟨⟨layout.replyBase + wire, by
-          simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
-          omega⟩, by
-            rintro ⟨serviceWire, hserviceWire⟩
-            have hlt := layout.serviceEmbedding_lt_replyBase serviceWire
-            have heq := congrArg Fin.val hserviceWire
-            change layout.serviceWire serviceWire = layout.replyBase + wire at heq
-            omega⟩
-        inj' := fun left right heq => Fin.ext <| by
-          have heq := congrArg (fun wire => ((wire.1 : Fin layout.width) : ℕ)) heq
-          change layout.replyBase + left = layout.replyBase + right at heq
-          omega }
+    let replyEmbedding := layout.serviceReplyEmbedding
     let Saved := {j : {j : Fin layout.width //
       ¬ ∃ i, layout.serviceEmbedding i = j} // ¬ ∃ i, replyEmbedding i = j}
     let initialReply : Bool → Fin (1 + layout.ciphertextWidth) → Bool :=
@@ -316,19 +403,7 @@ theorem matrix_b2ServiceReplyCopy_initializedInput (P : PKEParams)
   let ServiceState := Fin layout.service.width → Bool
   let ServiceRest := {j : Fin layout.width //
     ¬ ∃ i, layout.serviceEmbedding i = j}
-  let replyEmbedding : Fin (1 + layout.ciphertextWidth) ↪ ServiceRest :=
-    { toFun := fun wire => ⟨⟨layout.replyBase + wire, by
-        simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
-        omega⟩, by
-          rintro ⟨serviceWire, hserviceWire⟩
-          have hlt := layout.serviceEmbedding_lt_replyBase serviceWire
-          have heq := congrArg Fin.val hserviceWire
-          change layout.serviceWire serviceWire = layout.replyBase + wire at heq
-          omega⟩
-      inj' := fun left right heq => Fin.ext <| by
-        have heq := congrArg (fun wire => ((wire.1 : Fin layout.width) : ℕ)) heq
-        change layout.replyBase + left = layout.replyBase + right at heq
-        omega }
+  let replyEmbedding := layout.serviceReplyEmbedding
   let Saved := {j : ServiceRest // ¬ ∃ i, replyEmbedding i = j}
   let initialReply : Bool → Fin (1 + layout.ciphertextWidth) → Bool :=
     fun hidden => Fin.append (fun _ : Fin 1 => hidden)
