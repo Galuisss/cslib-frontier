@@ -66,8 +66,8 @@ arbitrary-state zero-oracle theorem justifies that erasure when this constructio
   calls.
 * `Cslib.Quantum.gateCount_compileClassicalQuery`: its exact online elementary-gate count.
 
-The reference-preserving final readout equality is the next semantic obligation for this
-construction; the count and compiler theorems here are not a security result.
+The reference-preserving final readout equality is proved in the companion
+`ClassicalQuery.Semantics` module; the count and compiler theorems here are not a security result.
 
 ## References
 

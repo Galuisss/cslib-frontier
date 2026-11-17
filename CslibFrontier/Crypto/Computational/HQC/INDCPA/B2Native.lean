@@ -47,9 +47,6 @@ full native success-law equality, or a QPT security theorem.
 * `Cslib.Crypto.HQC.matrix_b2ReplyCopySecondStage_withReference`: the actual reply-to-input copy
   and erased second stage run on the retained ciphertext and saved first-stage memory while
   acting as the identity on the protected hidden bit and an arbitrary external reference.
-* `Cslib.Crypto.HQC.measureDensity_b2FinalComparison`: the actual guess relocation and hidden-bit
-  comparison measure exactly whether the second-stage guess equals the protected hidden bit, for
-  arbitrary mixed states with an external reference.
 * `Cslib.Crypto.HQC.partialTraceLeft_b2ServiceEnvironment_fullReply`: discarding the actual
   reversible service environment dephases exactly the complete hidden-bit-and-ciphertext reply,
   while retaining an arbitrary reference and a reply-controlled continuation.
@@ -983,87 +980,6 @@ theorem matrix_b2ReplyCopySecondStage_withReference (P : PKEParams)
     by_cases hsaved : savedOut = savedIn <;>
       by_cases hreference : referenceOut = referenceIn <;>
         simp [hreply, hsaved, hreference]
-
-/-- **The final physical suffix accepts exactly when the second-stage guess equals the protected
-hidden bit.**  The actual one-wire prefix swap moves the second-stage output at `secondBase` to
-wire zero, and the actual comparison gates replace it by its equality with the retained hidden
-bit at `replyBase`.  For every mixed physical state, including one entangled with an arbitrary
-finite reference, measuring wire zero after this suffix is therefore exactly the original joint
-event `guess = hidden`.
-
-This is the final readout law for the fixed-parameter native controller, not the complete B2 game
-or a security theorem: composing it with the prefix, service and controlled second-stage
-identities remains separate. -/
-theorem measureDensity_b2FinalComparison (P : PKEParams)
-    (securityParameter : ℕ)
-    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen)
-    (first second : UniformOracleCircuitFamily)
-    (hsecondOutput :
-      1 ≤ (second.description securityParameter (P.n + P.codeLen)).outputWidth)
-    {Reference : Type*} [Fintype Reference] [DecidableEq Reference]
-    (rho :
-      let layout := b2ClassicalQueryLayout P encoder first second securityParameter
-      Matrix ((Fin layout.width → Bool) × Reference)
-        ((Fin layout.width → Bool) × Reference) ℂ)
-    (hrho : IsDensityMatrix rho) :
-    let layout := b2ClassicalQueryLayout P encoder first second securityParameter
-    let finalCodes :=
-      prefixSwapCodes layout.secondBase 1 ++ compareBits layout.replyBase 0
-    let finalCircuit := Circuit.ofCodes layout.width finalCodes
-    let finalMatrix : Matrix (Fin layout.width → Bool) (Fin layout.width → Bool) ℂ :=
-      Circuit.matrix finalCircuit
-    (POVM.basis.measureDensity
-      (densityConj
-        (finalMatrix ⊗ₖ (1 : Matrix Reference Reference ℂ)) rho)
-      (hrho.densityConj_kronecker
-        (V := finalMatrix)
-        (by exact UnitaryGroup.star_mul_self (Circuit.matrix finalCircuit)))).map
-        (fun p => readBit p.1 0) =
-      (POVM.basis.measureDensity rho hrho).map
-        (fun p => readBit p.1 layout.secondBase == readBit p.1 layout.replyBase) := by
-  classical
-  dsimp only
-  let layout := b2ClassicalQueryLayout P encoder first second securityParameter
-  let finalCodes :=
-    prefixSwapCodes layout.secondBase 1 ++ compareBits layout.replyBase 0
-  let finalCircuit := Circuit.ofCodes layout.width finalCodes
-  have hsecondWidth : 1 ≤ layout.second.width := by
-    change 1 ≤ (second.description securityParameter (P.n + P.codeLen)).width
-    exact hsecondOutput.trans
-      (second.wellFormed securityParameter (P.n + P.codeLen)).output_le
-  have hsourceDisjoint : 1 ≤ layout.secondBase := by
-    simp only [ClassicalQueryLayout.secondBase, ClassicalQueryLayout.replyBase,
-      ClassicalQueryLayout.serviceBase, ClassicalQueryLayout.hiddenWire]
-    omega
-  have hsourceFit : layout.secondBase + 1 ≤ layout.width := by
-    simp only [ClassicalQueryLayout.width]
-    omega
-  have hhiddenFit : layout.replyBase < layout.width := by
-    simp only [ClassicalQueryLayout.width, ClassicalQueryLayout.secondBase]
-    omega
-  have hzeroFit : 0 < layout.width := by omega
-  have hhiddenZero : layout.replyBase ≠ 0 := by
-    simp only [ClassicalQueryLayout.replyBase, ClassicalQueryLayout.serviceBase,
-      ClassicalQueryLayout.hiddenWire]
-    omega
-  have hhiddenSource : layout.replyBase ≠ layout.secondBase := by
-    simp only [ClassicalQueryLayout.secondBase]
-    omega
-  have hclass : IsClassical layout.width finalCodes :=
-    IsClassical.append.mpr ⟨
-      isClassical_prefixSwapCodes hsourceDisjoint hsourceFit,
-      isClassical_compareBits hhiddenZero hhiddenFit hzeroFit⟩
-  rw [Circuit.measureDensity_basis_ofCodes hclass rho hrho, PMF.map_comp]
-  congr 1
-  funext p
-  simp only [Function.comp_apply, finalCodes, classicalRun_append]
-  rw [readBit_classicalRun_compareBits hzeroFit]
-  have hone : prefixSwapCodes layout.secondBase 1 =
-      swapWireCodes 0 layout.secondBase := by
-    simp [prefixSwapCodes]
-  rw [hone,
-    readBit_classicalRun_swapWireCodes (by omega) (by omega) (by omega),
-    readBit_classicalRun_swapWireCodes_of_ne hhiddenZero hhiddenSource]
 
 /-- **The actual reversible B2 service dephases exactly its complete reply.**  For a fixed
 truncated-syndrome sample and measured message pair, the discarded service environment
