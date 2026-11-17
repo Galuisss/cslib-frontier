@@ -8,6 +8,7 @@ module
 
 public import CslibFrontier.Computability.PolyTime.CSP.OneHotOrder
 import CslibFrontier.Computability.Complexity.Problems.CSP.RotationSystem.Certificate
+import CslibFrontier.Computability.Complexity.Problems.CSP.OneHot3.OrderAcceptance
 
 /-! Scope alignment executes a genuine conjugation: a reverse-ordered clause star becomes
 accepted in the new scope order, while every variable-end tag remains fixed. -/
@@ -37,6 +38,13 @@ example : verifyRotationCertificate source reverseTable = false := by decide +ke
 
 example : verifyRotationCertificate (orderedConstraints source reverseTable)
     (orderedCertificate source reverseTable) = true := by decide +kernel
+
+-- The general acceptance proof consumes only the source width and source numerical check.
+example : verifyRotationCertificate (orderedConstraints source reverseTable)
+    (orderedCertificate source reverseTable) = true := by
+  apply verifyRotationCertificate_orderedCertificate
+  · simp [source, Cslib.Logic.PL.CSP.WellFormed, arity]
+  · decide +kernel
 
 -- A short raw table uses its fixed fallback; evaluation still retains the original assignment.
 example : (orderedConstraints [⟨(), []⟩, ⟨(), [7, 7, 7]⟩] ⟨[]⟩).eval sem

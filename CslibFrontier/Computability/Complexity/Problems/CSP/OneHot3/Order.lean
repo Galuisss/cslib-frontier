@@ -172,4 +172,13 @@ Only the original graph's actual edge-list length funds the output scan. -/
     (orderedCertificate F c).successor.length = 2 * (incidenceGraph F).edges.length := by
   simp only [orderedCertificate, List.length_map, List.length_range]
 
+/-- Reading an actual output position gives the literal conjugation of the supplied
+table. All missing input entries still use the program's fixed zero fallback. -/
+theorem getD_orderedCertificate (F : CSP Unit ℕ) (c : RotationCertificate) {a : ℕ}
+    (ha : a < 2 * (incidenceGraph F).edges.length) :
+    (orderedCertificate F c).successor.getD a 0 =
+      dartReindex c (c.successor.getD (dartReindex c a) 0) := by
+  rw [List.getD_eq_getElem _ _ (by rw [length_orderedCertificate]; exact ha)]
+  simp only [orderedCertificate, List.getElem_map, List.getElem_range]
+
 end Cslib.Complexity.CSP.OneHot3

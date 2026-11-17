@@ -21,8 +21,8 @@ last two arguments where necessary, and conjugates that table by the same occurr
 No source embedding generator, target rotation, or geometric rank is supplied as a parameter.
 
 This module proves native runtime, exact target width, and the satisfiability equivalence
-including malformed ordinary ThreeSAT inputs. It does not yet assert a reduction or hardness:
-the full target genus/order checker must also be proved to accept this executed output.
+including malformed ordinary ThreeSAT inputs. The separate hardness module combines these
+facts with acceptance of the emitted table by the full target genus/order checker.
 -/
 
 public section
