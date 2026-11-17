@@ -164,7 +164,7 @@ lemma length_encList_eq_le (l : List (Option ℕ)) :
   cases l <;> simp
 
 /-- Applying an action at most doubles a work tape, up to the length of the action. -/
-lemma length_eTape_apply (t : Tape) (a : Option (Option ℕ) × SignType) :
+public lemma length_eTape_apply (t : Tape) (a : Option (Option ℕ) × SignType) :
     (eTape (t.apply a)).length ≤ 2 * (eTape t).length + 2 * (eTA a).length + 8 := by
   obtain ⟨h, l, r⟩ := t
   obtain ⟨w, m⟩ := a
