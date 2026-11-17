@@ -8,6 +8,7 @@ module
 -- upstream: local-only (test)
 
 import CslibFrontier.Crypto.Computational.MLDSA.SigningROM
+import CslibFrontier.Crypto.Game.CloseTo.RejectedProgramming
 import Mathlib.Data.Fin.VecNotation
 import Mathlib.Tactic.FinCases
 
@@ -210,5 +211,19 @@ example : (interpret countTrials (expandSigningRetries toy 4 interleaved)).run 0
   simp only [expandSigningRetries, interleaved, hr, List.findSomeM?_cons, List.findSomeM?_nil,
     sumHandler, interpret_bind, interpret_query, countTrials, StateT.run, bind_pure_comp]
   rfl
+
+-- The rejected point is the first coin, and its digest equals that coin. Among the four
+-- equiprobable two-coin tapes, reading `false` returns true once if the rejected write is kept,
+-- twice if it is erased. Comparing only the response of the signing attempt misses this effect.
+private def readAfterRejection (keep : Bool) (coins : Bool × Bool) : Bool :=
+  let step := RandomOracle.programmedTrialStep keep (fun (_ : Unit) x => x) id
+    (fun _ _ => (none : Option Unit))
+  let rejected := step (.inl ()) coins.1 []
+  (step (.inr false) coins.2 rejected.2).1
+
+example :
+    let tapes := [(false, false), (false, true), (true, false), (true, true)]
+    (tapes.countP (readAfterRejection true), tapes.countP (readAfterRejection false)) = (1, 2) := by
+  decide +kernel
 
 end MLDSASigningTests
