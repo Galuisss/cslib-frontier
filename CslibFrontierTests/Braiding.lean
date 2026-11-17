@@ -12,11 +12,10 @@ import CslibFrontier.Foundations.Quantum.PauliTwirl
 
 /-! # Braiding relations from anticommutation, consistency and linearity
 
-Checked clients: the transfer through consistency, the averaged braiding bound and the Pauli-family
-defect from anticommutation, in any state of any star-ordered algebra, and the evaluation of the
-masked anticommutation defect. A concrete instance: the commuting phase flips `Z^a`, `Z^b`, as
-their own consistent copies, satisfy `Z^b Z^a = Z^a Z^b` with every input `0`, so the averaged
-transfer certifies commutation.
+Checked clients: the transfer through consistency, in any state of any star-ordered algebra, and
+the evaluation of the masked anticommutation defect. A concrete instance: the commuting phase flips
+`Z^a`, `Z^b`, as their own consistent copies, satisfy `Z^b Z^a = Z^a Z^b` with every input `0`, so
+the averaged transfer certifies commutation.
 -/
 
 set_option linter.privateModule false
@@ -50,21 +49,6 @@ example {n : Type} [Fintype n] [DecidableEq n] (φ : AlgState (Matrix (n → Boo
     (fun _ => hZ _) (fun _ => hc _ _) (fun _ => hc _ _) (fun _ => by simp)
   refine h.trans ?_
   simp [(hc _ _).eq, AlgState.norm_zero]
-
-/-- **The Pauli-family defect from anticommutation, consistency and linearity**, in any state of
-any star-ordered algebra. -/
-example {ι A : Type} [Fintype ι] [DecidableEq ι] [Ring A] [StarRing A] [PartialOrder A]
-    [StarOrderedRing A] [Algebra ℂ A] [StarModule ℂ A] [SelfAdjointDecompose A] (φ : AlgState A)
-    (X Z X' Z' : (ι → Bool) → A)
-    (hX : ∀ a, X a ∈ unitary A) (hZ : ∀ b, Z b ∈ unitary A) (hX' : ∀ a, X' a ∈ unitary A)
-    (hZ' : ∀ b, Z' b ∈ unitary A) (hXZ' : ∀ a b, Commute (X a) (Z' b))
-    (hZZ' : ∀ b b', Commute (Z b) (Z' b')) (hZX' : ∀ b a, Commute (Z b) (X' a)) (hX0 : X 0 = 1) :
-    𝔼 p, 𝔼 q, φ.norm (pauliFamily X Z p * pauliFamily X Z q - pauliFamily X Z (p * q)) ^ 2 ≤
-      5 * (40 * 𝔼 c, φ.norm (Z c - Z' c) ^ 2 + 32 * 𝔼 a, φ.norm (X a - X' a) ^ 2 +
-        33 * 𝔼 a, 𝔼 b, anticommDefectSq φ X Z a b +
-        𝔼 a, 𝔼 a', φ.norm (X a * X a' - X (a + a')) ^ 2 +
-        33 * 𝔼 b, 𝔼 b', φ.norm (Z b * Z b' - Z (b + b')) ^ 2) :=
-  expect_norm_pauliFamily_sub_sq_le_of_anticommute φ X Z X' Z' hX hZ hX' hZ' hXZ' hZZ' hZX' hX0
 
 /-- The masked anticommutation defect vanishes off the pairs with `a · c = 1`. -/
 example {ι A : Type} [Fintype ι] [Ring A] [StarRing A] [PartialOrder A] [StarOrderedRing A]

@@ -23,13 +23,14 @@ played on the observables of the other player. This file derives the rest, in an
 star-ordered algebra, for Alice's unitaries `X(a)`, `Z(b)` and Bob's consistent copies `X'(a)`,
 `Z'(b)` commuting with them.
 
-* **Transfer** (the step in the proof of their Lemma 15): a relation between two observables of
-  one player passes to consistent observables of the other,
+* **Transfer** (the step in the proof of their §4.3.2, Lemma 18, p. 21): a relation between two
+  observables of one player passes to consistent observables of the other,
   `‖Z X - s X Z‖_φ ≤ 2 ‖X - X'‖_φ + 2 ‖Z - Z'‖_φ + ‖X' Z' - s Z' X'‖_φ`
   (`Cslib.Quantum.norm_mul_sub_smul_mul_le_of_consistent`, averaged in
   `Cslib.Quantum.expect_norm_mul_sub_smul_mul_sq_le_of_consistent`).
-* **Commutation** (their Lemma 16): for `a · b = 0`, write `Z(b) ≈ Z(c) Z(c + b)` with `c · a = 1`
-  and anticommute `X(a)` past both factors (`Cslib.Quantum.norm_mul_sub_mul_le_of_anticommute`).
+* **Commutation** (their §4.3.3, Lemma 19, p. 22): for `a · b = 0`, write `Z(b) ≈ Z(c) Z(c + b)`
+  with `c · a = 1` and anticommute `X(a)` past both factors
+  (`Cslib.Quantum.norm_mul_sub_mul_le_of_anticommute`).
   Averaging over the half of the `c` with `c · a = 1`, and using `X(0) = 1` for `a = 0`, gives
   the braiding defect for every pair (`Cslib.Quantum.norm_braid_sq_le`,
   `Cslib.Quantum.expect_norm_braid_sq_le`):
@@ -39,6 +40,16 @@ star-ordered algebra, for Alice's unitaries `X(a)`, `Z(b)` and Bob's consistent 
   consistency distances.
 * **The Pauli-family defect** then follows from anticommutation, consistency and linearity
   (`Cslib.Quantum.expect_norm_pauliFamily_sub_sq_le_of_anticommute`).
+
+**Where this starts, relative to the source.** The source applies its lemmas to the averaged
+marginal observables of its eq. (11), which are self-adjoint contractions but need not be unitary.
+Here the inputs are unitary families with `X(0) = 1`, such as the rounded, exactly linear
+observables of the linearity test, and Bob's consistent unitary copies. The source states the
+anticommutation hypothesis as a conditional average `E_{a,b | a·b = 1}`; here it enters as the
+masked unconditional average `E_{a,b} [a · b = 1] α(a, b)²`, which equals
+`Pr[a · b = 1] · E_{a,b | a·b = 1} α(a, b)²` and so is at most the conditional average. The
+commutation step likewise averages over all `c` with the mask `c · a = 1` and uses that a nonzero
+`a` has `c · a = 1` for exactly half of the `c`.
 
 `X(0) = 1` holds for the character observables of a projective measurement
 (`Cslib.Quantum.Measurement.charObs_zero`), such as the rounded observables of the linearity test.
@@ -120,10 +131,11 @@ theorem expect_norm_mul_sub_smul_mul_sq_le_of_consistent {ι : Type*} [Fintype �
     have ha := φ.norm_nonneg (X i - X' i)
     have hb := φ.norm_nonneg (Z i - Z' i)
     have hc := φ.norm_nonneg (X' i * Z' i - s i • (Z' i * X' i))
+    have hCS := Finset.sum_mul_sq_le_sq_mul_sq Finset.univ ![(2 : ℝ), 2, 1] ![a, b, c]
+    simp only [Fin.sum_univ_three, Matrix.cons_val] at hCS
     calc φ.norm (Z i * X i - s i • (X i * Z i)) ^ 2 ≤ (2 * a + 2 * b + c) ^ 2 :=
           pow_le_pow_left₀ h0 h 2
-      _ ≤ 9 * (a ^ 2 + b ^ 2 + c ^ 2) := by
-          nlinarith [sq_nonneg (a - b), sq_nonneg (a - 2 * c), sq_nonneg (b - 2 * c)]
+      _ ≤ 9 * (a ^ 2 + b ^ 2 + c ^ 2) := by linarith
   calc 𝔼 i, φ.norm (Z i * X i - s i • (X i * Z i)) ^ 2
       ≤ 𝔼 i, 9 * (φ.norm (X i - X' i) ^ 2 + φ.norm (Z i - Z' i) ^ 2 +
           φ.norm (X' i * Z' i - s i • (Z' i * X' i)) ^ 2) := expect_le_expect fun i _ => hpt i
@@ -134,7 +146,7 @@ section Commutation
 variable {ι : Type*}
 
 /-- **Commutation from anticommutation, pointwise** (the chain of
-[Natarajan and Vidick, §4.3, Lemma 16][NatarajanVidick2017]). Let Alice's unitaries `X(a)`,
+[Natarajan and Vidick, §4.3.3, Lemma 19][NatarajanVidick2017]). Let Alice's unitaries `X(a)`,
 `Z(b)` commute with Bob's unitaries `X'(a)`, `Z'(b)`. Writing `Z(b) ≈ Z(c) Z(c + b)` and
 anticommuting `X(a)` past both factors, with Bob's copies carrying the factors that are in the way,
 gives, for all `a`, `b`, `c`,
@@ -275,9 +287,22 @@ theorem norm_braid_sq_le [Fintype ι] [DecidableEq ι] (φ : AlgState A) (X Z X'
     set w := φ.norm (X a * Z (c + b) + Z (c + b) * X a)
     calc β ^ 2 ≤ (2 * x + 2 * y + z + w + 2 * κX) ^ 2 := pow_le_pow_left₀ h0 h 2
       _ ≤ 8 * (2 * x ^ 2 + 2 * y ^ 2 + 2 * κX ^ 2 + z ^ 2 + w ^ 2) := by
-          nlinarith [sq_nonneg (x - y), sq_nonneg (x - z), sq_nonneg (x - w), sq_nonneg (x - κX),
-            sq_nonneg (y - z), sq_nonneg (y - w), sq_nonneg (y - κX), sq_nonneg (z - w),
-            sq_nonneg (z - κX), sq_nonneg (w - κX)]
+          have hCS := Finset.sum_sq_le_sum_mul_sum_of_sq_le_mul Finset.univ
+            (r := ![2 * x, 2 * y, z, w, 2 * κX]) (f := ![(2 : ℝ), 2, 1, 1, 2])
+            (g := ![2 * x ^ 2, 2 * y ^ 2, z ^ 2, w ^ 2, 2 * κX ^ 2])
+            (fun i _ => by fin_cases i <;> norm_num)
+            (fun i _ => by
+              fin_cases i <;>
+                simp only [Fin.zero_eta, Fin.mk_one, Fin.reduceFinMk, Fin.isValue,
+                  Matrix.cons_val_zero, Matrix.cons_val_one, Matrix.cons_val] <;>
+                positivity)
+            (fun i _ => by
+              fin_cases i <;>
+                simp only [Fin.zero_eta, Fin.mk_one, Fin.reduceFinMk, Fin.isValue,
+                  Matrix.cons_val_zero, Matrix.cons_val_one, Matrix.cons_val] <;>
+                nlinarith)
+          simp only [Fin.sum_univ_five, Matrix.cons_val] at hCS
+          linarith
   have hsum : (S.card : ℝ) * β ^ 2 ≤ ∑ c, 8 * R c :=
     calc (S.card : ℝ) * β ^ 2 = ∑ _c ∈ S, β ^ 2 := by rw [sum_const, nsmul_eq_mul]
       _ ≤ ∑ c ∈ S, 8 * R c := sum_le_sum hpt
@@ -287,8 +312,9 @@ theorem norm_braid_sq_le [Fintype ι] [DecidableEq ι] (φ : AlgState A) (X Z X'
     rw [Fintype.expect_eq_sum_div_card, ← mul_sum] at *
     rw [mul_div_assoc', le_div_iff₀ hN, ← hcard]
     nlinarith [hsum]
-  have hshift : ∀ f : (ι → Bool) → ℝ, 𝔼 c, f (c + b) = 𝔼 c, f c := fun f =>
-    Fintype.expect_equiv (Equiv.addRight b) _ _ fun c => rfl
+  have hshift : ∀ f : (ι → Bool) → ℝ, 𝔼 c, f (c + b) = 𝔼 c, f c := fun f => by
+    simp only [add_comm _ b]
+    exact Fintype.expect_add_left f b
   have hR' : 𝔼 c, R c = 2 * 𝔼 c, ℓ c ^ 2 + 2 * 𝔼 c, κZ c ^ 2 + 2 * κX ^ 2 + 2 * 𝔼 c, m c := by
     simp only [R, expect_add_distrib, ← mul_expect, Fintype.expect_const]
     rw [hshift (fun c => κZ c ^ 2), hshift m]
@@ -297,7 +323,8 @@ theorem norm_braid_sq_le [Fintype ι] [DecidableEq ι] (φ : AlgState A) (X Z X'
   linarith
 
 /-- **Braiding relations from anticommutation, consistency and linearity**, averaged
-([Natarajan and Vidick, §4.3, Lemmas 15 and 16][NatarajanVidick2017]): if `X(0) = 1`, then
+([Natarajan and Vidick, §4.3.2, Lemma 18 and §4.3.3, Lemma 19][NatarajanVidick2017]): if
+`X(0) = 1`, then
 `E_{a,b} ‖Z(b) X(a) - (-1)^{a·b} X(a) Z(b)‖²_φ` is at most
 `33 E_{a,b} [a · b = 1] α(a, b)² +
 32 (E_{c,c'} ‖Z(c) Z(c') - Z(c + c')‖²_φ + E_c κ_Z(c)² + E_a κ_X(a)²)`. -/
@@ -316,8 +343,8 @@ theorem expect_norm_braid_sq_le [Fintype ι] [DecidableEq ι] (φ : AlgState A)
       𝔼 c, 𝔼 c', φ.norm (Z c * Z c' - Z (c + c')) ^ 2 := by
     rw [Fintype.expect_const, expect_comm]
     refine expect_congr rfl fun c _ => ?_
-    exact Fintype.expect_equiv (Equiv.addLeft c) _ _ fun b => by
-      simp only [Equiv.coe_addLeft, BitString.add_cancel_left]
+    rw [← Fintype.expect_add_left (fun c' => φ.norm (Z c * Z c' - Z (c + c')) ^ 2) c]
+    simp only [BitString.add_cancel_left]
   simp only [expect_add_distrib, ← mul_expect, Fintype.expect_const] at hℓ ⊢
   rw [hℓ]
   ring
