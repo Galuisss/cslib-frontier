@@ -56,21 +56,22 @@ public section
 namespace Cslib.Crypto.SLHDSA.WOTS
 
 open Cslib.BitString Cslib.Crypto Cslib.Crypto.SLHDSA
+open scoped BigOperators
 
 /-- A WOTS+ signature is exactly `len` consecutive `n`-byte strings. -/
 abbrev Signature (p : SecurityBytes) := Fin (len p) → NBytes p
 
 /-- The exact number of remaining chain steps, hence of `F` calls, in Algorithm 8. -/
 @[expose] def totalChainSteps {p : SecurityBytes} (M : Message p) : ℕ :=
-  ∑ i : Fin (len p), w - 1 - (digits M i).val
+  Finset.univ.sum fun i : Fin (len p) => w - 1 - (digits M i).val
 
 /-- Every Algorithm 8 chain suffix has at most `w - 1` steps. -/
 theorem totalChainSteps_le {p : SecurityBytes} (M : Message p) :
     totalChainSteps M ≤ len p * (w - 1) := by
   unfold totalChainSteps
   calc
-    ∑ i : Fin (len p), w - 1 - (digits M i).val ≤
-        ∑ _i : Fin (len p), w - 1 :=
+    Finset.univ.sum (fun i : Fin (len p) => w - 1 - (digits M i).val) ≤
+        Finset.univ.sum (fun _i : Fin (len p) => w - 1) :=
       Finset.sum_le_sum fun _i _hi => Nat.sub_le _ _
     _ = len p * (w - 1) := by simp
 
@@ -79,7 +80,7 @@ theorem totalChainSteps_le {p : SecurityBytes} (M : Message p) :
 The fields count the executable specification. They are not a machine trace or a compiled-program
 cost: in particular they do not charge hash permutations/compressions, controllers, layouts,
 copies, interpreter work, handlers, advice or static tables. -/
-structure PublicKeyFromSigCalls where
+@[ext] structure PublicKeyFromSigCalls where
   /-- Number of WOTS+ chain suffixes. -/
   chainTraversals : ℕ
   /-- Writes to the chain-address word. -/
@@ -216,9 +217,7 @@ theorem publicKeyInput_eq_direct (family : HashFamily) {p : SecurityBytes} (sig 
               have hi := (digits M i).isLt
               omega) := by
   unfold publicKeyInput
-  apply blocksEquiv.symm.injective
-  funext i
-  exact chainEndNodes_eq_chain family sig M publicSeed address haddress i
+  congr 1
 
 /-- The result and source-call ledger of an instrumented Algorithm 8 invocation. -/
 structure PublicKeyFromSigRun (p : SecurityBytes) where
@@ -229,6 +228,7 @@ structure PublicKeyFromSigRun (p : SecurityBytes) where
 
 /-- Instrumented FIPS 205 Algorithm 8. The variable call counts are summed from the instrumented
 Algorithm 5 runs used to construct the actual compression input. -/
+@[expose]
 def wotsPkFromSigWithCalls (family : HashFamily) {p : SecurityBytes} (sig : Signature p)
     (M : Message p) (publicSeed : NBytes p) (address : Address)
     (haddress : ValidHashAddress address) : PublicKeyFromSigRun p :=
@@ -260,6 +260,7 @@ def wotsPkFromSigWithCalls (family : HashFamily) {p : SecurityBytes} (sig : Sign
       chainEndRuns_calls, chainCalls_fCalls, chainCalls_hashAddressWrites]
 
 /-- FIPS 205 Algorithm 8 (`wots_pkFromSig`) as the output projection of the instrumented run. -/
+@[expose]
 def wotsPkFromSig (family : HashFamily) {p : SecurityBytes} (sig : Signature p) (M : Message p)
     (publicSeed : NBytes p) (address : Address) (haddress : ValidHashAddress address) : NBytes p :=
   (wotsPkFromSigWithCalls family sig M publicSeed address haddress).output
@@ -309,7 +310,7 @@ theorem wotsPkFromSig_eq_direct (family : HashFamily) {p : SecurityBytes} (sig :
                   have hi := (digits M i).isLt
                   omega))
           (len_le_67 p)) :=
-  rw [wotsPkFromSig_eq, publicKeyInput_eq_direct]
+  by rw [wotsPkFromSig_eq, publicKeyInput_eq_direct]
 
 @[simp] theorem publicKeyFromSigCalls_fCalls {p : SecurityBytes} (M : Message p) :
     (publicKeyFromSigCalls M).fCalls = totalChainSteps M :=

@@ -67,9 +67,6 @@ instance (i s : ℕ) : Decidable (ValidChainRange i s) := by
   unfold ValidChainRange
   infer_instance
 
-private def chainHashAddressWord (j : ℕ) (hj : j < w) : AddressWord :=
-  ⟨j, hj.trans (by decide)⟩
-
 /-- Exact source-level counts for one Algorithm 5 invocation. -/
 structure ChainCalls where
   /-- Calls to the concrete addressed function `F`. -/
@@ -91,6 +88,7 @@ structure ChainRun (p : SecurityBytes) where
 
 /-- Instrumented FIPS 205 Algorithm 5. Its recursion constructs both the chain output and the
 ledger, so the counts are tied to the executable control flow. -/
+@[expose]
 def chainWithCalls (family : HashFamily) {p : SecurityBytes} (X : NBytes p) (i s : ℕ)
     (publicSeed : NBytes p) (address : Address) (_haddress : ValidHashAddress address)
     (hrange : ValidChainRange i s) : ChainRun p :=
@@ -101,9 +99,11 @@ def chainWithCalls (family : HashFamily) {p : SecurityBytes} (X : NBytes p) (i s
         unfold ValidChainRange at hrange ⊢
         omega)
       { output := f family publicSeed
-          (address.setHashAddress (chainHashAddressWord (i + s) (by
+          (address.setHashAddress ⟨i + s, (by
             unfold ValidChainRange at hrange
-            omega))) previous.output
+            have his : i + s < w := by omega
+            exact his.trans (by decide))⟩)
+          previous.output
         calls :=
           { fCalls := previous.calls.fCalls + 1
             hashAddressWrites := previous.calls.hashAddressWrites + 1 } }
@@ -115,13 +115,15 @@ termination_by s
     (haddress : ValidHashAddress address) (hrange : ValidChainRange i s) :
     (chainWithCalls family X i s publicSeed address haddress hrange).calls = chainCalls s := by
   induction s with
-  | zero => rfl
+  | zero => simp only [chainWithCalls]
   | succ s ih =>
       simp only [chainWithCalls]
       rw [ih]
+      rfl
 
 /-- FIPS 205 Algorithm 5. The proof arguments enforce the source's address-type and range
 conditions without adding a runtime branch. -/
+@[expose]
 def chain (family : HashFamily) {p : SecurityBytes} (X : NBytes p) (i s : ℕ)
     (publicSeed : NBytes p) (address : Address) (haddress : ValidHashAddress address)
     (hrange : ValidChainRange i s) : NBytes p :=
@@ -139,8 +141,8 @@ theorem chainWithCalls_output (family : HashFamily) {p : SecurityBytes} (X : NBy
 @[simp] theorem chain_zero (family : HashFamily) {p : SecurityBytes} (X : NBytes p) (i : ℕ)
     (publicSeed : NBytes p) (address : Address) (haddress : ValidHashAddress address)
     (hrange : ValidChainRange i 0) :
-    chain family X i 0 publicSeed address haddress hrange = X :=
-  rfl
+    chain family X i 0 publicSeed address haddress hrange = X := by
+  simp only [chain, chainWithCalls]
 
 /-- The last step of a nonempty chain writes hash address `i + s` and makes one call to `F`. -/
 theorem chain_succ (family : HashFamily) {p : SecurityBytes} (X : NBytes p) (i s : ℕ)
@@ -150,11 +152,12 @@ theorem chain_succ (family : HashFamily) {p : SecurityBytes} (X : NBytes p) (i s
       f family publicSeed
         (address.setHashAddress ⟨i + s, (by
           unfold ValidChainRange at hrange
-          omega : i + s < 2 ^ 32)⟩)
+          have his : i + s < w := by omega
+          exact his.trans (by decide))⟩)
         (chain family X i s publicSeed address haddress (by
           unfold ValidChainRange at hrange ⊢
           omega)) :=
-  rfl
+  by simp only [chain, chainWithCalls]
 
 /-- Running `s` steps and then `t` adjacent steps is the same as running `s + t` steps. -/
 theorem chain_add (family : HashFamily) {p : SecurityBytes} (X : NBytes p) (i s t : ℕ)
@@ -169,11 +172,18 @@ theorem chain_add (family : HashFamily) {p : SecurityBytes} (X : NBytes p) (i s 
           omega) =
       chain family X i (s + t) publicSeed address haddress hrange := by
   induction t generalizing X with
-  | zero => rfl
+  | zero => simp only [Nat.add_zero, chain_zero]
   | succ t ih =>
-      simp only [chain, chainWithCalls]
-      rw [ih]
-      congr 3 <;> omega
+      rw [chain_succ]
+      rw [ih X (by
+        unfold ValidChainRange at hrange ⊢
+        omega)]
+      symm
+      convert chain_succ family X i (s + t) publicSeed address haddress (by
+        unfold ValidChainRange at hrange ⊢
+        omega) using 1
+      congr 3
+      omega
 
 @[simp] theorem chainCalls_fCalls (s : ℕ) : (chainCalls s).fCalls = s :=
   rfl
