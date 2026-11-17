@@ -36,7 +36,7 @@ example (hl : ComputableInSpace l encIn (encList encNat) S)
 
 -- Runtime indices need a certificate; they are not arbitrary nonuniform advice.
 example (hl : ComputableInSpace l encIn (encList encNat) S)
-    (hv : ComputableInSpace v encIn encNat S) : True := by
+    (hv : ComputableInSpace v encIn encNat S) (i : α → ℕ) : True := by
   fail_if_success
     have : ComputableInSpace (fun x => (l x).set (i x) (v x))
         encIn (encList encNat) S := by space
@@ -44,7 +44,7 @@ example (hl : ComputableInSpace l encIn (encList encNat) S)
 
 -- A certified index cannot stand in for a missing replacement-value certificate.
 example (hl : ComputableInSpace l encIn (encList encNat) S)
-    (hi : ComputableInSpace i encIn encNat S) : True := by
+    (hi : ComputableInSpace i encIn encNat S) (v : α → ℕ) : True := by
   fail_if_success
     have : ComputableInSpace (fun x => (l x).set (i x) (v x))
         encIn (encList encNat) S := by space
