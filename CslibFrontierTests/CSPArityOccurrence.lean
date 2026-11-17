@@ -23,18 +23,20 @@ def body : CSP ℕ ℕ := [⟨0, []⟩, ⟨3, [2 ^ 250, 7, 7]⟩]
 private theorem width : body.WellFormed id := by
   simp [Cslib.Logic.PL.CSP.WellFormed, body]
 
-example : (arityOccurrence body width ⟨1, by decide⟩ (0 : Fin 3)).var = 2 ^ 250 := rfl
+private theorem row_bound : 1 < body.length := by simp [body]
 
-example : (argumentSuccessor (arityOccurrence body width ⟨1, by decide⟩
+example : (arityOccurrence body width ⟨1, row_bound⟩ (0 : Fin 3)).var = 2 ^ 250 := rfl
+
+example : (argumentSuccessor (arityOccurrence body width ⟨1, row_bound⟩
     (2 : Fin 3))).var = 2 ^ 250 := by
-  rw [argumentSuccessor_arityOccurrence]
-  rfl
+  exact congrArg (fun o : body.Occurrence => o.var)
+    (argumentSuccessor_arityOccurrence body width ⟨1, row_bound⟩ (2 : Fin 3))
 
 -- The repeated name does not identify its two actual scope positions.
-example : arityOccurrence body width ⟨1, by decide⟩ (1 : Fin 3) ≠
-    arityOccurrence body width ⟨1, by decide⟩ (2 : Fin 3) := by decide +kernel
+example : arityOccurrence body width ⟨1, row_bound⟩ (1 : Fin 3) ≠
+    arityOccurrence body width ⟨1, row_bound⟩ (2 : Fin 3) := by decide +kernel
 
-example : (arityOccurrence body width ⟨1, by decide⟩ (1 : Fin 3)).var =
-    (arityOccurrence body width ⟨1, by decide⟩ (2 : Fin 3)).var := rfl
+example : (arityOccurrence body width ⟨1, row_bound⟩ (1 : Fin 3)).var =
+    (arityOccurrence body width ⟨1, row_bound⟩ (2 : Fin 3)).var := rfl
 
 end CslibFrontierTests.CSPArityOccurrence
