@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Foundations.Quantum.Algebra.AlgState
+public import CslibFrontier.Foundations.Algebra.Star.Unitary
 public import CslibFrontier.Foundations.Analysis.Normed.Close
 public import CslibFrontier.Foundations.Algebra.Order.Star.Pi
 public import CslibFrontier.Probability.PMF
@@ -158,13 +159,6 @@ theorem approx_norm_sub (φ : AlgState A) (a b : A) : a ≈[φ; φ.norm (a - b)]
 theorem Approx.mul_left_unitary (h : a ≈[φ; δ] b) {u : A} (hu : u ∈ unitary A) :
     u * a ≈[φ; δ] u * b :=
   h.mul_left (by rw [Unitary.star_mul_self_of_mem hu])
-
-/-- `unitary_mem` closes a goal `u ∈ unitary A` for a product `u` of unitaries, of their stars and
-of `1`, using the local hypotheses, which may be quantified (`hX : ∀ a, X a ∈ unitary A`). It
-discharges the side goal of `Cslib.Quantum.AlgState.Approx.mul_left_unitary` in closeness
-chains. -/
-macro (name := unitaryMem) "unitary_mem" : tactic =>
-  `(tactic| solve_by_elim (maxDepth := 16) [mul_mem, one_mem, Unitary.star_mem])
 
 /-- Left multiplication by an operator that stretches the state norm by at most `k` turns
 `δ`-closeness into `kδ`-closeness. -/

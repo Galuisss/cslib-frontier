@@ -169,8 +169,8 @@ theorem one_sub_le_expect_re_apply_mul_mul_of_linearityTest
   have hN2 : ∀ k a b, N k a b * N k a b = 1 := fun k a b =>
     Measurement.observable_mul_self ((hB _).map _)
   have hdist : ∀ k a b, φ.norm (A (linearityQuery k a b) - N k a b) ^ 2 = 2 - 2 * C k a b :=
-    fun k a b => φ.norm_sub_sq_eq_of_commute (S.alice _).isSelfAdjoint_observable (hNsa k a b)
-      (Measurement.observable_mul_self (hA _)) (hN2 k a b) (hc k a b _)
+    fun k a b => φ.norm_sub_sq_eq_of_mul_self (S.alice _).isSelfAdjoint_observable (hNsa k a b)
+      (Measurement.observable_mul_self (hA _)) (hN2 k a b)
   have hdistE : ∀ k, 𝔼 a, 𝔼 b, φ.norm (A (linearityQuery k a b) - N k a b) ^ 2 =
       2 - 2 * 𝔼 a, 𝔼 b, C k a b := fun k => by
     simp only [hdist, expect_sub_distrib, ← mul_expect, Fintype.expect_const]
