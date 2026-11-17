@@ -47,8 +47,8 @@ original formalization infrastructure.
   register by an injective environment and tracing that environment gives the full-label
   classical branches with the hidden register discarded.
 * `Cslib.Quantum.partialTraceLeft_densityConj_controlled_coherentEnvironmentRecord`: replacing a
-  hidden register by an equivalent environment leaves the recorded label and a continuation on
-  the reference.
+  hidden register by an injective environment leaves the recorded label and a continuation on
+  the remaining factor.
 -/
 
 public section
@@ -173,14 +173,11 @@ theorem partialTraceLeft_densityConj_coherentEnvironmentRecord
     {H R S B : Type*} [Fintype H] [Fintype R] [Fintype S] [Fintype B]
     [DecidableEq H] [DecidableEq R] [DecidableEq S] [DecidableEq B]
     (env : H → S) (f : H → B)
-    (henv : ∀ left right, env left = env right ↔ f left = f right)
-    (hf : Function.Injective f) (ρ : Matrix (H × R) (H × R) ℂ) :
+    (henv : Function.Injective env) (ρ : Matrix (H × R) (H × R) ℂ) :
     partialTraceLeft (densityConj (coherentEnvironmentRecord env f) ρ) =
       ∑ y, pureState (ket y) ⊗ₖ
         partialTraceLeft (classicalDensityBranch (f ∘ Prod.fst) y ρ) := by
   classical
-  have henvInjective : Function.Injective env := fun left right h =>
-    hf ((henv left right).mp h)
   ext ⟨y, r⟩ ⟨z, q⟩
   have hsum :
       if y = z then
@@ -210,7 +207,7 @@ theorem partialTraceLeft_densityConj_coherentEnvironmentRecord
       conv_rhs =>
         rw [Finset.sum_comm (s := (Finset.univ : Finset S))
           (t := (Finset.univ : Finset H))]
-      simp only [henvInjective.eq_iff, Fintype.sum_ite_eq, Fintype.sum_ite_eq']
+      simp only [henv.eq_iff, Fintype.sum_ite_eq, Fintype.sum_ite_eq']
       apply Finset.sum_congr rfl
       intro x _
       by_cases hx : y = f x
@@ -220,7 +217,7 @@ theorem partialTraceLeft_densityConj_coherentEnvironmentRecord
       conv_rhs =>
         rw [Finset.sum_comm (s := (Finset.univ : Finset S))
           (t := (Finset.univ : Finset H))]
-      simp only [henvInjective.eq_iff, Fintype.sum_ite_eq, Fintype.sum_ite_eq']
+      simp only [henv.eq_iff, Fintype.sum_ite_eq, Fintype.sum_ite_eq']
       rw [eq_comm]
       apply Finset.sum_eq_zero
       intro x _
@@ -256,17 +253,17 @@ theorem partialTraceLeft_densityConj_controlled_coherentRecord_twice {ι' : Type
   intro y _
   rw [densityConj_blockDiagonal_swap_kronecker]
 
-/-- **A reversible environment may replace the hidden label register.** The environment and
-recorded full label distinguish the same hidden branches, and the full label is injective. After
-discarding the environment, a label-controlled continuation acts only on the retained reference;
-the hidden register is not duplicated in the output. This is the deferred-measurement form for
-an actual reversible service followed by a protected classical reply record. -/
+/-- **A reversible environment may replace the hidden label register.** The environment
+distinguishes the hidden branches. After discarding it, a label-controlled continuation acts on
+the remaining factor; the hidden register is not duplicated in the output. For an inaccessible
+subfactor `External`, instantiate `R` as `Active × External` and `V y` as `W y ⊗ 1_External`.
+This is the deferred-measurement form for an actual reversible service followed by a protected
+classical reply record. -/
 theorem partialTraceLeft_densityConj_controlled_coherentEnvironmentRecord
     {H R S B ι' : Type*} [Fintype H] [Fintype R] [Fintype S] [Fintype B]
     [DecidableEq H] [DecidableEq R] [DecidableEq S] [DecidableEq B]
     (env : H → S) (f : H → B)
-    (henv : ∀ left right, env left = env right ↔ f left = f right)
-    (hf : Function.Injective f) (V : B → Matrix ι' R ℂ)
+    (henv : Function.Injective env) (V : B → Matrix ι' R ℂ)
     (ρ : Matrix (H × R) (H × R) ℂ) :
     partialTraceLeft
         (densityConj
@@ -277,7 +274,7 @@ theorem partialTraceLeft_densityConj_controlled_coherentEnvironmentRecord
         densityConj (V y)
           (partialTraceLeft (classicalDensityBranch (f ∘ Prod.fst) y ρ)) := by
   rw [densityConj_mul, partialTraceLeft_densityConj_one_kronecker,
-    partialTraceLeft_densityConj_coherentEnvironmentRecord env f henv hf, map_sum]
+    partialTraceLeft_densityConj_coherentEnvironmentRecord env f henv, map_sum]
   apply Finset.sum_congr rfl
   intro y _
   rw [densityConj_blockDiagonal_swap_kronecker]

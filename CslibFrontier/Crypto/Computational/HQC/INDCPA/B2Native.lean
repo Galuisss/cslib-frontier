@@ -232,8 +232,10 @@ theorem matrix_b2ServiceBlock_initializedInput_withReference (P : PKEParams)
 /-- **The actual reversible B2 service dephases exactly its complete reply.**  For a fixed
 truncated-syndrome sample and measured message pair, the discarded service environment
 distinguishes precisely the complete `[hidden bit | u | v]` labels emitted by the service.  The
-identity retains an arbitrary reference register and permits a branch-dependent continuation
-selected by the full reply; no product-state or independence hypothesis is used.
+identity accepts an arbitrary, possibly entangled state on the hidden bit and saved reference,
+and permits a full-reply-selected continuation on that reference; no product-state or
+independence hypothesis is used. To preserve an inaccessible subfactor, that continuation must
+be instantiated as the active continuation tensored with its identity.
 
 The original hidden register is part of the discarded service environment, rather than being
 duplicated in the output. The continuation acts only on the saved reference factor; in the B2
@@ -345,26 +347,12 @@ theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
     rw [b2ServiceReadout_classicalRun P securityParameter encoder sample messages hidden]
   rw [hserviceReply]
   apply partialTraceLeft_densityConj_controlled_coherentEnvironmentRecord
-  · intro hiddenLeft hiddenRight
-    constructor
-    · intro henvironment
-      have hhidden := congrArg
-        (fun state => readBit state
-          (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k))
-        henvironment
-      rw [hserviceHidden hiddenLeft, hserviceHidden hiddenRight] at hhidden
-      subst hiddenRight
-      rfl
-    · intro hreply
-      have hhidden : hiddenLeft = hiddenRight := by
-        have h := congrFun hreply
-          (Fin.castAdd (P.n + P.codeLen) (0 : Fin 1))
-        simpa only [Fin.append_left] using h
-      subst hiddenRight
-      rfl
-  · intro hiddenLeft hiddenRight hreply
-    have h := congrFun hreply
-      (Fin.castAdd (P.n + P.codeLen) (0 : Fin 1))
-    simpa only [Fin.append_left] using h
+  intro hiddenLeft hiddenRight henvironment
+  have hhidden := congrArg
+    (fun state => readBit state
+      (2 * securityParameter + 1 + (3 * P.n + P.codeLen) + 2 * P.k))
+    henvironment
+  rw [hserviceHidden hiddenLeft, hserviceHidden hiddenRight] at hhidden
+  exact hhidden
 
 end Cslib.Crypto.HQC
