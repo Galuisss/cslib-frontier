@@ -8,7 +8,6 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.WangTile.Robinson.Signals
-import Mathlib.Tactic.FinCases
 
 /-!
 # Closed decorated Robinson expansions
@@ -42,11 +41,6 @@ obligations.
 -/
 
 public section
-
--- These finite certificates normalize the same tables. Serial elaboration avoids retaining
--- several large normalization tasks at once. Six-node batches keep peak memory moderate
--- while staying below the default proof limits.
-set_option Elab.async false
 
 namespace Cslib.WangTile.Robinson.Canonical
 
@@ -574,14 +568,147 @@ instance : DecidableRel VCompatible := fun lower upper =>
       lower.block.vMatches upper.block = true))
 
 -- Checked semantic seam caches and side refinement avoid enumerating every node pair.
--- Every cached code and four-child expansion is validated against the actual decorated nodes.
+-- Every cached code and four-child expansion is validated against the actual decorated nodes
+-- through pure-Bool single-pass checks over the underlying 24×13 tables.
+
+private def listGetRec {α : Type} (l : List α) (i : Nat) (d : α) : α :=
+  @List.rec α (fun _ => Nat → α) (fun _ => d)
+    (fun a _ ih n => match n with | 0 => a | k + 1 => ih k) l i
+
+private def listLenRec {α : Type} (l : List α) : Nat :=
+  @List.rec α (fun _ => Nat) 0 (fun _ _ ih => ih + 1) l
+
+private def checkListRec {α : Type} (p : Nat → α → Bool) (l : List α) (base : Nat) : Bool :=
+  @List.rec α (fun _ => Nat → Bool) (fun _ => true)
+    (fun a _ ih i => match p i a with | true => ih (i + 1) | false => false) l base
+
+private def allRangeRec (n : Nat) (f : Nat → Bool) : Bool :=
+  @Nat.rec (fun _ => Bool) true
+    (fun k ih => match f k with | true => ih | false => false) n
+
+private theorem allRangeRec_sound (n : Nat) (f : Nat → Bool)
+    (h : allRangeRec n f = true) (k : Nat) (hk : k < n) : f k = true := by
+  induction n with
+  | zero => cases hk
+  | succ m ih =>
+    simp only [allRangeRec] at h
+    cases hf : f m with
+    | false => simp [hf] at h
+    | true =>
+      simp only [hf] at h
+      rcases Nat.lt_succ_iff_lt_or_eq.mp hk with hlt | rfl
+      · exact ih h hlt
+      · exact hf
+
+private theorem listLenRec_eq {α : Type} (l : List α) : listLenRec l = l.length := by
+  induction l with
+  | nil => rfl
+  | cons _ _ ih => simpa only [listLenRec, List.length_cons] using congrArg (· + 1) ih
+
+private theorem checkListRec_sound {α : Type} (p : Nat → α → Bool) (l : List α) (base : Nat)
+    (h : checkListRec p l base = true) (i : Nat) (hi : i < l.length) :
+    p (base + i) (l[i]'hi) = true := by
+  induction l generalizing base i with
+  | nil => cases hi
+  | cons a l ih =>
+    simp only [checkListRec] at h
+    cases hp : p base a with
+    | false => simp [hp] at h
+    | true =>
+      simp only [hp] at h
+      cases i with
+      | zero => simpa using hp
+      | succ k =>
+        have hk : k < l.length := Nat.lt_of_succ_lt_succ hi
+        have hstep := ih (base + 1) h k hk
+        simpa only [Nat.add_assoc, Nat.add_comm 1 k, List.getElem_cons_succ] using hstep
+
+private theorem array_getD_eq_listGetRec {α : Type} (a : Array α) (i : Nat) (d : α) :
+    a.getD i d = listGetRec a.toList i d := by
+  rcases a with ⟨l⟩
+  simp only [Array.getD, Array.size, Array.getInternal]
+  split
+  · rename_i h
+    induction l generalizing i with
+    | nil => cases h
+    | cons a l ih =>
+      cases i with
+      | zero => rfl
+      | succ k => exact ih k (Nat.lt_of_succ_lt_succ h)
+  · rename_i h
+    induction l generalizing i with
+    | nil => rfl
+    | cons a l ih =>
+      cases i with
+      | zero => simp at h
+      | succ k => exact ih k (by simp at h; omega)
+
+private def gridGet24x13 {α : Type} (grid : Array (Array α)) (d : α) (n : Nat) : α :=
+  listGetRec (listGetRec grid.toList (n / 13) #[]).toList (n % 13) d
+
+private theorem grid_getD_eq_gridGet24x13 {α : Type} (grid : Array (Array α)) (d : α)
+    (n : Nat) : (grid.getD (n / 13) #[]).getD (n % 13) d = gridGet24x13 grid d n := by
+  rw [array_getD_eq_listGetRec, array_getD_eq_listGetRec]
+  rfl
+
+private def checkGrid24x13 {α : Type} (p : Nat → α → Bool) (grid : Array (Array α)) : Bool :=
+  Nat.beq (listLenRec grid.toList) 24 &&
+  checkListRec (fun b row =>
+    Nat.beq (listLenRec row.toList) 13 &&
+    checkListRec (fun r x => p (13 * b + r) x) row.toList 0) grid.toList 0
+
+private theorem checkGrid24x13_sound {α : Type} (p : Nat → α → Bool)
+    (grid : Array (Array α)) (d : α) (h : checkGrid24x13 p grid = true)
+    (n : Nat) (hn : n < 312) :
+    p n ((grid.getD (n / 13) #[]).getD (n % 13) d) = true := by
+  simp only [checkGrid24x13, Bool.and_eq_true, Nat.beq_eq, listLenRec_eq] at h
+  have hb : n / 13 < grid.toList.length := by omega
+  have hrow := checkListRec_sound _ grid.toList 0 h.2 (n / 13) hb
+  simp only [Nat.zero_add, Bool.and_eq_true, Nat.beq_eq, listLenRec_eq] at hrow
+  have hr : n % 13 < (grid.toList[n / 13]'hb).toList.length := by omega
+  have hx := checkListRec_sound _ (grid.toList[n / 13]'hb).toList 0 hrow.2 (n % 13) hr
+  simp only [Nat.zero_add] at hx
+  have hdiv : 13 * (n / 13) + n % 13 = n := by omega
+  rw [hdiv] at hx
+  have hget : ∀ (a : Array α) (i : Nat) (hi : i < a.toList.length),
+      a.getD i d = a.toList[i]'hi := by
+    rintro ⟨al⟩ i hi
+    simp only [Array.getD, Array.size, Array.getInternal, dite_eq_left hi]
+    rfl
+  have hget1 : grid.getD (n / 13) #[] = grid.toList[n / 13]'hb := by
+    rcases grid with ⟨gl⟩
+    simp only [Array.getD, Array.size, Array.getInternal, dite_eq_left hb]
+    rfl
+  rw [hget1, hget _ _ hr]
+  exact hx
+
+private structure Row8 (α : Type) where
+  v0 : α
+  v1 : α
+  v2 : α
+  v3 : α
+  v4 : α
+  v5 : α
+  v6 : α
+  v7 : α
+
+private def Row8.get {α : Type} (r : Row8 α) (i : Nat) : α :=
+  match Nat.blt i 4 with
+  | true =>
+    match Nat.blt i 2 with
+    | true => match Nat.beq i 0 with | true => r.v0 | false => r.v1
+    | false => match Nat.beq i 2 with | true => r.v2 | false => r.v3
+  | false =>
+    match Nat.blt i 6 with
+    | true => match Nat.beq i 4 with | true => r.v4 | false => r.v5
+    | false => match Nat.beq i 6 with | true => r.v6 | false => r.v7
 
 private def seamCode (edge : Nat) (low high : Option Shade) : Nat :=
   Nat.pair edge (Nat.pair (Shade.code low) (Shade.code high))
 
 private theorem seamCode_eq_iff {a b : Nat} {lo hi lo' hi' : Option Shade} :
     seamCode a lo hi = seamCode b lo' hi' ↔ a = b ∧ lo = lo' ∧ hi = hi' := by
-  simp [seamCode, Nat.pair_eq_pair, Shade.code_injective.eq_iff]
+  simp only [seamCode, Nat.pair_eq_pair, Shade.code_injective.eq_iff]
 
 private structure Seams where
   west : Nat
@@ -598,513 +725,872 @@ private def actualSeams (node : Node) : Seams :=
    seamCode t.bottom b.southwest.south b.southeast.south,
    seamCode t.top b.northwest.north b.northeast.north⟩
 
-private def seamRows : Array Seams := #[
-  ⟨348, 312, 110, 650⟩, ⟨38, 37, 110, 650⟩, ⟨210, 870, 348, 312⟩,
-  ⟨110, 650, 348, 312⟩, ⟨210, 870, 510, 466⟩, ⟨110, 650, 510, 466⟩,
-  ⟨210, 870, 38, 37⟩, ⟨110, 650, 38, 37⟩, ⟨510, 466, 110, 650⟩,
-  ⟨210, 870, 46, 34⟩, ⟨110, 650, 46, 34⟩, ⟨46, 34, 110, 650⟩,
-  ⟨38, 312, 110, 90⟩, ⟨8, 5, 210, 870⟩, ⟨8, 5, 38, 312⟩,
-  ⟨5, 8, 240, 812⟩, ⟨8, 5, 110, 650⟩, ⟨5, 8, 132, 600⟩,
-  ⟨930, 870, 46, 466⟩, ⟨930, 870, 110, 650⟩, ⟨210, 870, 507, 463⟩,
-  ⟨46, 466, 507, 463⟩, ⟨240, 812, 463, 507⟩, ⟨110, 650, 507, 463⟩,
-  ⟨132, 600, 463, 507⟩, ⟨348, 312, 210, 870⟩, ⟨348, 312, 210, 870⟩,
-  ⟨348, 312, 110, 650⟩, ⟨210, 870, 110, 90⟩, ⟨38, 37, 210, 870⟩,
-  ⟨38, 37, 210, 870⟩, ⟨110, 650, 110, 90⟩, ⟨38, 37, 110, 650⟩,
-  ⟨930, 870, 210, 870⟩, ⟨210, 870, 348, 312⟩, ⟨110, 650, 348, 312⟩,
-  ⟨210, 870, 510, 466⟩, ⟨110, 650, 510, 466⟩, ⟨210, 870, 210, 182⟩,
-  ⟨38, 312, 210, 182⟩, ⟨210, 182, 210, 870⟩, ⟨210, 182, 38, 312⟩,
-  ⟨110, 650, 210, 182⟩, ⟨210, 182, 110, 650⟩, ⟨344, 308, 210, 870⟩,
-  ⟨344, 308, 46, 466⟩, ⟨308, 344, 240, 812⟩, ⟨344, 308, 110, 650⟩,
-  ⟨308, 344, 132, 600⟩, ⟨210, 870, 344, 308⟩, ⟨46, 466, 344, 308⟩,
-  ⟨210, 870, 38, 37⟩, ⟨240, 812, 308, 344⟩, ⟨110, 650, 344, 308⟩,
-  ⟨132, 600, 308, 344⟩, ⟨110, 650, 38, 37⟩, ⟨510, 466, 210, 870⟩,
-  ⟨510, 466, 210, 870⟩, ⟨510, 466, 110, 650⟩, ⟨210, 870, 210, 182⟩,
-  ⟨38, 312, 210, 182⟩, ⟨210, 182, 210, 870⟩, ⟨210, 182, 38, 312⟩,
-  ⟨110, 650, 210, 182⟩, ⟨210, 182, 110, 650⟩, ⟨344, 308, 210, 870⟩,
-  ⟨344, 308, 46, 466⟩, ⟨308, 344, 240, 812⟩, ⟨344, 308, 110, 650⟩,
-  ⟨308, 344, 132, 600⟩, ⟨210, 870, 344, 308⟩, ⟨46, 466, 344, 308⟩,
-  ⟨210, 870, 46, 34⟩, ⟨46, 34, 210, 870⟩, ⟨240, 812, 308, 344⟩,
-  ⟨110, 650, 344, 308⟩, ⟨132, 600, 308, 344⟩, ⟨46, 34, 210, 870⟩,
-  ⟨110, 650, 46, 34⟩, ⟨46, 34, 110, 650⟩, ⟨210, 870, 110, 90⟩,
-  ⟨38, 312, 110, 90⟩, ⟨8, 5, 210, 870⟩, ⟨8, 5, 38, 312⟩,
-  ⟨110, 650, 110, 90⟩, ⟨5, 8, 240, 812⟩, ⟨8, 5, 110, 650⟩,
-  ⟨5, 8, 132, 600⟩, ⟨930, 870, 210, 870⟩, ⟨930, 870, 46, 466⟩,
-  ⟨930, 870, 110, 650⟩, ⟨210, 870, 507, 463⟩, ⟨46, 466, 507, 463⟩,
-  ⟨240, 812, 463, 507⟩, ⟨110, 650, 507, 463⟩, ⟨132, 600, 463, 507⟩,
-  ⟨210, 870, 8, 5⟩, ⟨38, 312, 8, 5⟩, ⟨110, 90, 210, 870⟩,
-  ⟨110, 90, 38, 312⟩, ⟨240, 812, 5, 8⟩, ⟨110, 650, 8, 5⟩,
-  ⟨132, 600, 5, 8⟩, ⟨110, 90, 110, 650⟩, ⟨507, 463, 210, 870⟩,
-  ⟨507, 463, 46, 466⟩, ⟨463, 507, 240, 812⟩, ⟨507, 463, 110, 650⟩,
-  ⟨463, 507, 132, 600⟩, ⟨46, 466, 930, 870⟩, ⟨210, 870, 930, 870⟩,
-  ⟨110, 650, 930, 870⟩, ⟨210, 870, 8, 5⟩, ⟨38, 312, 8, 5⟩,
-  ⟨110, 90, 210, 870⟩, ⟨110, 90, 38, 312⟩, ⟨240, 812, 5, 8⟩,
-  ⟨110, 650, 8, 5⟩, ⟨132, 600, 5, 8⟩, ⟨110, 90, 110, 650⟩,
-  ⟨507, 463, 210, 870⟩, ⟨507, 463, 46, 466⟩, ⟨463, 507, 240, 812⟩,
-  ⟨507, 463, 110, 650⟩, ⟨463, 507, 132, 600⟩, ⟨210, 870, 930, 870⟩,
-  ⟨46, 466, 930, 870⟩, ⟨110, 650, 930, 870⟩, ⟨240, 812, 182, 210⟩,
-  ⟨8, 308, 210, 182⟩, ⟨132, 600, 182, 210⟩, ⟨182, 210, 240, 812⟩,
-  ⟨210, 182, 8, 308⟩, ⟨182, 210, 132, 600⟩, ⟨348, 182, 348, 182⟩,
-  ⟨312, 348, 240, 812⟩, ⟨348, 312, 43, 463⟩, ⟨312, 348, 132, 600⟩,
-  ⟨38, 312, 43, 31⟩, ⟨240, 812, 90, 110⟩, ⟨8, 308, 110, 90⟩,
-  ⟨132, 600, 90, 110⟩, ⟨37, 38, 240, 812⟩, ⟨38, 37, 8, 308⟩,
-  ⟨37, 38, 132, 600⟩, ⟨930, 37, 510, 90⟩, ⟨870, 930, 240, 812⟩,
-  ⟨930, 870, 43, 463⟩, ⟨870, 930, 132, 600⟩, ⟨240, 812, 312, 348⟩,
-  ⟨43, 463, 348, 312⟩, ⟨132, 600, 312, 348⟩, ⟨43, 31, 38, 312⟩,
-  ⟨240, 812, 466, 510⟩, ⟨43, 463, 510, 466⟩, ⟨132, 600, 466, 510⟩,
-  ⟨702, 650, 210, 870⟩, ⟨702, 650, 46, 466⟩, ⟨702, 650, 110, 650⟩,
-  ⟨240, 812, 37, 38⟩, ⟨8, 308, 38, 37⟩, ⟨132, 600, 37, 38⟩,
-  ⟨90, 110, 240, 812⟩, ⟨110, 90, 8, 308⟩, ⟨90, 110, 132, 600⟩,
-  ⟨510, 90, 930, 37⟩, ⟨210, 870, 702, 650⟩, ⟨466, 510, 240, 812⟩,
-  ⟨510, 466, 43, 463⟩, ⟨466, 510, 132, 600⟩, ⟨46, 466, 702, 650⟩,
-  ⟨240, 812, 34, 46⟩, ⟨8, 308, 46, 34⟩, ⟨132, 600, 34, 46⟩,
-  ⟨34, 46, 240, 812⟩, ⟨46, 34, 8, 308⟩, ⟨34, 46, 132, 600⟩,
-  ⟨702, 34, 702, 34⟩, ⟨39, 278, 90, 110⟩, ⟨5, 8, 39, 278⟩,
-  ⟨930, 5, 507, 90⟩, ⟨870, 930, 60, 424⟩, ⟨210, 870, 43, 31⟩,
-  ⟨60, 424, 463, 507⟩, ⟨650, 702, 240, 812⟩, ⟨702, 650, 43, 463⟩,
-  ⟨650, 702, 132, 600⟩, ⟨240, 812, 870, 930⟩, ⟨43, 463, 930, 870⟩,
-  ⟨132, 600, 870, 930⟩, ⟨110, 650, 702, 650⟩, ⟨240, 812, 650, 702⟩,
-  ⟨43, 463, 702, 650⟩, ⟨132, 600, 650, 702⟩, ⟨240, 812, 182, 210⟩,
-  ⟨8, 308, 210, 182⟩, ⟨132, 600, 182, 210⟩, ⟨182, 210, 240, 812⟩,
-  ⟨210, 182, 8, 308⟩, ⟨182, 210, 132, 600⟩, ⟨348, 182, 348, 182⟩,
-  ⟨312, 348, 240, 812⟩, ⟨348, 312, 43, 463⟩, ⟨312, 348, 132, 600⟩,
-  ⟨38, 312, 43, 31⟩, ⟨240, 812, 90, 110⟩, ⟨8, 308, 110, 90⟩,
-  ⟨132, 600, 90, 110⟩, ⟨37, 38, 240, 812⟩, ⟨38, 37, 8, 308⟩,
-  ⟨37, 38, 132, 600⟩, ⟨930, 37, 510, 90⟩, ⟨870, 930, 240, 812⟩,
-  ⟨930, 870, 43, 463⟩, ⟨870, 930, 132, 600⟩, ⟨240, 812, 312, 348⟩,
-  ⟨43, 463, 348, 312⟩, ⟨132, 600, 312, 348⟩, ⟨43, 31, 38, 312⟩,
-  ⟨240, 812, 466, 510⟩, ⟨43, 463, 510, 466⟩, ⟨132, 600, 466, 510⟩,
-  ⟨702, 650, 210, 870⟩, ⟨702, 650, 46, 466⟩, ⟨702, 650, 110, 650⟩,
-  ⟨39, 278, 182, 210⟩, ⟨240, 812, 37, 38⟩, ⟨182, 210, 39, 278⟩,
-  ⟨344, 182, 344, 182⟩, ⟨308, 344, 60, 424⟩, ⟨8, 308, 38, 37⟩,
-  ⟨60, 424, 308, 344⟩, ⟨132, 600, 37, 38⟩, ⟨90, 110, 240, 812⟩,
-  ⟨110, 90, 8, 308⟩, ⟨90, 110, 132, 600⟩, ⟨510, 90, 930, 37⟩,
-  ⟨210, 870, 702, 650⟩, ⟨466, 510, 240, 812⟩, ⟨510, 466, 43, 463⟩,
-  ⟨466, 510, 132, 600⟩, ⟨46, 466, 702, 650⟩, ⟨39, 278, 182, 210⟩,
-  ⟨240, 812, 34, 46⟩, ⟨182, 210, 39, 278⟩, ⟨344, 182, 344, 182⟩,
-  ⟨308, 344, 60, 424⟩, ⟨8, 308, 46, 34⟩, ⟨60, 424, 308, 344⟩,
-  ⟨132, 600, 34, 46⟩, ⟨34, 46, 240, 812⟩, ⟨46, 34, 8, 308⟩,
-  ⟨34, 46, 132, 600⟩, ⟨702, 34, 702, 34⟩, ⟨39, 278, 90, 110⟩,
-  ⟨5, 8, 39, 278⟩, ⟨930, 5, 507, 90⟩, ⟨870, 930, 60, 424⟩,
-  ⟨210, 870, 43, 31⟩, ⟨60, 424, 463, 507⟩, ⟨650, 702, 240, 812⟩,
-  ⟨702, 650, 43, 463⟩, ⟨650, 702, 132, 600⟩, ⟨39, 278, 5, 8⟩,
-  ⟨240, 812, 870, 930⟩, ⟨90, 110, 39, 278⟩, ⟨507, 90, 930, 5⟩,
-  ⟨463, 507, 60, 424⟩, ⟨43, 463, 930, 870⟩, ⟨60, 424, 870, 930⟩,
-  ⟨132, 600, 870, 930⟩, ⟨43, 31, 210, 870⟩, ⟨110, 650, 702, 650⟩,
-  ⟨39, 278, 5, 8⟩, ⟨240, 812, 650, 702⟩, ⟨90, 110, 39, 278⟩,
-  ⟨507, 90, 930, 5⟩, ⟨463, 507, 60, 424⟩, ⟨43, 463, 702, 650⟩,
-  ⟨60, 424, 870, 930⟩, ⟨132, 600, 650, 702⟩, ⟨43, 31, 210, 870⟩,
-  ⟨278, 240, 278, 240⟩, ⟨39, 278, 31, 43⟩, ⟨812, 39, 424, 132⟩,
-  ⟨240, 812, 31, 43⟩, ⟨31, 43, 39, 278⟩, ⟨650, 702, 60, 424⟩,
-  ⟨110, 650, 43, 31⟩, ⟨424, 132, 812, 39⟩, ⟨60, 424, 650, 702⟩,
-  ⟨600, 60, 600, 60⟩, ⟨132, 600, 31, 43⟩, ⟨31, 43, 240, 812⟩,
-  ⟨43, 31, 110, 650⟩, ⟨31, 43, 132, 600⟩, ⟨278, 240, 278, 240⟩,
-  ⟨39, 278, 31, 43⟩, ⟨812, 39, 424, 132⟩, ⟨240, 812, 31, 43⟩,
-  ⟨31, 43, 39, 278⟩, ⟨650, 702, 60, 424⟩, ⟨110, 650, 43, 31⟩,
-  ⟨424, 132, 812, 39⟩, ⟨60, 424, 650, 702⟩, ⟨600, 60, 600, 60⟩,
-  ⟨132, 600, 31, 43⟩, ⟨31, 43, 240, 812⟩, ⟨43, 31, 110, 650⟩,
-  ⟨31, 43, 132, 600⟩, ⟨702, 31, 702, 31⟩, ⟨702, 31, 702, 31⟩
-]
+private structure Seam4 where
+  s0 : Nat
+  s1 : Nat
+  s2 : Nat
+  s3 : Nat
+
+private inductive SeamExpTree where
+  | leaf (key : Nat) (val : Seam4)
+  | branch (pivot : Nat) (left right : SeamExpTree)
+
+private def SeamExpTree.find (t : SeamExpTree) (code : Nat) : Seam4 :=
+  @SeamExpTree.rec (fun _ => Nat → Seam4)
+    (fun k v c => match Nat.beq c k with | true => v | false => ⟨0, 0, 0, 0⟩)
+    (fun pivot _ _ il ir c => match Nat.blt c pivot with | true => il c | false => ir c)
+    t code
+
+private structure Child4 where
+  sw : Nat
+  se : Nat
+  nw : Nat
+  ne : Nat
+
+private def dummySeamRow : Row8 Seams :=
+  ⟨⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩,
+   ⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩⟩
+
+private def dummySeamBlock : Row8 (Row8 Seams) :=
+  ⟨dummySeamRow, dummySeamRow, dummySeamRow, dummySeamRow,
+   dummySeamRow, dummySeamRow, dummySeamRow, dummySeamRow⟩
+
+private def seamTable : Row8 (Row8 (Row8 Seams)) := ⟨
+  ⟨
+    ⟨⟨348, 312, 110, 650⟩, ⟨38, 37, 110, 650⟩, ⟨210, 870, 348, 312⟩, ⟨110, 650, 348, 312⟩,
+     ⟨210, 870, 510, 466⟩, ⟨110, 650, 510, 466⟩, ⟨210, 870, 38, 37⟩, ⟨110, 650, 38, 37⟩⟩,
+    ⟨⟨510, 466, 110, 650⟩, ⟨210, 870, 46, 34⟩, ⟨110, 650, 46, 34⟩, ⟨46, 34, 110, 650⟩,
+     ⟨38, 312, 110, 90⟩, ⟨8, 5, 210, 870⟩, ⟨8, 5, 38, 312⟩, ⟨5, 8, 240, 812⟩⟩,
+    ⟨⟨8, 5, 110, 650⟩, ⟨5, 8, 132, 600⟩, ⟨930, 870, 46, 466⟩, ⟨930, 870, 110, 650⟩,
+     ⟨210, 870, 507, 463⟩, ⟨46, 466, 507, 463⟩, ⟨240, 812, 463, 507⟩, ⟨110, 650, 507, 463⟩⟩,
+    ⟨⟨132, 600, 463, 507⟩, ⟨348, 312, 210, 870⟩, ⟨348, 312, 210, 870⟩, ⟨348, 312, 110, 650⟩,
+     ⟨210, 870, 110, 90⟩, ⟨38, 37, 210, 870⟩, ⟨38, 37, 210, 870⟩, ⟨110, 650, 110, 90⟩⟩,
+    ⟨⟨38, 37, 110, 650⟩, ⟨930, 870, 210, 870⟩, ⟨210, 870, 348, 312⟩, ⟨110, 650, 348, 312⟩,
+     ⟨210, 870, 510, 466⟩, ⟨110, 650, 510, 466⟩, ⟨210, 870, 210, 182⟩, ⟨38, 312, 210, 182⟩⟩,
+    ⟨⟨210, 182, 210, 870⟩, ⟨210, 182, 38, 312⟩, ⟨110, 650, 210, 182⟩, ⟨210, 182, 110, 650⟩,
+     ⟨344, 308, 210, 870⟩, ⟨344, 308, 46, 466⟩, ⟨308, 344, 240, 812⟩, ⟨344, 308, 110, 650⟩⟩,
+    ⟨⟨308, 344, 132, 600⟩, ⟨210, 870, 344, 308⟩, ⟨46, 466, 344, 308⟩, ⟨210, 870, 38, 37⟩,
+     ⟨240, 812, 308, 344⟩, ⟨110, 650, 344, 308⟩, ⟨132, 600, 308, 344⟩, ⟨110, 650, 38, 37⟩⟩,
+    ⟨⟨510, 466, 210, 870⟩, ⟨510, 466, 210, 870⟩, ⟨510, 466, 110, 650⟩, ⟨210, 870, 210, 182⟩,
+     ⟨38, 312, 210, 182⟩, ⟨210, 182, 210, 870⟩, ⟨210, 182, 38, 312⟩, ⟨110, 650, 210, 182⟩⟩
+  ⟩,
+  ⟨
+    ⟨⟨210, 182, 110, 650⟩, ⟨344, 308, 210, 870⟩, ⟨344, 308, 46, 466⟩, ⟨308, 344, 240, 812⟩,
+     ⟨344, 308, 110, 650⟩, ⟨308, 344, 132, 600⟩, ⟨210, 870, 344, 308⟩, ⟨46, 466, 344, 308⟩⟩,
+    ⟨⟨210, 870, 46, 34⟩, ⟨46, 34, 210, 870⟩, ⟨240, 812, 308, 344⟩, ⟨110, 650, 344, 308⟩,
+     ⟨132, 600, 308, 344⟩, ⟨46, 34, 210, 870⟩, ⟨110, 650, 46, 34⟩, ⟨46, 34, 110, 650⟩⟩,
+    ⟨⟨210, 870, 110, 90⟩, ⟨38, 312, 110, 90⟩, ⟨8, 5, 210, 870⟩, ⟨8, 5, 38, 312⟩,
+     ⟨110, 650, 110, 90⟩, ⟨5, 8, 240, 812⟩, ⟨8, 5, 110, 650⟩, ⟨5, 8, 132, 600⟩⟩,
+    ⟨⟨930, 870, 210, 870⟩, ⟨930, 870, 46, 466⟩, ⟨930, 870, 110, 650⟩, ⟨210, 870, 507, 463⟩,
+     ⟨46, 466, 507, 463⟩, ⟨240, 812, 463, 507⟩, ⟨110, 650, 507, 463⟩, ⟨132, 600, 463, 507⟩⟩,
+    ⟨⟨210, 870, 8, 5⟩, ⟨38, 312, 8, 5⟩, ⟨110, 90, 210, 870⟩, ⟨110, 90, 38, 312⟩,
+     ⟨240, 812, 5, 8⟩, ⟨110, 650, 8, 5⟩, ⟨132, 600, 5, 8⟩, ⟨110, 90, 110, 650⟩⟩,
+    ⟨⟨507, 463, 210, 870⟩, ⟨507, 463, 46, 466⟩, ⟨463, 507, 240, 812⟩, ⟨507, 463, 110, 650⟩,
+     ⟨463, 507, 132, 600⟩, ⟨46, 466, 930, 870⟩, ⟨210, 870, 930, 870⟩, ⟨110, 650, 930, 870⟩⟩,
+    ⟨⟨210, 870, 8, 5⟩, ⟨38, 312, 8, 5⟩, ⟨110, 90, 210, 870⟩, ⟨110, 90, 38, 312⟩,
+     ⟨240, 812, 5, 8⟩, ⟨110, 650, 8, 5⟩, ⟨132, 600, 5, 8⟩, ⟨110, 90, 110, 650⟩⟩,
+    ⟨⟨507, 463, 210, 870⟩, ⟨507, 463, 46, 466⟩, ⟨463, 507, 240, 812⟩, ⟨507, 463, 110, 650⟩,
+     ⟨463, 507, 132, 600⟩, ⟨210, 870, 930, 870⟩, ⟨46, 466, 930, 870⟩, ⟨110, 650, 930, 870⟩⟩
+  ⟩,
+  ⟨
+    ⟨⟨240, 812, 182, 210⟩, ⟨8, 308, 210, 182⟩, ⟨132, 600, 182, 210⟩, ⟨182, 210, 240, 812⟩,
+     ⟨210, 182, 8, 308⟩, ⟨182, 210, 132, 600⟩, ⟨348, 182, 348, 182⟩, ⟨312, 348, 240, 812⟩⟩,
+    ⟨⟨348, 312, 43, 463⟩, ⟨312, 348, 132, 600⟩, ⟨38, 312, 43, 31⟩, ⟨240, 812, 90, 110⟩,
+     ⟨8, 308, 110, 90⟩, ⟨132, 600, 90, 110⟩, ⟨37, 38, 240, 812⟩, ⟨38, 37, 8, 308⟩⟩,
+    ⟨⟨37, 38, 132, 600⟩, ⟨930, 37, 510, 90⟩, ⟨870, 930, 240, 812⟩, ⟨930, 870, 43, 463⟩,
+     ⟨870, 930, 132, 600⟩, ⟨240, 812, 312, 348⟩, ⟨43, 463, 348, 312⟩, ⟨132, 600, 312, 348⟩⟩,
+    ⟨⟨43, 31, 38, 312⟩, ⟨240, 812, 466, 510⟩, ⟨43, 463, 510, 466⟩, ⟨132, 600, 466, 510⟩,
+     ⟨702, 650, 210, 870⟩, ⟨702, 650, 46, 466⟩, ⟨702, 650, 110, 650⟩, ⟨240, 812, 37, 38⟩⟩,
+    ⟨⟨8, 308, 38, 37⟩, ⟨132, 600, 37, 38⟩, ⟨90, 110, 240, 812⟩, ⟨110, 90, 8, 308⟩,
+     ⟨90, 110, 132, 600⟩, ⟨510, 90, 930, 37⟩, ⟨210, 870, 702, 650⟩, ⟨466, 510, 240, 812⟩⟩,
+    ⟨⟨510, 466, 43, 463⟩, ⟨466, 510, 132, 600⟩, ⟨46, 466, 702, 650⟩, ⟨240, 812, 34, 46⟩,
+     ⟨8, 308, 46, 34⟩, ⟨132, 600, 34, 46⟩, ⟨34, 46, 240, 812⟩, ⟨46, 34, 8, 308⟩⟩,
+    ⟨⟨34, 46, 132, 600⟩, ⟨702, 34, 702, 34⟩, ⟨39, 278, 90, 110⟩, ⟨5, 8, 39, 278⟩,
+     ⟨930, 5, 507, 90⟩, ⟨870, 930, 60, 424⟩, ⟨210, 870, 43, 31⟩, ⟨60, 424, 463, 507⟩⟩,
+    ⟨⟨650, 702, 240, 812⟩, ⟨702, 650, 43, 463⟩, ⟨650, 702, 132, 600⟩, ⟨240, 812, 870, 930⟩,
+     ⟨43, 463, 930, 870⟩, ⟨132, 600, 870, 930⟩, ⟨110, 650, 702, 650⟩, ⟨240, 812, 650, 702⟩⟩
+  ⟩,
+  ⟨
+    ⟨⟨43, 463, 702, 650⟩, ⟨132, 600, 650, 702⟩, ⟨240, 812, 182, 210⟩, ⟨8, 308, 210, 182⟩,
+     ⟨132, 600, 182, 210⟩, ⟨182, 210, 240, 812⟩, ⟨210, 182, 8, 308⟩, ⟨182, 210, 132, 600⟩⟩,
+    ⟨⟨348, 182, 348, 182⟩, ⟨312, 348, 240, 812⟩, ⟨348, 312, 43, 463⟩, ⟨312, 348, 132, 600⟩,
+     ⟨38, 312, 43, 31⟩, ⟨240, 812, 90, 110⟩, ⟨8, 308, 110, 90⟩, ⟨132, 600, 90, 110⟩⟩,
+    ⟨⟨37, 38, 240, 812⟩, ⟨38, 37, 8, 308⟩, ⟨37, 38, 132, 600⟩, ⟨930, 37, 510, 90⟩,
+     ⟨870, 930, 240, 812⟩, ⟨930, 870, 43, 463⟩, ⟨870, 930, 132, 600⟩, ⟨240, 812, 312, 348⟩⟩,
+    ⟨⟨43, 463, 348, 312⟩, ⟨132, 600, 312, 348⟩, ⟨43, 31, 38, 312⟩, ⟨240, 812, 466, 510⟩,
+     ⟨43, 463, 510, 466⟩, ⟨132, 600, 466, 510⟩, ⟨702, 650, 210, 870⟩, ⟨702, 650, 46, 466⟩⟩,
+    ⟨⟨702, 650, 110, 650⟩, ⟨39, 278, 182, 210⟩, ⟨240, 812, 37, 38⟩, ⟨182, 210, 39, 278⟩,
+     ⟨344, 182, 344, 182⟩, ⟨308, 344, 60, 424⟩, ⟨8, 308, 38, 37⟩, ⟨60, 424, 308, 344⟩⟩,
+    ⟨⟨132, 600, 37, 38⟩, ⟨90, 110, 240, 812⟩, ⟨110, 90, 8, 308⟩, ⟨90, 110, 132, 600⟩,
+     ⟨510, 90, 930, 37⟩, ⟨210, 870, 702, 650⟩, ⟨466, 510, 240, 812⟩, ⟨510, 466, 43, 463⟩⟩,
+    ⟨⟨466, 510, 132, 600⟩, ⟨46, 466, 702, 650⟩, ⟨39, 278, 182, 210⟩, ⟨240, 812, 34, 46⟩,
+     ⟨182, 210, 39, 278⟩, ⟨344, 182, 344, 182⟩, ⟨308, 344, 60, 424⟩, ⟨8, 308, 46, 34⟩⟩,
+    ⟨⟨60, 424, 308, 344⟩, ⟨132, 600, 34, 46⟩, ⟨34, 46, 240, 812⟩, ⟨46, 34, 8, 308⟩,
+     ⟨34, 46, 132, 600⟩, ⟨702, 34, 702, 34⟩, ⟨39, 278, 90, 110⟩, ⟨5, 8, 39, 278⟩⟩
+  ⟩,
+  ⟨
+    ⟨⟨930, 5, 507, 90⟩, ⟨870, 930, 60, 424⟩, ⟨210, 870, 43, 31⟩, ⟨60, 424, 463, 507⟩,
+     ⟨650, 702, 240, 812⟩, ⟨702, 650, 43, 463⟩, ⟨650, 702, 132, 600⟩, ⟨39, 278, 5, 8⟩⟩,
+    ⟨⟨240, 812, 870, 930⟩, ⟨90, 110, 39, 278⟩, ⟨507, 90, 930, 5⟩, ⟨463, 507, 60, 424⟩,
+     ⟨43, 463, 930, 870⟩, ⟨60, 424, 870, 930⟩, ⟨132, 600, 870, 930⟩, ⟨43, 31, 210, 870⟩⟩,
+    ⟨⟨110, 650, 702, 650⟩, ⟨39, 278, 5, 8⟩, ⟨240, 812, 650, 702⟩, ⟨90, 110, 39, 278⟩,
+     ⟨507, 90, 930, 5⟩, ⟨463, 507, 60, 424⟩, ⟨43, 463, 702, 650⟩, ⟨60, 424, 870, 930⟩⟩,
+    ⟨⟨132, 600, 650, 702⟩, ⟨43, 31, 210, 870⟩, ⟨278, 240, 278, 240⟩, ⟨39, 278, 31, 43⟩,
+     ⟨812, 39, 424, 132⟩, ⟨240, 812, 31, 43⟩, ⟨31, 43, 39, 278⟩, ⟨650, 702, 60, 424⟩⟩,
+    ⟨⟨110, 650, 43, 31⟩, ⟨424, 132, 812, 39⟩, ⟨60, 424, 650, 702⟩, ⟨600, 60, 600, 60⟩,
+     ⟨132, 600, 31, 43⟩, ⟨31, 43, 240, 812⟩, ⟨43, 31, 110, 650⟩, ⟨31, 43, 132, 600⟩⟩,
+    ⟨⟨278, 240, 278, 240⟩, ⟨39, 278, 31, 43⟩, ⟨812, 39, 424, 132⟩, ⟨240, 812, 31, 43⟩,
+     ⟨31, 43, 39, 278⟩, ⟨650, 702, 60, 424⟩, ⟨110, 650, 43, 31⟩, ⟨424, 132, 812, 39⟩⟩,
+    ⟨⟨60, 424, 650, 702⟩, ⟨600, 60, 600, 60⟩, ⟨132, 600, 31, 43⟩, ⟨31, 43, 240, 812⟩,
+     ⟨43, 31, 110, 650⟩, ⟨31, 43, 132, 600⟩, ⟨702, 31, 702, 31⟩, ⟨702, 31, 702, 31⟩⟩,
+    dummySeamRow
+  ⟩,
+  dummySeamBlock, dummySeamBlock, dummySeamBlock⟩
+
+private def seamExpTree : SeamExpTree :=
+  .branch 278
+    .branch 46
+      .branch 37
+        .branch 31
+          .branch 8
+            .leaf 5 ⟨8, 132, 43, 240⟩
+            .leaf 8 ⟨8, 132, 110, 240⟩
+          .branch 34
+            .leaf 31 ⟨43, 132, 43, 240⟩
+            .leaf 34 ⟨46, 132, 43, 240⟩
+        .branch 39
+          .branch 38
+            .leaf 37 ⟨38, 132, 43, 240⟩
+            .leaf 38 ⟨38, 132, 110, 240⟩
+          .branch 43
+            .leaf 39 ⟨38, 132, 210, 240⟩
+            .leaf 43 ⟨43, 132, 110, 240⟩
+      .branch 132
+        .branch 90
+          .branch 60
+            .leaf 46 ⟨46, 132, 110, 240⟩
+            .leaf 60 ⟨46, 132, 210, 240⟩
+          .branch 110
+            .leaf 90 ⟨110, 132, 43, 240⟩
+            .leaf 110 ⟨110, 132, 110, 240⟩
+        .branch 210
+          .branch 182
+            .leaf 132 ⟨110, 132, 210, 240⟩
+            .leaf 182 ⟨210, 132, 43, 240⟩
+          .branch 240
+            .leaf 210 ⟨210, 132, 110, 240⟩
+            .leaf 240 ⟨210, 132, 210, 240⟩
+    .branch 507
+      .branch 348
+        .branch 312
+          .branch 308
+            .leaf 278 ⟨348, 132, 8, 240⟩
+            .leaf 308 ⟨344, 132, 43, 240⟩
+          .branch 344
+            .leaf 312 ⟨348, 132, 43, 240⟩
+            .leaf 344 ⟨344, 132, 110, 240⟩
+        .branch 463
+          .branch 424
+            .leaf 348 ⟨348, 132, 110, 240⟩
+            .leaf 424 ⟨510, 132, 8, 240⟩
+          .branch 466
+            .leaf 463 ⟨507, 132, 43, 240⟩
+            .leaf 466 ⟨510, 132, 43, 240⟩
+      .branch 702
+        .branch 600
+          .branch 510
+            .leaf 507 ⟨507, 132, 110, 240⟩
+            .leaf 510 ⟨510, 132, 110, 240⟩
+          .branch 650
+            .leaf 600 ⟨702, 132, 8, 240⟩
+            .leaf 650 ⟨702, 132, 43, 240⟩
+        .branch 870
+          .branch 812
+            .leaf 702 ⟨702, 132, 110, 240⟩
+            .leaf 812 ⟨930, 132, 8, 240⟩
+          .branch 930
+            .leaf 870 ⟨930, 132, 43, 240⟩
+            .leaf 930 ⟨930, 132, 110, 240⟩
+
+private def dummyChild4Row : Row8 Child4 :=
+  ⟨⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩,
+   ⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩, ⟨0, 0, 0, 0⟩⟩
+
+private def childBlockLow : Row8 (Row8 Child4) := ⟨
+  ⟨⟨0, 22, 57, 4⟩, ⟨1, 20, 63, 4⟩, ⟨2, 26, 69, 4⟩, ⟨3, 24, 75, 4⟩,
+   ⟨0, 17, 61, 7⟩, ⟨1, 16, 67, 7⟩, ⟨2, 19, 73, 7⟩, ⟨3, 18, 79, 7⟩⟩,
+  ⟨⟨32, 8, 76, 5⟩, ⟨33, 9, 76, 5⟩, ⟨34, 10, 76, 5⟩, ⟨35, 11, 76, 5⟩,
+   ⟨36, 29, 58, 5⟩, ⟨37, 31, 58, 5⟩, ⟨38, 9, 58, 5⟩, ⟨39, 11, 58, 5⟩⟩,
+  ⟨⟨40, 28, 64, 5⟩, ⟨41, 30, 64, 5⟩, ⟨42, 8, 64, 5⟩, ⟨43, 10, 64, 5⟩,
+   ⟨44, 28, 70, 5⟩, ⟨45, 29, 70, 5⟩, ⟨46, 30, 70, 5⟩, ⟨47, 31, 70, 5⟩⟩,
+  ⟨⟨48, 8, 70, 5⟩, ⟨49, 9, 70, 5⟩, ⟨50, 10, 70, 5⟩, ⟨51, 11, 70, 5⟩,
+   ⟨52, 28, 76, 5⟩, ⟨53, 29, 76, 5⟩, ⟨54, 30, 76, 5⟩, ⟨55, 31, 76, 5⟩⟩,
+  ⟨⟨32, 24, 74, 4⟩, ⟨33, 25, 74, 4⟩, ⟨34, 26, 74, 4⟩, ⟨35, 27, 74, 4⟩,
+   ⟨36, 21, 56, 4⟩, ⟨37, 23, 56, 4⟩, ⟨38, 25, 56, 4⟩, ⟨39, 27, 56, 4⟩⟩,
+  ⟨⟨40, 20, 62, 4⟩, ⟨41, 22, 62, 4⟩, ⟨42, 24, 62, 4⟩, ⟨43, 26, 62, 4⟩,
+   ⟨44, 20, 68, 4⟩, ⟨45, 21, 68, 4⟩, ⟨46, 22, 68, 4⟩, ⟨47, 23, 68, 4⟩⟩,
+  ⟨⟨48, 24, 68, 4⟩, ⟨49, 25, 68, 4⟩, ⟨50, 26, 68, 4⟩, ⟨51, 27, 68, 4⟩,
+   ⟨52, 20, 74, 4⟩, ⟨53, 21, 74, 4⟩, ⟨54, 22, 74, 4⟩, ⟨55, 23, 74, 4⟩⟩,
+  ⟨⟨80, 12, 59, 6⟩, ⟨81, 12, 60, 6⟩, ⟨82, 13, 59, 6⟩, ⟨83, 14, 59, 6⟩,
+   ⟨84, 14, 60, 6⟩, ⟨85, 15, 60, 6⟩, ⟨86, 12, 65, 6⟩, ⟨87, 12, 66, 6⟩⟩
+⟩
+
+private def childBlockHigh : Row8 (Row8 Child4) := ⟨
+  ⟨⟨88, 13, 65, 6⟩, ⟨89, 14, 65, 6⟩, ⟨90, 14, 66, 6⟩, ⟨91, 15, 66, 6⟩,
+   ⟨92, 12, 71, 6⟩, ⟨93, 12, 72, 6⟩, ⟨94, 13, 71, 6⟩, ⟨95, 14, 71, 6⟩⟩,
+  ⟨⟨96, 14, 72, 6⟩, ⟨97, 15, 72, 6⟩, ⟨98, 12, 77, 6⟩, ⟨99, 12, 78, 6⟩,
+   ⟨100, 13, 77, 6⟩, ⟨101, 14, 77, 6⟩, ⟨102, 14, 78, 6⟩, ⟨103, 15, 78, 6⟩⟩,
+  ⟨⟨80, 21, 56, 4⟩, ⟨81, 21, 57, 4⟩, ⟨82, 23, 56, 4⟩, ⟨83, 25, 56, 4⟩,
+   ⟨84, 25, 57, 4⟩, ⟨85, 27, 57, 4⟩, ⟨86, 21, 62, 4⟩, ⟨87, 21, 63, 4⟩⟩,
+  ⟨⟨88, 23, 62, 4⟩, ⟨89, 25, 62, 4⟩, ⟨90, 25, 63, 4⟩, ⟨91, 27, 63, 4⟩,
+   ⟨92, 21, 68, 4⟩, ⟨93, 21, 69, 4⟩, ⟨94, 23, 68, 4⟩, ⟨95, 25, 68, 4⟩⟩,
+  ⟨⟨96, 25, 69, 4⟩, ⟨97, 27, 69, 4⟩, ⟨98, 21, 74, 4⟩, ⟨99, 21, 75, 4⟩,
+   ⟨100, 23, 74, 4⟩, ⟨101, 25, 74, 4⟩, ⟨102, 25, 75, 4⟩, ⟨103, 27, 75, 4⟩⟩,
+  dummyChild4Row, dummyChild4Row, dummyChild4Row⟩
+
+private def seamAt (n : Nat) : Seams :=
+  ((seamTable.get (n / 64)).get ((n / 8) % 8)).get (n % 8)
 
 private def cachedSeams (node : Node) : Seams :=
-  seamRows.getD node.code.val ⟨0, 0, 0, 0⟩
+  seamAt node.code.val
+
+private def seamExpansion4 (code : Nat) : Seam4 :=
+  seamExpTree.find code
 
 private def seamExpansion (code : Nat) (offset : Fin 4) : Nat :=
-  let row : Array Nat := match code with
-    | 37 => #[38, 132, 43, 240]
-    | 38 => #[38, 132, 110, 240]
-    | 39 => #[38, 132, 210, 240]
-    | 34 => #[46, 132, 43, 240]
-    | 31 => #[43, 132, 43, 240]
-    | 5 => #[8, 132, 43, 240]
-    | 8 => #[8, 132, 110, 240]
-    | 46 => #[46, 132, 110, 240]
-    | 43 => #[43, 132, 110, 240]
-    | 60 => #[46, 132, 210, 240]
-    | 90 => #[110, 132, 43, 240]
-    | 110 => #[110, 132, 110, 240]
-    | 132 => #[110, 132, 210, 240]
-    | 182 => #[210, 132, 43, 240]
-    | 210 => #[210, 132, 110, 240]
-    | 240 => #[210, 132, 210, 240]
-    | 278 => #[348, 132, 8, 240]
-    | 312 => #[348, 132, 43, 240]
-    | 308 => #[344, 132, 43, 240]
-    | 348 => #[348, 132, 110, 240]
-    | 344 => #[344, 132, 110, 240]
-    | 424 => #[510, 132, 8, 240]
-    | 466 => #[510, 132, 43, 240]
-    | 463 => #[507, 132, 43, 240]
-    | 510 => #[510, 132, 110, 240]
-    | 507 => #[507, 132, 110, 240]
-    | 600 => #[702, 132, 8, 240]
-    | 650 => #[702, 132, 43, 240]
-    | 702 => #[702, 132, 110, 240]
-    | 812 => #[930, 132, 8, 240]
-    | 870 => #[930, 132, 43, 240]
-    | 930 => #[930, 132, 110, 240]
-    | _ => #[]
-  row.getD offset.val 0
+  let s := seamExpansion4 code
+  match offset.val with
+  | 0 => s.s0
+  | 1 => s.s1
+  | 2 => s.s2
+  | _ => s.s3
 
-private def seamCheck (node : Node) : Bool := decide (
-  cachedSeams node = actualSeams node ∧
-  (∀ y : Fin 4, (cachedSeams (node.child (blockPosition 0 y))).west =
-    seamExpansion (cachedSeams node).west y) ∧
-  (∀ y : Fin 4, (cachedSeams (node.child (blockPosition 3 y))).east =
-    seamExpansion (cachedSeams node).east y) ∧
-  (∀ x : Fin 4, (cachedSeams (node.child (blockPosition x 0))).south =
-    seamExpansion (cachedSeams node).south x) ∧
-  (∀ x : Fin 4, (cachedSeams (node.child (blockPosition x 3))).north =
-    seamExpansion (cachedSeams node).north x))
+private def childBlock4 (p : Nat) : Child4 :=
+  match Nat.blt p 64 with
+  | true => (childBlockLow.get (p / 8)).get (p % 8)
+  | false => (childBlockHigh.get ((p - 64) / 8)).get (p % 8)
 
-private def seamChunk (chunk : Nat) : Bool :=
-  (List.range 6).all fun offset =>
-    seamCheck ⟨⟨(6 * chunk + offset) % 312, Nat.mod_lt _ (by decide)⟩⟩
+private def childBlockFast (p x y : Nat) : Nat :=
+  let c := childBlock4 p
+  match y with
+  | 0 => match x with | 0 => c.sw | _ => c.se
+  | _ => match x with | 0 => c.nw | _ => c.ne
 
-private theorem seam_0 : seamChunk 0 = true := by decide +kernel
-private theorem seam_1 : seamChunk 1 = true := by decide +kernel
-private theorem seam_2 : seamChunk 2 = true := by decide +kernel
-private theorem seam_3 : seamChunk 3 = true := by decide +kernel
-private theorem seam_4 : seamChunk 4 = true := by decide +kernel
-private theorem seam_5 : seamChunk 5 = true := by decide +kernel
-private theorem seam_6 : seamChunk 6 = true := by decide +kernel
-private theorem seam_7 : seamChunk 7 = true := by decide +kernel
-private theorem seam_8 : seamChunk 8 = true := by decide +kernel
-private theorem seam_9 : seamChunk 9 = true := by decide +kernel
-private theorem seam_10 : seamChunk 10 = true := by decide +kernel
-private theorem seam_11 : seamChunk 11 = true := by decide +kernel
-private theorem seam_12 : seamChunk 12 = true := by decide +kernel
-private theorem seam_13 : seamChunk 13 = true := by decide +kernel
-private theorem seam_14 : seamChunk 14 = true := by decide +kernel
-private theorem seam_15 : seamChunk 15 = true := by decide +kernel
-private theorem seam_16 : seamChunk 16 = true := by decide +kernel
-private theorem seam_17 : seamChunk 17 = true := by decide +kernel
-private theorem seam_18 : seamChunk 18 = true := by decide +kernel
-private theorem seam_19 : seamChunk 19 = true := by decide +kernel
-private theorem seam_20 : seamChunk 20 = true := by decide +kernel
-private theorem seam_21 : seamChunk 21 = true := by decide +kernel
-private theorem seam_22 : seamChunk 22 = true := by decide +kernel
-private theorem seam_23 : seamChunk 23 = true := by decide +kernel
-private theorem seam_24 : seamChunk 24 = true := by decide +kernel
-private theorem seam_25 : seamChunk 25 = true := by decide +kernel
-private theorem seam_26 : seamChunk 26 = true := by decide +kernel
-private theorem seam_27 : seamChunk 27 = true := by decide +kernel
-private theorem seam_28 : seamChunk 28 = true := by decide +kernel
-private theorem seam_29 : seamChunk 29 = true := by decide +kernel
-private theorem seam_30 : seamChunk 30 = true := by decide +kernel
-private theorem seam_31 : seamChunk 31 = true := by decide +kernel
-private theorem seam_32 : seamChunk 32 = true := by decide +kernel
-private theorem seam_33 : seamChunk 33 = true := by decide +kernel
-private theorem seam_34 : seamChunk 34 = true := by decide +kernel
-private theorem seam_35 : seamChunk 35 = true := by decide +kernel
-private theorem seam_36 : seamChunk 36 = true := by decide +kernel
-private theorem seam_37 : seamChunk 37 = true := by decide +kernel
-private theorem seam_38 : seamChunk 38 = true := by decide +kernel
-private theorem seam_39 : seamChunk 39 = true := by decide +kernel
-private theorem seam_40 : seamChunk 40 = true := by decide +kernel
-private theorem seam_41 : seamChunk 41 = true := by decide +kernel
-private theorem seam_42 : seamChunk 42 = true := by decide +kernel
-private theorem seam_43 : seamChunk 43 = true := by decide +kernel
-private theorem seam_44 : seamChunk 44 = true := by decide +kernel
-private theorem seam_45 : seamChunk 45 = true := by decide +kernel
-private theorem seam_46 : seamChunk 46 = true := by decide +kernel
-private theorem seam_47 : seamChunk 47 = true := by decide +kernel
-private theorem seam_48 : seamChunk 48 = true := by decide +kernel
-private theorem seam_49 : seamChunk 49 = true := by decide +kernel
-private theorem seam_50 : seamChunk 50 = true := by decide +kernel
-private theorem seam_51 : seamChunk 51 = true := by decide +kernel
+private def childBlockTableOk : Bool :=
+  allRangeRec 104 fun p =>
+    if hp : p < 104 then
+      match childBlock4 p with
+      | ⟨sw, se, nw, ne⟩ =>
+        let idx : Index := ⟨p, hp⟩
+        Nat.beq (childBlock idx 0 0).val sw &&
+        Nat.beq (childBlock idx 1 0).val se &&
+        Nat.beq (childBlock idx 0 1).val nw &&
+        Nat.beq (childBlock idx 1 1).val ne
+    else false
 
-private theorem seam_chunks (chunk : Fin 52) : seamChunk chunk.val = true := by
-  fin_cases chunk
-  · exact seam_0
-  · exact seam_1
-  · exact seam_2
-  · exact seam_3
-  · exact seam_4
-  · exact seam_5
-  · exact seam_6
-  · exact seam_7
-  · exact seam_8
-  · exact seam_9
-  · exact seam_10
-  · exact seam_11
-  · exact seam_12
-  · exact seam_13
-  · exact seam_14
-  · exact seam_15
-  · exact seam_16
-  · exact seam_17
-  · exact seam_18
-  · exact seam_19
-  · exact seam_20
-  · exact seam_21
-  · exact seam_22
-  · exact seam_23
-  · exact seam_24
-  · exact seam_25
-  · exact seam_26
-  · exact seam_27
-  · exact seam_28
-  · exact seam_29
-  · exact seam_30
-  · exact seam_31
-  · exact seam_32
-  · exact seam_33
-  · exact seam_34
-  · exact seam_35
-  · exact seam_36
-  · exact seam_37
-  · exact seam_38
-  · exact seam_39
-  · exact seam_40
-  · exact seam_41
-  · exact seam_42
-  · exact seam_43
-  · exact seam_44
-  · exact seam_45
-  · exact seam_46
-  · exact seam_47
-  · exact seam_48
-  · exact seam_49
-  · exact seam_50
-  · exact seam_51
+private theorem childBlockTable_checked : childBlockTableOk = true := by decide +kernel
 
-private theorem checked_from_chunks (check : Node → Bool)
-    (chunks : ∀ chunk : Fin 52, (List.range 6).all (fun offset =>
-      check ⟨⟨(6 * chunk.val + offset) % 312, Nat.mod_lt _ (by decide)⟩⟩) = true)
-    (node : Node) : check node = true := by
-  let chunk : Fin 52 := ⟨node.code.val / 6, by omega⟩
-  have checked := List.all_eq_true.mp (chunks chunk) (node.code.val % 6)
-    (List.mem_range.mpr (Nat.mod_lt _ (by decide)))
-  have reconstructed :
-      (⟨⟨(6 * chunk.val + node.code.val % 6) % 312,
-        Nat.mod_lt _ (by decide)⟩⟩ : Node) = node := by
-    cases node with
-    | mk code =>
-      apply congrArg Node.mk
-      apply Fin.ext
-      dsimp only [chunk]
-      omega
-  simpa only [reconstructed] using checked
+private theorem childBlock_eq_fast (p : Index) (x y : Fin 2) :
+    (childBlock p x y).val = childBlockFast p.val x.val y.val := by
+  have h := allRangeRec_sound 104 _ childBlockTable_checked p.val p.isLt
+  simp only [p.isLt, dite_true, Bool.and_eq_true, Nat.beq_eq] at h
+  rcases h with ⟨⟨⟨h00, h10⟩, h01⟩, h11⟩
+  rcases x with ⟨x, hx⟩
+  rcases y with ⟨y, hy⟩
+  have hx' : x = 0 ∨ x = 1 := by omega
+  have hy' : y = 0 ∨ y = 1 := by omega
+  rcases hx' with rfl | rfl <;> rcases hy' with rfl | rfl
+  · exact h00
+  · exact h01
+  · exact h10
+  · exact h11
 
-private theorem seam_checked (node : Node) : seamCheck node = true :=
-  checked_from_chunks seamCheck seam_chunks node
+private def fineGridFast (p x y : Nat) : Nat :=
+  childBlockFast (childBlockFast p (x / 2) (y / 2)) (x % 2) (y % 2)
+
+private theorem fineGrid_val_eq_fast (p : Index) (x y : Nat) (hx : x < 4) (hy : y < 4) :
+    (fineGrid p x y).val = fineGridFast p.val x y := by
+  have hx2 : x / 2 < 2 := by omega
+  have hy2 : y / 2 < 2 := by omega
+  have h1 : fineGrid p x y =
+      childBlock (childBlock p ⟨x / 2, hx2⟩ ⟨y / 2, hy2⟩)
+        ⟨x % 2, Nat.mod_lt _ (by decide)⟩ ⟨y % 2, Nat.mod_lt _ (by decide)⟩ := by
+    simp only [fineGrid, iterateRefine, refineIndexGrid, coarseGrid,
+      Nat.mod_eq_of_lt hx2, Nat.mod_eq_of_lt hy2]
+  rw [h1, childBlock_eq_fast, childBlock_eq_fast]
+  rfl
+
+private def optShadeEq : Option Shade → Option Shade → Bool
+  | none, none => true
+  | some .light, some .light => true
+  | some .dark, some .dark => true
+  | _, _ => false
+
+private theorem optShadeEq_eq {a b : Option Shade} (h : optShadeEq a b = true) : a = b := by
+  rcases a with _ | a <;> rcases b with _ | b
+  · rfl
+  · cases b <;> contradiction
+  · cases a <;> contradiction
+  · cases a <;> cases b <;> first | rfl | contradiction
+
+private def decodeShadeFast : Nat → Option Shade
+  | 0 => none
+  | 1 => some .dark
+  | _ => some .light
+
+private def decodeStateFast (code : Nat) : ShadeState :=
+  ⟨decodeShadeFast (code % 3), decodeShadeFast (code / 3 % 3),
+   decodeShadeFast (code / 9 % 3), decodeShadeFast (code / 27 % 3)⟩
+
+private def decodeBlockFast (code : Nat) : ShadeBlock :=
+  ⟨decodeStateFast (code % 81), decodeStateFast (code / 81 % 81),
+   decodeStateFast (code / 6561 % 81), decodeStateFast (code / 531441 % 81)⟩
+
+private def forceOptShade (x : Option Shade) (k : Option Shade → Bool) : Bool :=
+  match x with
+  | none => k none
+  | some .light => k (some .light)
+  | some .dark => k (some .dark)
+
+private theorem forceOptShade_eq (x : Option Shade) (k : Option Shade → Bool) :
+    forceOptShade x k = k x := by
+  rcases x with _ | s
+  · rfl
+  · cases s <;> rfl
+
+private def withDecodedState (c : Nat) (k : ShadeState → Bool) : Bool :=
+  forceOptShade (decodeShadeFast (c % 3)) fun w =>
+  forceOptShade (decodeShadeFast (c / 3 % 3)) fun e =>
+  forceOptShade (decodeShadeFast (c / 9 % 3)) fun s =>
+  forceOptShade (decodeShadeFast (c / 27 % 3)) fun n =>
+    k ⟨w, e, s, n⟩
+
+private theorem withDecodedState_eq (c : Nat) (k : ShadeState → Bool) :
+    withDecodedState c k = k (decodeStateFast c) := by
+  simp only [withDecodedState, forceOptShade_eq, decodeStateFast]
+
+private def withDecodedBlock (code : Nat) (k : ShadeBlock → Bool) : Bool :=
+  withDecodedState (code % 81) fun sw =>
+  withDecodedState (code / 81 % 81) fun se =>
+  withDecodedState (code / 6561 % 81) fun nw =>
+  withDecodedState (code / 531441 % 81) fun ne =>
+    k ⟨sw, se, nw, ne⟩
+
+private theorem withDecodedBlock_eq (code : Nat) (k : ShadeBlock → Bool) :
+    withDecodedBlock code k = k (decodeBlockFast code) := by
+  simp only [withDecodedBlock, withDecodedState_eq, decodeBlockFast]
+
+private def forceThin (x : Thin) (k : Thin → Bool) : Bool :=
+  match x with
+  | .a => k .a | .b => k .b | .c => k .c | .d => k .d
+
+private theorem forceThin_eq (x : Thin) (k : Thin → Bool) : forceThin x k = k x := by
+  cases x <;> rfl
+
+private def forceThick (x : Thick) (k : Thick → Bool) : Bool :=
+  match x with
+  | .a => k .a | .b => k .b | .c => k .c | .d => k .d | .e => k .e
+  | .f => k .f | .g => k .g | .h => k .h | .i => k .i | .j => k .j
+  | .k => k .k | .l => k .l | .m => k .m | .n => k .n | .o => k .o
+  | .p => k .p | .q => k .q | .r => k .r | .s => k .s | .t => k .t
+
+private theorem forceThick_eq (x : Thick) (k : Thick → Bool) : forceThick x k = k x := by
+  cases x <;> rfl
+
+private def forceBlack (x : Black) (k : Black → Bool) : Bool :=
+  match x with
+  | .a => k .a | .b => k .b | .c => k .c | .d => k .d | .e => k .e
+
+private theorem forceBlack_eq (x : Black) (k : Black → Bool) : forceBlack x k = k x := by
+  cases x <;> rfl
+
+private def forceNat (x : Nat) (k : Nat → Bool) : Bool :=
+  match x with
+  | 0 => k 0
+  | n + 1 => k (n + 1)
+
+private theorem forceNat_eq (x : Nat) (k : Nat → Bool) : forceNat x k = k x := by
+  cases x <;> rfl
+
+private def nodeLocalOk (n p code : Nat) : Bool :=
+  let idx : Index := ⟨p % 104, Nat.mod_lt _ (by decide)⟩
+  match components idx with
+  | ⟨thin, thick, black⟩ =>
+    forceThin thin fun thin =>
+    forceThick thick fun thick =>
+    forceBlack black fun black =>
+    withDecodedBlock code fun b =>
+      match seamAt n, tile ⟨thin, thick, black⟩ with
+      | ⟨sw, se, ss, sn⟩, ⟨tt, tb, tl, tr⟩ =>
+        Nat.beq sw (seamCode tl b.southwest.west b.northwest.west) &&
+        Nat.beq se (seamCode tr b.southeast.east b.northeast.east) &&
+        Nat.beq ss (seamCode tb b.southwest.south b.southeast.south) &&
+        Nat.beq sn (seamCode tt b.northwest.north b.northeast.north) &&
+        allowedFor thick .southwest b.southwest &&
+        allowedFor thick .southeast b.southeast &&
+        allowedFor thick .northwest b.northwest &&
+        allowedFor thick .northeast b.northeast &&
+        optShadeEq b.southwest.east b.southeast.west &&
+        optShadeEq b.northwest.east b.northeast.west &&
+        optShadeEq b.southwest.north b.northwest.south &&
+        optShadeEq b.southeast.north b.northeast.south
+
+private theorem nodeLocalOk_sound (node : Node) (p code : Nat)
+    (hp : node.parent = ⟨p % 104, Nat.mod_lt _ (by decide)⟩)
+    (hb : node.block = decodeBlockFast code)
+    (h : nodeLocalOk node.code.val p code = true) :
+    cachedSeams node = actualSeams node ∧
+    (∀ x y : Fin 2, locallyAllowed ⟨node.parent, quadrantAt x.val y.val⟩
+      (node.block.at x.val y.val) = true) ∧
+    (node.block.southwest.east = node.block.southeast.west ∧
+     node.block.northwest.east = node.block.northeast.west ∧
+     node.block.southwest.north = node.block.northwest.south ∧
+     node.block.southeast.north = node.block.northeast.south) := by
+  unfold nodeLocalOk at h
+  generalize hcomp : components ⟨p % 104, Nat.mod_lt _ (by decide)⟩ = comp at h
+  rcases comp with ⟨thin, thick, black⟩
+  simp only [forceThin_eq, forceThick_eq, forceBlack_eq, withDecodedBlock_eq] at h
+  generalize hseam : seamAt node.code.val = s at h
+  rcases s with ⟨sw, se, ss, sn⟩
+  generalize htile : tile ⟨thin, thick, black⟩ = t at h
+  rcases t with ⟨tt, tb, tl, tr⟩
+  simp only [Bool.and_eq_true, Nat.beq_eq] at h
+  rcases h with ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨hsw, hse⟩, hss⟩, hsn⟩, hasw⟩, hase⟩, hanw⟩, hane⟩,
+    hi1⟩, hi2⟩, hi3⟩, hi4⟩
+  refine ⟨?_, ?_, ?_⟩
+  · simp only [cachedSeams, actualSeams, hseam, hp, hcomp, htile, hb, hsw, hse, hss, hsn]
+  · intro x y
+    rcases x with ⟨x, hx⟩
+    rcases y with ⟨y, hy⟩
+    have hx' : x = 0 ∨ x = 1 := by omega
+    have hy' : y = 0 ∨ y = 1 := by omega
+    rcases hx' with rfl | rfl <;> rcases hy' with rfl | rfl
+    · simpa only [locallyAllowed, hp, hcomp, hb, quadrantAt, Quadrant.ofBits, ShadeBlock.at]
+        using hasw
+    · simpa only [locallyAllowed, hp, hcomp, hb, quadrantAt, Quadrant.ofBits, ShadeBlock.at]
+        using hanw
+    · simpa only [locallyAllowed, hp, hcomp, hb, quadrantAt, Quadrant.ofBits, ShadeBlock.at]
+        using hase
+    · simpa only [locallyAllowed, hp, hcomp, hb, quadrantAt, Quadrant.ofBits, ShadeBlock.at]
+        using hane
+  · rw [hb]
+    exact ⟨optShadeEq_eq hi1, optShadeEq_eq hi2, optShadeEq_eq hi3, optShadeEq_eq hi4⟩
+
+private theorem node_local_checked (node : Node) :
+    cachedSeams node = actualSeams node ∧
+    (∀ x y : Fin 2, locallyAllowed ⟨node.parent, quadrantAt x.val y.val⟩
+      (node.block.at x.val y.val) = true) ∧
+    (node.block.southwest.east = node.block.southeast.west ∧
+     node.block.northwest.east = node.block.northeast.west ∧
+     node.block.southwest.north = node.block.northwest.south ∧
+     node.block.southeast.north = node.block.northeast.south) := by
+  have h : ∃ p code : Nat,
+      node.parent = ⟨p % 104, Nat.mod_lt _ (by decide)⟩ ∧
+      node.block = decodeBlockFast code ∧
+      nodeLocalOk node.code.val p code = true := by
+    refine ⟨_, _, ?_, ?_, ?_⟩
+    · unfold Node.parent; rfl
+    · unfold Node.block; rfl
+    · conv =>
+        lhs
+        arg 3
+        rw [grid_getD_eq_gridGet24x13]
+      refine checkGrid24x13_sound (fun k p => nodeLocalOk k p (gridGet24x13 _ 0 k)) _ 0 ?_
+        node.code.val node.code.isLt
+      decide +kernel
+  obtain ⟨p, code, hp, hb, hok⟩ := h
+  exact nodeLocalOk_sound node p code hp hb hok
 
 private theorem cached_correct (node : Node) : cachedSeams node = actualSeams node :=
-  (of_decide_eq_true (seam_checked node)).1
+  (node_local_checked node).1
 
 private theorem hCompatible_cached (left right : Node) :
     HCompatible left right ↔ (cachedSeams left).east = (cachedSeams right).west := by
   rw [cached_correct left, cached_correct right]
-  simp [actualSeams, HCompatible, seamCode_eq_iff, ShadeBlock.hMatches, ShadeBlock.at]
+  simp only [actualSeams, HCompatible, seamCode_eq_iff, ShadeBlock.hMatches, ShadeBlock.at,
+    Bool.and_eq_true, decide_eq_true_eq, Nat.one_ne_zero, ↓reduceIte]
 
 private theorem vCompatible_cached (lower upper : Node) :
     VCompatible lower upper ↔ (cachedSeams lower).north = (cachedSeams upper).south := by
   rw [cached_correct lower, cached_correct upper]
-  simp [actualSeams, VCompatible, seamCode_eq_iff, ShadeBlock.vMatches, ShadeBlock.at]
+  simp only [actualSeams, VCompatible, seamCode_eq_iff, ShadeBlock.vMatches, ShadeBlock.at,
+    Bool.and_eq_true, decide_eq_true_eq, Nat.one_ne_zero, ↓reduceIte]
 
--- Internal child seams are checked on the certified cache, avoiding repeated evaluation
--- of the decorated edges. The public compatibility statements below use its proved semantics.
-private def nodeCheck (node : Node) : Bool := decide (
-  (∀ x y : Fin 2, locallyAllowed ⟨node.parent, quadrantAt x y⟩
-    (node.block.at x y) = true) ∧
-  (node.block.southwest.east = node.block.southeast.west ∧
-    node.block.northwest.east = node.block.northeast.west ∧
-    node.block.southwest.north = node.block.northwest.south ∧
-    node.block.southeast.north = node.block.northeast.south) ∧
-  (∀ position : Fin 16, (node.child position).parent =
-    fineGrid node.parent (position.val % 4) (position.val / 4)) ∧
-  ((node.child 0).block = node.block) ∧
-  (∀ (x : Fin 3) (y : Fin 4),
-    (cachedSeams (node.child (blockPosition ⟨x.val, by omega⟩ y))).east =
-    (cachedSeams (node.child (blockPosition ⟨x.val + 1, by omega⟩ y))).west) ∧
-  (∀ (x : Fin 4) (y : Fin 3),
-    (cachedSeams (node.child (blockPosition x ⟨y.val, by omega⟩))).north =
-    (cachedSeams (node.child (blockPosition x ⟨y.val + 1, by omega⟩))).south))
+private def checkChildSeams (n c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15 : Nat) :
+    Bool :=
+  match seamAt n with
+  | ⟨sw, se, ss, sn⟩ =>
+  match seamExpansion4 sw, seamExpansion4 se, seamExpansion4 ss, seamExpansion4 sn with
+  | ⟨ew0, ew1, ew2, ew3⟩, ⟨ee0, ee1, ee2, ee3⟩, ⟨es0, es1, es2, es3⟩, ⟨en0, en1, en2, en3⟩ =>
+  match seamAt c0, seamAt c1, seamAt c2, seamAt c3,
+        seamAt c4, seamAt c5, seamAt c6, seamAt c7,
+        seamAt c8, seamAt c9, seamAt c10, seamAt c11,
+        seamAt c12, seamAt c13, seamAt c14, seamAt c15 with
+  | ⟨w0, e0, s0, n0⟩, ⟨w1, e1, s1, n1⟩, ⟨w2, e2, s2, n2⟩, ⟨w3, e3, s3, n3⟩,
+    ⟨w4, e4, s4, n4⟩, ⟨w5, e5, s5, n5⟩, ⟨w6, e6, s6, n6⟩, ⟨w7, e7, s7, n7⟩,
+    ⟨w8, e8, s8, n8⟩, ⟨w9, e9, s9, n9⟩, ⟨w10, e10, s10, n10⟩, ⟨w11, e11, s11, n11⟩,
+    ⟨w12, e12, s12, n12⟩, ⟨w13, e13, s13, n13⟩, ⟨w14, e14, s14, n14⟩, ⟨w15, e15, s15, n15⟩ =>
+    Nat.beq w0 ew0 && Nat.beq w4 ew1 && Nat.beq w8 ew2 && Nat.beq w12 ew3 &&
+    Nat.beq e3 ee0 && Nat.beq e7 ee1 && Nat.beq e11 ee2 && Nat.beq e15 ee3 &&
+    Nat.beq s0 es0 && Nat.beq s1 es1 && Nat.beq s2 es2 && Nat.beq s3 es3 &&
+    Nat.beq n12 en0 && Nat.beq n13 en1 && Nat.beq n14 en2 && Nat.beq n15 en3 &&
+    Nat.beq e0 w1 && Nat.beq e1 w2 && Nat.beq e2 w3 &&
+    Nat.beq e4 w5 && Nat.beq e5 w6 && Nat.beq e6 w7 &&
+    Nat.beq e8 w9 && Nat.beq e9 w10 && Nat.beq e10 w11 &&
+    Nat.beq e12 w13 && Nat.beq e13 w14 && Nat.beq e14 w15 &&
+    Nat.beq n0 s4 && Nat.beq n4 s8 && Nat.beq n8 s12 &&
+    Nat.beq n1 s5 && Nat.beq n5 s9 && Nat.beq n9 s13 &&
+    Nat.beq n2 s6 && Nat.beq n6 s10 && Nat.beq n10 s14 &&
+    Nat.beq n3 s7 && Nat.beq n7 s11 && Nat.beq n11 s15
 
-private def nodeChunk (chunk : ℕ) : Bool :=
-  (List.range 6).all fun offset =>
-    nodeCheck ⟨⟨(6 * chunk + offset) % 312, Nat.mod_lt _ (by decide)⟩⟩
+private def checkChildParents (parents : Array (Array Nat)) (p : Nat)
+    (c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15 : Nat) : Bool :=
+  match childBlock4 p with
+  | ⟨q00, q10, q01, q11⟩ =>
+  match childBlock4 q00, childBlock4 q10, childBlock4 q01, childBlock4 q11 with
+  | ⟨p0, p1, p4, p5⟩, ⟨p2, p3, p6, p7⟩, ⟨p8, p9, p12, p13⟩, ⟨p10, p11, p14, p15⟩ =>
+    Nat.beq (gridGet24x13 parents 0 c0 % 104) p0 &&
+    Nat.beq (gridGet24x13 parents 0 c1 % 104) p1 &&
+    Nat.beq (gridGet24x13 parents 0 c2 % 104) p2 &&
+    Nat.beq (gridGet24x13 parents 0 c3 % 104) p3 &&
+    Nat.beq (gridGet24x13 parents 0 c4 % 104) p4 &&
+    Nat.beq (gridGet24x13 parents 0 c5 % 104) p5 &&
+    Nat.beq (gridGet24x13 parents 0 c6 % 104) p6 &&
+    Nat.beq (gridGet24x13 parents 0 c7 % 104) p7 &&
+    Nat.beq (gridGet24x13 parents 0 c8 % 104) p8 &&
+    Nat.beq (gridGet24x13 parents 0 c9 % 104) p9 &&
+    Nat.beq (gridGet24x13 parents 0 c10 % 104) p10 &&
+    Nat.beq (gridGet24x13 parents 0 c11 % 104) p11 &&
+    Nat.beq (gridGet24x13 parents 0 c12 % 104) p12 &&
+    Nat.beq (gridGet24x13 parents 0 c13 % 104) p13 &&
+    Nat.beq (gridGet24x13 parents 0 c14 % 104) p14 &&
+    Nat.beq (gridGet24x13 parents 0 c15 % 104) p15
 
-private theorem node_0 : nodeChunk 0 = true := by decide +kernel
-private theorem node_1 : nodeChunk 1 = true := by decide +kernel
-private theorem node_2 : nodeChunk 2 = true := by decide +kernel
-private theorem node_3 : nodeChunk 3 = true := by decide +kernel
-private theorem node_4 : nodeChunk 4 = true := by decide +kernel
-private theorem node_5 : nodeChunk 5 = true := by decide +kernel
-private theorem node_6 : nodeChunk 6 = true := by decide +kernel
-private theorem node_7 : nodeChunk 7 = true := by decide +kernel
-private theorem node_8 : nodeChunk 8 = true := by decide +kernel
-private theorem node_9 : nodeChunk 9 = true := by decide +kernel
-private theorem node_10 : nodeChunk 10 = true := by decide +kernel
-private theorem node_11 : nodeChunk 11 = true := by decide +kernel
-private theorem node_12 : nodeChunk 12 = true := by decide +kernel
-private theorem node_13 : nodeChunk 13 = true := by decide +kernel
-private theorem node_14 : nodeChunk 14 = true := by decide +kernel
-private theorem node_15 : nodeChunk 15 = true := by decide +kernel
-private theorem node_16 : nodeChunk 16 = true := by decide +kernel
-private theorem node_17 : nodeChunk 17 = true := by decide +kernel
-private theorem node_18 : nodeChunk 18 = true := by decide +kernel
-private theorem node_19 : nodeChunk 19 = true := by decide +kernel
-private theorem node_20 : nodeChunk 20 = true := by decide +kernel
-private theorem node_21 : nodeChunk 21 = true := by decide +kernel
-private theorem node_22 : nodeChunk 22 = true := by decide +kernel
-private theorem node_23 : nodeChunk 23 = true := by decide +kernel
-private theorem node_24 : nodeChunk 24 = true := by decide +kernel
-private theorem node_25 : nodeChunk 25 = true := by decide +kernel
-private theorem node_26 : nodeChunk 26 = true := by decide +kernel
-private theorem node_27 : nodeChunk 27 = true := by decide +kernel
-private theorem node_28 : nodeChunk 28 = true := by decide +kernel
-private theorem node_29 : nodeChunk 29 = true := by decide +kernel
-private theorem node_30 : nodeChunk 30 = true := by decide +kernel
-private theorem node_31 : nodeChunk 31 = true := by decide +kernel
-private theorem node_32 : nodeChunk 32 = true := by decide +kernel
-private theorem node_33 : nodeChunk 33 = true := by decide +kernel
-private theorem node_34 : nodeChunk 34 = true := by decide +kernel
-private theorem node_35 : nodeChunk 35 = true := by decide +kernel
-private theorem node_36 : nodeChunk 36 = true := by decide +kernel
-private theorem node_37 : nodeChunk 37 = true := by decide +kernel
-private theorem node_38 : nodeChunk 38 = true := by decide +kernel
-private theorem node_39 : nodeChunk 39 = true := by decide +kernel
-private theorem node_40 : nodeChunk 40 = true := by decide +kernel
-private theorem node_41 : nodeChunk 41 = true := by decide +kernel
-private theorem node_42 : nodeChunk 42 = true := by decide +kernel
-private theorem node_43 : nodeChunk 43 = true := by decide +kernel
-private theorem node_44 : nodeChunk 44 = true := by decide +kernel
-private theorem node_45 : nodeChunk 45 = true := by decide +kernel
-private theorem node_46 : nodeChunk 46 = true := by decide +kernel
-private theorem node_47 : nodeChunk 47 = true := by decide +kernel
-private theorem node_48 : nodeChunk 48 = true := by decide +kernel
-private theorem node_49 : nodeChunk 49 = true := by decide +kernel
-private theorem node_50 : nodeChunk 50 = true := by decide +kernel
-private theorem node_51 : nodeChunk 51 = true := by decide +kernel
+private def nodeChildrenRowOk (parents codes : Array (Array Nat)) (n : Nat) (row : Array Nat) :
+    Bool :=
+  match row.toList with
+  | [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15] =>
+    Nat.blt c0 312 && Nat.blt c1 312 && Nat.blt c2 312 && Nat.blt c3 312 &&
+    Nat.blt c4 312 && Nat.blt c5 312 && Nat.blt c6 312 && Nat.blt c7 312 &&
+    Nat.blt c8 312 && Nat.blt c9 312 && Nat.blt c10 312 && Nat.blt c11 312 &&
+    Nat.blt c12 312 && Nat.blt c13 312 && Nat.blt c14 312 && Nat.blt c15 312 &&
+    Nat.beq (gridGet24x13 codes 0 c0) (gridGet24x13 codes 0 n) &&
+    forceNat (gridGet24x13 parents 0 n % 104) (fun p =>
+      checkChildParents parents p c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15) &&
+    checkChildSeams n c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
+  | _ => false
 
-private theorem node_chunks (chunk : Fin 52) : nodeChunk chunk.val = true := by
-  fin_cases chunk
-  · exact node_0
-  · exact node_1
-  · exact node_2
-  · exact node_3
-  · exact node_4
-  · exact node_5
-  · exact node_6
-  · exact node_7
-  · exact node_8
-  · exact node_9
-  · exact node_10
-  · exact node_11
-  · exact node_12
-  · exact node_13
-  · exact node_14
-  · exact node_15
-  · exact node_16
-  · exact node_17
-  · exact node_18
-  · exact node_19
-  · exact node_20
-  · exact node_21
-  · exact node_22
-  · exact node_23
-  · exact node_24
-  · exact node_25
-  · exact node_26
-  · exact node_27
-  · exact node_28
-  · exact node_29
-  · exact node_30
-  · exact node_31
-  · exact node_32
-  · exact node_33
-  · exact node_34
-  · exact node_35
-  · exact node_36
-  · exact node_37
-  · exact node_38
-  · exact node_39
-  · exact node_40
-  · exact node_41
-  · exact node_42
-  · exact node_43
-  · exact node_44
-  · exact node_45
-  · exact node_46
-  · exact node_47
-  · exact node_48
-  · exact node_49
-  · exact node_50
-  · exact node_51
+private theorem row16_getD (row : Array Nat)
+    (c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15 : Nat)
+    (hrow : row.toList = [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15]) :
+    row.getD 0 0 = c0 ∧ row.getD 1 0 = c1 ∧ row.getD 2 0 = c2 ∧ row.getD 3 0 = c3 ∧
+    row.getD 4 0 = c4 ∧ row.getD 5 0 = c5 ∧ row.getD 6 0 = c6 ∧ row.getD 7 0 = c7 ∧
+    row.getD 8 0 = c8 ∧ row.getD 9 0 = c9 ∧ row.getD 10 0 = c10 ∧ row.getD 11 0 = c11 ∧
+    row.getD 12 0 = c12 ∧ row.getD 13 0 = c13 ∧ row.getD 14 0 = c14 ∧ row.getD 15 0 = c15 := by
+  simp only [array_getD_eq_listGetRec, hrow, listGetRec, and_self]
+
+private theorem nodeChildrenRowOk_sound (parents codes : Array (Array Nat))
+    (children : Array (Array (Array Nat)))
+    (hparents : ∀ n : Node, n.parent = ⟨gridGet24x13 parents 0 n.code.val % 104,
+      Nat.mod_lt _ (by decide)⟩)
+    (hcodes : ∀ n : Node, n.block = decodeBlockFast (gridGet24x13 codes 0 n.code.val))
+    (hchild : ∀ (n : Node) (pos : Fin 16),
+      (n.child pos).code.val =
+        ((children.getD (n.code.val / 13) #[]).getD (n.code.val % 13) #[]).getD pos.val 0 % 312)
+    (hcheck : checkGrid24x13 (nodeChildrenRowOk parents codes) children = true)
+    (node : Node) :
+    (node.child 0).block = node.block ∧
+    (∀ position : Fin 16, (node.child position).parent =
+      fineGrid node.parent (position.val % 4) (position.val / 4)) ∧
+    (∀ y : Fin 4, (cachedSeams (node.child (blockPosition 0 y))).west =
+      seamExpansion (cachedSeams node).west y) ∧
+    (∀ y : Fin 4, (cachedSeams (node.child (blockPosition 3 y))).east =
+      seamExpansion (cachedSeams node).east y) ∧
+    (∀ x : Fin 4, (cachedSeams (node.child (blockPosition x 0))).south =
+      seamExpansion (cachedSeams node).south x) ∧
+    (∀ x : Fin 4, (cachedSeams (node.child (blockPosition x 3))).north =
+      seamExpansion (cachedSeams node).north x) ∧
+    (∀ (x : Fin 3) (y : Fin 4),
+      (cachedSeams (node.child (blockPosition ⟨x.val, by omega⟩ y))).east =
+      (cachedSeams (node.child (blockPosition ⟨x.val + 1, by omega⟩ y))).west) ∧
+    (∀ (x : Fin 4) (y : Fin 3),
+      (cachedSeams (node.child (blockPosition x ⟨y.val, by omega⟩))).north =
+      (cachedSeams (node.child (blockPosition x ⟨y.val + 1, by omega⟩))).south) := by
+  have hrow := checkGrid24x13_sound (nodeChildrenRowOk parents codes) children #[] hcheck
+    node.code.val node.code.isLt
+  generalize hrowEq : (children.getD (node.code.val / 13) #[]).getD (node.code.val % 13) #[] = row
+    at hrow
+  have hcVal : ∀ pos : Fin 16, (node.child pos).code.val = row.getD pos.val 0 % 312 := by
+    intro pos
+    rw [hchild node pos, hrowEq]
+  unfold nodeChildrenRowOk at hrow
+  rcases hlist : row.toList with
+    _ | ⟨c0, _ | ⟨c1, _ | ⟨c2, _ | ⟨c3, _ | ⟨c4, _ | ⟨c5, _ | ⟨c6, _ | ⟨c7,
+    _ | ⟨c8, _ | ⟨c9, _ | ⟨c10, _ | ⟨c11, _ | ⟨c12, _ | ⟨c13, _ | ⟨c14, _ | ⟨c15, _ | _⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩
+  all_goals simp only [hlist] at hrow
+  all_goals try contradiction
+  simp only [forceNat_eq, Bool.and_eq_true, Nat.blt_eq, Nat.beq_eq] at hrow
+  rcases hrow with ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨hlt0, hlt1⟩, hlt2⟩, hlt3⟩, hlt4⟩, hlt5⟩, hlt6⟩, hlt7⟩,
+    hlt8⟩, hlt9⟩, hlt10⟩, hlt11⟩, hlt12⟩, hlt13⟩, hlt14⟩, hlt15⟩, hcode0⟩, hpar⟩, hseams⟩
+  have hgets := row16_getD row c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15 hlist
+  have hc0 : (node.child 0).code.val = c0 := by rw [hcVal 0, hgets.1, Nat.mod_eq_of_lt hlt0]
+  have hc1 : (node.child 1).code.val = c1 := by rw [hcVal 1, hgets.2.1, Nat.mod_eq_of_lt hlt1]
+  have hc2 : (node.child 2).code.val = c2 := by rw [hcVal 2, hgets.2.2.1, Nat.mod_eq_of_lt hlt2]
+  have hc3 : (node.child 3).code.val = c3 := by rw [hcVal 3, hgets.2.2.2.1, Nat.mod_eq_of_lt hlt3]
+  have hc4 : (node.child 4).code.val = c4 := by
+    rw [hcVal 4, hgets.2.2.2.2.1, Nat.mod_eq_of_lt hlt4]
+  have hc5 : (node.child 5).code.val = c5 := by
+    rw [hcVal 5, hgets.2.2.2.2.2.1, Nat.mod_eq_of_lt hlt5]
+  have hc6 : (node.child 6).code.val = c6 := by
+    rw [hcVal 6, hgets.2.2.2.2.2.2.1, Nat.mod_eq_of_lt hlt6]
+  have hc7 : (node.child 7).code.val = c7 := by
+    rw [hcVal 7, hgets.2.2.2.2.2.2.2.1, Nat.mod_eq_of_lt hlt7]
+  have hc8 : (node.child 8).code.val = c8 := by
+    rw [hcVal 8, hgets.2.2.2.2.2.2.2.2.1, Nat.mod_eq_of_lt hlt8]
+  have hc9 : (node.child 9).code.val = c9 := by
+    rw [hcVal 9, hgets.2.2.2.2.2.2.2.2.2.1, Nat.mod_eq_of_lt hlt9]
+  have hc10 : (node.child 10).code.val = c10 := by
+    rw [hcVal 10, hgets.2.2.2.2.2.2.2.2.2.2.1, Nat.mod_eq_of_lt hlt10]
+  have hc11 : (node.child 11).code.val = c11 := by
+    rw [hcVal 11, hgets.2.2.2.2.2.2.2.2.2.2.2.1, Nat.mod_eq_of_lt hlt11]
+  have hc12 : (node.child 12).code.val = c12 := by
+    rw [hcVal 12, hgets.2.2.2.2.2.2.2.2.2.2.2.2.1, Nat.mod_eq_of_lt hlt12]
+  have hc13 : (node.child 13).code.val = c13 := by
+    rw [hcVal 13, hgets.2.2.2.2.2.2.2.2.2.2.2.2.2.1, Nat.mod_eq_of_lt hlt13]
+  have hc14 : (node.child 14).code.val = c14 := by
+    rw [hcVal 14, hgets.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1, Nat.mod_eq_of_lt hlt14]
+  have hc15 : (node.child 15).code.val = c15 := by
+    rw [hcVal 15, hgets.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2, Nat.mod_eq_of_lt hlt15]
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · rw [hcodes (node.child 0), hcodes node, hc0, hcode0]
+  · intro position
+    apply Fin.ext
+    rw [fineGrid_val_eq_fast node.parent (position.val % 4) (position.val / 4)
+      (Nat.mod_lt _ (by decide)) (by omega)]
+    rw [hparents (node.child position), hparents node]
+    dsimp only [fineGridFast, childBlockFast] at hpar ⊢
+    unfold checkChildParents at hpar
+    generalize hcb : childBlock4 (gridGet24x13 parents 0 node.code.val % 104) = cb at hpar ⊢
+    rcases cb with ⟨q00, q10, q01, q11⟩
+    generalize hq00 : childBlock4 q00 = r00 at hpar ⊢
+    generalize hq10 : childBlock4 q10 = r10 at hpar ⊢
+    generalize hq01 : childBlock4 q01 = r01 at hpar ⊢
+    generalize hq11 : childBlock4 q11 = r11 at hpar ⊢
+    rcases r00 with ⟨p0, p1, p4, p5⟩
+    rcases r10 with ⟨p2, p3, p6, p7⟩
+    rcases r01 with ⟨p8, p9, p12, p13⟩
+    rcases r11 with ⟨p10, p11, p14, p15⟩
+    simp only [Bool.and_eq_true, Nat.beq_eq] at hpar
+    rcases hpar with ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨hp0, hp1⟩, hp2⟩, hp3⟩, hp4⟩, hp5⟩, hp6⟩, hp7⟩,
+      hp8⟩, hp9⟩, hp10⟩, hp11⟩, hp12⟩, hp13⟩, hp14⟩, hp15⟩
+    rcases position with ⟨pos, hpos⟩
+    match pos, hpos with
+    | 0, _ => simpa only [hc0] using hp0
+    | 1, _ => simpa only [hc1] using hp1
+    | 2, _ => simpa only [hc2] using hp2
+    | 3, _ => simpa only [hc3] using hp3
+    | 4, _ => simpa only [hc4] using hp4
+    | 5, _ => simpa only [hc5] using hp5
+    | 6, _ => simpa only [hc6] using hp6
+    | 7, _ => simpa only [hc7] using hp7
+    | 8, _ => simpa only [hc8] using hp8
+    | 9, _ => simpa only [hc9] using hp9
+    | 10, _ => simpa only [hc10] using hp10
+    | 11, _ => simpa only [hc11] using hp11
+    | 12, _ => simpa only [hc12] using hp12
+    | 13, _ => simpa only [hc13] using hp13
+    | 14, _ => simpa only [hc14] using hp14
+    | 15, _ => simpa only [hc15] using hp15
+  all_goals
+    unfold checkChildSeams at hseams
+    generalize hsn : seamAt node.code.val = sn at hseams
+    rcases sn with ⟨sw, se, ss, sno⟩
+    generalize hew : seamExpansion4 sw = ew at hseams
+    generalize hee : seamExpansion4 se = ee at hseams
+    generalize hes : seamExpansion4 ss = es at hseams
+    generalize hen : seamExpansion4 sno = en at hseams
+    rcases ew with ⟨ew0, ew1, ew2, ew3⟩
+    rcases ee with ⟨ee0, ee1, ee2, ee3⟩
+    rcases es with ⟨es0, es1, es2, es3⟩
+    rcases en with ⟨en0, en1, en2, en3⟩
+    generalize hs0 : seamAt c0 = sc0 at hseams
+    generalize hs1 : seamAt c1 = sc1 at hseams
+    generalize hs2 : seamAt c2 = sc2 at hseams
+    generalize hs3 : seamAt c3 = sc3 at hseams
+    generalize hs4 : seamAt c4 = sc4 at hseams
+    generalize hs5 : seamAt c5 = sc5 at hseams
+    generalize hs6 : seamAt c6 = sc6 at hseams
+    generalize hs7 : seamAt c7 = sc7 at hseams
+    generalize hs8 : seamAt c8 = sc8 at hseams
+    generalize hs9 : seamAt c9 = sc9 at hseams
+    generalize hs10 : seamAt c10 = sc10 at hseams
+    generalize hs11 : seamAt c11 = sc11 at hseams
+    generalize hs12 : seamAt c12 = sc12 at hseams
+    generalize hs13 : seamAt c13 = sc13 at hseams
+    generalize hs14 : seamAt c14 = sc14 at hseams
+    generalize hs15 : seamAt c15 = sc15 at hseams
+    rcases sc0 with ⟨w0, e0, s0, n0⟩
+    rcases sc1 with ⟨w1, e1, s1, n1⟩
+    rcases sc2 with ⟨w2, e2, s2, n2⟩
+    rcases sc3 with ⟨w3, e3, s3, n3⟩
+    rcases sc4 with ⟨w4, e4, s4, n4⟩
+    rcases sc5 with ⟨w5, e5, s5, n5⟩
+    rcases sc6 with ⟨w6, e6, s6, n6⟩
+    rcases sc7 with ⟨w7, e7, s7, n7⟩
+    rcases sc8 with ⟨w8, e8, s8, n8⟩
+    rcases sc9 with ⟨w9, e9, s9, n9⟩
+    rcases sc10 with ⟨w10, e10, s10, n10⟩
+    rcases sc11 with ⟨w11, e11, s11, n11⟩
+    rcases sc12 with ⟨w12, e12, s12, n12⟩
+    rcases sc13 with ⟨w13, e13, s13, n13⟩
+    rcases sc14 with ⟨w14, e14, s14, n14⟩
+    rcases sc15 with ⟨w15, e15, s15, n15⟩
+    simp only [Bool.and_eq_true, Nat.beq_eq] at hseams
+    rcases hseams with ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨hw0, hw1⟩, hw2⟩, hw3⟩,
+      he0⟩, he1⟩, he2⟩, he3⟩, hso0⟩, hso1⟩, hso2⟩, hso3⟩, hn0⟩, hn1⟩, hn2⟩, hn3⟩,
+      hh0⟩, hh1⟩, hh2⟩, hh3⟩, hh4⟩, hh5⟩, hh6⟩, hh7⟩, hh8⟩, hh9⟩, hh10⟩, hh11⟩,
+      hv0⟩, hv1⟩, hv2⟩, hv3⟩, hv4⟩, hv5⟩, hv6⟩, hv7⟩, hv8⟩, hv9⟩, hv10⟩, hv11⟩
+  · intro ⟨y, hy⟩
+    match y, hy with
+    | 0, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hew, hc0, hs0] using hw0
+    | 1, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hew, hc4, hs4] using hw1
+    | 2, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hew, hc8, hs8] using hw2
+    | 3, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hew, hc12, hs12] using hw3
+  · intro ⟨y, hy⟩
+    match y, hy with
+    | 0, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hee, hc3, hs3] using he0
+    | 1, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hee, hc7, hs7] using he1
+    | 2, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hee, hc11, hs11] using he2
+    | 3, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hee, hc15, hs15] using he3
+  · intro ⟨x, hx⟩
+    match x, hx with
+    | 0, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hes, hc0, hs0] using hso0
+    | 1, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hes, hc1, hs1] using hso1
+    | 2, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hes, hc2, hs2] using hso2
+    | 3, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hes, hc3, hs3] using hso3
+  · intro ⟨x, hx⟩
+    match x, hx with
+    | 0, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hen, hc12, hs12] using hn0
+    | 1, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hen, hc13, hs13] using hn1
+    | 2, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hen, hc14, hs14] using hn2
+    | 3, _ => simpa only [cachedSeams, blockPosition, seamExpansion, hsn, hen, hc15, hs15] using hn3
+  · intro ⟨x, hx⟩ ⟨y, hy⟩
+    match x, hx, y, hy with
+    | 0, _, 0, _ => simpa only [cachedSeams, blockPosition, hc0, hc1, hs0, hs1] using hh0
+    | 1, _, 0, _ => simpa only [cachedSeams, blockPosition, hc1, hc2, hs1, hs2] using hh1
+    | 2, _, 0, _ => simpa only [cachedSeams, blockPosition, hc2, hc3, hs2, hs3] using hh2
+    | 0, _, 1, _ => simpa only [cachedSeams, blockPosition, hc4, hc5, hs4, hs5] using hh3
+    | 1, _, 1, _ => simpa only [cachedSeams, blockPosition, hc5, hc6, hs5, hs6] using hh4
+    | 2, _, 1, _ => simpa only [cachedSeams, blockPosition, hc6, hc7, hs6, hs7] using hh5
+    | 0, _, 2, _ => simpa only [cachedSeams, blockPosition, hc8, hc9, hs8, hs9] using hh6
+    | 1, _, 2, _ => simpa only [cachedSeams, blockPosition, hc9, hc10, hs9, hs10] using hh7
+    | 2, _, 2, _ => simpa only [cachedSeams, blockPosition, hc10, hc11, hs10, hs11] using hh8
+    | 0, _, 3, _ => simpa only [cachedSeams, blockPosition, hc12, hc13, hs12, hs13] using hh9
+    | 1, _, 3, _ => simpa only [cachedSeams, blockPosition, hc13, hc14, hs13, hs14] using hh10
+    | 2, _, 3, _ => simpa only [cachedSeams, blockPosition, hc14, hc15, hs14, hs15] using hh11
+  · intro ⟨x, hx⟩ ⟨y, hy⟩
+    match x, hx, y, hy with
+    | 0, _, 0, _ => simpa only [cachedSeams, blockPosition, hc0, hc4, hs0, hs4] using hv0
+    | 0, _, 1, _ => simpa only [cachedSeams, blockPosition, hc4, hc8, hs4, hs8] using hv1
+    | 0, _, 2, _ => simpa only [cachedSeams, blockPosition, hc8, hc12, hs8, hs12] using hv2
+    | 1, _, 0, _ => simpa only [cachedSeams, blockPosition, hc1, hc5, hs1, hs5] using hv3
+    | 1, _, 1, _ => simpa only [cachedSeams, blockPosition, hc5, hc9, hs5, hs9] using hv4
+    | 1, _, 2, _ => simpa only [cachedSeams, blockPosition, hc9, hc13, hs9, hs13] using hv5
+    | 2, _, 0, _ => simpa only [cachedSeams, blockPosition, hc2, hc6, hs2, hs6] using hv6
+    | 2, _, 1, _ => simpa only [cachedSeams, blockPosition, hc6, hc10, hs6, hs10] using hv7
+    | 2, _, 2, _ => simpa only [cachedSeams, blockPosition, hc10, hc14, hs10, hs14] using hv8
+    | 3, _, 0, _ => simpa only [cachedSeams, blockPosition, hc3, hc7, hs3, hs7] using hv9
+    | 3, _, 1, _ => simpa only [cachedSeams, blockPosition, hc7, hc11, hs7, hs11] using hv10
+    | 3, _, 2, _ => simpa only [cachedSeams, blockPosition, hc11, hc15, hs11, hs15] using hv11
+
+private theorem node_children_checked (node : Node) :
+    (node.child 0).block = node.block ∧
+    (∀ position : Fin 16, (node.child position).parent =
+      fineGrid node.parent (position.val % 4) (position.val / 4)) ∧
+    (∀ y : Fin 4, (cachedSeams (node.child (blockPosition 0 y))).west =
+      seamExpansion (cachedSeams node).west y) ∧
+    (∀ y : Fin 4, (cachedSeams (node.child (blockPosition 3 y))).east =
+      seamExpansion (cachedSeams node).east y) ∧
+    (∀ x : Fin 4, (cachedSeams (node.child (blockPosition x 0))).south =
+      seamExpansion (cachedSeams node).south x) ∧
+    (∀ x : Fin 4, (cachedSeams (node.child (blockPosition x 3))).north =
+      seamExpansion (cachedSeams node).north x) ∧
+    (∀ (x : Fin 3) (y : Fin 4),
+      (cachedSeams (node.child (blockPosition ⟨x.val, by omega⟩ y))).east =
+      (cachedSeams (node.child (blockPosition ⟨x.val + 1, by omega⟩ y))).west) ∧
+    (∀ (x : Fin 4) (y : Fin 3),
+      (cachedSeams (node.child (blockPosition x ⟨y.val, by omega⟩))).north =
+      (cachedSeams (node.child (blockPosition x ⟨y.val + 1, by omega⟩))).south) := by
+  refine nodeChildrenRowOk_sound _ _ _ ?_ ?_ ?_ ?_ node
+  · intro n
+    unfold Node.parent
+    simp only [grid_getD_eq_gridGet24x13]
+  · intro n
+    unfold Node.block
+    simp only [grid_getD_eq_gridGet24x13]
+    rfl
+  · intro n pos
+    unfold Node.child
+    rfl
+  · decide +kernel
 
 private theorem pair_checked (left right : Node) :
     (HCompatible left right → ∀ y : Fin 4, HCompatible
       (left.child (blockPosition 3 y)) (right.child (blockPosition 0 y))) ∧
     (VCompatible left right → ∀ x : Fin 4, VCompatible
       (left.child (blockPosition x 3)) (right.child (blockPosition x 0))) := by
-  have hl := of_decide_eq_true (seam_checked left)
-  have hr := of_decide_eq_true (seam_checked right)
+  have hl := node_children_checked left
+  have hr := node_children_checked right
   constructor
   · intro h y
     apply (hCompatible_cached _ _).mpr
     calc
-      _ = seamExpansion (cachedSeams left).east y := hl.2.2.1 y
+      _ = seamExpansion (cachedSeams left).east y := hl.2.2.2.1 y
       _ = seamExpansion (cachedSeams right).west y := by
         rw [(hCompatible_cached left right).mp h]
-      _ = _ := (hr.2.1 y).symm
+      _ = _ := (hr.2.2.1 y).symm
   · intro h x
     apply (vCompatible_cached _ _).mpr
     calc
-      _ = seamExpansion (cachedSeams left).north x := hl.2.2.2.2 x
+      _ = seamExpansion (cachedSeams left).north x := hl.2.2.2.2.2.1 x
       _ = seamExpansion (cachedSeams right).south x := by
         rw [(vCompatible_cached left right).mp h]
-      _ = _ := (hr.2.2.2.1 x).symm
-
-private theorem node_checked (node : Node) : nodeCheck node = true :=
-  checked_from_chunks nodeCheck node_chunks node
+      _ = _ := (hr.2.2.2.2.1 x).symm
 
 /-- Every quarter of a selected node satisfies the actual local shade rule. -/
 theorem Node.block_allowed (node : Node) (x y : Fin 2) :
     locallyAllowed ⟨node.parent, quadrantAt x.val y.val⟩
-      (node.block.at x.val y.val) = true := by
-  have h := node_checked node
-  simp only [nodeCheck, decide_eq_true_eq] at h
-  exact h.1 x y
+      (node.block.at x.val y.val) = true :=
+  (node_local_checked node).2.1 x y
 
 /-- All four internal shade seams of a selected node match. -/
 theorem Node.block_internal (node : Node) :
     node.block.southwest.east = node.block.southeast.west ∧
     node.block.northwest.east = node.block.northeast.west ∧
     node.block.southwest.north = node.block.northwest.south ∧
-    node.block.southeast.north = node.block.northeast.south := by
-  have h := node_checked node
-  simp only [nodeCheck, decide_eq_true_eq] at h
-  exact h.2.1
+    node.block.southeast.north = node.block.northeast.south :=
+  (node_local_checked node).2.2
 
 /-- The chosen child has exactly the parent prescribed by two Robinson substitutions. -/
 theorem Node.child_parent (node : Node) (position : Fin 16) :
-    (node.child position).parent = fineGrid node.parent (position.val % 4) (position.val / 4) := by
-  have h := node_checked node
-  simp only [nodeCheck, decide_eq_true_eq] at h
-  exact h.2.2.1 position
+    (node.child position).parent = fineGrid node.parent (position.val % 4) (position.val / 4) :=
+  (node_children_checked node).2.1 position
 
 /-- The sparse southwest child retains the preceding shade block. -/
-theorem Node.child_zero_block (node : Node) : (node.child 0).block = node.block := by
-  have h := node_checked node
-  simp only [nodeCheck, decide_eq_true_eq] at h
-  exact h.2.2.2.1
+theorem Node.child_zero_block (node : Node) : (node.child 0).block = node.block :=
+  (node_children_checked node).1
 
 /-- Horizontal neighbors within a selected expansion are compatible. -/
 theorem children_hCompatible_within (node : Node) (x : Fin 3) (y : Fin 4) :
     HCompatible (node.child (blockPosition ⟨x.val, by omega⟩ y))
-      (node.child (blockPosition ⟨x.val + 1, by omega⟩ y)) := by
-  have h := node_checked node
-  simp only [nodeCheck, decide_eq_true_eq] at h
-  exact (hCompatible_cached _ _).mpr (h.2.2.2.2.1 x y)
+      (node.child (blockPosition ⟨x.val + 1, by omega⟩ y)) :=
+  (hCompatible_cached _ _).mpr ((node_children_checked node).2.2.2.2.2.2.1 x y)
 
 /-- Vertical neighbors within a selected expansion are compatible. -/
 theorem children_vCompatible_within (node : Node) (x : Fin 4) (y : Fin 3) :
     VCompatible (node.child (blockPosition x ⟨y.val, by omega⟩))
-      (node.child (blockPosition x ⟨y.val + 1, by omega⟩)) := by
-  have h := node_checked node
-  simp only [nodeCheck, decide_eq_true_eq] at h
-  exact (vCompatible_cached _ _).mpr (h.2.2.2.2.2 x y)
+      (node.child (blockPosition x ⟨y.val + 1, by omega⟩)) :=
+  (vCompatible_cached _ _).mpr ((node_children_checked node).2.2.2.2.2.2.2 x y)
 
 /-- Expansion preserves horizontal matching across neighboring parent blocks. -/
 theorem children_hCompatible_boundary {left right : Node}
