@@ -13,17 +13,17 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.Nat
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Halting.Partrec
 
 /-!
-# Concrete interpretation of an existing uniform-generator certificate
+# Polynomial native interpretation of an existing uniform-generator certificate
 
-This concrete-only construction consumes an arbitrary existing `GeneratorCertificate`; it does
+This construction consumes an arbitrary existing `GeneratorCertificate`; it does
 not restrict the admitted circuit family to generators originally assembled with `NativeCompiler`.
 Its installed program contains the certified description and a literal polynomial clock. The
 certificate's possibly noncomputable time schedule is used only to prove that the clock suffices.
 
 The result retains the actual interpreter table, its complete static description, its separate
-native time and workspace maps, and its exact emitted circuit-description word. Polynomial
-majorants for those native maps remain open in issue #5281; this component does not yet supply
-the asymptotic efficiency witness for the HQC reduction.
+native time and workspace maps, and its exact emitted circuit-description word. Explicit
+length-indexed polynomial schedules bound both native resource maps. This is the generator
+interpretation component of the open HQC reduction in issue #5281, not its security theorem.
 
 ## Main definitions
 
@@ -33,7 +33,9 @@ the asymptotic efficiency witness for the HQC reduction.
 ## Main results
 
 The construction derives exact output correctness from the adversary's certificate and the
-halted-run extension law. No correctness premise about the constructed interpreter is required.
+halted-run extension law. `toNativeCompiler_resources_le` bounds its actual native time and
+visited workspace by separate polynomial schedules. No correctness or efficiency premise about
+the constructed interpreter is required.
 -/
 
 public section
@@ -117,7 +119,7 @@ noncomputable def toNativeCompiler {F : UniformOracleCircuitFamily}
     (encOracleCircuitDescription (F.description input.securityParameter input.classicalInputLength))
   simp only [Bool.toNat_eq_one, Bool.decide_eq_true, List.map_id']
 
-private theorem toNativeCompiler_resources_le {F : UniformOracleCircuitFamily}
+private theorem toNativeCompiler_resources_le_interpreter {F : UniformOracleCircuitFamily}
     (certificate : F.GeneratorCertificate) (c d : ℕ)
     (hclock : ∀ n, certificate.time n ≤ c * (n + 1) ^ d) (input : OracleInputSize) :
     let word := encOracleInputSize input
@@ -174,5 +176,89 @@ private theorem toNativeCompiler_resources_le {F : UniformOracleCircuitFamily}
     have hnQ := hnP.trans hPQ
     dsimp only [Q] at hmQ hnQ
     nlinarith
+
+/-- Length-indexed native interpreter time schedule. The clock contributes degree
+`max d 1` to the simulated input size; the cubic interpreter cost and the separately constructed
+unary clock are charged independently. `certificate.code` is fixed in this schedule. -/
+def toNativeCompilerTimeBound {F : UniformOracleCircuitFamily}
+    (certificate : F.GeneratorCertificate) (c d n : ℕ) : ℕ :=
+  let M := Universal.descLen certificate.code +
+    (Universal.eCfg (Universal.init certificate.code)).length + 1
+  10 ^ 41 * M ^ 4 * ((c + 1) * (n + 1) ^ max d 1) ^ 3 +
+    100200 * (c + 1) * (d + 1) * (n + 1) ^ (d + 2)
+
+/-- Length-indexed visited-workspace schedule of the native interpreter and its unary clock.
+The interpreter's actual tape count and the clock/composition tape charges remain explicit;
+this schedule does not substitute running time for workspace. -/
+noncomputable def toNativeCompilerWorkspaceBound {F : UniformOracleCircuitFamily}
+    (certificate : F.GeneratorCertificate) (c d n : ℕ) : ℕ :=
+  let interpreter := simulateBitOutputCompiler certificate.code
+  let M := Universal.descLen certificate.code +
+    (Universal.eCfg (Universal.init certificate.code)).length + 1
+  10 ^ 42 * (interpreter.tapeCount + 1) ^ 2 * M ^ 4 *
+      ((c + 1) * (n + 1) ^ max d 1) ^ 2 +
+    1000200 * (c + 1) * (d + 1) ^ 2 * (n + 1) ^ (d + 2) +
+    100 * (unaryPolynomialClock c d).tapeCount +
+      6 * max (clockedInputCompiler c d).tapeCount interpreter.tapeCount
+
+/-- The actual native interpreter's length-indexed time schedule is polynomial for every fixed
+certified description and fixed literal clock constants. -/
+theorem toNativeCompilerTimeBound_polynomiallyBounded {F : UniformOracleCircuitFamily}
+    (certificate : F.GeneratorCertificate) (c d : ℕ) :
+    PolynomiallyBounded (certificate.toNativeCompilerTimeBound c d) := by
+  unfold toNativeCompilerTimeBound
+  fun_prop
+
+/-- The native visited-workspace schedule is polynomial independently of the time schedule. -/
+theorem toNativeCompilerWorkspaceBound_polynomiallyBounded {F : UniformOracleCircuitFamily}
+    (certificate : F.GeneratorCertificate) (c d : ℕ) :
+    PolynomiallyBounded (certificate.toNativeCompilerWorkspaceBound c d) := by
+  unfold toNativeCompilerWorkspaceBound
+  fun_prop
+
+private theorem clockedInputSize_le (c d n : ℕ) :
+    n + c * (n + 1) ^ d + 1 ≤ (c + 1) * (n + 1) ^ max d 1 := by
+  have hlinear : n + 1 ≤ (n + 1) ^ max d 1 :=
+    Nat.le_self_pow (by omega) _
+  have hpower : (n + 1) ^ d ≤ (n + 1) ^ max d 1 :=
+    Nat.pow_le_pow_right (by omega) (Nat.le_max_left _ _)
+  calc
+    _ = (n + 1) + c * (n + 1) ^ d := by omega
+    _ ≤ (n + 1) ^ max d 1 + c * (n + 1) ^ max d 1 :=
+      Nat.add_le_add hlinear (Nat.mul_le_mul_left c hpower)
+    _ = _ := by ring
+
+/-- The retained interpretation of any existing generator certificate obeys explicit polynomial
+schedules for native time and visited workspace. Only the original generator's clock bound is
+assumed; the interpreter's resource bounds are proved from its actual transition table. -/
+theorem toNativeCompiler_resources_le {F : UniformOracleCircuitFamily}
+    (certificate : F.GeneratorCertificate) (c d : ℕ)
+    (hclock : ∀ n, certificate.time n ≤ c * (n + 1) ^ d) (input : OracleInputSize) :
+    (certificate.toNativeCompiler c d hclock).time input ≤
+        certificate.toNativeCompilerTimeBound c d (encOracleInputSize input).length ∧
+      (certificate.toNativeCompiler c d hclock).workspace input ≤
+        certificate.toNativeCompilerWorkspaceBound c d (encOracleInputSize input).length := by
+  let word := encOracleInputSize input
+  let n := word.length
+  let count := c * (n + 1) ^ d
+  let M := Universal.descLen certificate.code +
+    (Universal.eCfg (Universal.init certificate.code)).length + 1
+  let interpreter := simulateBitOutputCompiler certificate.code
+  have hsize := clockedInputSize_le c d n
+  have ht := simulateBitOutputCompiler_time_le certificate.code word count
+  have hs := simulateBitOutputCompiler_workspace_le certificate.code word count
+  have hnative := toNativeCompiler_resources_le_interpreter certificate c d hclock input
+  have htScale : 10 ^ 41 * M ^ 4 * (n + count + 1) ^ 3 ≤
+      10 ^ 41 * M ^ 4 * ((c + 1) * (n + 1) ^ max d 1) ^ 3 :=
+    Nat.mul_le_mul_left _ (Nat.pow_le_pow_left hsize 3)
+  have hsScale : 10 ^ 42 * (interpreter.tapeCount + 1) ^ 2 * M ^ 4 *
+        (n + count + 1) ^ 2 ≤
+      10 ^ 42 * (interpreter.tapeCount + 1) ^ 2 * M ^ 4 *
+        ((c + 1) * (n + 1) ^ max d 1) ^ 2 :=
+    Nat.mul_le_mul_left _ (Nat.pow_le_pow_left hsize 2)
+  constructor
+  · exact hnative.1.trans (Nat.add_le_add_right (ht.trans htScale) _)
+  · exact hnative.2.trans (Nat.add_le_add_right
+      (Nat.add_le_add_right (Nat.add_le_add_right (hs.trans hsScale) _) _) _)
 
 end Cslib.Quantum.UniformOracleCircuitFamily.GeneratorCertificate

@@ -16,16 +16,17 @@ import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Output
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.BitLength
 
 /-!
-# Concrete retained bounded interpretation
+# Retained bounded interpretation with polynomial resources
 
-This concrete-only component installs an actual deterministic interpreter for a fixed description
+This component installs an actual deterministic interpreter for a fixed description
 and a unary clock. It streams emitted symbols instead of retaining and repeatedly copying the
 output prefix. The clock controls simulated steps; the returned compiler charges the interpreter's
 own native execution and workspace separately. Its complete installed description includes the
 interpreted program.
 
-Polynomial majorants for this exact interpreter, and its use with the adversary certificate's
-dominating polynomial clock, remain part of the open certificate bridge in issue #5281.
+For each fixed description, native time is cubic and visited workspace is quadratic in the
+bit-input length plus the unary clock. The estimates expose the description, initial-configuration
+and tape-count factors; the returned compiler separately retains its exact installed program size.
 
 ## Main definitions
 
@@ -917,5 +918,164 @@ private theorem simulateBitOutputCompiler_workspace_le_of_stepBound (description
       5713 * M ^ 2 + 10000 + 600000 * M + 5 * K + 43 +
       6 * K₀ + 6 * K₁ + 6 * K₂) * x
   nlinarith only [hb, hstream, htail, hL1, hA, hO]
+
+
+private theorem interpreterTapeCounts_le (description : Desc) :
+    let total := (simulateBitOutputCompiler description).tapeCount
+    streamFoldPairTapeCount interpreterNextCompiler interpreterEmitCompiler
+        (const eCtx encBits []) ≤ total ∧
+      contextStepCompiler.tapeCount ≤ total ∧
+      max 4 stepCompiler.tapeCount ≤ total ∧
+      max (interpreterInputCompiler description).tapeCount
+        interpreterStreamCompiler.tapeCount ≤ total ∧
+      max bitInterpreterInputCompiler.tapeCount
+        (simulateOutputCompiler description).tapeCount ≤ total ∧
+      max ((simulateOutputCompiler description).comp bitInterpreterInputCompiler).tapeCount
+        outputBitsCompiler.tapeCount ≤ total := by
+  have hcontext : max 4 stepCompiler.tapeCount ≤ contextStepCompiler.tapeCount := by
+    change max 4 stepCompiler.tapeCount ≤ max 4 stepCompiler.tapeCount + 2
+    omega
+  have hemit : contextStepCompiler.tapeCount ≤ interpreterEmitCompiler.tapeCount := by
+    simp only [interpreterEmitCompiler, ofOutputEq, comp]
+    omega
+  have hstream : interpreterEmitCompiler.tapeCount ≤
+      streamFoldPairTapeCount interpreterNextCompiler interpreterEmitCompiler
+        (const eCtx encBits []) := by
+    simp only [streamFoldPairTapeCount]
+    omega
+  have hstreamCount : interpreterStreamCompiler.tapeCount =
+      streamFoldPairTapeCount interpreterNextCompiler interpreterEmitCompiler
+        (const eCtx encBits []) := rfl
+  have houtput : (simulateOutputCompiler description).tapeCount =
+      max (interpreterInputCompiler description).tapeCount
+        interpreterStreamCompiler.tapeCount + 2 := rfl
+  have htotal : (simulateBitOutputCompiler description).tapeCount =
+      max (max bitInterpreterInputCompiler.tapeCount
+        (simulateOutputCompiler description).tapeCount + 2) outputBitsCompiler.tapeCount + 2 := rfl
+  dsimp only
+  simp only [comp]
+  omega
+
+
+/-- The actual bit interpreter has cubic time in the bit-input length plus the unary clock.
+The fixed description and initial configuration contribute the explicit fourth-power factor. -/
+theorem simulateBitOutputCompiler_time_le (description : Desc)
+    (word : List Bool) (count : ℕ) :
+    let M := descLen description + (eCfg (Universal.init description)).length + 1
+    (simulateBitOutputCompiler description).time (word, count) ≤
+      10 ^ 41 * M ^ 4 * (word.length + count + 1) ^ 3 := by
+  let M := descLen description + (eCfg (Universal.init description)).length + 1
+  let x := word.length + count + 1
+  have hM : 1 ≤ M := by dsimp only [M]; omega
+  have hx : 1 ≤ x := by dsimp only [x]; omega
+  have hsmall : M ^ 2 * x ^ 2 ≤ M ^ 4 * x ^ 3 :=
+    Nat.mul_le_mul (Nat.pow_le_pow_right hM (by decide))
+      (Nat.pow_le_pow_right hx (by decide))
+  have h := simulateBitOutputCompiler_time_le_of_stepBound description (10 ^ 36) 2
+    (fun input cfg => stepCompiler_time_le (description, input, cfg)) word count
+  change _ ≤ 2 * 10 ^ 36 * (101 * M ^ 2) ^ 2 * x ^ 3 + 1000000 * M ^ 2 * x ^ 2 at h
+  change _ ≤ 10 ^ 41 * M ^ 4 * x ^ 3
+  calc
+    _ ≤ 2 * 10 ^ 36 * (101 * M ^ 2) ^ 2 * x ^ 3 + 1000000 * M ^ 2 * x ^ 2 := h
+    _ ≤ (2 * 10 ^ 36 * 101 ^ 2 + 1000000) * (M ^ 4 * x ^ 3) := by
+      nlinarith only [hsmall]
+    _ ≤ 10 ^ 41 * (M ^ 4 * x ^ 3) := Nat.mul_le_mul_right _ (by norm_num)
+    _ = _ := by ring
+
+/-- The actual bit interpreter has quadratic visited workspace in the bit-input length plus
+the unary clock. This bound is derived from the step workspace bound independently of time;
+the complete interpreter's tape count remains an explicit static parameter. -/
+theorem simulateBitOutputCompiler_workspace_le (description : Desc)
+    (word : List Bool) (count : ℕ) :
+    let M := descLen description + (eCfg (Universal.init description)).length + 1
+    (simulateBitOutputCompiler description).workspace (word, count) ≤
+      10 ^ 42 * ((simulateBitOutputCompiler description).tapeCount + 1) ^ 2 * M ^ 4 *
+        (word.length + count + 1) ^ 2 := by
+  let M := descLen description + (eCfg (Universal.init description)).length + 1
+  let x := word.length + count + 1
+  let total := (simulateBitOutputCompiler description).tapeCount
+  let Kp := total + 1
+  let K := streamFoldPairTapeCount interpreterNextCompiler interpreterEmitCompiler
+    (const eCtx encBits [])
+  let R := 256 * (contextStepCompiler.tapeCount + 1) + 6 * max 4 stepCompiler.tapeCount
+  let K₀ := max (interpreterInputCompiler description).tapeCount
+    interpreterStreamCompiler.tapeCount
+  let K₁ := max bitInterpreterInputCompiler.tapeCount
+    (simulateOutputCompiler description).tapeCount
+  let K₂ := max ((simulateOutputCompiler description).comp bitInterpreterInputCompiler).tapeCount
+    outputBitsCompiler.tapeCount
+  let Q := Kp ^ 2 * M ^ 2
+  obtain ⟨hK, hcontext, hstepCount, hK₀, hK₁, hK₂⟩ := interpreterTapeCounts_le description
+  change K ≤ total at hK
+  change contextStepCompiler.tapeCount ≤ total at hcontext
+  change max 4 stepCompiler.tapeCount ≤ total at hstepCount
+  change K₀ ≤ total at hK₀
+  change K₁ ≤ total at hK₁
+  change K₂ ≤ total at hK₂
+  have hM : 1 ≤ M := by dsimp only [M]; omega
+  have hx : 1 ≤ x := by dsimp only [x]; omega
+  have hKp : 1 ≤ Kp := by dsimp only [Kp]; omega
+  have hK' : K ≤ Kp := hK.trans (Nat.le_succ _)
+  have hR : R ≤ 262 * Kp := by
+    calc
+      _ ≤ 256 * Kp + 6 * Kp := Nat.add_le_add
+        (Nat.mul_le_mul_left 256 (Nat.add_le_add_right hcontext 1))
+        (Nat.mul_le_mul_left 6 (hstepCount.trans (Nat.le_succ _)))
+      _ = _ := by ring
+  have hMscale : M ^ 2 ≤ Kp * M ^ 2 := Nat.le_mul_of_pos_left _ hKp
+  have hKscale : Kp ≤ Kp * M ^ 2 := Nat.le_mul_of_pos_right _ (Nat.pow_pos hM)
+  have hscale : 1 ≤ Kp * M ^ 2 := Nat.mul_pos hKp (Nat.pow_pos hM)
+  have hinside : 214000 * M ^ 2 + 2 * R + 20 * K + 90 ≤
+      214634 * (Kp * M ^ 2) := by
+    nlinarith only [hR, hK', hMscale, hKscale, hscale]
+  have hmainTail : 2 * K * (214000 * M ^ 2 + 2 * R + 20 * K + 90) ≤
+      429268 * Q := by
+    calc
+      _ ≤ (2 * Kp) * (214634 * (Kp * M ^ 2)) :=
+        Nat.mul_le_mul (Nat.mul_le_mul_left 2 hK') hinside
+      _ = _ := by dsimp only [Q]; ring
+  have hMQ : M ^ 2 ≤ Q := Nat.le_mul_of_pos_left _ (Nat.pow_pos hKp)
+  have hmQ : M ≤ Q := (Nat.le_self_pow (by decide) M).trans hMQ
+  have h1Q : 1 ≤ Q := Nat.mul_pos (Nat.pow_pos hKp) (Nat.pow_pos hM)
+  have hKpQ : Kp ≤ Q := (Nat.le_self_pow (by decide) Kp).trans
+    (Nat.le_mul_of_pos_right _ (Nat.pow_pos hM))
+  have hKQ := hK'.trans hKpQ
+  have hK₀Q := hK₀.trans ((Nat.le_succ total).trans hKpQ)
+  have hK₁Q := hK₁.trans ((Nat.le_succ total).trans hKpQ)
+  have hK₂Q := hK₂.trans ((Nat.le_succ total).trans hKpQ)
+  have htail : 2 * K * (214000 * M ^ 2 + 2 * R + 20 * K + 90) +
+      5713 * M ^ 2 + 10000 + 600000 * M + 5 * K + 43 +
+      6 * K₀ + 6 * K₁ + 6 * K₂ ≤ 1100000 * Q := by
+    nlinarith only [hmainTail, hMQ, hmQ, h1Q, hKQ, hK₀Q, hK₁Q, hK₂Q]
+  have hsmall : M ^ 2 * x ≤ M ^ 4 * x ^ 2 :=
+    Nat.mul_le_mul (Nat.pow_le_pow_right hM (by decide))
+      (Nat.le_self_pow (by decide) x)
+  have htailLength : Q * x ≤ Kp ^ 2 * M ^ 4 * x ^ 2 := by
+    calc
+      _ = Kp ^ 2 * (M ^ 2 * x) := by dsimp only [Q]; ring
+      _ ≤ Kp ^ 2 * (M ^ 4 * x ^ 2) := Nat.mul_le_mul_left _ hsmall
+      _ = _ := by ring
+  have hKsquare : K ≤ Kp ^ 2 := hK'.trans (Nat.le_self_pow (by decide) Kp)
+  have hleading : 4 * K * 10 ^ 37 * (101 * M ^ 2) ^ 2 * x ^ 2 ≤
+      (40804 * 10 ^ 37) * (Kp ^ 2 * M ^ 4 * x ^ 2) := by
+    calc
+      _ = (40804 * 10 ^ 37) * (K * (M ^ 4 * x ^ 2)) := by ring
+      _ ≤ (40804 * 10 ^ 37) * (Kp ^ 2 * (M ^ 4 * x ^ 2)) :=
+        Nat.mul_le_mul_left _ (Nat.mul_le_mul_right _ hKsquare)
+      _ = _ := by ring
+  have h := simulateBitOutputCompiler_workspace_le_of_stepBound description (10 ^ 37) 2
+    (fun input cfg => stepCompiler_workspace_le (description, input, cfg)) word count
+  change _ ≤ 4 * K * 10 ^ 37 * (101 * M ^ 2) ^ 2 * x ^ 2 +
+    (2 * K * (214000 * M ^ 2 + 2 * R + 20 * K + 90) +
+      5713 * M ^ 2 + 10000 + 600000 * M + 5 * K + 43 +
+      6 * K₀ + 6 * K₁ + 6 * K₂) * x at h
+  change _ ≤ 10 ^ 42 * Kp ^ 2 * M ^ 4 * x ^ 2
+  have htail' := (Nat.mul_le_mul_right x htail).trans
+    (by simpa only [Nat.mul_assoc] using Nat.mul_le_mul_left 1100000 htailLength)
+  calc
+    _ ≤ (40804 * 10 ^ 37 + 1100000) * (Kp ^ 2 * M ^ 4 * x ^ 2) := by
+      nlinarith only [h, hleading, htail']
+    _ ≤ 10 ^ 42 * (Kp ^ 2 * M ^ 4 * x ^ 2) := Nat.mul_le_mul_right _ (by norm_num)
+    _ = _ := by ring
 
 end Turing.MultiTapeTM.Internal.NativeCompiler
