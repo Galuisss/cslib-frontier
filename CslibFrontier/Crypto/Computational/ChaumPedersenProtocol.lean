@@ -217,7 +217,8 @@ theorem isPPTOn_chaumPedersenSimulateWord :
   have hz : ComputableInPolyTime
       (fun p : ((ℕ × F.Desc) × List Bool × List Bool) × ℕ =>
         (p.2 % F.order p.1.1.2).bits) encMid encBits :=
-    (ComputableInPolyTime.binary_mod' hs hq).encoding_comp
+    (ComputableInPolyTime.binary_mod' hs hq).of_enc_eq
+      fun _ => (Cslib.Encoding.encNat_eq_bits _).symm
   exact ((ht₁.prod ht₂).encoding_comp.prod hz).isPPTOn
 
 /-- `chaumPedersenSimulator` is uniform strict PPT, certified by `chaumPedersenSimulateWord`. -/
