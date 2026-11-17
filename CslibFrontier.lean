@@ -1923,6 +1923,7 @@ public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.GraphN
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.Operators
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.PH
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.PerfectCompleteness
+public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.RandomizedReduction
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.RoundCollapse
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.SetLowerBound
 public import CslibFrontier.Computability.Complexity.Classes.AverageCase.BoundedHalting
@@ -1944,6 +1945,7 @@ public import CslibFrontier.Computability.Complexity.Classes.BPP.Derandomization
 public import CslibFrontier.Computability.Complexity.Classes.BPP.Derandomization.Generator
 public import CslibFrontier.Computability.Complexity.Classes.BPP.Derandomization.SeedEnumeration
 public import CslibFrontier.Computability.Complexity.Classes.BPP.KarpLipton
+public import CslibFrontier.Computability.Complexity.Classes.BPP.RandomizedReduction
 public import CslibFrontier.Computability.Complexity.Classes.BPP.Reduction
 public import CslibFrontier.Computability.Complexity.Classes.BPP.WorstCaseHardness
 public import CslibFrontier.Computability.Complexity.Classes.BPPpath
@@ -2778,6 +2780,7 @@ public import CslibFrontier.Computability.Complexity.Problems.SAT.Incidence.Comp
 public import CslibFrontier.Computability.Complexity.Problems.SAT.Incidence.Degree
 public import CslibFrontier.Computability.Complexity.Problems.SAT.LeftSet
 public import CslibFrontier.Computability.Complexity.Problems.SAT.Paddable
+public import CslibFrontier.Computability.Complexity.Problems.SAT.Padded
 public import CslibFrontier.Computability.Complexity.Problems.SAT.Planar.CrossoverLayout
 public import CslibFrontier.Computability.Complexity.Problems.SAT.Planar.CrossoverLayoutChecks
 public import CslibFrontier.Computability.Complexity.Problems.SAT.Planar.CrossoverLayoutData
@@ -5674,6 +5677,7 @@ public import CslibFrontier.Foundations.Algebra.Group.HomomorphismTesting
 public import CslibFrontier.Foundations.Algebra.Group.ZPowCoprime
 public import CslibFrontier.Foundations.Algebra.Module.ZLattice.CoefficientFiber
 public import CslibFrontier.Foundations.Algebra.Negacyclic
+public import CslibFrontier.Foundations.Algebra.Polynomial.Bivariate
 public import CslibFrontier.Foundations.Algebra.Polynomial.LagrangeInversion
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BitBounds
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.Isolation
@@ -6187,6 +6191,7 @@ public import CslibFrontier.Foundations.Data.Code.DuplicatedReedMuller
 public import CslibFrontier.Foundations.Data.Code.EliasBassalygo
 public import CslibFrontier.Foundations.Data.Code.ExpanderCode
 public import CslibFrontier.Foundations.Data.Code.FlipDecoding
+public import CslibFrontier.Foundations.Data.Code.GuruswamiSudan
 public import CslibFrontier.Foundations.Data.Code.Hadamard
 public import CslibFrontier.Foundations.Data.Code.HammingBound
 public import CslibFrontier.Foundations.Data.Code.HintDecoding
@@ -6210,6 +6215,7 @@ public import CslibFrontier.Foundations.Data.Code.Plotkin
 public import CslibFrontier.Foundations.Data.Code.Plotkin.Asymptotic
 public import CslibFrontier.Foundations.Data.Code.PuncturedBallFourier
 public import CslibFrontier.Foundations.Data.Code.RadialDecoding
+public import CslibFrontier.Foundations.Data.Code.RandomLinear
 public import CslibFrontier.Foundations.Data.Code.ReedMuller
 public import CslibFrontier.Foundations.Data.Code.ReedSolomon
 public import CslibFrontier.Foundations.Data.Code.RegularSyndrome
