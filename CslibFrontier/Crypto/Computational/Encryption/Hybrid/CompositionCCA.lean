@@ -687,9 +687,13 @@ private theorem computableInPolyTime_postprocessed_decaps
       (encPair encUnary (encPair encBits encBits)) (encSilentOption encBits)) :
     ComputableInPolyTime (fun ⟨n, sk, ct⟩ => (decaps n sk ct).map (F n))
       (encPair encUnary (encPair encBits encBits)) (encSilentOption encBits) := by
+  have hargs : ComputableInPolyTime
+      (fun p : (ℕ × List Bool × List Bool) × List Bool => (p.1.1, p.2))
+      (encPair (encPair encUnary (encPair encBits encBits)) encBits)
+      (encPair encUnary encBits) := by fun_prop
   exact ComputableInPolyTime.optionMapWithInput
     (encB := encBits) (encC := encBits) (encO := encSilentOption encBits)
-    hdecaps (hF.comp (by fun_prop))
+    (f := fun x key => F x.1 key) hdecaps (hF.comp hargs)
 
 /-- **Adaptive CCA security of KEM–DEM encryption**, for the source symmetric cipher's
 `n`-bit message model ([BonehShoup2023], Exercise 12.5(a)). The same native postprocessor is

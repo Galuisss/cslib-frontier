@@ -208,8 +208,9 @@ theorem computableInPolyTime_schnorrExtractWord :
     (hword (k := fun p => p.2.2.2.2.1) (by fun_prop))
     (hword (k := fun p => p.2.2.2.2.2.1) (by fun_prop))
     (hword (k := fun p => p.2.2.2.2.2.2) (by fun_prop))
-  simpa only [Cslib.Encoding.encNat_eq_bits, Function.comp_def, schnorrExtractWord] using
-    hext.encoding_comp
+  have hbits : ComputableInPolyTime (fun n : ℕ => n.bits) encNat encBits :=
+    .of_eq fun n => (Cslib.Encoding.encNat_eq_bits n).symm
+  exact (hbits.comp hext :)
 
 /-- `schnorrExtractWord` computes Schnorr's extractor `schnorrExtract` on encodings. -/
 theorem extractorRealizedBy_schnorrExtractWord :
@@ -576,9 +577,10 @@ theorem computableInPolyTime_schnorrRespondBits :
   have hsk_nat := ComputableInPolyTime.bitsToNat.comp hsk
   have hr_nat := ComputableInPolyTime.bitsToNat.comp hr
   have hro_nat := ComputableInPolyTime.bitsToNat.comp hro
-  simpa only [Cslib.Encoding.encNat_eq_bits, Function.comp_def, schnorrRespondBits] using
-    (ComputableInPolyTime.binary_mod'
-    (.binary_add' hr_nat (.binary_mul' hro_nat hsk_nat)) hq).encoding_comp
+  have hbits : ComputableInPolyTime (fun n : ℕ => n.bits) encNat encBits :=
+    .of_eq fun n => (Cslib.Encoding.encNat_eq_bits n).symm
+  exact (hbits.comp (ComputableInPolyTime.binary_mod'
+    (.binary_add' hr_nat (.binary_mul' hro_nat hsk_nat)) hq) :)
 
 /-- `schnorrRespondBits` lifted to `ProbComp` is uniform strict PPT. -/
 theorem isPPTOn_schnorrRespondBits :
