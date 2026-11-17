@@ -645,9 +645,11 @@ be instantiated as the active continuation tensored with its identity.
 
 The original hidden register is part of the discarded service environment, rather than being
 duplicated in the output. The continuation acts only on the saved reference factor; in the B2
-controller this is where the saved first-stage state and inaccessible reference live. Connecting
-this identity to the physical reply-copy block, and then to the final comparison measurement,
-remain separate obligations; this is not the native B2 success-law or a security theorem. -/
+controller this is where the saved first-stage state and inaccessible reference live. The
+preceding `matrix_b2ServiceReplyCopy_initializedInput` supplies the physical service-and-reply-copy
+bridge. Composing it with the controller prefix, the reply-to-second-stage copy, the actual second
+stage and final comparison remains open; this is not the native B2 success-law or a security
+theorem. -/
 theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
     (securityParameter : ℕ)
     (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen)
