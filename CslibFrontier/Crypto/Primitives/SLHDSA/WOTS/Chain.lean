@@ -88,7 +88,6 @@ structure ChainRun (p : SecurityBytes) where
 
 /-- Instrumented FIPS 205 Algorithm 5. Its recursion constructs both the chain output and the
 ledger, so the counts are tied to the executable control flow. -/
-@[expose]
 def chainWithCalls (family : HashFamily) {p : SecurityBytes} (X : NBytes p) (i s : ℕ)
     (publicSeed : NBytes p) (address : Address) (_haddress : ValidHashAddress address)
     (hrange : ValidChainRange i s) : ChainRun p :=
@@ -123,7 +122,6 @@ termination_by s
 
 /-- FIPS 205 Algorithm 5. The proof arguments enforce the source's address-type and range
 conditions without adding a runtime branch. -/
-@[expose]
 def chain (family : HashFamily) {p : SecurityBytes} (X : NBytes p) (i s : ℕ)
     (publicSeed : NBytes p) (address : Address) (haddress : ValidHashAddress address)
     (hrange : ValidChainRange i s) : NBytes p :=
@@ -135,7 +133,7 @@ theorem chainWithCalls_output (family : HashFamily) {p : SecurityBytes} (X : NBy
     (haddress : ValidHashAddress address) (hrange : ValidChainRange i s) :
     (chainWithCalls family X i s publicSeed address haddress hrange).output =
       chain family X i s publicSeed address haddress hrange :=
-  rfl
+  (rfl)
 
 /-- A zero-step chain is the identity, including at a nonzero valid start index. -/
 @[simp] theorem chain_zero (family : HashFamily) {p : SecurityBytes} (X : NBytes p) (i : ℕ)
