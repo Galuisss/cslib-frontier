@@ -6,7 +6,7 @@ Authors: Erik Demaine
 
 module
 
-import CslibFrontier.Computability.PolyTime.Graph.OrthogonalRotation
+public import CslibFrontier.Computability.PolyTime.Graph.OrthogonalRotation
 
 /-!
 The four rays at a star center must follow east, south, west, north. Mixed input route
@@ -16,7 +16,12 @@ computation and rejection separately from the geometric correctness theorem.
 
 open Cslib.Complexity Cslib.Complexity.Graph
 
-private def fourRayGraph : Graph :=
+public section
+
+namespace CslibFrontierTests.OrthogonalRotation
+
+/-- A center joined to four separately indexed cardinal leaves. -/
+def fourRayGraph : Graph :=
   ⟨[0, 1, 2, 3, 4], [(0, 1), (0, 2), (0, 3), (0, 4)]⟩
 
 private def fourRayDrawing : OrthogonalDrawing :=
@@ -41,3 +46,5 @@ example : (OrthogonalDrawing.rotationCertificate (⟨[], []⟩ : Graph) ([], [])
 example (G : Graph) (d : OrthogonalDrawing) (i : ℕ) (hi : i < 2 * G.edges.length) :
     OrthogonalDrawing.clockwiseSuccessor G d i < 2 * G.edges.length :=
   (OrthogonalDrawing.clockwiseSuccessor_spec G d hi).1
+
+end CslibFrontierTests.OrthogonalRotation

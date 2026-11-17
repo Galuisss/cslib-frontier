@@ -6,7 +6,7 @@ Authors: Erik Demaine
 
 module
 
-import CslibFrontier.Computability.Complexity.Problems.Graph.OrthogonalDrawing.Polygonal
+public import CslibFrontier.Computability.Complexity.Problems.Graph.OrthogonalDrawing.Polygonal
 
 /-!
 A genuine one-edge integer drawing supplies the polygonal embedding contract, including
@@ -16,7 +16,12 @@ so this also checks that shared normalization retains the actual graph endpoints
 
 open Cslib.Complexity Cslib.Complexity.Graph Cslib.Orthogonal
 
-private def oneEdge : Graph := ⟨[7, 23], [(7, 23)]⟩
+public section
+
+namespace CslibFrontierTests.OrthogonalPolygonal
+
+/-- One indexed edge with sparse original endpoint labels. -/
+def oneEdge : Graph := ⟨[7, 23], [(7, 23)]⟩
 
 private def reversedDrawing : OrthogonalDrawing :=
   ([(0, 0), (2, 0)], [[(2, 0), (0, 0)]])
@@ -60,3 +65,5 @@ example : (validDrawing.polygonalDrawing.route 0).endpoint false =
 
 example : validDrawing.polygonalDrawing.vertex 7 ≠ validDrawing.polygonalDrawing.vertex 23 :=
   validDrawing.isEmbedding_polygonalDrawing.vertex_ne (by decide) (by decide) (by decide)
+
+end CslibFrontierTests.OrthogonalPolygonal

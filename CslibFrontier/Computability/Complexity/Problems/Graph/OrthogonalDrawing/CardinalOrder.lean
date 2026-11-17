@@ -89,7 +89,8 @@ theorem sbtw_clockwiseRanks_iff {a b c : ℕ} (ha : a < 4) (hb : b < 4) (hc : c 
         (-(7 : ℝ) * Real.pi / 4 + 2 * Real.pi) := by
     have hn' : (n : ℝ) ≤ 3 := by exact_mod_cast (by omega : n ≤ 3)
     have hz : (0 : ℝ) ≤ n := Nat.cast_nonneg _
-    constructor <;> nlinarith [Real.pi_pos]
+    constructor <;> linarith [Real.pi_pos,
+      mul_le_mul_of_nonneg_right hn' Real.pi_pos.le, mul_nonneg hz Real.pi_pos.le]
   have ne (i j : ℕ) (hij : i ≠ j) :
       -(i : ℝ) * Real.pi / 2 ≠ -(j : ℝ) * Real.pi / 2 := by
     intro he
@@ -100,8 +101,8 @@ theorem sbtw_clockwiseRanks_iff {a b c : ℕ} (ha : a < 4) (hb : b < 4) (hc : c 
   rw [Cslib.Polygonal.sbtw_angle_iff_cyclic_lt (bound c hc) (bound b hb) (bound a ha)
     (ne c b hbc.symm) (ne b a hab.symm) (ne c a hac.symm)]
   have lt (i j : ℕ) : -(i : ℝ) * Real.pi / 2 < -(j : ℝ) * Real.pi / 2 ↔ j < i := by
-    rw [← Nat.cast_lt (α := ℝ)]
-    constructor <;> intro hij <;> nlinarith [Real.pi_pos]
+    rw [div_lt_div_iff_of_pos_right (by norm_num : (0 : ℝ) < 2)]
+    simp only [neg_mul, neg_lt_neg_iff, mul_lt_mul_iff_left₀ Real.pi_pos, Nat.cast_lt]
   simp only [lt]
   tauto
 

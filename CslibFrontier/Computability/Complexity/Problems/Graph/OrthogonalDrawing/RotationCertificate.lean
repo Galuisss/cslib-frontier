@@ -12,6 +12,7 @@ public import CslibFrontier.Computability.Complexity.Problems.Graph.OrthogonalDr
 public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Certificate
 public import CslibFrontier.Foundations.Geometry.Orthogonal.Subdivision
 import Mathlib.Data.List.GetD
+import Mathlib.Tactic.IntervalCases
 
 /-!
 # Executed clockwise successors of an orthogonal drawing
@@ -71,6 +72,22 @@ a planarity search or use an abstract rotation chosen in a proof. -/
 @[expose] def rotationCertificate (G : Graph) (d : OrthogonalDrawing) : RotationCertificate :=
   ⟨(List.range (2 * G.edges.length)).map (clockwiseSuccessor G d)⟩
 
+/-- An indexed dart reads the corresponding actual route end, with the original total
+fallbacks. This separates binary edge/end arithmetic from geometric callers. -/
+theorem exitNeighbor_index (G : Graph) (d : OrthogonalDrawing)
+    (e : Fin G.edges.length) (side : Bool) :
+    exitNeighbor G d (e, side).index =
+      let r := (sourceRoute G d e).reverse
+      if side then r.getD (r.length - 2) (0, 0) else r.getD 1 (0, 0) := by
+  cases side <;> simp only [exitNeighbor, Dart.index, Bool.toNat_false, Bool.toNat_true,
+    Nat.add_zero, Bool.false_eq_true, ↓reduceIte]
+  · have hdiv : (2 * e.val) / 2 = e.val := by omega
+    have hmod : (2 * e.val) % 2 = 0 := by omega
+    simp only [hdiv, hmod, ↓reduceIte]
+  · have hdiv : (2 * e.val + 1) / 2 = e.val := by omega
+    have hmod : (2 * e.val + 1) % 2 = 1 := by omega
+    simp only [hdiv, hmod, Nat.one_ne_zero, ↓reduceIte]
+
 /-- Every direction has one of the four fixed ranks, even on malformed route data. -/
 theorem clockwiseRank_lt (a b : Point) : clockwiseRank a b < 4 := by
   unfold clockwiseRank
@@ -116,5 +133,56 @@ theorem clockwiseSuccessor_spec (G : Graph) (d : OrthogonalDrawing) {i : ℕ}
     | cons head tail => exact List.mem_cons_self
   obtain ⟨_, _, hb, hv, _⟩ := (mem_clockwiseCandidates_iff G d i _).mp hc
   exact ⟨hb, hv⟩
+
+/-- The executed scan returns the unique dart on the first occupied clockwise ray.
+The hypotheses concern the actual four bounded scans, including the fourth return ray;
+they do not supply a permutation or a genus certificate. -/
+theorem clockwiseSuccessor_eq_of_firstRay (G : Graph) (d : OrthogonalDrawing)
+    {i j step : ℕ} (hj : j < 2 * G.edges.length) (hstep : step < 4)
+    (hv : endpoint G j = endpoint G i)
+    (hr : dartRank G d j = (dartRank G d i + step + 1) % 4)
+    (hbefore : ∀ k < step, ∀ b < 2 * G.edges.length,
+      endpoint G b = endpoint G i →
+        dartRank G d b ≠ (dartRank G d i + k + 1) % 4)
+    (hunique : ∀ b < 2 * G.edges.length, endpoint G b = endpoint G i →
+      dartRank G d b = dartRank G d j → b = j) :
+    clockwiseSuccessor G d i = j := by
+  let slice (k : ℕ) := (List.range (2 * G.edges.length)).filter fun b =>
+    decide (endpoint G b = endpoint G i ∧
+      dartRank G d b = (dartRank G d i + k + 1) % 4)
+  have hempty (k : ℕ) (hk : k < step) : slice k = [] := by
+    apply List.filter_eq_nil_iff.mpr
+    intro b hb
+    have hbound := List.mem_range.mp hb
+    simp only [decide_eq_true_eq, not_and]
+    exact fun hvertex => hbefore k hk b hbound hvertex
+  have hmem : j ∈ slice step := by
+    simp only [slice, List.mem_filter, List.mem_range, decide_eq_true_eq]
+    exact ⟨hj, hv, hr⟩
+  have hcons : ∃ tail, slice step = j :: tail := by
+    cases hs : slice step with
+    | nil => simp only [hs, List.not_mem_nil] at hmem
+    | cons b tail =>
+      have hb : b ∈ slice step := by rw [hs]; exact List.mem_cons_self
+      simp only [slice, List.mem_filter, List.mem_range, decide_eq_true_eq] at hb
+      obtain ⟨hb, hvertex, hrank⟩ := hb
+      have heq := hunique b hb hvertex (hrank.trans hr.symm)
+      exact ⟨tail, by simpa only [heq] using hs⟩
+  obtain ⟨tail, htail⟩ := hcons
+  change ((List.range 4).flatMap slice).headD i = j
+  rw [show List.range 4 = [0, 1, 2, 3] from rfl]
+  simp only [List.flatMap_cons, List.flatMap_nil, List.append_nil]
+  interval_cases step
+  · rw [htail]
+    rfl
+  · rw [hempty 0 (by omega), List.nil_append, htail]
+    rfl
+  · rw [hempty 0 (by omega), List.nil_append,
+      hempty 1 (by omega), List.nil_append, htail]
+    rfl
+  · rw [hempty 0 (by omega), List.nil_append,
+      hempty 1 (by omega), List.nil_append,
+      hempty 2 (by omega), List.nil_append, htail]
+    rfl
 
 end Cslib.Complexity.Graph.OrthogonalDrawing

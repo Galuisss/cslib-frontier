@@ -6,7 +6,7 @@ Authors: Erik Demaine
 
 module
 
-import CslibFrontier.Computability.Complexity.Problems.CSP.OneHot3
+public import CslibFrontier.Computability.Complexity.Problems.CSP.OneHot3
 
 /-!
 The adapter keeps indexed repeated clauses and repeated variable occurrences. Exactly one
@@ -16,7 +16,12 @@ below rejects an assignment making its repeated variable true.
 
 open Cslib.Logic.PL Cslib.Complexity Cslib.Complexity.CSP
 
-private def positive : CNF ℕ :=
+public section
+
+namespace CslibFrontierTests.CSPPositiveOneHot3
+
+/-- Two equal positive clauses, each retaining a repeated literal occurrence. -/
+def positive : CNF ℕ :=
   [[(91, true), (91, true), (4, true)], [(91, true), (91, true), (4, true)]]
 
 example : OneHot3.ofCNF positive =
@@ -35,3 +40,5 @@ example : OneHot3.sem () [true, false, false] = OneHot3.sem () [false, true, fal
 example : (OneHot3.ofCNF [[]]).eval OneHot3.sem (fun _ => false) = false := by decide
 
 example : (OneHot3.ofCNF []).eval OneHot3.sem (fun _ => false) = true := by decide
+
+end CslibFrontierTests.CSPPositiveOneHot3
