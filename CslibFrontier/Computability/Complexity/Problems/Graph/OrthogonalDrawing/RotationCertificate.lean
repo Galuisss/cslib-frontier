@@ -76,7 +76,7 @@ a planarity search or use an abstract rotation chosen in a proof. -/
 fallbacks. This separates binary edge/end arithmetic from geometric callers. -/
 theorem exitNeighbor_index (G : Graph) (d : OrthogonalDrawing)
     (e : Fin G.edges.length) (side : Bool) :
-    exitNeighbor G d (e, side).index =
+    exitNeighbor G d (Dart.index (G := G) (e, side)) =
       let r := (sourceRoute G d e).reverse
       if side then r.getD (r.length - 2) (0, 0) else r.getD 1 (0, 0) := by
   cases side <;> simp only [exitNeighbor, Dart.index, Bool.toNat_false, Bool.toNat_true,
@@ -90,7 +90,7 @@ theorem exitNeighbor_index (G : Graph) (d : OrthogonalDrawing)
 
 /-- Every direction has one of the four fixed ranks, even on malformed route data. -/
 theorem clockwiseRank_lt (a b : Point) : clockwiseRank a b < 4 := by
-  unfold clockwiseRank
+  dsimp only [clockwiseRank]
   split_ifs <;> omega
 
 /-- The output table has exactly the actual number of indexed darts. -/
@@ -106,7 +106,6 @@ theorem mem_clockwiseCandidates_iff (G : Graph) (d : OrthogonalDrawing) (i j : �
         dartRank G d j = (dartRank G d i + step + 1) % 4 := by
   simp only [clockwiseCandidates, List.mem_flatMap, List.mem_range, List.mem_filter,
     decide_eq_true_eq]
-  tauto
 
 /-- Every actual input dart appears in the fourth pass. In particular the executed scan
 has a candidate even before requiring a valid geometric drawing. -/
@@ -167,7 +166,7 @@ theorem clockwiseSuccessor_eq_of_firstRay (G : Graph) (d : OrthogonalDrawing)
       simp only [slice, List.mem_filter, List.mem_range, decide_eq_true_eq] at hb
       obtain ⟨hb, hvertex, hrank⟩ := hb
       have heq := hunique b hb hvertex (hrank.trans hr.symm)
-      exact ⟨tail, by simpa only [heq] using hs⟩
+      exact ⟨tail, by simp only [heq]⟩
   obtain ⟨tail, htail⟩ := hcons
   change ((List.range 4).flatMap slice).headD i = j
   rw [show List.range 4 = [0, 1, 2, 3] from rfl]

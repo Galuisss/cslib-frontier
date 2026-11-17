@@ -10,6 +10,8 @@ module
 public import CslibFrontier.Computability.Complexity.Problems.Graph.OrthogonalDrawing.Polygonal
 public import CslibFrontier.Computability.Complexity.Problems.Graph.OrthogonalDrawing.CardinalOrder
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Germs
+import CslibFrontier.Foundations.Data.List.ConsecutivePairs
+import Mathlib.Data.List.GetD
 
 /-!
 # Actual end-segment germs and executed integer neighbours
@@ -73,20 +75,20 @@ theorem IsPlanarOrthogonalDrawing.axisAligned_exitNeighbor
   · have he := hd.polygonalDrawing.endpoint_eq e false
     change complexPoint r[0] = complexPoint (drawingPosition G d (Dart.vertex (e, false))) at he
     rw [← complexPoint_injective he]
-    simp only [Bool.false_eq_true, ↓reduceIte,
-      List.getD_eq_getElem r (0, 0) (by omega : 1 < r.length)]
+    change AxisAligned r[0] (r.getD 1 (0, 0))
+    rw [List.getD_eq_getElem r (0, 0) (by omega : 1 < r.length)]
     exact horth _ (List.getElem_mem_consecutivePairs r 0 (by omega))
   · have he := hd.polygonalDrawing.endpoint_eq e true
     change complexPoint r[r.length - 2 + 1] =
       complexPoint (drawingPosition G d (Dart.vertex (e, true))) at he
     rw [← complexPoint_injective he]
-    simp only [↓reduceIte,
-      List.getD_eq_getElem r (0, 0) (by omega : r.length - 2 < r.length)]
+    change AxisAligned r[r.length - 2 + 1] (r.getD (r.length - 2) (0, 0))
+    rw [List.getD_eq_getElem r (0, 0) (by omega : r.length - 2 < r.length)]
     have hrev : IsOrthogonal r.reverse := (isOrthogonal_reverse_iff _).mpr horth
     have hp := hrev _ (List.getElem_mem_consecutivePairs r.reverse 0 (by
       simp only [List.length_reverse]; omega))
     simp only [List.getElem_reverse, Nat.sub_zero] at hp
-    convert hp using 1 <;> congr 1 <;> omega
+    convert hp using 1; congr 1; omega
 
 /-- The converted drawing's literal outgoing angle is exactly the rank read by the
 native program; no rotation or idealized ray is supplied. -/

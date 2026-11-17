@@ -57,7 +57,7 @@ theorem arg_eq_clockwiseRank {a b : Point} (hab : AxisAligned a b) :
       have hrank : clockwiseRank a b = 1 := by simp [clockwiseRank, direction, hn₁, hn₂, hp]
       rw [harg, hrank]
       congr 1
-      norm_num
+      ring
   · have hn : a.1 ≠ b.1 := fun h => hne (Prod.ext h hy)
     by_cases hp : a.1 < b.1
     · have harg : (complexPoint b - complexPoint a).arg = 0 := by

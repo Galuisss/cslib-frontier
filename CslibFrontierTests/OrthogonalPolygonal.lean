@@ -23,6 +23,8 @@ namespace CslibFrontierTests.OrthogonalPolygonal
 /-- One indexed edge with sparse original endpoint labels. -/
 def oneEdge : Graph := ⟨[7, 23], [(7, 23)]⟩
 
+private def edge : Fin oneEdge.edges.length := ⟨0, by simp [oneEdge]⟩
+
 private def reversedDrawing : OrthogonalDrawing :=
   ([(0, 0), (2, 0)], [[(2, 0), (0, 0)]])
 
@@ -57,11 +59,11 @@ private theorem validDrawing : IsPlanarOrthogonalDrawing oneEdge reversedDrawing
 example : validDrawing.polygonalDrawing.IsEmbedding :=
   validDrawing.isEmbedding_polygonalDrawing
 
-example : (validDrawing.polygonalDrawing.route 0).bends = 0 := rfl
+example : (validDrawing.polygonalDrawing.route edge).bends = 0 := rfl
 
-example : (validDrawing.polygonalDrawing.route 0).endpoint false =
+example : (validDrawing.polygonalDrawing.route edge).endpoint false =
     validDrawing.polygonalDrawing.vertex 7 :=
-  validDrawing.polygonalDrawing.endpoint_eq 0 false
+  validDrawing.polygonalDrawing.endpoint_eq edge false
 
 example : validDrawing.polygonalDrawing.vertex 7 ≠ validDrawing.polygonalDrawing.vertex 23 :=
   validDrawing.isEmbedding_polygonalDrawing.vertex_ne (by decide) (by decide) (by decide)

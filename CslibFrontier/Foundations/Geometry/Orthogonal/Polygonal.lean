@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Foundations.Geometry.Orthogonal.Simple
 public import CslibFrontier.Foundations.Geometry.Polygonal.Route
+import CslibFrontier.Foundations.Data.List.ConsecutivePairs
 import Mathlib.Analysis.Complex.Basic
 
 /-!
@@ -44,7 +45,13 @@ theorem complexPoint_injective : Function.Injective complexPoint :=
 @[expose] noncomputable def toPolygonalRoute (r : Route) (h : 2 ≤ r.length) :
     Polygonal.Route where
   bends := r.length - 2
-  point i := complexPoint r[i.val]'(by have := i.isLt; omega)
+  point i := complexPoint (r[i.val]'(by have := i.isLt; omega))
+
+private theorem segment_succ_lt (r : Route) (h : 2 ≤ r.length)
+    (i : Fin (toPolygonalRoute r h).segments) : i.val + 1 < r.length := by
+  have hi := i.isLt
+  change i.val < r.length - 2 + 1 at hi
+  omega
 
 /-- The first polygonal point is the original first listed point. -/
 @[simp] theorem start_toPolygonalRoute (r : Route) (h : 2 ≤ r.length) :
@@ -54,12 +61,15 @@ theorem complexPoint_injective : Function.Injective complexPoint :=
 theorem finish_toPolygonalRoute (r : Route) (h : 2 ≤ r.length) :
     (toPolygonalRoute r h).finish = complexPoint r[r.length - 1] := by
   change complexPoint r[r.length - 2 + 1] = _
-  congr 2 <;> omega
+  congr 2; omega
 
 private theorem segment_mem_toPolygonalRoute (r : Route) (h : 2 ≤ r.length)
     (i : Fin (toPolygonalRoute r h).segments) {t : ℝ} (ht : t ∈ Set.Icc 0 1) :
     Complex.equivRealProdCLM ((toPolygonalRoute r h).eval i t) ∈
-      segment r[i.val] r[i.val + 1] := by
+      segment (r[i.val]'((Nat.lt_succ_self _).trans (segment_succ_lt r h i)))
+        (r[i.val + 1]'(segment_succ_lt r h i)) := by
+  have hic := segment_succ_lt r h i
+  have hi : i.val < r.length := by omega
   have he := AffineMap.apply_lineMap Complex.equivRealProdCLM.toLinearMap.toAffineMap
     (complexPoint r[i.val]) (complexPoint r[i.val + 1]) t
   change Complex.equivRealProdCLM ((toPolygonalRoute r h).eval i t) =
@@ -72,9 +82,10 @@ private theorem segment_mem_toPolygonalRoute (r : Route) (h : 2 ≤ r.length)
 /-- Every real point on a converted segment belongs to the original continuous support. -/
 theorem eval_toPolygonalRoute_mem_support (r : Route) (h : 2 ≤ r.length)
     (i : Fin (toPolygonalRoute r h).segments) {t : ℝ} (ht : t ∈ Set.Icc 0 1) :
-    Complex.equivRealProdCLM ((toPolygonalRoute r h).eval i t) ∈ support r :=
-  Or.inr ⟨(r[i.val], r[i.val + 1]),
-    List.getElem_mem_consecutivePairs r i.val (by have := i.isLt; dsimp [toPolygonalRoute] at *; omega),
+    Complex.equivRealProdCLM ((toPolygonalRoute r h).eval i t) ∈ support r := by
+  have hic := segment_succ_lt r h i
+  have hi : i.val < r.length := by omega
+  exact Or.inr ⟨(r[i.val], r[i.val + 1]), List.getElem_mem_consecutivePairs r i.val hic,
     segment_mem_toPolygonalRoute r h i ht⟩
 
 private theorem point_injective_toPolygonalRoute {r : Route} (hr : r.Nodup)
@@ -118,21 +129,21 @@ theorem position_eq_of_eval_toPolygonalRoute_eq {r : Route} (hr : IsSimple r)
       omega
     exact congrArg ((toPolygonalRoute r h).position i)
       (AffineMap.lineMap_injective ℝ hne he)
-  · have hpair : (r[i.val], r[i.val + 1]) ≠ (r[j.val], r[j.val + 1]) := by
+  · have hic := segment_succ_lt r h i
+    have hjc := segment_succ_lt r h j
+    have hpair : (r[i.val], r[i.val + 1]) ≠ (r[j.val], r[j.val + 1]) := by
       intro hp
       apply hij
       exact Fin.ext (hr.1.getElem_inj_iff.mp (congrArg Prod.fst hp))
-    have hic : i.val + 1 < r.length := by have := i.isLt; dsimp [toPolygonalRoute] at *; omega
-    have hjc : j.val + 1 < r.length := by have := j.isLt; dsimp [toPolygonalRoute] at *; omega
     obtain ⟨hi, hj⟩ := hr.2 _ (List.getElem_mem_consecutivePairs r _ hic)
       _ (List.getElem_mem_consecutivePairs r _ hjc) hpair
       _ (segment_mem_toPolygonalRoute r h i hs)
       (he.symm ▸ segment_mem_toPolygonalRoute r h j ht)
     have hpoint (k : Fin (toPolygonalRoute r h).segments) (u : ℝ)
         (hk : Complex.equivRealProdCLM ((toPolygonalRoute r h).eval k u) =
-          realPoint r[k.val] ∨
+          realPoint (r[k.val]'((Nat.lt_succ_self _).trans (segment_succ_lt r h k))) ∨
           Complex.equivRealProdCLM ((toPolygonalRoute r h).eval k u) =
-            realPoint r[k.val + 1]) :
+            realPoint (r[k.val + 1]'(segment_succ_lt r h k))) :
         ∃ a : Fin ((toPolygonalRoute r h).bends + 2),
           (toPolygonalRoute r h).eval k u = (toPolygonalRoute r h).point a ∧
           (toPolygonalRoute r h).position k u = a.val := by

@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Computability.Complexity.Problems.Graph.OrthogonalDrawing.Routes
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing
 public import CslibFrontier.Foundations.Geometry.Orthogonal.Polygonal
+import Mathlib.Data.List.GetD
 
 /-!
 # Supplied orthogonal embeddings as polygonal embeddings
@@ -30,37 +31,22 @@ namespace Cslib.Complexity.Graph
 
 open Cslib.Orthogonal OrthogonalDrawing
 
-@[expose] private def forwardRoute (G : Graph) (d : OrthogonalDrawing) (i : ℕ) : Route :=
-  (sourceRoute G d i).reverse
-
-private theorem forwardRoute_length {G : Graph} {d : OrthogonalDrawing}
-    (hd : IsPlanarOrthogonalDrawing G d) (e : Fin G.edges.length) :
-    2 ≤ (forwardRoute G d e).length := by
-  simpa only [forwardRoute, List.length_reverse] using sourceRoute_length_ge_two hd e.isLt
-
-private theorem forwardRoute_simple {G : Graph} {d : OrthogonalDrawing}
-    (hd : IsPlanarOrthogonalDrawing G d) (e : Fin G.edges.length) :
-    IsSimple (forwardRoute G d e) :=
-  (isSimple_reverse_iff _).mpr (sourceRoute_regular hd e.isLt).2
-
-private theorem forwardRoute_support (G : Graph) (d : OrthogonalDrawing) (i : ℕ) :
-    support (forwardRoute G d i) = support (d.2.getD i []) := by
-  rw [forwardRoute, support_reverse, support_sourceRoute]
-
 /-- Convert a genuine supplied integer drawing to the existing polygonal drawing model,
 retaining the original listed graph, vertices and indexed edge occurrences. -/
 @[expose] noncomputable def IsPlanarOrthogonalDrawing.polygonalDrawing
     {G : Graph} {d : OrthogonalDrawing} (hd : IsPlanarOrthogonalDrawing G d) :
     PolygonalDrawing G where
   vertex v := complexPoint (drawingPosition G d v)
-  route e := toPolygonalRoute (forwardRoute G d e) (forwardRoute_length hd e)
+  route e := toPolygonalRoute (sourceRoute G d e).reverse
+    (by simpa only [List.length_reverse] using sourceRoute_length_ge_two hd e.isLt)
   endpoint_eq e side := by
     have he := sourceRoute_endpoints hd e.isLt
-    have hlen := forwardRoute_length hd e
-    have hhead : (forwardRoute G d e).head? = some (sourceFinish G d e) := by
-      simpa only [forwardRoute, List.head?_reverse] using he.2
-    have hlast : (forwardRoute G d e).getLast? = some (sourceStart G d e) := by
-      simpa only [forwardRoute, List.getLast?_reverse] using he.1
+    have hlen : 2 ≤ (sourceRoute G d e).reverse.length := by
+      simpa only [List.length_reverse] using sourceRoute_length_ge_two hd e.isLt
+    have hhead : (sourceRoute G d e).reverse.head? = some (sourceFinish G d e) := by
+      simpa only [List.head?_reverse] using he.2
+    have hlast : (sourceRoute G d e).reverse.getLast? = some (sourceStart G d e) := by
+      simpa only [List.getLast?_reverse] using he.1
     cases side
     · rw [List.head?_eq_getElem?, List.getElem?_eq_getElem (by omega)] at hhead
       change (toPolygonalRoute _ _).start = _
@@ -80,8 +66,10 @@ private theorem polygonalDrawing_eval_mem_support {G : Graph} {d : OrthogonalDra
     (i : Fin (hd.polygonalDrawing.route e).segments) {t : ℝ} (ht : t ∈ Set.Icc 0 1) :
     Complex.equivRealProdCLM ((hd.polygonalDrawing.route e).eval i t) ∈
       support (d.2.getD e []) := by
-  rw [← forwardRoute_support G d e]
-  exact eval_toPolygonalRoute_mem_support _ _ i ht
+  have hlen : 2 ≤ (sourceRoute G d e).reverse.length := by
+    simpa only [List.length_reverse] using sourceRoute_length_ge_two hd e.isLt
+  rw [← support_sourceRoute G d e, ← support_reverse (sourceRoute G d e)]
+  exact eval_toPolygonalRoute_mem_support _ hlen i ht
 
 private theorem polygonalDrawing_vertex_contact {G : Graph} {d : OrthogonalDrawing}
     (hd : IsPlanarOrthogonalDrawing G d) (e : Fin G.edges.length)
@@ -89,6 +77,9 @@ private theorem polygonalDrawing_vertex_contact {G : Graph} {d : OrthogonalDrawi
     (v : ℕ) (hv : v ∈ G.vertices)
     (he : (hd.polygonalDrawing.route e).eval i t = hd.polygonalDrawing.vertex v) :
     ∃ b, (hd.polygonalDrawing.route e).AtEnd i t b ∧ Dart.vertex (e, b) = v := by
+  have hlen : 2 ≤ (sourceRoute G d e).reverse.length := by
+    simpa only [List.length_reverse] using sourceRoute_length_ge_two hd e.isLt
+  have hsimple := (isSimple_reverse_iff _).mpr (sourceRoute_regular hd e.isLt).2
   have hs := polygonalDrawing_eval_mem_support hd e i ht
   have he' := congrArg Complex.equivRealProdCLM he
   change Complex.equivRealProdCLM ((hd.polygonalDrawing.route e).eval i t) =
@@ -101,19 +92,17 @@ private theorem polygonalDrawing_vertex_contact {G : Graph} {d : OrthogonalDrawi
       rw [List.getD_eq_getElem _ _ e.isLt]
       exact hfirst.symm
     refine ⟨false, ?_, hv'⟩
-    apply (eval_toPolygonalRoute_eq_endpoint_iff (forwardRoute_simple hd e)
-      (forwardRoute_length hd e) i t ht false).mp
-    rw [hd.polygonalDrawing.endpoint_eq, hv']
-    exact he
+    apply (eval_toPolygonalRoute_eq_endpoint_iff hsimple hlen i t ht false).mp
+    exact he.trans ((hd.polygonalDrawing.endpoint_eq e false).trans
+      (congrArg hd.polygonalDrawing.vertex hv')).symm
   · have hv' : Dart.vertex (e, true) = v := by
       unfold Dart.vertex edgeEndpoint
       rw [List.getD_eq_getElem _ _ e.isLt]
       exact hsecond.symm
     refine ⟨true, ?_, hv'⟩
-    apply (eval_toPolygonalRoute_eq_endpoint_iff (forwardRoute_simple hd e)
-      (forwardRoute_length hd e) i t ht true).mp
-    rw [hd.polygonalDrawing.endpoint_eq, hv']
-    exact he
+    apply (eval_toPolygonalRoute_eq_endpoint_iff hsimple hlen i t ht true).mp
+    exact he.trans ((hd.polygonalDrawing.endpoint_eq e true).trans
+      (congrArg hd.polygonalDrawing.vertex hv')).symm
 
 /-- Full real-support orthogonal drawing validity implies the actual polygonal embedding
 contract, with no supplied rotation or topological comparison premise. -/
@@ -122,7 +111,9 @@ theorem IsPlanarOrthogonalDrawing.isEmbedding_polygonalDrawing
     hd.polygonalDrawing.IsEmbedding where
   vertices_injective := fun _ hv _ hw he => drawingPosition_injOn hd hv hw
     (complexPoint_injective he)
-  simple e := isSimple_toPolygonalRoute (forwardRoute_simple hd e) (forwardRoute_length hd e)
+  simple e := isSimple_toPolygonalRoute
+    ((isSimple_reverse_iff _).mpr (sourceRoute_regular hd e.isLt).2)
+    (by simpa only [List.length_reverse] using sourceRoute_length_ge_two hd e.isLt)
   vertex_contacts := polygonalDrawing_vertex_contact hd
   edge_contacts e f hef i j s t hs ht he := by
     have hfirst := polygonalDrawing_eval_mem_support hd e i hs

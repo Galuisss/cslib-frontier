@@ -12,6 +12,7 @@ public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDra
 import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.CertificateLookup
 import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Realization.Converse
 import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Realization.Sectors
+import Mathlib.Data.List.GetD
 
 /-!
 # Correctness of the executed orthogonal clockwise table
@@ -48,7 +49,8 @@ private theorem successor_eq_of_realizes {G : Graph} {d : OrthogonalDrawing}
     have hs := hrank s
     dsimp only [step]
     omega
-  apply clockwiseSuccessor_eq_of_firstRay G d (Dart.indexEquiv G s).isLt hstep
+  have hsindex : s.index < 2 * G.edges.length := (Dart.indexEquiv G s).isLt
+  apply clockwiseSuccessor_eq_of_firstRay G d hsindex hstep
     (by simpa only [endpoint, Dart.vertex_index] using hsv) hsray
   · intro k hk b hb hv he
     let b' := (Dart.indexEquiv G).symm ⟨b, hb⟩
@@ -116,8 +118,10 @@ theorem rotationCertificate_eq_ofRotation {G : Graph} {d : OrthogonalDrawing}
   symm
   apply (RotationCertificate.ofRotation_eq_iff _ _).mpr
   refine ⟨length_rotationCertificate G d, fun a => ?_⟩
-  rw [List.getD_eq_getElem _ _ (by
-    rw [length_rotationCertificate]; exact (Dart.indexEquiv G a).isLt)]
+  have hi : a.index < (rotationCertificate G d).successor.length := by
+    rw [length_rotationCertificate]
+    exact (Dart.indexEquiv G a).isLt
+  rw [List.getD_eq_getElem _ _ hi]
   simp only [rotationCertificate, List.getElem_map, List.getElem_range]
   exact clockwiseSuccessor_eq_rotate hd a
 
@@ -129,13 +133,13 @@ theorem verifyGenusZero_rotationCertificate {G : Graph} {d : OrthogonalDrawing}
   have hG : ∀ v ∈ G.incidenceVertices, v ∈ G.vertices := by
     intro v hv
     obtain ⟨e, he, hv⟩ := List.mem_flatMap.mp hv
-    obtain rfl | rfl := by simpa only [List.mem_cons, List.mem_singleton] using hv
+    obtain rfl | rfl := by simpa using hv
     · exact (hd.endpointsDeclared e he).1
     · exact (hd.endpointsDeclared e he).2
   rw [rotationCertificate_eq_ofRotation hd]
   apply (RotationCertificate.verifyGenusZero_eq_true_iff _ _).mpr
   refine ⟨RotationCertificate.verifyRotation_ofRotation _ hG, ?_⟩
-  rw [RotationCertificate.decode_ofRotation]
+  rw [RotationCertificate.decode_ofRotation _ hG]
   exact hd.isEmbedding_polygonalDrawing.numericalGenusZero hG
     hd.isEmbedding_polygonalDrawing.realizes_rotation
 
