@@ -27,10 +27,9 @@ bits of `BitVec` words, those comparisons unfold the word operations before they
 On a fifteen-step chain they exhaust the default heartbeat budget.
 
 `synthesis_bool` constructs a singleton-output De Morgan synthesis certificate by composing
-constants, NOT, AND, OR and XOR. A conditional is also supported when its three inputs are
-already available. An available wire costs zero; every other operation uses its existing
-synthesis theorem, including the four-gate XOR and multiplexer constructions. The final generated
-cost must satisfy the original goal's bound. `synthesis_bool [f, g]` first unfolds the indicated
+constants, NOT, AND, OR and XOR. An available wire costs zero; every other operation uses its
+existing synthesis theorem, including the four-gate XOR construction. The final generated cost
+must satisfy the original goal's bound. `synthesis_bool [f, g]` first unfolds the indicated
 definitions. This is expression construction, not a minimizer: share a computed intermediate by
 adding it to a builder before using it in another construction.
 
@@ -109,8 +108,7 @@ macro_rules | `(tactic| synthesis_bool_search) => `(tactic| first
   | (solve | apply Cslib.Circuits.Synthesis.not; synthesis_bool_search)
   | (solve | apply Cslib.Circuits.Synthesis.and <;> synthesis_bool_search)
   | (solve | apply Cslib.Circuits.Synthesis.or <;> synthesis_bool_search)
-  | (solve | apply Cslib.Circuits.Synthesis.xor <;> synthesis_bool_search)
-  | (solve | apply Cslib.Circuits.Synthesis.mux <;> synthesis_available))
+  | (solve | apply Cslib.Circuits.Synthesis.xor <;> synthesis_bool_search))
 
 /-- Synthesize a Boolean expression over available wires and check the requested gate bound.
 Optional definitions are unfolded only in the goal; no circuit statement or budget is weakened. -/
