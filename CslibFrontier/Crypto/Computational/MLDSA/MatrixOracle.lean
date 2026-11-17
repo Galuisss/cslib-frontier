@@ -58,10 +58,12 @@ noncomputable def shortVectorLaw (s : Level) (rows : ℕ) : PMF (Fin rows → Po
 private def sampleSeed : ProbComp (FixedBytes 32) :=
   replicateFin 32 (ProbComp.unifFin 255)
 
-private def sampleMatrix (s : Level) : ProbComp (PublicMatrix s) :=
+/-- Sample every matrix coefficient independently by a uniform integer below the modulus. -/
+def sampleMatrix (s : Level) : ProbComp (PublicMatrix s) :=
   replicateFin s.params.k (replicateFin s.params.ℓ (replicateFin 256 (ProbComp.unifFin 8380416)))
 
-private theorem eval_sampleMatrix (s : Level) :
+/-- Sampling the matrix coefficientwise gives the uniform matrix law. -/
+@[simp] theorem eval_sampleMatrix (s : Level) :
     (sampleMatrix s).eval = PMF.uniformOfFintype (PublicMatrix s) := by
   change ProbComp.eval (replicateFin s.params.k (replicateFin s.params.ℓ
     (replicateFin 256 (ProbComp.unifFin 8380416)))) =

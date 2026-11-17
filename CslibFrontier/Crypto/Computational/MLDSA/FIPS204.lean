@@ -12,6 +12,7 @@ public import CslibFrontier.Crypto.Computational.SIS.SelfTargetFork
 public import CslibFrontier.Crypto.Primitives.ByteString
 public import CslibFrontier.Crypto.Primitives.Hash.Keccak.SHAKE128
 public import CslibFrontier.Probability.PMF
+import CslibFrontier.Crypto.Primitives.Hash.Keccak
 import CslibFrontier.Probability.PMF.Bind
 import CslibFrontier.Crypto.Game.Order
 import Mathlib.Order.Interval.Finset.Fin
@@ -51,6 +52,13 @@ abbrev Level.params (s : Level) : Params :=
     | .mlDSA65 => Params.mldsa65
     | .mlDSA87 => Params.mldsa87
   { p with n := 256, q := 8380417 }
+
+/-- Each FIPS parameter set satisfies the ring, challenge and rounding conditions. -/
+theorem Level.valid (s : Level) : s.params.Valid := by
+  cases s
+  · exact Params.valid_mldsa44
+  · exact Params.valid_mldsa65
+  · exact Params.valid_mldsa87
 
 /-- Byte length of the commitment digest (FIPS 204, Table 1, `2λ` bits). -/
 def digestBytes : Level → ℕ
@@ -310,6 +318,10 @@ def publicKey (s : Level) (bytes : List Byte)
     ((decodeRounded s bytes i j).val : ZMod 8380417) * 8192
   ⟨matrix, fun i j => t[i.val][j.val]⟩
 
+/-- Public-key decoding retains the matrix obtained from the published seed. -/
+@[simp] theorem publicKey_matrix (s : Level) (bytes : List Byte) (matrix : PublicMatrix s) :
+    (publicKey s bytes matrix).A = matrix := by simp [publicKey]
+
 private theorem highPart_range (r : ZMod 8380417) :
     0 ≤ (power2Round 8380417 13 r).1 ∧ (power2Round 8380417 13 r).1 < 1024 := by
   have h := power2Round_high_mul_add_low (d := 13) r
@@ -375,7 +387,15 @@ def commitmentDigest (s : Level) (w : Fin s.params.k → Fin 256 → ℤ) (μ : 
   Keccak.bitSponge Keccak.shake256Layout [true, true, true, true]
     (μ ++ Keccak.bytesToBitsLE packed) (digestBytes s)
 
-private def hintedCommitment (s : Level) (pk : MLDSA.PublicKey s.params)
+/-- Algorithm 8 computes the parameter set's specified number of digest bytes. -/
+@[simp] theorem length_commitmentDigest (s : Level) (w : Fin s.params.k → Fin 256 → ℤ)
+    (μ : List Bool) : (commitmentDigest s w μ).length = digestBytes s := by
+  unfold commitmentDigest
+  exact Keccak.length_bitSponge _ _ _ _
+
+/-- Algorithm 8 reconstructs the high commitment from the public key, response, hint and
+expanded challenge. -/
+@[expose] def hintedCommitment (s : Level) (pk : MLDSA.PublicKey s.params)
     (σ : Signature s) (c : Poly) : Fin s.params.k → Fin 256 → ℤ :=
   fun i => useHintVec s.params.q s.params.γ₂ (σ.h i)
     (moduleSISMap pk.A σ.z i - negacyclicMul c (pk.t i))
@@ -455,6 +475,26 @@ structure Forgery where
 def formattedMessage (f : Forgery) : List Bool :=
   Keccak.bytesToBitsLE (0 :: Fin.ofNat 256 f.context.length :: f.context) ++ f.message
 
+/-- Acceptance by the byte verifier for a matrix already expanded at the public seed,
+including the input lengths and the full commitment-digest equality. -/
+theorem verifyWithMatrix_eq_some_true_iff (s : Level) (bytes : List Byte) (A : PublicMatrix s)
+    (f : Forgery) :
+    verifyWithExpansion s (fun _ => some A) bytes f.message f.context f.signature = some true ↔
+      f.context.length ≤ 255 ∧ bytes.length = 32 + 320 * s.params.k ∧
+      ∃ σ c, sigDecode s f.signature = some σ ∧ sampleInBall s σ.digest = some c ∧
+        ResponseShort s.params σ.z ∧
+        commitmentDigest s (hintedCommitment s (publicKey s bytes A) σ c)
+          (messageRepresentative bytes (formattedMessage f)) = σ.digest := by
+  by_cases hctx : f.context.length ≤ 255 <;> by_cases hlen : bytes.length = 32 + 320 * s.params.k
+  · cases hd : sigDecode s f.signature with
+    | none => simp [verifyWithExpansion, verifyInternalWith, guard, hctx, hlen, hd]
+    | some σ =>
+      cases hc : sampleInBall s σ.digest with
+      | none => simp [verifyWithExpansion, verifyInternalWith, guard, hctx, hlen, hd, hc]
+      | some c => simp [verifyWithExpansion, verifyInternalWith, guard, hctx, hlen, hd, hc,
+          check, formattedMessage]
+  all_goals simp [verifyWithExpansion, verifyInternalWith, guard, hctx, hlen]
+
 private def candidate (s : Level) (pk : MLDSA.PublicKey s.params) (μ : List Bool)
     (σ : Signature s) (c : Poly) : SelfTargetCandidate s.params :=
   SelfTargetCandidate.ofCompressedForgery s.params 13 pk μ ⟨σ.z, σ.h, c⟩
@@ -515,12 +555,7 @@ private theorem solution_of_compressed {s : Level} {pk : MLDSA.PublicKey s.param
     (hv : compressedVerify s.params 13 (algebraicHash s) pk μ ⟨σ.z, σ.h, c⟩) :
     IsSelfTargetSolution s.params (selfTargetHash s.params (algebraicHash s))
       (compressedSelfTargetRadius s.params 13) pk (candidate s pk μ σ c) := by
-  have hvalid : s.params.Valid := by
-    cases s
-    · exact Params.valid_mldsa44
-    · exact Params.valid_mldsa65
-    · exact Params.valid_mldsa87
-  exact isSelfTargetSolution_of_compressedVerify hvalid
+  exact isSelfTargetSolution_of_compressedVerify s.valid
     (by cases s <;> decide : 4 * s.params.γ₂ < s.params.q) (by decide : 0 < 13) hv
 
 /-- Extraction for a full challenge `(A,t)`. The published bytes and message representative
@@ -624,7 +659,7 @@ theorem succProbability_verify_le_seededSelfTarget (s : Level)
 
 /-- Expand an oracle's fixed-length commitment digest by Algorithm 29, including XOF
 exhaustion at the Appendix C limit. -/
-def expandDigest (s : Level) (digest : FixedBytes (digestBytes s)) : Option Poly :=
+@[expose] def expandDigest (s : Level) (digest : FixedBytes (digestBytes s)) : Option Poly :=
   sampleInBall s digest.toList
 
 open ModuleSIS.SelfTarget in
