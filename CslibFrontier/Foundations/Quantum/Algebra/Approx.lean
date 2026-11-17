@@ -87,9 +87,6 @@ def Approx (φ : AlgState A) (δ : ℝ) (a b : A) : Prop :=
 
 variable {φ : AlgState A} {a b c a' b' : A} {δ δ' : ℝ}
 
-theorem approx_iff_close : (a ≈[φ; δ] b) ↔ a ≈[φ.toPreGNS.toLinearMap | δ] b :=
-  Iff.rfl
-
 theorem approx_iff : (a ≈[φ; δ] b) ↔ φ.norm (a - b) ≤ δ :=
   Iff.rfl
 

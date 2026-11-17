@@ -25,7 +25,8 @@ defect of the isometry, `‖P - w w*‖ ≤ 4ε`
 the first step of both proofs, the compression of the regular representation, in the
 state-dependent form used for rigidity of nonlocal games; it follows the first paragraph of the
 proof of [de la Salle, §1.5, Lemma 1.6][delaSalle2025] (p. 6). The dimension or isometry-defect
-control of the full stability theorem is not formalized here.
+control of the full stability theorem is not formalized here; it is tracked in
+[#6149](https://github.com/cslib-community/cslib-frontier/issues/6149) (milestone M2).
 
 Let `f : G → U(ℂ^ι)` be unitaries and `φ` a state. The right regular representation `g` on the
 second factor of `ℂ^ι ⊗ ℂ^G` (`Cslib.Quantum.regularRep`, the permutation matrices of
@@ -36,7 +37,7 @@ second factor of `ℂ^ι ⊗ ℂ^G` (`Cslib.Quantum.regularRep`, the permutation
 
 in every state (`Cslib.Quantum.expect_norm_sub_compress_sq_le`; with sums, in a vector state,
 `Cslib.Quantum.sum_vector_norm_sub_compress_le`). The proof needs no representation theory:
-`Vᴴ g(y) V = E_z f(z)ᴴ f(zy)` (`Cslib.Quantum.regularIsometry_compress_eq_expect`), so
+`Vᴴ g(y) V = E_z f(z)ᴴ f(zy)` (`Cslib.Quantum.regularIsometry_compress`), so
 `f(y) - Vᴴ g(y) V = E_z f(z)ᴴ (f(z) f(y) - f(zy))`, and the bound is Jensen's inequality with
 contractions for the state norm (`Cslib.Quantum.AlgState.norm_expect_mul_sq_le`). Before
 compressing, `V` intertwines `f` and `g` up to exactly the same error, for any matrices `f(x)` and
@@ -147,19 +148,23 @@ private theorem regularScale_sq :
   push_cast
   rfl
 
-/-- `Vᴴ g(y) V = E_z f(z)ᴴ f(zy)`. -/
+/-- **Compression of the regular representation**: `Vᴴ g(y) V = E_z f(z)ᴴ f(zy)`. -/
 theorem regularIsometry_compress (y : G) :
-    (regularIsometry f)ᴴ * regularRep y * regularIsometry f =
+    (regularIsometry f)ᴴ * regularRep y * regularIsometry f = 𝔼 z, (f z)ᴴ * f (z * y) := by
+  have h : (regularIsometry f)ᴴ * regularRep y * regularIsometry f =
       ((Fintype.card G : ℂ))⁻¹ • ∑ z, (f z)ᴴ * f (z * y) := by
-  ext j j'
-  rw [Matrix.mul_assoc, Matrix.mul_apply, Fintype.sum_prod_type, sum_comm, Matrix.smul_apply,
-    Matrix.sum_apply, smul_eq_mul, mul_sum]
-  refine sum_congr rfl fun z _ => ?_
-  rw [Matrix.mul_apply, mul_sum]
-  refine sum_congr rfl fun i _ => ?_
-  rw [regularRep_mul_apply, conjTranspose_apply, regularIsometry_apply, regularIsometry_apply,
-    conjTranspose_apply, star_mul', Complex.star_def, Complex.conj_ofReal, ← regularScale_sq]
-  ring
+    ext j j'
+    rw [Matrix.mul_assoc, Matrix.mul_apply, Fintype.sum_prod_type, sum_comm, Matrix.smul_apply,
+      Matrix.sum_apply, smul_eq_mul, mul_sum]
+    refine sum_congr rfl fun z _ => ?_
+    rw [Matrix.mul_apply, mul_sum]
+    refine sum_congr rfl fun i _ => ?_
+    rw [regularRep_mul_apply, conjTranspose_apply, regularIsometry_apply, regularIsometry_apply,
+      conjTranspose_apply, star_mul', Complex.star_def, Complex.conj_ofReal, ← regularScale_sq]
+    ring
+  rw [h, expect_univ, ← NNRat.cast_smul_eq_nnqsmul ℂ]
+  push_cast
+  rfl
 
 omit [DecidableEq G] in
 /-- The averaging isometry is an isometry when the `f(x)` are unitary. -/
@@ -167,9 +172,8 @@ theorem conjTranspose_regularIsometry_mul (hf : ∀ x, (f x)ᴴ * f x = 1) :
     (regularIsometry f)ᴴ * regularIsometry f = 1 := by
   classical
   have h := regularIsometry_compress f 1
-  simp only [regularRep_one, Matrix.mul_one, mul_one, hf, sum_const, card_univ] at h
-  rw [h, ← Nat.cast_smul_eq_nsmul ℂ, smul_smul, inv_mul_cancel₀ (by exact_mod_cast
-    Fintype.card_ne_zero), one_smul]
+  simp only [regularRep_one, Matrix.mul_one, mul_one, hf, Fintype.expect_const] at h
+  exact h
 
 /-- The rows of `V f(y) - g(y) V` are the multiplicative defects: row `(i, z)` is
 `|G|^{-1/2} (f(z) f(y) - f(zy))_i`. -/
@@ -208,13 +212,6 @@ theorem sum_norm_regularIsometry_mul_sub_eq (ψ : EuclideanSpace ℂ ι) :
   rw [sum_comm]
   field_simp
 
-/-- `Vᴴ g(y) V` as an average: `E_z f(z)ᴴ f(zy)`. -/
-theorem regularIsometry_compress_eq_expect (y : G) :
-    (regularIsometry f)ᴴ * regularRep y * regularIsometry f = 𝔼 z, (f z)ᴴ * f (z * y) := by
-  rw [regularIsometry_compress, expect_univ, ← NNRat.cast_smul_eq_nnqsmul ℂ]
-  push_cast
-  rfl
-
 open scoped MatrixOrder in
 /-- **Compression of the regular representation**, a step toward the Gowers–Hatami theorem
 (the first paragraph of the proof of [de la Salle, §1.5, Lemma 1.6][delaSalle2025]): for unitaries
@@ -229,7 +226,7 @@ theorem expect_norm_sub_compress_sq_le (φ : AlgState (Matrix ι ι ℂ))
   refine expect_le_expect fun y _ => ?_
   have hdiff : f y - (regularIsometry f)ᴴ * regularRep y * regularIsometry f =
       𝔼 x, (f x)ᴴ * (f x * f y - f (x * y)) := by
-    simp only [regularIsometry_compress_eq_expect, Matrix.mul_sub, ← Matrix.mul_assoc, hf,
+    simp only [regularIsometry_compress, Matrix.mul_sub, ← Matrix.mul_assoc, hf,
       Matrix.one_mul, expect_sub_distrib, expect_const univ_nonempty]
   rw [hdiff]
   exact φ.norm_expect_mul_sq_le _ fun x _ => by
@@ -252,7 +249,7 @@ theorem sum_vector_norm_sub_compress_le (hf : ∀ x, (f x)ᴴ * f x = 1) (ψ : E
 then `Vᴴ g(y) V = f(y)` for every `y`. -/
 theorem compress_eq_of_mul (hf : ∀ x, (f x)ᴴ * f x = 1) (hrep : ∀ x y, f x * f y = f (x * y))
     (y : G) : (regularIsometry f)ᴴ * regularRep y * regularIsometry f = f y := by
-  simp only [regularIsometry_compress_eq_expect, ← hrep, ← Matrix.mul_assoc, hf, Matrix.one_mul,
+  simp only [regularIsometry_compress, ← hrep, ← Matrix.mul_assoc, hf, Matrix.one_mul,
     expect_const univ_nonempty]
 
 end Cslib.Quantum

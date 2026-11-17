@@ -17,7 +17,7 @@ public import Mathlib.Algebra.Order.BigOperators.Group.Finset
 Approximation arguments compare elements of a vector space `A` that carries no norm of its own
 but a linear map `L : A → F` into a seminormed space. Two examples are the state seminorm of an
 operator algebra, through the GNS map, and averaged norms of families of operators, through a
-weighted `ℓ²` embedding. The relation `a ≈[L | δ] b` (`Cslib.Close`) says `‖L (a - b)‖ ≤ δ`. Its
+weighted map into `ℓ²`. The relation `a ≈[L | δ] b` (`Cslib.Close`) says `‖L (a - b)‖ ≤ δ`. Its
 calculus is proved once for every `L`:
 
 * errors add along chains (`Cslib.Close.trans`), with a `Trans` instance, so `calc` chains of
@@ -57,9 +57,6 @@ def Close (L : A →ₗ[𝕜] F) (δ : ℝ) (a b : A) : Prop :=
 @[inherit_doc] notation:50 a " ≈[" L " | " δ "] " b:50 => Close L δ a b
 
 variable {L : A →ₗ[𝕜] F} {a b c a' b' : A} {δ δ' : ℝ}
-
-theorem close_iff : (a ≈[L | δ] b) ↔ ‖L (a - b)‖ ≤ δ :=
-  Iff.rfl
 
 theorem close_self (L : A →ₗ[𝕜] F) (a : A) : a ≈[L | 0] a := by
   simp [Close]

@@ -31,8 +31,10 @@ where `f(s, a, b) = (-1)^s X(a) Z(b)` is the **Pauli family** on the Pauli group
 
 Two steps toward Theorem 14 are not formalized here: bounding the defect of the Pauli family by
 the consistency, linearity and anticommutation conditions, and passing from the products to the
-individual generators. The bound alone does not certify the generators: `X(a) = -X^a`,
-`Z(b) = -Z^b` give the Pauli strings as products, with defect `0`, but `X(0) = Z(0) = -1`.
+individual generators. Both are tracked in
+[#6149](https://github.com/cslib-community/cslib-frontier/issues/6149) (milestone M3). The bound
+alone does not certify the generators: `X(a) = -X^a`, `Z(b) = -Z^b` give the Pauli strings as
+products, with defect `0`, but `X(0) = Z(0) = -1`.
 
 The proof composes three steps:
 

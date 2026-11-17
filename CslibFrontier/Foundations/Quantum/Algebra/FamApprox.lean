@@ -14,29 +14,38 @@ public import Mathlib.Analysis.InnerProductSpace.PiL2
 # Closeness of families of measurements
 
 Rigidity arguments compare *families* of measurements `A = (A^q_a)_{q,a}`, indexed by a question
-`q` and an outcome `a`, in a state `φ` and under a question distribution `μ`. The relevant
-distance squares, sums over outcomes and averages over questions
-[Ji, Natarajan, Vidick, Wright and Yuen, §5.2, Definition 5.16][JNVWY2020]:
+`q` and an outcome `a`, in a state `φ` and under a question distribution `μ`. The source's relation
+[Ji, Natarajan, Vidick, Wright and Yuen, §5.2, Definition 5.16][JNVWY2020] (arXiv:2001.04383v4,
+p. 55) squares, sums over outcomes and averages over questions, for vector states, and bounds the
+result by `O(δ)`:
 
-`A ≈_δ B  :↔  E_{q ∼ μ} ∑_a ‖A^q_a - B^q_a‖²_φ ≤ δ`.
+`E_{q ∼ μ} ∑_a ‖(A^q_a - B^q_a) ψ‖² = O(δ)`.
 
-The relation `A ≈ᶠ[μ, φ; δ] B` (`Cslib.Quantum.FamApprox`) is the distance form: the square root
-of the left side is at most `δ`. It is the generic closeness `Cslib.Close` through the map
-`x ↦ (√μ(q) · x_{q,a})_{q,a}` into `ℓ²(Q × α)` over the GNS space of `φ`
-(`Cslib.Quantum.famL`), so it inherits the calculus of `Cslib.Close` and composes in `calc`
-chains. Per-question bounds turn into family closeness
+The relation `A ≈ᶠ[μ, φ; δ] B` (`Cslib.Quantum.FamApprox`) adapts it. It fixes an exact budget in
+place of `O(δ)`, bounds the *distance* rather than its square, so for `δ ≥ 0` it says
+`E_{q ∼ μ} ∑_a ‖A^q_a - B^q_a‖²_φ ≤ δ²` (`Cslib.Quantum.famApprox_iff`), and it allows families of
+arbitrary operators in an arbitrary state of an algebra. So the source's `A ≈_δ B` with constant
+`C` is `A ≈ᶠ[μ, φ; √(C δ)] B`, as for single operators in
+`CslibFrontier/Foundations/Quantum/Algebra/Approx.lean`.
+
+The relation is the generic closeness `Cslib.Close` through the weighted linear map
+`x ↦ (√μ(q) · x_{q,a})_{q,a}` into `ℓ²(Q × α)` over the GNS pre-inner-product space of `φ`
+(`Cslib.Quantum.famL`). This map need not be injective: questions outside the support of `μ`, and
+operators of state norm `0`, are invisible. The relation inherits the calculus of `Cslib.Close`
+and composes in `calc` chains. Per-question bounds turn into family closeness
 (`Cslib.Quantum.famApprox_of_forall`). For example, consistent measurements are close
 (`Cslib.Quantum.Measurement.famApprox_of_agreement`).
 
 ## Main definitions
 
-* `Cslib.Quantum.famL`: the weighted `ℓ²` embedding of families.
+* `Cslib.Quantum.famL`: the weighted linear map of families into `ℓ²`.
 * `Cslib.Quantum.FamApprox`: closeness of families, notation `A ≈ᶠ[μ, φ; δ] B`.
 * `Cslib.Quantum.Measurement.effects`: the effects of a family of measurements.
 
 ## Main results
 
-* `Cslib.Quantum.famApprox_iff`: `A ≈ᶠ[μ, φ; δ] B` iff `E_q ∑_a ‖A^q_a - B^q_a‖²_φ ≤ δ²`.
+* `Cslib.Quantum.famApprox_iff`: for `δ ≥ 0`, `A ≈ᶠ[μ, φ; δ] B` iff
+  `E_q ∑_a ‖A^q_a - B^q_a‖²_φ ≤ δ²`.
 * `Cslib.Quantum.famApprox_of_forall`: per-question bounds give family closeness.
 * `Cslib.Quantum.Measurement.famApprox_of_agreement`: consistency implies closeness, for families.
 
@@ -54,8 +63,9 @@ namespace Cslib.Quantum
 variable {A : Type*} [Ring A] [StarRing A] [PartialOrder A] [StarOrderedRing A] [Algebra ℂ A]
   [StarModule ℂ A] [SelfAdjointDecompose A] {Q α : Type*} [Fintype Q] [Fintype α]
 
-/-- The weighted `ℓ²` embedding `x ↦ (√μ(q) · x_{q,a})_{q,a}` of families into
-`ℓ²(Q × α; GNS(φ))`. Its norm is `√(E_{q∼μ} ∑_a ‖x_{q,a}‖²_φ)` (`Cslib.Quantum.norm_famL_sq`). -/
+/-- The weighted linear map `x ↦ (√μ(q) · x_{q,a})_{q,a}` of families into `ℓ²(Q × α)` over the
+GNS pre-inner-product space of `φ`. Its norm is `√(E_{q∼μ} ∑_a ‖x_{q,a}‖²_φ)`
+(`Cslib.Quantum.norm_famL_sq`); it need not be injective. -/
 noncomputable def famL (μ : PMF Q) (φ : AlgState A) :
     (Q → α → A) →ₗ[ℂ] PiLp 2 (fun _ : Q × α => φ.toPositiveLinearMap.PreGNS) where
   toFun x := WithLp.toLp 2 fun p => (√(μ p.1).toReal : ℂ) • φ.toPreGNS (x p.1 p.2)
@@ -73,8 +83,8 @@ theorem norm_famL_sq (μ : PMF Q) (φ : AlgState A) (x : Q → α → A) :
   rfl
 
 /-- `x` and `y` are `δ`-close as families in the state `φ` under the question distribution `μ`:
-`E_{q∼μ} ∑_a ‖x_{q,a} - y_{q,a}‖²_φ ≤ δ²`. A named relation, so that it elaborates under
-binders. -/
+`‖famL μ φ (x - y)‖ ≤ δ`, which for `δ ≥ 0` is `E_{q∼μ} ∑_a ‖x_{q,a} - y_{q,a}‖²_φ ≤ δ²`
+(`Cslib.Quantum.famApprox_iff`). A named relation, so that it elaborates under binders. -/
 def FamApprox (μ : PMF Q) (φ : AlgState A) (δ : ℝ) (x y : Q → α → A) : Prop :=
   x ≈[famL μ φ | δ] y
 
