@@ -30,9 +30,10 @@ arbitrary operators in an arbitrary state of an algebra. So the source's `A ≈_
 
 The relation is the generic closeness `Cslib.Close` through the weighted linear map
 `x ↦ (√μ(q) · x_{q,a})_{q,a}` into `ℓ²(Q × α)` over the GNS pre-inner-product space of `φ`
-(`Cslib.Quantum.famL`). This map need not be injective: questions outside the support of `μ`, and
-operators of state norm `0`, are invisible. The relation inherits the calculus of `Cslib.Close`
-and composes in `calc` chains. Per-question bounds turn into family closeness
+(`Cslib.Quantum.famL`).
+This map may discard the questions of probability `0`, so it need not be injective; separately, its
+seminorm does not distinguish operators of state norm `0`. The relation inherits the calculus of
+`Cslib.Close` and composes in `calc` chains. Per-question bounds turn into family closeness
 (`Cslib.Quantum.famApprox_of_forall`). For example, consistent measurements are close
 (`Cslib.Quantum.Measurement.famApprox_of_agreement`).
 
@@ -65,7 +66,7 @@ variable {A : Type*} [Ring A] [StarRing A] [PartialOrder A] [StarOrderedRing A] 
 
 /-- The weighted linear map `x ↦ (√μ(q) · x_{q,a})_{q,a}` of families into `ℓ²(Q × α)` over the
 GNS pre-inner-product space of `φ`. Its norm is `√(E_{q∼μ} ∑_a ‖x_{q,a}‖²_φ)`
-(`Cslib.Quantum.norm_famL_sq`); it need not be injective. -/
+(`Cslib.Quantum.norm_famL_sq`). It discards the questions of probability `0`. -/
 noncomputable def famL (μ : PMF Q) (φ : AlgState A) :
     (Q → α → A) →ₗ[ℂ] PiLp 2 (fun _ : Q × α => φ.toPositiveLinearMap.PreGNS) where
   toFun x := WithLp.toLp 2 fun p => (√(μ p.1).toReal : ℂ) • φ.toPreGNS (x p.1 p.2)
