@@ -427,7 +427,6 @@ def xmssPkFromSigWithLedger (family : HashFamily) {p : SecurityBytes}
         staticDescription := staticDescriptionLedger p shape } }
 
 /-- FIPS 205 Algorithm 11 as the output projection of its instrumented evaluator. -/
-@[expose]
 def xmssPkFromSig (family : HashFamily) {p : SecurityBytes} {shape : ParameterShape}
     (idx : LeafIndex p shape) (sig : Signature p shape) (M : WOTS.Message p)
     (publicSeed : NBytes p) (address : Address) : NBytes p :=
@@ -447,6 +446,6 @@ theorem xmssPkFromSigWithLedger_output (family : HashFamily) {p : SecurityBytes}
     (M : WOTS.Message p) (publicSeed : NBytes p) (address : Address) :
     (xmssPkFromSigWithLedger family idx sig M publicSeed address).output =
       xmssPkFromSig family idx sig M publicSeed address :=
-  rfl
+  (rfl)
 
 end Cslib.Crypto.SLHDSA.XMSS
