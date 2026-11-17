@@ -175,7 +175,6 @@ import CslibFrontier.Crypto.Computational.GoldreichLevin.HardCore
 import CslibFrontier.Crypto.Computational.InaccessibleEntropy.OneWay
 import CslibFrontier.Crypto.Primitives.PRG.ReadOnceBias
 import CslibFrontier.Crypto.Computational.InaccessibleEntropy.TargetCollision
-import CslibFrontier.Crypto.Computational.MLDSA.KeyOnly
 import CslibFrontier.Crypto.Computational.NaorYungUOWHF
 import CslibFrontier.Crypto.Computational.Nonuniform.ZeroKnowledge
 import CslibFrontier.Crypto.Computational.OneWay.LiuPass
@@ -5619,31 +5618,6 @@ register_result "ajtai-collision-sis" where
     for expected time T(n, m, q); (5) the cost of sampling the key and of evaluating the \
     hash is not certified; (6) worst-case lattice hardness (the source's Theorem 1, after \
     Ajtai) is not formalized."
-
-register_result "mldsa-key-only-forgery" where
-  title := "ML-DSA key-only unforgeability from Module-LWE and self-target MSIS"
-  topic := "cryptography"
-  sources := [
-    { paper := DucasEtAl2018, theorem := unverified, locator := unverified },
-    { paper := NISTFIPS204, theorem := unverified, locator := unverified }
-  ]
-  theorems := [
-    Cslib.Crypto.MLDSA.isSelfTargetSolution_of_verify,
-    Cslib.Crypto.MLDSA.succProbability_koaGame_le_selfTargetGame,
-    Cslib.Crypto.MLDSA.succProbability_koaGame_le
-  ]
-  scope := "Key-only attacks (no signing queries) on ML-DSA verification with valid parameters \
-    and a fixed hash H. A verifying forgery yields a self-target MSIS solution for \
-    [I_k | A | -t] with hash H(HighBits(·), ·) and bound max γ₁ γ₂. For honest keys with \
-    secret coefficients drawn independently from an arbitrary law, the forger's success \
-    probability is at most the advantage of forgeryDistinguisher between honest and uniform \
-    keys plus the success probability of selfTargetReduction against a uniform [A | t]. \
-    Hardness of self-target MSIS is the assumption, not reduced to Module-SIS; the honest-key \
-    term is the Module-LWE advantage for the short laws, the quantity of the short-secret \
-    assumption DecisionModuleLWEWith rather than the uniform-secret DecisionModuleLWE. \
-    Chosen-message security \
-    (signing-oracle simulation in the random-oracle model) and asymptotic packaging are not \
-    formalized; no running time is charged."
 
 register_result "ctr-mode-cpa" where
   title := "CTR mode is CPA-secure for a pseudorandom function"

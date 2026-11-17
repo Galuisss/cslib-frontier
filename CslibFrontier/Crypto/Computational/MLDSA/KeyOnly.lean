@@ -302,7 +302,7 @@ theorem succProbability_koaGame_le_selfTargetGame (hP : P.Valid) (keys : PMF (Pu
   · rw [Bool.not_eq_true] at hv
     simp [hv]
 
-/-- **Key-only unforgeability from Module-LWE and self-target MSIS.** Against honest keys, the
+/-- **Finite key-only bound in the uncompressed, fixed-hash model.** Against its honest keys, the
 success probability of a key-only forger is at most the Module-LWE advantage of
 `forgeryDistinguisher`, with secret and error drawn coefficientwise from `secret`, plus the success
 probability of `selfTargetReduction` against self-target MSIS for a uniform matrix `[A | t]`. -/
