@@ -60,4 +60,25 @@ example (old : Bool) :
       measureProb (readBit old) {((), old, ())} = 1 := by
   cases old <;> norm_num [Fintype.expect_eq_sum_div_card, storedBit, Fintype.sum_bool]
 
+-- The retained response now chooses the address to refresh. A false response selects the
+-- previously queried address, while a true response selects the untouched second address.
+private noncomputable def readFirst (old : Bool) : ValueState Bool Bool Unit :=
+  runValue addStep (fun _ => LinearIsometry.id) (ket (false, false, ())) (fun _ => old) 1
+
+private theorem branchScore (old msg current : Bool) :
+    measureProb (projOutcomes (fun x => x.2.1 = msg) (readFirst old)) {(false, current, ())} =
+      if old = msg ∧ old = current then 1 else 0 := by
+  cases old <;> cases msg <;> cases current <;>
+    simp [readFirst, runValue, measureProb, valueOracle_apply, addStep_apply, Bool.zero_eq_false]
+
+open scoped BigOperators in
+example (old : Bool) :
+    (𝔼 fresh : Bool, ∑ msg : Bool,
+      measureProb (projOutcomes (fun x => x.2.1 = msg) (readFirst old))
+        {(false, Function.update (fun _ => old) msg fresh false, ())}) =
+      if old then 1 else (1 / 2 : ℝ) := by
+  rw [Fintype.expect_eq_sum_div_card]
+  simp only [Fintype.sum_bool, branchScore]
+  cases old <;> norm_num [Function.update]
+
 end CslibFrontierTests.QuantumSearch
