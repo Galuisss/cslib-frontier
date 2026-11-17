@@ -9,6 +9,8 @@ module
 
 public import CslibFrontier.Crypto.Primitives.SLHDSA.WOTS.PublicKeyFromSignature
 
+set_option linter.privateModule false
+
 /-!
 # Checked clients for FIPS 205 WOTS+ chaining and public-key reconstruction
 
@@ -43,7 +45,11 @@ example (family : HashFamily) (p : SecurityBytes) :
 example (family : HashFamily) (p : SecurityBytes) :
     chain family (zeroBytes p) 4 1 (zeroBytes p) hashAddress hashAddress_valid (by decide) =
       f family (zeroBytes p) (hashAddress.setHashAddress 4) (zeroBytes p) :=
-  chain_succ family (zeroBytes p) 4 0 (zeroBytes p) hashAddress hashAddress_valid (by decide)
+  by
+    convert chain_succ family (zeroBytes p) 4 0 (zeroBytes p) hashAddress hashAddress_valid
+      (by decide) using 1
+    congr 3
+    simp only [chain_zero]
 
 example (family : HashFamily) (p : SecurityBytes) :
     chain family
@@ -91,7 +97,7 @@ private def recompute (family : HashFamily) (p : SecurityBytes) : NBytes p :=
       chain family (zeroSignature p i) (digits (zeroMessage p) i).val
         (w - 1 - (digits (zeroMessage p) i).val) (zeroBytes p)
         (hashAddress.setChainAddress ⟨i, i.isLt.trans_le ((len_le_67 p).trans (by decide))⟩)
-        (by decide) (by
+        (by simpa only [ValidHashAddress, Address.setChainAddress] using hashAddress_valid) (by
           unfold ValidChainRange
           have hi := (digits (zeroMessage p) i).isLt
           omega))
@@ -100,7 +106,7 @@ private def recompute (family : HashFamily) (p : SecurityBytes) : NBytes p :=
         chain family (zeroSignature p i) (digits (zeroMessage p) i).val
           (w - 1 - (digits (zeroMessage p) i).val) (zeroBytes p)
           (hashAddress.setChainAddress ⟨i, i.isLt.trans_le ((len_le_67 p).trans (by decide))⟩)
-          (by decide) (by
+          (by simpa only [ValidHashAddress, Address.setChainAddress] using hashAddress_valid) (by
             unfold ValidChainRange
             have hi := (digits (zeroMessage p) i).isLt
             omega))
