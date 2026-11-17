@@ -48,6 +48,7 @@ inductive SecurityBytes where
 namespace SecurityBytes
 
 /-- The security-element and message length `n`, in bytes. -/
+@[expose]
 def count : SecurityBytes → ℕ
   | .bytes16 => 16
   | .bytes24 => 24

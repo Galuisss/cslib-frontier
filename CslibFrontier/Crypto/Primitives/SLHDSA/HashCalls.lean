@@ -89,7 +89,7 @@ def shakeInput {p : SecurityBytes} {m : ℕ} (publicSeed : NBytes p)
 @[simp] theorem length_shakeInput {p : SecurityBytes} {m : ℕ} (publicSeed : NBytes p)
     (address : Address) (message : FixedBytes m) :
     (shakeInput publicSeed address message).length = p.count + 32 + m := by
-  simp [shakeInput]
+  simp [shakeInput, Nat.add_assoc]
 
 /-- The exact SHA2 input `PK.seed || toByte(0, b - n) || ADRS^c || X`.
 
@@ -139,12 +139,12 @@ private def shakeFixed (input : List Byte) (outputBytes : ℕ) : FixedBytes outp
     (Keccak.length_shake256 input outputBytes)
 
 private def sha256Truncated {p : SecurityBytes} (input : List Byte)
-    (hinput : SHA2.ValidSHA256Input input) : NBytes p :=
-  (SHA2.sha256 input hinput).take p.count p.count_le_32
+    (_hinput : SHA2.ValidSHA256Input input) : NBytes p :=
+  fun i => SHA2.sha256 input (Fin.castLE p.count_le_32 i)
 
 private def sha512Truncated {p : SecurityBytes} (input : List Byte)
-    (hinput : SHA2.ValidSHA512Input input) : NBytes p :=
-  (SHA2.sha512 input hinput).take p.count (p.count_le_32.trans (by decide))
+    (_hinput : SHA2.ValidSHA512Input input) : NBytes p :=
+  fun i => SHA2.sha512 input (Fin.castLE (p.count_le_32.trans (by decide)) i)
 
 private def addressedOneBlock (family : HashFamily) {p : SecurityBytes}
     (publicSeed : NBytes p) (address : Address) (message : NBytes p) : NBytes p :=
@@ -152,7 +152,7 @@ private def addressedOneBlock (family : HashFamily) {p : SecurityBytes}
   | .shake => shakeFixed (shakeInput publicSeed address message) p.count
   | .sha2 =>
       sha256Truncated (sha256Input publicSeed address message) (by
-        cases p <;> norm_num [SHA2.ValidSHA256Input])
+        cases p <;> norm_num [SecurityBytes.count, SHA2.ValidSHA256Input])
 
 /-- FIPS 205 `PRF(PK.seed, SK.seed, ADRS)` from Sections 11.1--11.2.2. -/
 def prf (family : HashFamily) {p : SecurityBytes} (publicSeed secretSeed : NBytes p)
@@ -160,9 +160,10 @@ def prf (family : HashFamily) {p : SecurityBytes} (publicSeed secretSeed : NByte
   addressedOneBlock family publicSeed address secretSeed
 
 /-- FIPS 205 `F(PK.seed, ADRS, M_1)` from Sections 11.1--11.2.2. -/
+@[expose]
 def f (family : HashFamily) {p : SecurityBytes} (publicSeed : NBytes p)
     (address : Address) (message : NBytes p) : NBytes p :=
-  addressedOneBlock family publicSeed address message
+  prf family publicSeed message address
 
 /-- `PRF` and `F` use the same concrete hash call when their final `n`-byte inputs agree. -/
 theorem prf_eq_f (family : HashFamily) {p : SecurityBytes}
@@ -170,27 +171,12 @@ theorem prf_eq_f (family : HashFamily) {p : SecurityBytes}
     prf family publicSeed secretSeed address = f family publicSeed address secretSeed :=
   rfl
 
-/-- FIPS 205 `H(PK.seed, ADRS, M_2)` from Sections 11.1--11.2.2. -/
-def h (family : HashFamily) {p : SecurityBytes} (publicSeed : NBytes p)
-    (address : Address) (message : TwoNBytes p) : NBytes p :=
-  match family, p with
-  | .shake, _ => shakeFixed (shakeInput publicSeed address message) p.count
-  | .sha2, .bytes16 =>
-      sha256Truncated (sha256Input publicSeed address message) (by
-        norm_num [SHA2.ValidSHA256Input])
-  | .sha2, .bytes24 =>
-      sha512Truncated (sha512Input publicSeed address message) (by
-        norm_num [SHA2.ValidSHA512Input])
-  | .sha2, .bytes32 =>
-      sha512Truncated (sha512Input publicSeed address message) (by
-        norm_num [SHA2.ValidSHA512Input])
-
 /-- The source-domain obligation for an arbitrary `T_l` call.
 
 SHAKE256 accepts every finite byte string. For SHA2, the obligation is exactly the input predicate
 of the SHA-256 or SHA-512 branch selected by FIPS 205. It is a proof precondition, not a new
 runtime failure in the standard. -/
-def ValidTInput (family : HashFamily) {p : SecurityBytes} {l : ℕ}
+@[expose] def ValidTInput (family : HashFamily) {p : SecurityBytes} {l : ℕ}
     (publicSeed : NBytes p) (address : Address) (message : LBlocksBytes p l) : Prop :=
   match family, p with
   | .shake, _ => True
@@ -211,24 +197,34 @@ theorem validTInput_of_blocks_le_67 (family : HashFamily) {p : SecurityBytes} {l
     (publicSeed : NBytes p) (address : Address) (message : LBlocksBytes p l)
     (hl : l ≤ 67) : ValidTInput family publicSeed address message := by
   cases family <;> cases p <;>
-    norm_num [ValidTInput, SHA2.ValidSHA256Input, SHA2.ValidSHA512Input] at * <;>
+    norm_num [SecurityBytes.count, ValidTInput, SHA2.ValidSHA256Input,
+      SHA2.ValidSHA512Input] at * <;>
     omega
 
 /-- FIPS 205 `T_l(PK.seed, ADRS, M_l)` from Sections 11.1--11.2.2. -/
 def tL (family : HashFamily) {p : SecurityBytes} (l : ℕ) (publicSeed : NBytes p)
     (address : Address) (message : LBlocksBytes p l)
     (hinput : ValidTInput family publicSeed address message) : NBytes p :=
-  match family, p with
-  | .shake, _ => shakeFixed (shakeInput publicSeed address message) p.count
-  | .sha2, .bytes16 =>
-      sha256Truncated (sha256Input publicSeed address message) (by
-        simpa [ValidTInput] using hinput)
-  | .sha2, .bytes24 =>
-      sha512Truncated (sha512Input publicSeed address message) (by
-        simpa [ValidTInput] using hinput)
-  | .sha2, .bytes32 =>
-      sha512Truncated (sha512Input publicSeed address message) (by
-        simpa [ValidTInput] using hinput)
+  match family with
+  | .shake => shakeFixed (shakeInput publicSeed address message) p.count
+  | .sha2 =>
+      match p with
+      | .bytes16 =>
+          sha256Truncated (sha256Input publicSeed address message) (by
+            simpa [ValidTInput] using hinput)
+      | .bytes24 =>
+          sha512Truncated (sha512Input publicSeed address message) (by
+            simpa [ValidTInput] using hinput)
+      | .bytes32 =>
+          sha512Truncated (sha512Input publicSeed address message) (by
+            simpa [ValidTInput] using hinput)
+
+/-- FIPS 205 `H(PK.seed, ADRS, M_2)` from Sections 11.1--11.2.2. -/
+@[expose]
+def h (family : HashFamily) {p : SecurityBytes} (publicSeed : NBytes p)
+    (address : Address) (message : TwoNBytes p) : NBytes p :=
+  tL family 2 publicSeed address message
+    (validTInput_of_blocks_le_67 family publicSeed address message (by decide))
 
 /-- `H` is exactly the two-block instance of `T_l`. -/
 theorem h_eq_tL_two (family : HashFamily) {p : SecurityBytes} (publicSeed : NBytes p)

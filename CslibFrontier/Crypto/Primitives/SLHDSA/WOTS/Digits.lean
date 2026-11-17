@@ -134,7 +134,8 @@ theorem message_base2bInput {p : SecurityBytes} (M : Message p) :
     Base2bInput (messageByteString M) lgW (len1 p) := by
   unfold Base2bInput messageByteString
   rw [List.length_ofFn]
-  cases p <;> decide
+  norm_num [len1, lgW]
+  omega
 
 /-- The `len1 = 2n` base-16 message digits from line 2 of Algorithms 7 and 8. -/
 def messageDigits {p : SecurityBytes} (M : Message p) : Fin (len1 p) → Digit :=
@@ -150,7 +151,9 @@ theorem checksum_lt {p : SecurityBytes} (M : Message p) : checksum M < 2 ^ (len2
     unfold checksum
     exact Finset.sum_le_sum fun _i _hi => Nat.sub_le _ _
   have hcount : len1 p * (w - 1) < 2 ^ (len2 * lgW) := by
-    cases p <;> decide
+    have hp := p.count_le_32
+    norm_num [len1, w, len2, lgW] at *
+    omega
   calc
     checksum M ≤ Finset.univ.sum (fun _i : Fin (len1 p) => w - 1) := hle
     _ = len1 p * (w - 1) := by simp
