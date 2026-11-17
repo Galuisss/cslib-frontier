@@ -48,8 +48,8 @@ full native success-law equality, or a QPT security theorem.
   and erased second stage run on the retained ciphertext and saved first-stage memory while
   acting as the identity on the protected hidden bit and an arbitrary external reference.
 * `Cslib.Crypto.HQC.partialTraceLeft_b2ServiceEnvironment_fullReply`: discarding the actual
-  reversible service environment dephases exactly the complete hidden-bit-and-ciphertext reply,
-  while retaining an arbitrary reference and a reply-controlled continuation.
+  reversible service environment traces out the complete message-pair-and-hidden-bit request and
+  groups the remaining state by complete hidden-bit-and-ciphertext reply.
 
 ## References
 
@@ -981,14 +981,15 @@ theorem matrix_b2ReplyCopySecondStage_withReference (P : PKEParams)
       by_cases hreference : referenceOut = referenceIn <;>
         simp [hreply, hsaved, hreference]
 
-/-- **The actual reversible B2 service dephases exactly its complete reply.**  For a fixed
-truncated-syndrome sample, the discarded service environment distinguishes every two-message
-request and hidden bit while the retained record contains the complete `[hidden bit | u | v]`
-reply emitted by the service.  The identity accepts an arbitrary, possibly entangled state on
-the request, hidden bit and saved reference, and permits a full-reply-selected continuation on
-that reference; no product-state or independence hypothesis is used. To preserve an inaccessible
-subfactor, that continuation must be instantiated as the active continuation tensored with its
-identity.
+/-- **The actual reversible B2 service discards its full request and records its complete reply.**
+For a fixed truncated-syndrome sample, the discarded service environment is injective in the
+two-message request and hidden bit. Tracing it therefore removes all cross-request coherence,
+including between distinct requests that emit the same retained reply. The retained record is the
+complete `[hidden bit | u | v]` reply emitted by the service. The identity accepts an arbitrary,
+possibly entangled state on the request, hidden bit and saved reference, and permits a
+full-reply-selected continuation on that reference; no product-state or independence hypothesis
+is used. To preserve an inaccessible subfactor, that continuation must be instantiated as the
+active continuation tensored with its identity.
 
 The original hidden register is part of the discarded service environment, rather than being
 duplicated in the output. The continuation acts only on the saved reference factor; in the B2
@@ -1114,47 +1115,19 @@ theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
     have htail :
         List.ofFn messagesLeft.msg₀ ++ (List.ofFn messagesLeft.msg₁ ++ [hiddenLeft]) =
           List.ofFn messagesRight.msg₀ ++ (List.ofFn messagesRight.msg₁ ++ [hiddenRight]) := by
-      apply List.append_right_injective
-        (encPair encUnary encBits (securityParameter, sample.toWord))
-      simpa only [requestWord, List.append_assoc] using hword
+      exact (List.append_inj
+        (by simpa only [requestWord, List.append_assoc] using hword) rfl).2
+    have hrequestParts := List.append_inj htail (by simp only [List.length_ofFn])
     have hmessageZeroList :
-        List.ofFn messagesLeft.msg₀ = List.ofFn messagesRight.msg₀ := by
-      calc
-        List.ofFn messagesLeft.msg₀ =
-            List.take (List.ofFn messagesLeft.msg₀).length
-              (List.ofFn messagesLeft.msg₀ ++
-                (List.ofFn messagesLeft.msg₁ ++ [hiddenLeft])) :=
-          List.take_append_length.symm
-        _ = List.take (List.ofFn messagesLeft.msg₀).length
-              (List.ofFn messagesRight.msg₀ ++
-                (List.ofFn messagesRight.msg₁ ++ [hiddenRight])) := congrArg _ htail
-        _ = List.take (List.ofFn messagesRight.msg₀).length
-              (List.ofFn messagesRight.msg₀ ++
-                (List.ofFn messagesRight.msg₁ ++ [hiddenRight])) := by
-          simp only [List.length_ofFn]
-        _ = List.ofFn messagesRight.msg₀ := List.take_append_length
+        List.ofFn messagesLeft.msg₀ = List.ofFn messagesRight.msg₀ := hrequestParts.1
     have hrest :
         List.ofFn messagesLeft.msg₁ ++ [hiddenLeft] =
-          List.ofFn messagesRight.msg₁ ++ [hiddenRight] := by
-      rw [hmessageZeroList] at htail
-      exact List.append_right_injective (List.ofFn messagesRight.msg₀) htail
+          List.ofFn messagesRight.msg₁ ++ [hiddenRight] := hrequestParts.2
+    have hhiddenParts := List.append_inj hrest (by simp only [List.length_ofFn])
     have hmessageOneList :
-        List.ofFn messagesLeft.msg₁ = List.ofFn messagesRight.msg₁ := by
-      calc
-        List.ofFn messagesLeft.msg₁ =
-            List.take (List.ofFn messagesLeft.msg₁).length
-              (List.ofFn messagesLeft.msg₁ ++ [hiddenLeft]) :=
-          List.take_append_length.symm
-        _ = List.take (List.ofFn messagesLeft.msg₁).length
-              (List.ofFn messagesRight.msg₁ ++ [hiddenRight]) := congrArg _ hrest
-        _ = List.take (List.ofFn messagesRight.msg₁).length
-              (List.ofFn messagesRight.msg₁ ++ [hiddenRight]) := by
-          simp only [List.length_ofFn]
-        _ = List.ofFn messagesRight.msg₁ := List.take_append_length
+        List.ofFn messagesLeft.msg₁ = List.ofFn messagesRight.msg₁ := hhiddenParts.1
     have hhidden : hiddenLeft = hiddenRight := by
-      rw [hmessageOneList] at hrest
-      have hsingleton := List.append_right_injective (List.ofFn messagesRight.msg₁) hrest
-      exact (List.cons.inj hsingleton).1
+      exact (List.cons.inj hhiddenParts.2).1
     have hmessages : messagesLeft = messagesRight :=
       MessagePair.equivProd.injective
         (Prod.ext (List.ofFn_injective hmessageZeroList)
@@ -1180,20 +1153,6 @@ theorem partialTraceLeft_b2ServiceEnvironment_fullReply (P : PKEParams)
           (requestWord requestRight).length) false at hbits
   have hlength : (requestWord requestLeft).length = (requestWord requestRight).length := by
     simp only [requestWord, List.length_append, List.length_ofFn, List.length_singleton]
-  calc
-    requestWord requestLeft =
-        List.take (requestWord requestLeft).length
-          (requestWord requestLeft ++
-            List.replicate ((b2ServiceDescription P securityParameter encoder).width -
-              (requestWord requestLeft).length) false) := List.take_append_length.symm
-    _ = List.take (requestWord requestLeft).length
-          (requestWord requestRight ++
-            List.replicate ((b2ServiceDescription P securityParameter encoder).width -
-              (requestWord requestRight).length) false) := congrArg _ hbits
-    _ = List.take (requestWord requestRight).length
-          (requestWord requestRight ++
-            List.replicate ((b2ServiceDescription P securityParameter encoder).width -
-              (requestWord requestRight).length) false) := by rw [hlength]
-    _ = requestWord requestRight := List.take_append_length
+  exact (List.append_inj hbits hlength).1
 
 end Cslib.Crypto.HQC
