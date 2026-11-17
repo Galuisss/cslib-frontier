@@ -55,13 +55,6 @@ open scoped Kronecker MatrixOrder ComplexOrder BigOperators Matrix.Norms.L2Opera
 variable {ι κ n : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ] [Fintype n]
   [DecidableEq n]
 
-private theorem map_mem_unitary {S T : Type*} [Ring S] [StarRing S] [Algebra ℂ S] [Ring T]
-    [StarRing T] [Algebra ℂ T] (f : S →⋆ₐ[ℂ] T) {u : S} (hu : u ∈ unitary S) :
-    f u ∈ unitary T := by
-  rw [Unitary.mem_iff] at hu ⊢
-  rw [← map_star, ← map_mul, ← map_mul, hu.1, hu.2, map_one]
-  exact ⟨rfl, rfl⟩
-
 /-- **Exactly linear observables from the linearity and consistency tests**, on the first player's
 factor of a tensor-product strategy. -/
 theorem exists_isProjective_charObs_of_linearityTest (φ : AlgState (Matrix (ι × κ) (ι × κ) ℂ))
@@ -80,7 +73,7 @@ theorem exists_isProjective_charObs_of_linearityTest (φ : AlgState (Matrix (ι 
     exact ⟨hA2 a, hA2 a⟩
   have hlin := one_sub_le_expect_re_apply_mul_mul φ (fun c => kroneckerOne (κ := κ) (A c))
     (fun a b => oneKronecker (ι := ι) (N₁ a b)) (fun a b => oneKronecker (ι := ι) (N₂ a b))
-    (fun a => map_mem_unitary _ (hAu a)) (fun a b => map_mem_unitary _ (hN₁ a b))
+    (fun a => Unitary.map_mem _ (hAu a)) (fun a b => Unitary.map_mem _ (hN₁ a b))
     (fun a b c => (commute_kroneckerOne_oneKronecker _ _).symm)
     (fun a b c => (commute_kroneckerOne_oneKronecker _ _).symm)
     (by simpa only [kroneckerOne_apply, oneKronecker_apply] using hL)
