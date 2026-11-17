@@ -38,6 +38,9 @@ full native success-law equality, or a QPT security theorem.
 
 * `Cslib.Crypto.HQC.compatible_b2ClassicalQueryLayout`: the actual HQC service and admitted native
   stage shapes satisfy every shared controller compatibility condition.
+* `Cslib.Crypto.HQC.matrix_b2ServiceBlock_initializedInput_withReference`: the actual embedded
+  service block, on its initialized input, coherently records its complete reversible environment
+  while retaining every other controller wire and an arbitrary reference.
 * `Cslib.Crypto.HQC.partialTraceLeft_b2ServiceEnvironment_fullReply`: discarding the actual
   reversible service environment dephases exactly the complete hidden-bit-and-ciphertext reply,
   while retaining an arbitrary reference and a reply-controlled continuation.
@@ -120,6 +123,111 @@ theorem compatible_b2ClassicalQueryLayout (P : PKEParams)
         exact hciphertext.symm
       second_quantumInputWidth := hsecondInput
       second_outputWidth := hsecondOutput }
+
+/-- **The embedded B2 service block coherently records its actual reversible environment.**
+Reindexing the physical controller register by its service embedding exposes the actual erased
+service circuit tensored with the identity.  Restricting its input to the initialized HQC sample,
+measured messages and the protected hidden-bit copy therefore gives the coherent record of
+`classicalRun b2ServiceCodes`.  Every physical wire outside the service embedding and an
+arbitrary inaccessible reference are retained; no product-state hypothesis is used.
+
+This is a physical block identity, not yet the complete controller success law: the subsequent
+reply copies, ciphertext-only second stage and final comparison remain to be composed. -/
+theorem matrix_b2ServiceBlock_initializedInput_withReference (P : PKEParams)
+    (securityParameter : ℕ)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen)
+    (sample : TruncatedSyndromeSample P.n P.codeLen)
+    (messages : MessagePair (PKEMessage P))
+    (first second : UniformOracleCircuitFamily)
+    {Reference : Type*} [DecidableEq Reference] :
+    let layout := b2ClassicalQueryLayout P encoder first second securityParameter
+    let Rest := {j : Fin layout.width //
+      ¬ ∃ i, layout.serviceEmbedding i = j}
+    let protectedHidden : (Rest → Bool) → Bool :=
+      fun rest => readBit
+        ((splitEquiv layout.serviceEmbedding).symm (fun _ => false, rest))
+        layout.replyBase
+    let serviceInput : (Rest → Bool) →
+        Fin layout.service.width → Bool :=
+      fun rest =>
+        inputState layout.service.width
+          (encPair encUnary encBits (securityParameter, sample.toWord) ++
+            List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++ [protectedHidden rest])
+    let physical :=
+      (((Circuit.matrix
+          ((Circuit.ofPhaseCodes layout.service.width
+            layout.service.instructions.zeroOraclePhaseCodes).mapWires
+              layout.serviceEmbedding) : Matrix _ _ ℂ) ⊗ₖ
+          (1 : Matrix Reference Reference ℂ)).submatrix
+        (fun p :
+            (Fin layout.service.width → Bool) × ((Rest → Bool) × Reference) =>
+          ((splitEquiv layout.serviceEmbedding).symm (p.1, p.2.1), p.2.2))
+        (fun p : (Rest → Bool) × Reference =>
+          ((splitEquiv layout.serviceEmbedding).symm (serviceInput p.1, p.1), p.2)))
+    physical = coherentRecord (fun p : (Rest → Bool) × Reference =>
+      classicalRun (b2ServiceCodes P securityParameter encoder) (serviceInput p.1)) := by
+  classical
+  dsimp only
+  let layout := b2ClassicalQueryLayout P encoder first second securityParameter
+  let serviceInput :
+      ({j : Fin layout.width // ¬ ∃ i, layout.serviceEmbedding i = j} → Bool) →
+        Fin layout.service.width → Bool :=
+    fun rest =>
+      inputState layout.service.width
+        (encPair encUnary encBits (securityParameter, sample.toWord) ++
+          List.ofFn messages.msg₀ ++ List.ofFn messages.msg₁ ++
+            [readBit ((splitEquiv layout.serviceEmbedding).symm (fun _ => false, rest))
+              layout.replyBase])
+  have hserviceCircuit :
+      Circuit.ofPhaseCodes layout.service.width
+          layout.service.instructions.zeroOraclePhaseCodes =
+        Circuit.ofCodes layout.service.width
+          (b2ServiceCodes P securityParameter encoder) := by
+    simp [layout, b2ClassicalQueryLayout,
+      OracleCircuit.zeroOraclePhaseCodes, Circuit.ofPhaseCodes_map]
+  have hclass : IsClassical layout.service.width
+      (b2ServiceCodes P securityParameter encoder) := by
+    simpa only [layout, b2ClassicalQueryLayout] using
+      isClassical_b2ServiceDescription P securityParameter encoder
+  have hsplit := Circuit.matrix_mapWires_splitEquiv layout.serviceEmbedding
+    (Circuit.ofCodes layout.service.width
+      (b2ServiceCodes P securityParameter encoder))
+  rw [hserviceCircuit]
+  ext ⟨environment, restOut, referenceOut⟩ ⟨restIn, referenceIn⟩
+  change
+    ((Circuit.matrix
+        ((Circuit.ofCodes layout.service.width
+          (b2ServiceCodes P securityParameter encoder)).mapWires layout.serviceEmbedding) :
+          Matrix _ _ ℂ).submatrix
+        (splitEquiv layout.serviceEmbedding).symm
+        (splitEquiv layout.serviceEmbedding).symm
+        (environment, restOut) (serviceInput restIn, restIn)) *
+      (1 : Matrix Reference Reference ℂ) referenceOut referenceIn = _
+  rw [hsplit]
+  simp only [kroneckerMap_apply, Matrix.one_apply, coherentRecord]
+  have hmatrix :
+      (Circuit.matrix (Circuit.ofCodes layout.service.width
+        (b2ServiceCodes P securityParameter encoder)) : Matrix _ _ ℂ)
+          environment (serviceInput restIn) =
+        if environment = classicalRun (b2ServiceCodes P securityParameter encoder)
+          (serviceInput restIn) then 1 else 0 := by
+    calc
+      _ = ((Circuit.ofCodes layout.service.width
+          (b2ServiceCodes P securityParameter encoder)).eval
+            (ket (serviceInput restIn))).ofLp environment :=
+        (Circuit.eval_ket_apply _ _ _).symm
+      _ = (ket (classicalRun (b2ServiceCodes P securityParameter encoder)
+          (serviceInput restIn))).ofLp environment := by
+        rw [Circuit.eval_ofCodes_ket hclass]
+      _ = _ := by simp only [ket_apply]
+  rw [hmatrix]
+  simp only [serviceInput, layout, encPair_apply, encUnary_apply, encBits_apply,
+    List.append_assoc]
+  by_cases hreference : referenceOut = referenceIn <;>
+    by_cases hrest : restOut = restIn <;>
+      by_cases henvironment : environment =
+        classicalRun (b2ServiceCodes P securityParameter encoder) (serviceInput restIn) <;>
+        simp [hreference, hrest, henvironment]
 
 /-- **The actual reversible B2 service dephases exactly its complete reply.**  For a fixed
 truncated-syndrome sample and measured message pair, the discarded service environment

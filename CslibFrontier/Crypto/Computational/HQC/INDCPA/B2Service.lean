@@ -775,6 +775,23 @@ def b2ServiceDescription (P : PKEParams) (securityParameter : ℕ)
     instructions :=
       (b2ServiceCodes P securityParameter encoder).map fun code => .gate (false, code) }
 
+/-- The retained service description contains exactly the phase-free instructions emitted by
+`b2ServiceCodes`.  This is the instruction-level interface used by physical circuit semantics. -/
+@[simp] theorem b2ServiceDescription_instructions (P : PKEParams) (securityParameter : ℕ)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen) :
+    (b2ServiceDescription P securityParameter encoder).instructions =
+      (b2ServiceCodes P securityParameter encoder).map fun code => .gate (false, code) := by
+  rfl
+
+/-- Every instruction of the retained B2 service is a well-formed classical reversible gate.
+This is the circuit-semantic interface used to execute the installed service on basis states. -/
+theorem isClassical_b2ServiceDescription (P : PKEParams) (securityParameter : ℕ)
+    (encoder : Circuits.Circuit Boolean.signature P.k P.codeLen) :
+    IsClassical (b2ServiceDescription P securityParameter encoder).width
+      (b2ServiceCodes P securityParameter encoder) := by
+  simpa only [b2ServiceDescription] using
+    isClassical_b2ServiceCodes P securityParameter encoder
+
 /-- The service consumes exactly the two `P.k`-bit messages followed by the hidden bit. -/
 @[simp] theorem b2ServiceDescription_quantumInputWidth (P : PKEParams)
     (securityParameter : ℕ)

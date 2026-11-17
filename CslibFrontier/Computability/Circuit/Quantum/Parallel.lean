@@ -34,6 +34,8 @@ circuit on the block of qubits `o, …, o + m - 1` (`Cslib.Quantum.Circuit.ofCod
 
 * `Cslib.Quantum.sum_agreeOff`: summing over the basis strings that agree with `x` off `e`.
 * `Cslib.Quantum.Circuit.matrix_mapWires`: the entries of a circuit on part of a register.
+* `Cslib.Quantum.Circuit.matrix_mapWires_splitEquiv`: after splitting selected qubits from their
+  complement, a mapped circuit is the original circuit tensored with the identity.
 * `Cslib.Quantum.Circuit.matrix_flatMap_mapWires`: copies on disjoint parts act independently.
 * `Cslib.Quantum.Circuit.ofCodes_map_shift`: shifted gate codes denote a circuit on a block.
 * `Cslib.Quantum.GateCode.WellFormed.shift`: shifted gate codes are well formed on a larger
@@ -44,7 +46,8 @@ circuit on the block of qubits `o, …, o + m - 1` (`Cslib.Quantum.Circuit.ofCod
 
 namespace Cslib.Quantum
 
-open Finset
+open Matrix Finset
+open scoped Kronecker
 
 variable {ι : Type*} {m N : ℕ}
 
@@ -197,6 +200,37 @@ theorem Circuit.matrix_mapWires (e : Fin m ↪ Fin N) (C : Circuit m) (y x : Fin
         (g.matrix : Matrix _ _ ℂ) w (x ∘ e)
     · refine sum_eq_zero fun z _ => ?_
       split_ifs with h₁ h₂ <;> first | rfl | exact absurd (h₂.trans h₁) hyx
+
+/-- **Splitting selected qubits exposes a mapped circuit as a tensor factor.** Reindexing the
+complete register by `splitEquiv e` turns the circuit on `e` into the original circuit tensored
+with the identity on every unselected qubit. -/
+theorem Circuit.matrix_mapWires_splitEquiv (e : Fin m ↪ Fin N) (C : Circuit m) :
+    (Circuit.matrix (Circuit.mapWires e C) : Matrix _ _ ℂ).submatrix
+        (splitEquiv e).symm (splitEquiv e).symm =
+      (Circuit.matrix C : Matrix _ _ ℂ) ⊗ₖ
+        (1 : Matrix ({j : Fin N // ¬ ∃ i, e i = j} → Bool) _ ℂ) := by
+  ext ⟨y, yRest⟩ ⟨x, xRest⟩
+  have hy : (splitEquiv e).symm (y, yRest) ∘ e = y := by
+    exact congrArg Prod.fst ((splitEquiv e).apply_symm_apply (y, yRest))
+  have hx : (splitEquiv e).symm (x, xRest) ∘ e = x := by
+    exact congrArg Prod.fst ((splitEquiv e).apply_symm_apply (x, xRest))
+  have hagree :
+      AgreeOff e ((splitEquiv e).symm (y, yRest))
+          ((splitEquiv e).symm (x, xRest)) ↔ yRest = xRest := by
+    constructor
+    · intro h
+      funext j
+      have hj := h j fun i hi => j.2 ⟨i, hi⟩
+      simpa only [splitEquiv_symm_apply_of_not e y yRest j j.2,
+        splitEquiv_symm_apply_of_not e x xRest j j.2] using hj
+    · intro h
+      subst xRest
+      intro j hj
+      rw [splitEquiv_symm_apply_of_not e y yRest j (by simpa using hj),
+        splitEquiv_symm_apply_of_not e x yRest j (by simpa using hj)]
+  simp only [Matrix.submatrix_apply, Circuit.matrix_mapWires, hy, hx, hagree,
+    kroneckerMap_apply, Matrix.one_apply]
+  by_cases h : yRest = xRest <;> simp [h]
 
 /-- **Copies of a circuit on disjoint parts of a register act independently**: an entry of the
 whole is the product of the entries of the copies, when the basis strings agree off all parts. -/
