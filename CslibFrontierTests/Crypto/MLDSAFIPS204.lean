@@ -115,3 +115,24 @@ private def allOnesXof := constantStream (fun _ => 255)
 
 #guard ((Xofs.mk allOnesXof allOnesXof).keyGen .mlDSA44 (fun _ => 0)).isNone
 #guard ((Xofs.mk allOnesXof allOnesXof).sampleInBall .mlDSA87 []).isNone
+
+-- The same valid signature bytes can verify for two distinct requests under a colliding XOF.
+-- The log search skips an unrelated digest and returns the two literal representative inputs.
+private def repeatedAcrossMessages : Bool := Id.run do
+  let Z := constantStream fun _ => 0
+  let H := Xofs.mk Z Z
+  let pk := List.replicate 1312 (0 : Byte)
+  let A : PublicMatrix .mlDSA44 := fun _ _ _ => 0
+  let sig := encodeSignature .mlDSA44 ⟨List.replicate 32 0, fun _ _ => 0, fun _ _ => false⟩
+  let signed : Forgery := ⟨[7], [true], sig⟩
+  let forged : Forgery := ⟨[], [true, false, true], sig⟩
+  let log := [{ signed with signature := List.replicate 32 4 }, signed]
+  let verifies (f : Forgery) := H.verifyWithExpansion .mlDSA44 (fun _ => some A)
+    pk f.message f.context f.signature == some true
+  let some (.collision x y) := H.extractLoggedDigest .mlDSA44 pk A forged log | return false
+  let tr := List.replicate 64 (0 : Byte)
+  return verifies signed && verifies forged && x != y &&
+    x == representativeInput tr (formattedMessage forged) &&
+    y == representativeInput tr (formattedMessage signed) && H.h256.read x 32 == H.h256.read y 32
+
+#guard repeatedAcrossMessages
