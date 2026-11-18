@@ -85,19 +85,19 @@ private noncomputable def withVector (s : Level) (observe : Observable s)
 
 /-- The key generator samples its short secret and error, obtains its matrix through the
 public seed oracle and passes the populated cache to the supplied post-key computation. -/
-noncomputable def keyOnlyGame (s : Level) (observe : Observable s) : Game := do
+noncomputable def realKeyGame (s : Level) (observe : Observable s) : Game := do
   let s₁ ← shortVectorLaw s s.params.ℓ
   let s₂ ← shortVectorLaw s s.params.k
   withVector s observe fun A => moduleSISMap A s₁ + s₂
 
 /-- The uniform-vector hybrid performs exactly the same matrix query as key generation. -/
-noncomputable def uniformVectorGame (s : Level) (observe : Observable s) : Game := do
+noncomputable def uniformKeyGame (s : Level) (observe : Observable s) : Game := do
   let t ← PMF.uniformOfFintype (Fin s.params.k → Poly)
   withVector s observe fun _ => t
 
 /-- Given the full challenger instance, sample a fresh seed and plant its matrix as the first
 cache entry. All later oracle and verification operations belong to the same observable. -/
-noncomputable def planted (s : Level) (observe : Observable s) (A : PublicMatrix s)
+@[expose] noncomputable def planted (s : Level) (observe : Observable s) (A : PublicMatrix s)
     (t : Fin s.params.k → Poly) : Game := do
   let rho ← PMF.uniformOfFintype (FixedBytes 32)
   observe rho A t [(rho, A)]
@@ -113,12 +113,12 @@ private theorem withVector_eq (s : Level) (observe : Observable s)
 /-- The post-key computation runs in the real Module-LWE experiment whenever the supplied
 program realizes its behavior at a planted seed. The seed and short-vector sampling laws
 and the initial matrix lookup are discharged here for every such program. -/
-theorem keyOnlyGame_eq_realGame_of_planted (s : Level) (observe : Observable s)
+theorem realKeyGame_eq_realGame_of_planted (s : Level) (observe : Observable s)
     (D : PublicMatrix s → (Fin s.params.k → Poly) → ProbComp Bool)
     (h : ∀ A t, planted s observe A t = (D A t).eval) :
-    keyOnlyGame s observe = ModuleLWE.realGame (shortVectorLaw s s.params.ℓ)
+    realKeyGame s observe = ModuleLWE.realGame (shortVectorLaw s s.params.ℓ)
       (shortVectorLaw s s.params.k) D := by
-  simp only [keyOnlyGame, withVector_eq, h, ModuleLWE.realGame, ModuleLWE.eval_realExperiment,
+  simp only [realKeyGame, withVector_eq, h, ModuleLWE.realGame, ModuleLWE.eval_realExperiment,
     PMF.monad_bind_eq_bind]
   rfl
 
@@ -148,14 +148,14 @@ private theorem planted_concreteSHAKE (s : Level) (adv : Forger s)
 the same matrix oracle used by key generation and check its full digest against the rounded
 public-key bytes. The distinguisher runs the forger once. -/
 theorem advantage_eq_moduleLWE (s : Level) (adv : Forger s) :
-    Game.advantage (keyOnlyGame s (concreteSHAKE s adv))
-      (uniformVectorGame s (concreteSHAKE s adv)) =
+    Game.advantage (realKeyGame s (concreteSHAKE s adv))
+      (uniformKeyGame s (concreteSHAKE s adv)) =
       ModuleLWE.advantage (shortVectorLaw s s.params.ℓ) (shortVectorLaw s s.params.k)
         (distinguisher s adv) := by
   unfold ModuleLWE.advantage
   apply congrArg₂ Game.advantage
-  · exact keyOnlyGame_eq_realGame_of_planted s _ _ (planted_concreteSHAKE s adv)
-  · simp only [uniformVectorGame, withVector_eq, planted_concreteSHAKE, ModuleLWE.randomGame,
+  · exact realKeyGame_eq_realGame_of_planted s _ _ (planted_concreteSHAKE s adv)
+  · simp only [uniformKeyGame, withVector_eq, planted_concreteSHAKE, ModuleLWE.randomGame,
       ModuleLWE.eval_randomExperiment, PMF.monad_bind_eq_bind]
     exact PMF.bind_comm _ _ _
 
