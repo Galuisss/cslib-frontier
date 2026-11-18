@@ -9,7 +9,6 @@ module
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.ConsistencyTest
 public import CslibFrontier.Computability.PCP.TwoProverGame.SymmetricLinearity
-import CslibFrontier.Probability.PMF.EventBind
 
 /-!
 # The Pauli braiding verifier
@@ -89,6 +88,14 @@ variable {n : ℕ} {Q A : Type*}
     (answer : Bool × Bool) : Bool :=
   q.checkedBit (cond (lexSwap q.xString q.zString) Prod.swap id answer)
 
+/-- The two basis questions before lexicographic sorting, in physical player order. -/
+@[expose] def pauliBraidingSameBasisQuestions (swapRoles basis : Bool)
+    (p : ↥(oddPairs (Fin n))) (dummy : Fin n → Bool) :
+    PauliConsistencyQuestion (Fin n) × PauliConsistencyQuestion (Fin n) :=
+  let q : PauliConsistencyQuestion (Fin n) := ⟨p.val.1, p.val.2, basis⟩
+  let r := PauliConsistencyQuestion.ofChecked basis (if basis then q.zString else q.xString) dummy
+  cond swapRoles Prod.swap id (q, r)
+
 /-- A verifier conditioned on the linearity (0), anticommutation (1), or consistency (2)
 branch. It uses the same questions and checks as the full game. It takes a game, two
 distinguished second-player questions and a
@@ -102,8 +109,6 @@ in the special branch when the sampled question would otherwise be accepted auto
       ((Bool × Bool) ⊕ A) ((Bool × Bool) ⊕ A) :=
   let pairQuestion (basis : Bool) (p : ↥(oddPairs (Fin n))) :
       PauliConsistencyQuestion (Fin n) := ⟨p.val.1, p.val.2, basis⟩
-  let dummyQuestion (q : PauliConsistencyQuestion (Fin n)) (dummy : Fin n → Bool) :=
-    PauliConsistencyQuestion.ofChecked q.basis (if q.basis then q.zString else q.xString) dummy
   letI := oddPairs_nonempty (ι := Fin n)
   let odd := Probability.PMF.uniformOfFintype ↥(oddPairs (Fin n))
   let uniformBit := Probability.PMF.uniformOfFintype Bool
@@ -135,8 +140,8 @@ in the special branch when the sampled question would otherwise be accepted auto
       cond roles Prod.swap id
         ((pairQuestion basis p).toBraidingQuestion, .anticommutation true y p)
     | .sameBasis roles basis p dummy =>
-      let q := pairQuestion basis p
-      cond roles Prod.swap id (q.toBraidingQuestion, (dummyQuestion q dummy).toBraidingQuestion)
+      let (q, r) := pauliBraidingSameBasisQuestions roles basis p dummy
+      (q.toBraidingQuestion, r.toBraidingQuestion)
     accepts := fun
     | .linearity _ r, .inl a, .inl b => (symmetricLinearityGame n).accepts r a b
     | .linearity .., _, _ => False
@@ -150,9 +155,8 @@ in the special branch when the sampled question would otherwise be accepted auto
         y = special basis → (pairQuestion basis p).braidingCheckedBit bits = decode basis answer
       | _ => False
     | .sameBasis roles basis p dummy, .inl a, .inl b =>
-      let (a, b) := cond roles Prod.swap id (a, b)
-      let q := pairQuestion basis p
-      q.braidingCheckedBit a = (dummyQuestion q dummy).braidingCheckedBit b
+      let (q, r) := pauliBraidingSameBasisQuestions roles basis p dummy
+      q.braidingCheckedBit a = r.braidingCheckedBit b
     | .sameBasis .., _, _ => False }
 
 /-- The Pauli braiding verifier with a private uniform choice among the three branches. -/
@@ -173,9 +177,9 @@ theorem answersWinProb_pauliBraidingGame [Nonempty (Fin n)]
     (pauliBraidingGame n G special decode).answersWinProb answer =
       (∑ branch, (pauliBraidingBranchGame n G special decode branch).answersWinProb answer) /
         3 := by
-  unfold pauliBraidingGame SeededGame.answersWinProb
-  simp only [PMF.bind_bind, Probability.PMF.toOuterMeasure_bind_toReal,
-    Probability.PMF.uniformOfFintype_apply, Fintype.card_fin, ENNReal.toReal_inv,
+  unfold pauliBraidingGame
+  rw [SeededGame.answersWinProb_bind_seed]
+  simp only [Probability.PMF.uniformOfFintype_apply, Fintype.card_fin, ENNReal.toReal_inv,
     Nat.cast_ofNat, ← Finset.mul_sum, div_eq_inv_mul]
   rfl
 
