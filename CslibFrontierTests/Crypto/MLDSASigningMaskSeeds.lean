@@ -142,9 +142,9 @@ example (C : QuantumSigningForger) (q : SigningQuery) :
 -- wires, the observed address is the marginal of its computational-basis Born distribution.
 open Cslib.Quantum QuantumSigningForger in
 example (C : QuantumSigningForger) (st : C.State) :
-    C.addressRead (true, st) = (POVM.basis.measureDensity st.1.density st.1.isDensityMatrix).map
-      (fun z => some (fun i : Fin (C.addressBits + 2) =>
-        z.1 ⟨i.val, i.isLt.trans_le (by dsimp only [Width]; lia)⟩)) := by
+    C.addressRead (true, st) =
+      (st.1.measure (fun z => fun i : Fin (C.addressBits + 2) =>
+        z ⟨i.val, i.isLt.trans_le (by dsimp only [Width]; lia)⟩)).map (some ∘ Prod.fst) := by
   unfold addressRead
   simp only [ite_true]
   rw [← PMF.map_comp, DeviceState.measure_map_fst, PMF.map_comp]

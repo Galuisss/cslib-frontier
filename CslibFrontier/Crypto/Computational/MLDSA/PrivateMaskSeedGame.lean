@@ -294,7 +294,7 @@ private theorem score_eq_rows (C : QuantumSigningForger) {base : Xofs} {s : Leve
         p.background.messageRepresentative keys.publicKey m := by
       by_contra ne
       exact good ⟨keys, hg, m, ne⟩
-    simp only [scoreWithSetup, scoreTranscript,
+    simp only [scoreWithSetup, scoreTranscript, withTrialSetup,
       Xofs.expandA_congr (agree_off_sampleSigningMaskSeeds hp).1,
       transcript_eq_rows C hp hg rep hn]
     cases p.background.expandA s (keys.publicKey.take 32) with
@@ -316,7 +316,7 @@ private theorem avg_score_rows (C : QuantumSigningForger) (H : Xofs) (s : Level)
   cases keys with
   | none => exact PMF.bind_const _ _
   | some k =>
-    simp only [scoreTranscript]
+    simp only [scoreTranscript, withTrialSetup]
     cases H.expandA s (k.publicKey.take 32) with
     | none => exact PMF.bind_const _ _
     | some A =>
@@ -398,7 +398,8 @@ theorem dist_maskSeedGame_privateMaskSeedGame (C : QuantumSigningForger) (s : Le
       C.rowTranscript H s k (List.ofFn fun i μ => rows (i, μ)))
   have actual : C.maskSeedGame s base ha hb hn hsize false SignedMatrixTrial.newDigestWin =
       seeds.bind (fun seed => tables.bind (L seed)) := by
-    simp only [maskSeedGame, PMF.monad_bind_eq_bind, Bool.false_eq_true, ↓reduceIte, seeds, tables,
+    simp only [maskSeedGame, withMaskSeedOracles, PMF.monad_bind_eq_bind, Bool.false_eq_true,
+      ↓reduceIte, seeds, tables,
       L, tapes]
     pmf_swap with seed
     pmf_swap with rows

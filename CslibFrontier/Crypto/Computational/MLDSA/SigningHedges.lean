@@ -103,15 +103,20 @@ private theorem card_hedge : Fintype.card (FixedBytes 32) = 2 ^ 256 := by
   rw [Fintype.card_fun, Fintype.card_fin, Fintype.card_fin]
   decide
 
+private noncomputable def withTrialSetup {α : Type} (H : Xofs) (s : Level) (keys : Option KeyPair)
+    (failure : α) (run : KeyPair → PublicMatrix s → PMF α) : PMF α :=
+  match keys with
+  | none => PMF.pure failure
+  | some keys =>
+    match H.expandA s (keys.publicKey.take 32) with
+    | none => PMF.pure failure
+    | some A => run keys A
+
 private noncomputable def scoreTranscript (H : Xofs) (s : Level)
     (score : SignedMatrixTrial s → Bool) (keys : Option KeyPair)
     (run : KeyPair → PMF (Forgery × List Forgery)) : Game :=
-  match keys with
-  | none => PMF.pure false
-  | some keys =>
-    match H.expandA s (keys.publicKey.take 32) with
-    | none => PMF.pure false
-    | some A => (run keys).map fun (f, log) => score ⟨H, A, keys.publicKey, f, log⟩
+  withTrialSetup H s keys false fun k A =>
+    (run k).map fun (f, log) => score ⟨H, A, k.publicKey, f, log⟩
 
 private noncomputable def scoreWithSetup (C : QuantumSigningForger) (s : Level)
     (device H : Xofs) (keys : Option KeyPair) (tape : List (FixedBytes 32))
@@ -147,7 +152,7 @@ private theorem uniform_fixedHedgeGame (C : QuantumSigningForger) (s : Level) (b
   simp only [matrixTrial, PMF.monad_bind_eq_bind, PMF.map_bind]
   rw [show (fun H => (matrixSetup H s).bind fun z => (C.runAtSetup s z).map (·.any score)) =
     (fun H => (matrixSetup H s).bind eval) from rfl, eq]
-  unfold fixedHedgeGame scoreWithSetup scoreTranscript
+  unfold fixedHedgeGame scoreWithSetup scoreTranscript withTrialSetup
   pmf_swap with H
   pmf_swap with seed
   dsimp only [eval, readSetup]

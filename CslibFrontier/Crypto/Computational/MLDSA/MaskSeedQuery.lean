@@ -67,34 +67,31 @@ private noncomputable def addressRead (C : QuantumSigningForger) (result : Bool 
     PMF (Option (Address C)) :=
   if result.1 then
     let A := Fin.castLEEmb (Nat.le_add_right (C.addressBits + 2 + 8 * C.responseBytes) C.workQubits)
-    (result.2.1.measure (fun z => (queryRegisters (a := C.addressBits + 2)
-      (b := 8 * C.responseBytes) A z).1)).map (some ∘ Prod.fst)
+    let dev := result.2.1
+    (POVM.basis.measureDensity dev.density dev.isDensityMatrix).map fun z =>
+      some ((queryRegisters (a := C.addressBits + 2) (b := 8 * C.responseBytes) A z.1).1)
   else PMF.pure none
 
-private noncomputable def addressLaw (C : QuantumSigningForger) (H : Xofs) (s : Level)
-    (seed : FixedBytes 32) {V : Type} (fallback : V) (tape : List V)
+private noncomputable def addressLaw (C : QuantumSigningForger) (matrixXof : Xofs) (s : Level)
+    (keys : Option KeyPair) {V : Type} (fallback : V) (tape : List V)
     (command : KeyPair → V → (q : Request C) → StateT (State C) PMF
       (probOracleSpec (OracleSpec.sum (fun _ : DeviceRequest (Width C) Empty => List Bool)
         (fun _ : SigningQuery => Option (List Byte))) q)) (j : ℕ) : PMF (Option (Address C)) :=
-  match H.keyGen s seed with
-  | none => PMF.pure none
-  | some keys =>
-    match H.expandA s (keys.publicKey.take 32) with
-    | none => PMF.pure none
-    | some _ =>
-      let p := queryPrefix (C := C) (C.program keys.publicKey) j
-      let outcomes := (OracleComp.interpret (OracleComp.withSampleListWhen isSigningCall fallback
-        (command keys)) p).run (C.initial, tape)
-      (outcomes.map (fun (found, st, _) => (found, st))).bind (addressRead C)
+  withTrialSetup matrixXof s keys none fun keys _ =>
+    let p := queryPrefix (C := C) (C.program keys.publicKey) j
+    let outcomes := (OracleComp.interpret (OracleComp.withSampleListWhen isSigningCall fallback
+      (command keys)) p).run (C.initial, tape)
+    (outcomes.map (fun (found, st, _) => (found, st))).bind (addressRead C)
 
 private noncomputable def actualAddress (C : QuantumSigningForger) (s : Level)
     (seed : FixedBytes 32) {n : ℕ} (t : Fin n ↪ FixedBytes 32) (p : SigningMaskSeedOracles) :=
-  C.addressLaw p.background s seed (fun _ => 0) (List.ofFn t)
+  C.addressLaw p.shared s (p.background.keyGen s seed) (fun _ => 0) (List.ofFn t)
     (fun k => C.hedgeCommand p.background p.shared s k.secretKey)
 
 private noncomputable def rowAddress (C : QuantumSigningForger) (s : Level)
     (seed : FixedBytes 32) {n : ℕ} (rows : SigningMaskSeeds n) (H : Xofs) :=
-  C.addressLaw H s seed (fun _ _ => 0) (List.ofFn fun i μ => rows (i, μ)) (C.rowCommand H s)
+  C.addressLaw H s (H.keyGen s seed) (fun _ _ => 0) (List.ofFn fun i μ => rows (i, μ))
+    (C.rowCommand H s)
 
 private theorem actualAddress_eq {C : QuantumSigningForger} {base : Xofs} {s : Level}
     {seed : FixedBytes 32} {a b n : ℕ} {t : Fin n ↪ FixedBytes 32} {ha : 1024 ≤ a}
@@ -102,7 +99,8 @@ private theorem actualAddress_eq {C : QuantumSigningForger} {base : Xofs} {s : L
     (hp : p ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
     (good : ¬representativeBad s seed p) (hn : C.SigningCallsLe n) (j : ℕ) :
     C.actualAddress s seed t p j = C.rowAddress s seed rows p.background j := by
-  simp only [actualAddress, rowAddress, addressLaw]
+  simp only [actualAddress, rowAddress, addressLaw, withTrialSetup,
+    Xofs.expandA_congr (agree_off_sampleSigningMaskSeeds hp).1]
   cases hg : p.background.keyGen s seed with
   | none => rfl
   | some keys =>
@@ -180,12 +178,8 @@ background-device experiment. Signing uses the shared programmed XOFs. Return tr
 two XOR tables differ at the measured address. Early termination and failed setup lose. -/
 noncomputable def maskSeedQueryHit (C : QuantumSigningForger) (s : Level) (base : Xofs)
     {a b n : ℕ} (ha : 1024 ≤ a) (hb : 64 ≤ b) (hsize : n ≤ 2 ^ 256) (j : ℕ) : Game :=
-  letI : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-    (by simpa only [Fintype.card_fin, card_hedge] using hsize)
-  do
-    let seed ← PMF.uniformOfFintype (FixedBytes 32)
-    let rows ← PMF.uniformOfFintype (SigningMaskSeeds n)
-    C.fixedQueryGame s base seed ha hb rows j
+  withMaskSeedOracles s base ha hb hsize fun t seed p =>
+    (C.actualAddress s seed t p j).map (differs C p)
 
 private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base : Xofs)
     (seed : FixedBytes 32) {a b n : ℕ} (ha : 1024 ≤ a) (hb : 64 ≤ b)
@@ -252,9 +246,16 @@ theorem maskSeedQueryHit_le (C : QuantumSigningForger) (s : Level) (base : Xofs)
       2 * n / 2 ^ 256 := by
   let _ : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
     (by simpa only [Fintype.card_fin, card_hedge] using hsize)
-  rw [Game.coe_succProbability]
+  have law : C.maskSeedQueryHit s base ha hb hsize j =
+      (PMF.uniformOfFintype (FixedBytes 32)).bind fun seed =>
+        (PMF.uniformOfFintype (SigningMaskSeeds n)).bind fun rows =>
+          C.fixedQueryGame s base seed ha hb rows j := by
+    simp only [maskSeedQueryHit, withMaskSeedOracles, fixedQueryGame, PMF.monad_bind_eq_bind]
+    pmf_swap with seed
+    pmf_swap with rows
+    rfl
+  rw [law, Game.coe_succProbability]
   apply (ENNReal.le_ofReal_iff_toReal_le (PMF.apply_ne_top _ _) (by positivity)).mp
-  simp only [maskSeedQueryHit, PMF.monad_bind_eq_bind]
   apply PMF.bind_apply_le_on_support
   intro seed _
   apply PMF.bind_apply_le_on_support
