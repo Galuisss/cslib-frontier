@@ -98,12 +98,22 @@ private structure SigningState (s : Level) where
   μ : List Bool
   maskSeed : List Byte
 
+/-- Raw SHAKE256 input for the private mask seed in Algorithm 7, line 7. -/
+@[expose] def maskSeedInput (key : List Byte) (rnd : FixedBytes 32) (μ : List Bool) : List Bool :=
+  Keccak.bytesToBitsLE (key ++ rnd.toList) ++ μ
+
+/-- The 32-byte hedge contributes 256 bits between the key and representative. -/
+theorem length_maskSeedInput (key : List Byte) (rnd : FixedBytes 32) (μ : List Bool) :
+    (maskSeedInput key rnd μ).length = 8 * (key.length + 32) + μ.length := by
+  rw [maskSeedInput, List.length_append, Keccak.length_bytesToBitsLE, List.length_append,
+    FixedBytes.length_toList]
+
 private def Xofs.startSigning (H : Xofs) (s : Level) (bytes : List Byte) (formatted : List Bool)
     (rnd : FixedBytes 32) : Option (SigningState s) := do
   let sk ← decodePrivate s bytes
   let matrix ← H.expandA s sk.rho
   let μ := H.representativeFromTr sk.tr formatted
-  let maskSeed := H.h256.read (Keccak.bytesToBitsLE (sk.key ++ rnd.toList) ++ μ) 64
+  let maskSeed := H.h256.read (maskSeedInput sk.key rnd μ) 64
   return ⟨sk, matrix, μ, maskSeed⟩
 
 /-- Algorithm 7 on encoded secret keys, formatted bit-string messages and 32 hedging bytes.
@@ -195,7 +205,7 @@ theorem verify_of_sign {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys : Key
     {rnd : FixedBytes 32} (hg : H.keyGen s seed = some keys)
     (hs : H.sign s keys.secretKey f.message f.context rnd = some f.signature) :
     H.verify s keys.publicKey f.message f.context f.signature = some true := by
-  obtain ⟨rho, sk, key, hA, pk, decoded, short⟩ := privateKey_of_keyGen hg
+  obtain ⟨rho, sk, hA, pk, decoded, short⟩ := privateKey_of_keyGen hg
   have ctx : f.context.length ≤ 255 := by
     by_contra h
     simp [Xofs.sign, guard, h] at hs
@@ -283,7 +293,7 @@ theorem extractLoggedDigest_of_signingTranscript {H : Xofs} {s : Level} {seed : 
     (valid : H.verify s keys.publicKey out.message out.context out.signature = some true) :
     ∃ A w, H.expandA s (keys.publicKey.take 32) = some A ∧
       H.extractLoggedDigest s keys.publicKey A out log = some w ∧ w.Valid H A := by
-  obtain ⟨rho, sk, _, hA, hpk, _, _⟩ := privateKey_of_keyGen hg
+  obtain ⟨rho, sk, hA, hpk, _, _⟩ := privateKey_of_keyGen hg
   have matrix : H.expandA s (keys.publicKey.take 32) = some sk.A := by
     rwa [hpk, take_encodePublic]
   let same (g : Forgery) := g.signature.take (digestBytes s) == out.signature.take (digestBytes s)
@@ -364,7 +374,7 @@ private theorem startSigning_off_rows {H : Xofs} {s : Level} {seed : FixedBytes 
       ∀ st, H.startSigning s keys.secretKey fmt rnd = some st →
         st.μ.length = 512 ∧ st.maskSeed.length = 64 := by
   intro K fmt
-  obtain ⟨rho, sk, key, hA, _, dec, _⟩ := privateKey_of_keyGen hg
+  obtain ⟨rho, sk, hA, _, dec, _⟩ := privateKey_of_keyGen hg
   let tr := H.h256.readBytes keys.publicKey 64
   have trlen : tr.length = 64 := H.h256.length_read ..
   have bound : 8 * digestBytes s ≤ 512 := by cases s <;> decide
@@ -380,11 +390,11 @@ private theorem startSigning_off_rows {H : Xofs} {s : Level} {seed : FixedBytes 
   have mlen : μ.length = 512 := by
     simp only [μ, Xofs.representativeFromTr, Keccak.length_bytesToBitsLE]
     rw [H.h256.length_read]
-  have mask : K.h256.read (Keccak.bytesToBitsLE (key ++ rnd.toList) ++ μ) 64 =
-      H.h256.read (Keccak.bytesToBitsLE (key ++ rnd.toList) ++ μ) 64 := by
+  let key := (H.expandKeySeed s seed).drop 96
+  have mask : K.h256.read (maskSeedInput key rnd μ) 64 =
+      H.h256.read (maskSeedInput key rnd μ) 64 := by
     apply read_off_rows
-    rw [List.length_append, Keccak.length_bytesToBitsLE, List.length_append,
-      FixedBytes.length_toList, mlen]
+    rw [length_maskSeedInput, mlen]
     omega
   have matrix : K.expandA s rho.toList = some sk.A :=
     (Xofs.expandA_congr (K := K) (H := H) rfl s rho.toList).trans hA
