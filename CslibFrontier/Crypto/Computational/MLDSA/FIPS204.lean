@@ -29,7 +29,7 @@ The key-only reduction retains the matrix seed and the verifier's SHAKE-derived 
 representative. Its setup samples the Algorithm 6 key-generation seed. The resulting
 self-target experiment has that same seeded setup. For challenges supplying a full vector and a
 matrix at the published seed, `decode_encodePublic` recovers the rounded high term, and
-`extractFull_of_verifyWithExpansion` constructs the candidate for the full vector.
+`verifiedSignature_of_verifyWithExpansion` recovers the full digest check for that vector.
 -/
 
 public section
@@ -520,33 +520,6 @@ private theorem solution_of_compressed {s : Level} {pk : MLDSA.PublicKey s.param
     · exact Params.valid_mldsa87
   exact isSelfTargetSolution_of_compressedVerify hvalid
     (by cases s <;> decide : 4 * s.params.γ₂ < s.params.q) (by decide : 0 < 13) hv
-
-/-- Extraction for a full challenge `(A,t)`. The published bytes and message representative
-use the rounded key, while the witness computed from the full key includes the term `c t₀`
-in the low vector (Dilithium v3.1, §6.2.1, equation (10)). -/
-def extractFull (s : Level) (rho : FixedBytes 32) (A : PublicMatrix s)
-    (t : Fin s.params.k → Poly) (f : Forgery) : Option (SelfTargetCandidate s.params) := do
-  let σ ← sigDecode s f.signature
-  let c ← sampleInBall s σ.digest
-  return candidate s ⟨A, t⟩ (messageRepresentative (encodePublic s rho.toList t)
-    (formattedMessage f)) σ c
-
-/-- Every accepted byte forgery yields a solution on the full vector supplied by the challenge. -/
-theorem extractFull_of_verifyWithExpansion {s : Level}
-    {expand : List Byte → Option (PublicMatrix s)} {rho : FixedBytes 32}
-    {A : PublicMatrix s} {t : Fin s.params.k → Poly} {f : Forgery}
-    (hA : expand rho.toList = some A)
-    (hv : verifyWithExpansion s expand (encodePublic s rho.toList t)
-      f.message f.context f.signature = some true) :
-    ∃ y, extractFull s rho A t f = some y ∧
-      IsSelfTargetSolution s.params (selfTargetHash s.params (algebraicHash s))
-        (compressedSelfTargetRadius s.params 13) ⟨A, t⟩ y := by
-  obtain ⟨σ, c, hσ, hc, hz, hd⟩ := verifiedSignature_of_verifyWithExpansion hA hv
-  let μ := messageRepresentative (encodePublic s rho.toList t) (formattedMessage f)
-  have hv' : compressedVerify s.params 13 (algebraicHash s) ⟨A, t⟩ μ ⟨σ.z, σ.h, c⟩ := by
-    simp only [compressedVerify, Bool.and_eq_true, decide_eq_true_eq]
-    exact ⟨⟨hz, inBall_of_sampleInBall hc⟩, by simp [algebraicHash, μ, hd, hc]⟩
-  exact ⟨_, by simp [extractFull, hσ, hc, μ], solution_of_compressed hv'⟩
 
 /-- For each fixed published byte key, the solver parses the forgery and extracts a self-target
 candidate. The hash input contains its actual public-key-bound message representative. -/
