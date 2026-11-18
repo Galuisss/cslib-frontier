@@ -244,8 +244,7 @@ theorem maskSeedQueryHit_le (C : QuantumSigningForger) (s : Level) (base : Xofs)
     (hsize : n ≤ 2 ^ 256) (j : ℕ) :
     (Game.succProbability (C.maskSeedQueryHit s base (n := n) ha hb hsize j) : ℝ) ≤
       2 * n / 2 ^ 256 := by
-  let _ : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-    (by simpa only [Fintype.card_fin, card_hedge] using hsize)
+  let _ : Nonempty (Fin n ↪ FixedBytes 32) := hedgeEmbedding_nonempty hsize
   have law : C.maskSeedQueryHit s base ha hb hsize j =
       (PMF.uniformOfFintype (FixedBytes 32)).bind fun seed =>
         (PMF.uniformOfFintype (SigningMaskSeeds n)).bind fun rows =>
