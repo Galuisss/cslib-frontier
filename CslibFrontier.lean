@@ -4213,7 +4213,10 @@ public import CslibFrontier.Computability.Probabilistic.Time
 public import CslibFrontier.Computability.Probabilistic.Traverse
 public import CslibFrontier.Computability.Probabilistic.UniformNat
 public import CslibFrontier.Computability.Probabilistic.UniformNat.ModIndex
+public import CslibFrontier.Computability.Program.Assemble
 public import CslibFrontier.Computability.Program.Blocks
+public import CslibFrontier.Computability.Program.Structured
+public import CslibFrontier.Computability.Program.WP
 public import CslibFrontier.Computability.PropertyTesting.DenseGraph.Basic
 public import CslibFrontier.Computability.PropertyTesting.DenseGraph.Bipartite
 public import CslibFrontier.Computability.PropertyTesting.DenseGraph.Canonical
