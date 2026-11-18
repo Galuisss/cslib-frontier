@@ -12,6 +12,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.SigningROM
 public import CslibFrontier.Languages.Probabilistic.Oracle.EvalPure
 public import CslibFrontier.Languages.Probabilistic.QueriesWith
 import CslibFrontier.Languages.Probabilistic.Traverse.FindM
+import CslibFrontier.Probability.PMF.Union
 import all CslibFrontier.Crypto.Computational.MLDSA.SigningROM
 import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
 import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204
@@ -71,10 +72,11 @@ private def attemptQuery (H : Xofs) (s : Level) (sk : PrivateKey s) (A : PublicM
 /-- Run the remaining FIPS signing attempts with a supplied mask schedule. Each retry consults
 the table on the literal commitment input. The other SHAKE reads use the background streams. -/
 def Xofs.retryDigestQueries (H : Xofs) (s : Level) (sk : PrivateKey s) (A : PublicMatrix s)
-    (μ : List Bool) (mask : ℕ → Vector (Vector (ZMod 8380417) 256) s.params.ℓ) (fuel nonce : ℕ) :
+    (μ : List.Vector Bool 512) (mask : ℕ → Vector (Vector (ZMod 8380417) 256) s.params.ℓ)
+    (fuel nonce : ℕ) :
     DigestReads s (Option (List Byte)) :=
   Option.join <$> (List.finRange fuel).findSomeM? fun i =>
-    attemptQuery H s sk A μ (ringVectorCoeffs (mask (nonce + i.val * s.params.ℓ)))
+    attemptQuery H s sk A μ.toList (ringVectorCoeffs (mask (nonce + i.val * s.params.ℓ)))
 
 /-- Even a run reaching its last retry makes at most one digest lookup per available attempt. -/
 theorem Xofs.retryDigestQueries_bounded (H : Xofs) (s : Level) (sk A μ mask) (fuel nonce : ℕ) :
@@ -83,43 +85,48 @@ theorem Xofs.retryDigestQueries_bounded (H : Xofs) (s : Level) (sk A μ mask) (f
   apply OracleComp.IsCostBounded.bind (n := fuel) (m := 0)
   · simpa only [List.length_finRange, Nat.mul_one] using
       (OracleComp.IsCostBounded.findSomeM? (cost := fun _ => 1) (n := 1)
-        (xs := List.finRange fuel) (f := fun i => attemptQuery H s sk A μ
+        (xs := List.finRange fuel) (f := fun i => attemptQuery H s sk A μ.toList
           (ringVectorCoeffs (mask (nonce + i.val * s.params.ℓ))))
         (fun _ _ => .liftBind _ _ 0 fun _ => .pure _ _))
   · exact fun _ => .pure _ _
 
-private theorem eval_retries (H : Xofs) (s : Level) (D) (sk A) (μ : List Bool)
-    (hμ : μ.length = 512) (mask) (fuel nonce : ℕ) :
+private theorem eval_retries (H : Xofs) (s : Level) (D) (sk A) (μ : List.Vector Bool 512)
+    (mask) (fuel nonce : ℕ) :
     OracleComp.evalPure D (H.retryDigestQueries s sk A μ mask fuel nonce) =
-      firstAccepted s.params.ℓ (fun n => (H.withDigestRegister s D).attemptWithMask s sk A μ
+      firstAccepted s.params.ℓ (fun n => (H.withDigestRegister s D).attemptWithMask s sk A μ.toList
         (ringVectorCoeffs (mask n))) fuel nonce := by
   rw [Xofs.retryDigestQueries, OracleComp.evalPure_map, OracleComp.evalPure_findSomeM?,
     firstAccepted_eq_terminal, Fin.findSome?_eq_findSome?_finRange]
   simp only [attemptQuery, OracleComp.evalPure_bind, OracleComp.evalPure_query,
-    OracleComp.evalPure_pure, Xofs.attemptWithMask, digest_at H s D _ hμ, challenge_off]
+    OracleComp.evalPure_pure, Xofs.attemptWithMask, digest_at H s D _ μ.toList_length,
+    challenge_off]
 
 /-- The full 814-attempt native signer with any fixed mask schedule computes exactly the
 table program's reply. Sparse-challenge exhaustion and reaching the retry cap both return error. -/
-theorem Xofs.evalPure_retryDigestQueries (H : Xofs) (s : Level) (D) (sk A) (μ : List Bool)
-    (hμ : μ.length = 512) (mask) :
+theorem Xofs.evalPure_retryDigestQueries (H : Xofs) (s : Level) (D) (sk A)
+    (μ : List.Vector Bool 512) (mask) :
     OracleComp.evalPure D (H.retryDigestQueries s sk A μ mask 814 0) =
-      (H.withDigestRegister s D).signingRetries s sk A μ mask :=
-  eval_retries H s D sk A μ hμ mask 814 0
+      (H.withDigestRegister s D).signingRetries s sk A μ.toList mask :=
+  eval_retries H s D sk A μ mask 814 0
 
 private def representativeQuery (H : Xofs) (s : Level) (tr : List Byte) (fmt : List Bool) :
-    DigestReads s (List Bool) :=
+    DigestReads s (List.Vector Bool 512) :=
   let x := representativeInput tr fmt
   if x.length = s.commitmentInputBits then do
     let v ← OracleComp.query (BitString.ofList _ x)
-    return Keccak.bytesToBitsLE (H.h256.readWithPrefix x 64 (digestBytesAt s v).toList)
-  else pure (H.representativeFromTr tr fmt)
+    return ⟨Keccak.bytesToBitsLE (H.h256.readWithPrefix x 64 (digestBytesAt s v).toList), by
+      simp only [Keccak.length_bytesToBitsLE, ExtendableOutput.readWithPrefix, List.length_append,
+        List.length_take, List.length_drop, H.h256.length_read]
+      lia⟩
+  else pure ⟨H.representativeFromTr tr fmt, by
+    simp [Xofs.representativeFromTr, Keccak.length_bytesToBitsLE, H.h256.length_read]⟩
 
 private theorem eval_rep (H : Xofs) (s : Level) (D) (tr fmt) :
-    OracleComp.evalPure D (representativeQuery H s tr fmt) =
+    (OracleComp.evalPure D (representativeQuery H s tr fmt)).toList =
       (H.withDigestRegister s D).representativeFromTr tr fmt := by
   by_cases hx : (representativeInput tr fmt).length = s.commitmentInputBits <;>
-    simp [representativeQuery, Xofs.representativeFromTr, Xofs.withDigestRegister,
-      ExtendableOutput.withPrefixes, hx, digestBytesAt]
+    simp only [representativeQuery, Xofs.representativeFromTr, Xofs.withDigestRegister,
+      ExtendableOutput.withPrefixes, hx, ↓reduceIte, digestBytesAt] <;> rfl
 
 /-- A full hedged signing query on the digest register. The representative may use a raw
 commitment address. In that case its 64-byte read includes any suffix supplied by SHAKE256. -/
@@ -133,14 +140,14 @@ def Xofs.signDigestQueries (H : Xofs) (s : Level) (key : List Byte) (q : Signing
       | none => pure none
       | some A => do
         let μ ← representativeQuery H s sk.tr (formatMessage q.message q.context)
-        let seed := H.h256.read (maskSeedInput sk.key rnd μ) 64
+        let seed := H.h256.read (maskSeedInput sk.key rnd μ.toList) 64
         H.retryDigestQueries s sk A μ (H.expandMask s seed) 814 0
   else pure none
 
 private theorem rep_bounded (H : Xofs) (s : Level) (tr fmt) :
     (representativeQuery H s tr fmt).IsQueryBounded 1 := by
-  dsimp only [representativeQuery]
-  split
+  by_cases hx : (representativeInput tr fmt).length = s.commitmentInputBits <;>
+    simp only [representativeQuery, hx, ↓reduceIte]
   · exact .liftBind _ _ 0 fun _ => .pure _ _
   · exact .pure _ _
 
@@ -197,11 +204,9 @@ theorem Xofs.evalPure_signDigestQueries (H : Xofs) (s : Level) (D) (key : List B
           rw [length_maskSeedInput, len]
           have lower : 1024 < s.commitmentInputBits := by cases s <;> decide
           lia)
-        simp only [OracleComp.evalPure_bind, eval_rep]
-        change OracleComp.evalPure D (H.retryDigestQueries s sk A μ _ 814 0) =
-          G.signingRetries s sk A μ (G.expandMask s (G.h256.read (maskSeedInput sk.key rnd μ) 64))
+        simp only [OracleComp.evalPure_bind, Xofs.evalPure_retryDigestQueries, eval_rep]
+        change G.signingRetries s sk A μ (H.expandMask s _) = G.signingRetries s sk A μ _
         rw [seed, mask_off H s D _ (H.h256.length_read ..)]
-        exact H.evalPure_retryDigestQueries s D sk A μ len _
   · simp [Xofs.signDigestQueries, Xofs.sign, guard, hc]
 
 /-- The native signing service samples one hedge, executes the bounded register program,
@@ -229,7 +234,7 @@ def Xofs.verifyDigestQueries (H : Xofs) (s : Level) (pk : List Byte) (f : Forger
     | some A, some c => do
       let μ ← representativeQuery H s (H.h256.readBytes pk 64) (formatMessage f.message f.context)
       let pair := publicKey s pk A
-      let x := commitmentInput s (hintedCommitment s pair σ c) μ
+      let x := commitmentInput s (hintedCommitment s pair σ c) μ.toList
       let v ← OracleComp.query (BitString.ofList _ x)
       return some (σ.acceptDigest fun _ => (digestBytesAt s v).toList)
     | _, _ => pure none
@@ -349,7 +354,7 @@ private theorem prob_response_changes {R : Type} (s : Level) (A : PublicMatrix s
   let δ := commitmentGuessProbability s.params (by cases s <;> decide) A
   have covered : {y | ∃ v, OracleComp.evalPure (Function.update D (addr y) v) run ≠
       OracleComp.evalPure D run} ⊆
-      addr ⁻¹' (reads.toFinset : Set _) := by
+      {y | addr y ∈ reads} := by
     intro y hy
     obtain ⟨v, hv⟩ := hy
     by_contra off
@@ -358,17 +363,15 @@ private theorem prob_response_changes {R : Type} (s : Level) (A : PublicMatrix s
     intro j hj
     apply Function.update_of_ne
     rintro rfl
-    exact off (List.mem_toFinset.mpr hj)
-  calc
-    _ ≤ μ.toOuterMeasure (addr ⁻¹' (reads.toFinset : Set _)) := μ.toOuterMeasure.mono covered
-    _ = ∑ i ∈ reads.toFinset, (μ.map addr) i := by
-      rw [← PMF.toOuterMeasure_map_apply, PMF.toOuterMeasure_apply_finset]
-    _ ≤ reads.toFinset.card * δ := by
-      rw [← nsmul_eq_mul]
-      exact Finset.sum_le_card_nsmul _ _ _ fun i _ => maskCommitmentAddress_mass_le s A m i
-    _ ≤ K * δ := by
-      gcongr
-      exact_mod_cast (List.toFinset_card_le reads).trans (bound.length_queriesWith_le D)
+    exact off hj
+  have point (i) : μ.toOuterMeasure {y | addr y = i} ≤ δ := by
+    change μ.toOuterMeasure (addr ⁻¹' {i}) ≤ δ
+    rw [← PMF.toOuterMeasure_map_apply, PMF.toOuterMeasure_apply_singleton]
+    exact maskCommitmentAddress_mass_le s A m i
+  refine (μ.toOuterMeasure.mono covered).trans
+    ((PMF.toOuterMeasure_mem_list_le μ addr point reads).trans ?_)
+  gcongr
+  exact_mod_cast bound.length_queriesWith_le D
 
 /-- Changing the entry at a fresh mask commitment can affect one whole native signing
 reply with probability at most 815 times the largest rounded-commitment atom. The digest
