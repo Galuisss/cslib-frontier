@@ -8,7 +8,9 @@ module
 -- upstream: local-only (test driver)
 
 import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
+import CslibFrontier.Crypto.Computational.MLDSA.RejNTTProgramming
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
+meta import CslibFrontier.Crypto.Computational.MLDSA.RejNTTProgramming
 
 /-!
 # ML-DSA byte keys, signing and verification
@@ -21,6 +23,28 @@ set_option linter.privateModule false
 set_option linter.hashCommand false
 
 open Cslib.Crypto Cslib.Crypto.MLDSA.FIPS204
+
+-- Start with q itself (rejected), then accept a high-bit-set zero. The byte after the
+-- last swapped triple is a sentinel. The shorter prefix contains only 255 accepted triples.
+private def matrixStream (n : ℕ) : FixedBytes n := fun i =>
+  match i.val with
+  | 0 => 1
+  | 1 => 224
+  | 2 => 127
+  | 5 => 128
+  | 771 => 99
+  | _ => 0
+
+private def matrixStreamCheck : Bool := Id.run do
+  let target : Poly := fun _ => 66051
+  let (stream, saved) := exchangeRejNTT 894 (matrixStream 894, target)
+  let first := (List.ofFn stream).take 9
+  let short := (exchangeRejNTT 768 (matrixStream 768, target)).1
+  return first == [1, 224, 127, 3, 2, 129, 3, 2, 1] && saved 0 == 0 &&
+    stream 771 == 99 && (rejNTTPoly (List.ofFn stream)).map (· 255) == some 66051 &&
+    (rejNTTPoly (List.ofFn short)).isNone
+
+#guard matrixStreamCheck
 
 -- NIST ACVP-Server, ML-DSA-keyGen-FIPS204/internalProjection.json, tgId 1, tcId 1
 -- (commit 975de31eb83d87039ec88934fdc47d8c312b892d). Compare a SHAKE256 fingerprint of
