@@ -7812,6 +7812,7 @@ public import CslibFrontier.Probability.HashFamily
 public import CslibFrontier.Probability.HashFamily.Collisions
 public import CslibFrontier.Probability.HashFamily.IntegerBox
 public import CslibFrontier.Probability.HashFamily.Matrix
+public import CslibFrontier.Probability.HashFamily.MatrixKernel
 public import CslibFrontier.Probability.HashFamily.MultiplyShift
 public import CslibFrontier.Probability.HashFamily.Polynomial
 public import CslibFrontier.Probability.HashFamily.Transport
