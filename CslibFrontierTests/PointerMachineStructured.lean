@@ -96,7 +96,8 @@ example (x : State model L) (k : ℕ) (hq : x.ptr q = none)
         dist ((Op.loadPtr p next p).effect y) < dist y)
     (hk : dist x = k) :
     ∃ y, ExecWithin pm[ while p ≠ q do [ p ← p[next] ] ] x y (k * 3 + 1) ∧ y.ptr p = none := by
-  obtain ⟨y, run, inv, done⟩ := ExecWithin.loopUntil_invariant (t := .ptrEq p q)
+  obtain ⟨y, run, inv, done⟩ := Cslib.Program.ExecWithin.loopUntil_invariant
+    (I := instructionSet model L) (t := .ptrEq p q)
     (body := .op (.loadPtr p next p)) (fun y => y.ptr q = none) dist (T := 1)
     (fun y hy ht => ⟨_, ExecWithin.op, step y hy (by simpa [Test.Holds, hy] using ht)⟩) hq
   exact ⟨y, hk ▸ run, by simpa [Test.Holds, inv] using done⟩

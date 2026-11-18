@@ -17,9 +17,10 @@ Flat programs are lists of `Instr` with numeric labels, which are inconvenient t
 reason about. This file makes the pointer machine an instruction set (`instructionSet`) for the
 structured programs of `Cslib.Program`: its data instructions (`Op`) and its two tests (`Test`),
 acting on states. `Code`, `Exec` and `ExecWithin` are those of `Cslib.Program` at this
-instruction set, and the sequencing, conditional and loop rules there are restated on states
-under the same names (`ExecWithin.seq`, `ExecWithin.loopUntil_invariant`, …), so that they apply
-to terms of these types by name and by field notation.
+instruction set, so the sequencing, conditional and loop rules there (`Program.ExecWithin.seq`,
+`Program.ExecWithin.loopUntil_invariant`, …) apply to them as they are, also by field notation.
+This file adds what is specific to the machine: the effect of a data instruction, and the
+program counter, validity and field frame of an execution.
 
 `Exec c x y n` relates states and ignores the program counter: `y.pc = x.pc` (`Exec.pc_eq`).
 The count `n` is exactly that of the flat program `c` assembles to (`Exec.runs` in `Assemble`).
@@ -200,18 +201,7 @@ abbrev Code.eval (c : Code M L) (fuel : ℕ) (x : State M L) : Option (State M L
 
 namespace Exec
 
-variable {c : Code M L} {x y y' : State M L} {n n' : ℕ}
-
-/-- Executions are deterministic. -/
-theorem unique (h : Exec c x y n) (h' : Exec c x y' n') : y = y' ∧ n = n' :=
-  Program.Exec.unique h h'
-
-/-- An execution is within its instruction count. -/
-theorem within (h : Exec c x y n) : ExecWithin c x y n := Program.Exec.within h
-
-/-- The interpreter only finds executions. -/
-theorem of_eval {fuel : ℕ} (h : c.eval fuel x = some (y, n)) : Exec c x y n :=
-  Program.Exec.of_eval h
+variable {c : Code M L} {x y : State M L} {n : ℕ}
 
 /-- A data instruction is one instruction. -/
 theorem op {o : Op M L} : Exec (.op o) x (o.effect x) 1 := Program.Exec.op rfl
@@ -230,83 +220,7 @@ end Exec
 
 namespace ExecWithin
 
-variable {c c₁ c₂ pos neg body : Code M L} {t : Test M L} {x y z : State M L} {T T₁ T₂ : ℕ}
-
-/-- An execution whose instruction count is within the budget. -/
-theorem of_exec {n : ℕ} (h : Exec c x y n) (hn : n ≤ T) : ExecWithin c x y T :=
-  Program.ExecWithin.of_exec h hn
-
-/-- Monotonicity in the instruction budget. -/
-theorem mono (h : ExecWithin c x y T) (hT : T ≤ T₂) : ExecWithin c x y T₂ :=
-  Program.ExecWithin.mono h hT
-
-/-- `skip` executes within any bound. -/
-theorem skip : ExecWithin (.skip : Code M L) x x T := Program.ExecWithin.skip
-
-/-- Sequencing adds the instruction bounds. -/
-theorem seq (h₁ : ExecWithin c₁ x y T₁) (h₂ : ExecWithin c₂ y z T₂) :
-    ExecWithin (.seq c₁ c₂) x z (T₁ + T₂) := Program.ExecWithin.seq h₁ h₂
-
-/-- The first alternative of a conditional adds one instruction to the bound. -/
-theorem branch_pos (ht : t.Holds x) (h : ExecWithin pos x y T) :
-    ExecWithin (.branch t pos neg) x y (T + 1) := Program.ExecWithin.branch_pos ht h
-
-/-- The second alternative of a conditional adds two instructions to the bound. -/
-theorem branch_neg (ht : ¬t.Holds x) (h : ExecWithin neg x y T) :
-    ExecWithin (.branch t pos neg) x y (T + 2) := Program.ExecWithin.branch_neg ht h
-
-/-- A conditional, with one bound for both alternatives. -/
-theorem branch (hpos : t.Holds x → ExecWithin pos x y T)
-    (hneg : ¬t.Holds x → ExecWithin neg x y T) : ExecWithin (.branch t pos neg) x y (T + 2) :=
-  Program.ExecWithin.branch hpos hneg
-
-/-- Leaving a `loop` takes two instructions. -/
-theorem loop_exit (ht : ¬t.Holds x) : ExecWithin (.loop t body) x x 2 :=
-  Program.ExecWithin.loop_exit ht
-
-/-- An iteration of a `loop` followed by the rest of it. -/
-theorem loop_iter (ht : t.Holds x) (h₁ : ExecWithin body x y T₁)
-    (h₂ : ExecWithin (.loop t body) y z T₂) : ExecWithin (.loop t body) x z (T₁ + T₂ + 2) :=
-  Program.ExecWithin.loop_iter ht h₁ h₂
-
-/-- Leaving a `loopUntil` takes one instruction. -/
-theorem loopUntil_exit (ht : t.Holds x) : ExecWithin (.loopUntil t body) x x 1 :=
-  Program.ExecWithin.loopUntil_exit ht
-
-/-- An iteration of a `loopUntil` followed by the rest of it. -/
-theorem loopUntil_iter (ht : ¬t.Holds x) (h₁ : ExecWithin body x y T₁)
-    (h₂ : ExecWithin (.loopUntil t body) y z T₂) :
-    ExecWithin (.loopUntil t body) x z (T₁ + T₂ + 2) :=
-  Program.ExecWithin.loopUntil_iter ht h₁ h₂
-
-/-- An interpreter result within the budget is an execution within it. -/
-theorem of_eval {fuel n : ℕ} (h : c.eval fuel x = some (y, n)) (hn : n ≤ T) :
-    ExecWithin c x y T := Program.ExecWithin.of_eval h hn
-
-/-- **Loop rule, invariant and potential.** `Program.ExecWithin.loop_potential` on states. -/
-theorem loop_potential (P : State M L → Prop) (Φ : State M L → ℕ)
-    (hbody : ∀ x, P x → t.Holds x → ∃ y T, ExecWithin body x y T ∧ P y ∧ T + 2 + Φ y ≤ Φ x)
-    (hx : P x) : ∃ y, ExecWithin (.loop t body) x y (Φ x + 2) ∧ P y ∧ ¬t.Holds y :=
-  Program.ExecWithin.loop_potential (I := instructionSet M L) P Φ hbody hx
-
-/-- **Loop rule, invariant and measure.** `Program.ExecWithin.loop_invariant` on states. -/
-theorem loop_invariant (P : State M L → Prop) (μ : State M L → ℕ) {T : ℕ}
-    (hbody : ∀ x, P x → t.Holds x → ∃ y, ExecWithin body x y T ∧ P y ∧ μ y < μ x) (hx : P x) :
-    ∃ y, ExecWithin (.loop t body) x y (μ x * (T + 2) + 2) ∧ P y ∧ ¬t.Holds y :=
-  Program.ExecWithin.loop_invariant (I := instructionSet M L) P μ hbody hx
-
-/-- **Until rule, invariant and potential.** `Program.ExecWithin.loopUntil_potential` on
-states. -/
-theorem loopUntil_potential (P : State M L → Prop) (Φ : State M L → ℕ)
-    (hbody : ∀ x, P x → ¬t.Holds x → ∃ y T, ExecWithin body x y T ∧ P y ∧ T + 2 + Φ y ≤ Φ x)
-    (hx : P x) : ∃ y, ExecWithin (.loopUntil t body) x y (Φ x + 1) ∧ P y ∧ t.Holds y :=
-  Program.ExecWithin.loopUntil_potential (I := instructionSet M L) P Φ hbody hx
-
-/-- **Until rule, invariant and measure.** `Program.ExecWithin.loopUntil_invariant` on states. -/
-theorem loopUntil_invariant (P : State M L → Prop) (μ : State M L → ℕ) {T : ℕ}
-    (hbody : ∀ x, P x → ¬t.Holds x → ∃ y, ExecWithin body x y T ∧ P y ∧ μ y < μ x) (hx : P x) :
-    ∃ y, ExecWithin (.loopUntil t body) x y (μ x * (T + 2) + 1) ∧ P y ∧ t.Holds y :=
-  Program.ExecWithin.loopUntil_invariant (I := instructionSet M L) P μ hbody hx
+variable {c : Code M L} {x y : State M L} {T : ℕ}
 
 /-- A data instruction executes within one instruction. -/
 theorem op {o : Op M L} : ExecWithin (.op o) x (o.effect x) 1 :=
@@ -321,8 +235,8 @@ theorem seqList_op (os : List (Op M L)) (x : State M L) :
     ExecWithin (Program.Code.seqList (os.map .op)) x (os.foldl (fun s o => o.effect s) x)
       os.length := by
   induction os generalizing x with
-  | nil => exact skip
-  | cons o os ih => exact (seq op (ih (o.effect x))).mono (by simp [Nat.add_comm])
+  | nil => exact Program.ExecWithin.skip
+  | cons o os ih => exact (Program.ExecWithin.seq op (ih (o.effect x))).mono (by simp [Nat.add_comm])
 
 /-- When no data instruction of the program allocates or stores `field`, every execution
 preserves that field at every address, including the absence of a record. -/
