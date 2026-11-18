@@ -7,7 +7,7 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
+import all CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitment
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 
 /-!
@@ -70,3 +70,16 @@ private def digest44 : List Byte := (List.finRange 32).map (fun i => Fin.ofNat 2
     match i.val with
     | 0 => 4096 | 1 => 4097 | 2 => -1 | 3 => 16384 | _ => 0).drop 32).take 5 ==
   [0, 4, 240, 191, 0]
+
+-- Every mask reaches the same encoded address at the zero matrix. A useful
+-- reprogramming estimate therefore has to account for the law of the public matrix.
+example (s : Level) (extra : Finset (List Bool)) (μ : Cslib.BitString 512) :
+    (signingAddressLaw s extra 0 μ).support.Subsingleton := by
+  have hz (y : Fin s.params.ℓ → Poly) : moduleSISMap (0 : PublicMatrix s) y = 0 := by
+    funext i
+    simp [moduleSISMap]
+  unfold signingAddressLaw
+  simp_rw [hz]
+  change (PMF.map (Function.const _ _) _).support.Subsingleton
+  rw [PMF.map_const, PMF.support_pure]
+  exact Set.subsingleton_singleton
