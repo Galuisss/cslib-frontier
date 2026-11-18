@@ -100,14 +100,8 @@ private theorem expect_roundDistance_le :
     (fun r => (alice r, bob r)) (fun r => (alice r).checkedBit) (fun r => (bob r).checkedBit) S
   simp only [Probability.PMF.uniformOfFintype_apply, ENNReal.toReal_inv,
     ENNReal.toReal_natCast, ← mul_sum] at h
-  have hf (f : ((ι → Bool) × (ι → Bool) × (ι → Bool)) → ℝ) :
-      (𝔼 r, f r) = 𝔼 a, 𝔼 b, 𝔼 c, f (a, b, c) := by
-    rw [← univ_product_univ, expect_product]
-    refine expect_congr rfl fun a _ => ?_
-    rw [← univ_product_univ, expect_product]
-  rw [← hf (fun r => S.state.norm (((S.alice (alice r)).map (alice r).checkedBit).observable -
-    ((S.bob (bob r)).map (bob r).checkedBit).observable) ^ 2)]
-  simpa only [pauliSameBasisTest, expect_eq_sum_div_card, card_univ, div_eq_inv_mul] using h
+  simpa only [pauliSameBasisTest, ← div_eq_inv_mul, ← card_univ,
+    ← expect_eq_sum_div_card, Fintype.expect_prod_type, alice, bob] using h
 
 private theorem expect_localDistance_le :
     (𝔼 a : ι → Bool, 𝔼 b : ι → Bool,

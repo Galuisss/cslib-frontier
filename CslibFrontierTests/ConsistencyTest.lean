@@ -153,4 +153,25 @@ example :
     rw [sameBasisWinProb φ, specialWinProb φ false] at h
     simpa [sameBasisStrategy] using h
 
+private noncomputable def dummyStrategy :
+    CommutingStrategy (PauliConsistencyQuestion Unit) (PauliConsistencyQuestion Unit)
+      (Bool × Bool) (Bool × Bool) (Matrix (Fin 1) (Fin 1) ℂ) where
+  state := φ
+  alice q := Measurement.const (q.zString (), false)
+  bob q := Measurement.const (q.zString (), false)
+  commute _ _ a b := by
+    simp only [Measurement.const]
+    split_ifs <;> simp [Commute, SemiconjBy]
+
+/-- Echoing the X-basis dummy agrees on half of the seeds. Sharing the dummy would give
+agreement on every seed. -/
+example : (pauliSameBasisTest Unit false).commutingWinProb (dummyStrategy φ) = 1 / 2 := by
+  rw [pauliSameBasisTest, SeededGame.commutingWinProb_eq_sum]
+  simp only [SeededGame.bitAgreement, PauliConsistencyQuestion.checkedBit,
+    PauliConsistencyQuestion.ofChecked, Bool.false_eq_true, ite_false,
+    Probability.PMF.uniformOfFintype_apply, ENNReal.toReal_inv, ENNReal.toReal_natCast,
+    CommutingStrategy.prob, dummyStrategy, Measurement.const, Fintype.sum_prod_type]
+  simp_rw [← (Equiv.funUnique Unit Bool).symm.sum_comp]
+  norm_num [Fintype.sum_bool, φ.map_one]
+
 end CslibFrontierTests.ConsistencyTest
