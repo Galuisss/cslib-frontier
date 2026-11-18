@@ -9,6 +9,7 @@ module
 
 import all CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 import all CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
+import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 import CslibFrontier.Probability.PMF.ToReal
 import CslibFrontier.Probability.PMF.Uniform
@@ -160,3 +161,38 @@ example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ}
     (Game.succProbability (C.maskSeedQueryHit s base (n := 2 ^ 64) ha hb (by decide) j) : ℝ) ≤
       1 / 2 ^ 191 :=
   (C.maskSeedQueryHit_le s base ha hb hn (by decide) j).trans (by norm_num)
+
+-- At a large signing budget the entire measured-query loss scales with the chance of
+-- predicting the secret prefix, including the public-key-hash candidate.
+example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ} (ha : 1024 ≤ a)
+    (hb : 64 ≤ b) (hn : C.SigningCallsLe (2 ^ 64)) (j : ℕ) :
+    (Game.succProbability (C.maskSeedQueryHit s base (n := 2 ^ 64) ha hb (by decide) j) : ℝ) ≤
+      (1 / 2 ^ 191) * Game.succProbability (C.maskSeedKeyPrediction s base a b (2 ^ 64) j) := by
+  have h := C.maskSeedQueryHit_le_keyPrediction s base ha hb hn (by decide) j
+  convert h using 2
+  norm_num
+
+-- Decode the candidate from the raw SHAKE256 input. SHAKE128 has no candidate.
+open QuantumSigningForger in
+example (C : QuantumSigningForger) (x : List Bool) (hx : x.length ≤ C.addressBits)
+    (strength : Bool) :
+    queryKeyPrefix (C := C) (some (Xofs.queryAddress C.addressBits strength x hx)) =
+      if strength then some (x.take 256) else none := by
+  have len : (List.replicate (C.addressBits - x.length) false ++ true :: x).length =
+      C.addressBits + 1 := by
+    simp only [List.length_append, List.length_replicate, List.length_cons]
+    lia
+  cases strength with
+  | false => rfl
+  | true =>
+    simp only [queryKeyPrefix, Xofs.queryAddress, Option.bind_eq_bind, Option.bind_some,
+      Fin.cons_zero, guard, ↓reduceIte, Option.pure_def, Fin.cons_succ, BitString.ofFn_ofList len,
+      Xofs.unpad_word]
+
+-- If the forger stops early, only the public-key hash can predict the secret prefix.
+open QuantumSigningForger in
+example (C : QuantumSigningForger) (H : Xofs) (s : Level) (seed : FixedBytes 32) (keys : KeyPair)
+    (hg : H.keyGen s seed = some keys) :
+    guessed (C := C) H s seed none =
+      ((H.h256.readBytes keys.publicKey 64).take 32 == (H.expandKeySeed s seed).drop 96) := by
+  simp [guessed, setupHash, hg, queryKeyPrefix, signingKeyBytes]

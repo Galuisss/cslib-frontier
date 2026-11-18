@@ -287,16 +287,16 @@ theorem Xofs.uniform_shared_sampleSigningMaskSeeds (base : Xofs) (s : Level) (se
   rw [PMF.bind_comm]
   exact law
 
-/-- A change in any message representative forces a selected hedge to equal the second
-half of the public-key hash. All formatted messages for that hash share the same condition. -/
-private theorem hedge_of_representative_ne {base : Xofs} {s : Level} {seed : FixedBytes 32}
+/-- A changed representative identifies both halves of the public-key hash: the signing
+key followed by one of the selected hedges. -/
+private theorem key_hedge_of_representative_ne {base : Xofs} {s : Level} {seed : FixedBytes 32}
     {a b n : ℕ} {t : Fin n ↪ FixedBytes 32} {ha : 1024 ≤ a} {hb : 64 ≤ b}
     {rows : SigningMaskSeeds n} {pair : SigningMaskSeedOracles}
     (hp : pair ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
     (tr : List Byte) (ht : tr.length = 64) (formatted : List Bool)
     (hne : pair.shared.representativeFromTr tr formatted ≠
       pair.background.representativeFromTr tr formatted) :
-    ∃ i, (t i).toList = tr.drop 32 := by
+    ∃ i, tr = (pair.background.expandKeySeed s seed).drop 96 ++ (t i).toList := by
   let key := signingKeyBytes pair.background s seed
   have hk : key.length = 32 := signingKeyBytes_length ..
   by_contra! miss
@@ -309,9 +309,7 @@ private theorem hedge_of_representative_ne {base : Xofs} {s : Level} {seed : Fix
   have bytes : key ++ (t i).toList = tr := bytes_eq_of_bits_eq (List.append_inj eq
     (by simp only [bitsLength, List.length_append, FixedBytes.length_toList, ht, hk,
       ← show key = (pair.background.expandKeySeed s seed).drop 96 from rfl])).1
-  apply miss i
-  rw [← bytes]
-  simpa only [hk] using (List.drop_left (l₁ := key) (l₂ := (t i).toList)).symm
+  exact miss i bytes.symm
 
 /-- For each setup seed and supplied table of mask seeds, with a uniformly drawn injective
 hedge tape, the chance that installing the mask seeds changes the message representative for
@@ -352,7 +350,13 @@ theorem Xofs.prob_representative_ne_sampleSigningMaskSeeds (base : Xofs) (s : Le
       obtain ⟨keys, hg, formatted, ne⟩ := of_decide_eq_true hbad
       rw [Xofs.messageRepresentative, publicKeyHash_eq_of_mem_sampleSigningMaskSeeds hp hg] at ne
       apply decide_eq_true
-      exact ⟨keys, hg, hedge_of_representative_ne hp _ (p.background.h256.length_read ..) _ ne⟩
+      obtain ⟨i, eq⟩ := key_hedge_of_representative_ne hp _ (p.background.h256.length_read ..) _ ne
+      refine ⟨keys, hg, i, ?_⟩
+      change p.background.h256.readBytes keys.publicKey 64 =
+        signingKeyBytes p.background s seed ++ (t i).toList at eq
+      rw [eq]
+      simpa only [signingKeyBytes_length] using
+        (List.drop_left (l₁ := signingKeyBytes p.background s seed) (l₂ := (t i).toList)).symm
     _ ≤ _ := by
       rw [PMF.bind_comm]
       apply PMF.bind_apply_le_on_support
