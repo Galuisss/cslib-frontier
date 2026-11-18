@@ -7,6 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: candidate
 
+public import CslibFrontier.Computability.PCP.TwoProverGame.LinearityDiagonal
 public import CslibFrontier.Computability.PCP.TwoProverGame.PauliBraidingGame
 
 /-!
@@ -97,5 +98,100 @@ theorem rejection_pauliBraidingDiagonalGame_le
   convert h using 1
   rw [div_eq_mul_inv, ← mul_assoc, ← mul_inv]
   ring
+
+open BitString Finset Quantum in
+/-- For either role assignment, the three checks of a diagonal round bound the point
+player’s probability of a true decoded answer at zero.
+Malformed answers are decoded as false and still rejected by the verifier. -/
+theorem prob_true_le_pauliBraidingDiagonal {𝒜 : Type*} [Fintype A] [Ring 𝒜] [StarRing 𝒜]
+    [PartialOrder 𝒜] [StarOrderedRing 𝒜] [Algebra ℂ 𝒜] [TopologicalSpace 𝒜]
+    [ContinuousFunctionalCalculus ℝ 𝒜 IsSelfAdjoint] [NonnegSpectrumClass ℝ 𝒜]
+    (G : TwoProverGame Q Q A A) (special : Bool → Q) (decode : Bool → A → Bool)
+    (roles basis : Bool)
+    (S : CommutingStrategy (PauliBraidingQuestion n Q) (PauliBraidingQuestion n Q)
+      ((Bool × Bool) ⊕ A) ((Bool × Bool) ⊕ A) 𝒜)
+    (a dummy : Fin n → Bool) :
+    let game := pauliBraidingDiagonalGame n G special decode roles basis
+    let logical := cond roles S.swap S
+    let loss (k : Fin 3) :=
+      1 - ({ game with seed := PMF.pure (k, a, dummy) }).commutingWinProb S
+    let read : (Bool × Bool) ⊕ A → Bool :=
+      Sum.elim (fun bits => (cond (lexSwap (0 : Fin n → Bool) dummy) Prod.swap id bits).1)
+        (fun _ => false)
+    let q := game.query (2, a, dummy)
+    ((logical.bob (cond roles q.1 q.2)).map read).prob logical.state true ≤
+      loss 0 + loss 1 + loss 2 := by
+  classical
+  intro game logical loss read queryAtZero
+  let x : PauliBraidingQuestion n Q := .basis basis (a, a)
+  let point (c : Fin n → Bool) : PauliBraidingQuestion n Q :=
+    .basis basis (cond (lexSwap c dummy) Prod.swap id (c, dummy))
+  let pair : (Bool × Bool) ⊕ A → Bool × Bool := Sum.elim id (fun _ => (false, false))
+  let pointRead (c : Fin n → Bool) (ans : (Bool × Bool) ⊕ A) : Bool :=
+    (cond (lexSwap c dummy) Prod.swap id (pair ans)).1
+  have hread : pointRead 0 = read := by
+    funext ans
+    cases ans with
+    | inl bits => rfl
+    | inr bad =>
+      change (cond (lexSwap (0 : Fin n → Bool) dummy) Prod.swap id (false, false)).1 = false
+      cases lexSwap (0 : Fin n → Bool) dummy <;> rfl
+  have htie : lexSwap a a = false := by simp [lexSwap]
+  have hquery (k : Fin 3) : game.query (k, a, dummy) =
+      cond roles Prod.swap id (x, point (linearityQuery k a a)) := by
+    cases roles <;>
+      simp only [game, pauliBraidingDiagonalGame, SeededGame.pullbackSeed, Function.comp_apply,
+      pauliBraidingGame, pauliBraidingBranchGame, SymmetricLinearitySeed.diagonal,
+        Function.Embedding.coeFn_mk, symmetricLinearityGame, htie, Bool.cond_false,
+        Bool.cond_true, id_eq, Prod.swap_prod_mk, x, point]
+  have hcheck (k : Fin 3) (p q : (Bool × Bool) ⊕ A)
+      (h : game.accepts (k, a, dummy) (cond roles q p) (cond roles p q)) :
+      pointRead (linearityQuery k a a) q = linearityCheck k (pair p) := by
+    cases roles <;> cases p <;> cases q
+    all_goals
+      first
+      | exact False.elim h
+      | simpa only [game, pauliBraidingDiagonalGame, SeededGame.pullbackSeed, pauliBraidingGame,
+          pauliBraidingBranchGame, SymmetricLinearitySeed.diagonal, Function.Embedding.coeFn_mk,
+          symmetricLinearityGame, htie, Bool.cond_false, Bool.cond_true, id_eq, Prod.swap_prod_mk,
+          pointRead, pair, Sum.elim_inl] using h
+  have hcompare (k : Fin 3) :
+      (∑ p, ∑ q, if pointRead (linearityQuery k a a) q = linearityCheck k (pair p) then 0
+        else logical.prob x (point (linearityQuery k a a)) p q) ≤ loss k := by
+    rw [show loss k = _ from game.one_sub_commutingWinProb_pure_seed (k, a, dummy) S, hquery]
+    have hloss :
+        (∑ p, ∑ q, if game.accepts (k, a, dummy) (cond roles q p) (cond roles p q) then 0
+          else logical.prob x (point (linearityQuery k a a)) p q) =
+        ∑ p, ∑ q, if game.accepts (k, a, dummy) p q then 0 else
+          S.prob (cond roles Prod.swap id (x, point (linearityQuery k a a))).1
+            (cond roles Prod.swap id (x, point (linearityQuery k a a))).2 p q := by
+      cases roles
+      · rfl
+      · simp only [logical, Bool.cond_true, Prod.swap_prod_mk, S.prob_swap]
+        exact sum_comm
+    rw [← hloss]
+    refine sum_le_sum fun p _ => sum_le_sum fun q _ => ?_
+    by_cases h : game.accepts (k, a, dummy) (cond roles q p) (cond roles p q)
+    · simp only [h, hcheck k p q h, ite_true, le_refl]
+    · simp only [h, ite_false]
+      split_ifs
+      · exact logical.prob_nonneg _ _ _ _
+      · exact le_rfl
+  have hzero : linearityQuery 2 a a = 0 := by simp [linearityQuery]
+  have hpoint : cond roles queryAtZero.1 queryAtZero.2 = point 0 := by
+    dsimp [queryAtZero]
+    rw [hquery, hzero]
+    cases roles <;> rfl
+  rw [hpoint, ← hread]
+  have h := logical.prob_true_le_diagonal_linearity x (point a) (point 0) pair
+    (pointRead a) (pointRead 0)
+  have h0 := hcompare 0
+  have h1 := hcompare 1
+  have h2 := hcompare 2
+  rw [hzero] at h2
+  simp only [linearityQuery, linearityCheck, Fin.reduceEq, ite_true, ite_false] at h0 h1
+  simp only [linearityCheck, Fin.reduceEq, ite_false] at h2
+  dsimp only at h
+  linarith only [h, h0, h1, h2]
 
 end Cslib.PCP
