@@ -23,7 +23,9 @@ import Mathlib.Tactic.NormNum.Prime
 The 256 distinct roots of `X^256 + 1` over the FIPS 204 field split the negacyclic coefficient
 algebra into 256 copies of that field. Evaluation commutes with each module matrix product.
 The kernel of a square coefficient matrix is therefore the product of the finite-field kernels
-in the 256 coordinates, as used in [BarbosaEtAl2023, Appendix A.1].
+in the 256 coordinates. Barbosa et al. [BarbosaEtAl2023, Appendix A.2, Lemma 8, p. 35] use
+this splitting to express the rank of a uniform ring matrix as the sum of the ranks of
+independent uniform field matrices.
 -/
 
 public section

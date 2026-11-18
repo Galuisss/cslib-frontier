@@ -163,17 +163,13 @@ theorem freshSigningAttempt_eq_simulate (hP : P.Valid) (hq : 2 * P.γ₁ < P.q)
     sub_mem_mask P ((mem_response_iff P hq z).1 hz) hv
   have hgate := PMF.shiftReject_eq_sampleWithRatio (hB := mask_nonempty P (by lia)) hpre
     (response_nonempty P hβ)
-  have hm : (maskSet P).card = (2 * P.γ₁) ^ (P.ℓ * P.n) := by
-    rw [intervalVectors_card P (by lia) (by lia)]
-    congr 1
-    lia
   have hr : (responseSet P).card = (2 * (P.γ₁ - P.β) - 1) ^ (P.ℓ * P.n) := by
     rw [intervalVectors_card P (by lia) (by lia)]
     congr 1
     lia
   unfold simulateFreshSigningAttempt
-  simp only [← hm, ← hr, ← hgate, PMF.shiftReject, PMF.map_comp, Function.comp_def,
-    freshSigningAttempt, signingMaskLaw]
+  simp only [← mask_card P (by lia) hq, ← hr, ← hgate, PMF.shiftReject, PMF.map_comp,
+    Function.comp_def, freshSigningAttempt, signingMaskLaw]
   congr 1 with y : 1
   let w := moduleSISMap sk.A y
   let r := w - fun i => negacyclicMul c (sk.s₂ i)
