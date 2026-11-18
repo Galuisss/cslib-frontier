@@ -42,10 +42,12 @@ is the parity observable. Linearity from consistency
 
 This is the test of [Natarajan and Vidick, §3, Figure 1][NatarajanVidick2017]
 (arXiv:1610.03574v1) in an **asymmetric variant**, and the estimate is the commuting-operator,
-point-player form of their Theorem 11. The variant differs from the source in two ways:
+point-player form of their Theorem 11. The variant differs from the source in three ways:
 
 * one player always gets the point and the other the pair, whereas the source labels the players
   at random and sends Bob a second, uniformly random query so that symmetric strategies apply;
+* the pair is sent in sampled order `(a, b)`. Figure 1 sends it in lexicographic order, so
+  a strategy for this variant can distinguish the two sampled orders;
 * the conclusion concerns the point player's own observables, whereas the source rounds the
   Naimark dilation of the averaged pair marginals.
 

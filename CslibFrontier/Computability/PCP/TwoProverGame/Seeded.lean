@@ -8,7 +8,6 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.Commuting
-import CslibFrontier.Probability.PMF.Event
 
 /-!
 # Two-prover games with private verifier randomness
@@ -50,52 +49,9 @@ namespace Cslib.PCP
 
 open Finset Quantum
 
-/-- A **two-prover game with private verifier randomness**: the verifier draws a seed `r` from
-`seed`, sends the questions `query r`, and accepts the answers `(a, b)` when `accepts r a b`. -/
-structure SeededGame (R X Y A B : Type*) where
-  /-- The distribution of the verifier's seed. -/
-  seed : PMF R
-  /-- The questions sent on the seed `r`. -/
-  query : R → X × Y
-  /-- The verifier's decision on the seed `r` and the answers. -/
-  accepts : R → A → B → Prop
-
 namespace SeededGame
 
 variable {R X Y A B : Type*} (G : SeededGame R X Y A B)
-
-/-- The verdict of `G` on a seed and answers. -/
-def AcceptsRound : R × A × B → Prop
-  | (r, (a, b)) => G.accepts r a b
-
-/-- The probability of winning `G` when the answers to questions `(x, y)` are drawn from
-`ans x y`. -/
-noncomputable def answersWinProb (ans : X → Y → PMF (A × B)) : ℝ :=
-  ((G.seed.bind fun r => (ans (G.query r).1 (G.query r).2).map fun ab => (r, ab)).toOuterMeasure
-    {z | G.AcceptsRound z}).toReal
-
-theorem answersWinProb_nonneg (ans : X → Y → PMF (A × B)) : 0 ≤ G.answersWinProb ans :=
-  ENNReal.toReal_nonneg
-
-theorem answersWinProb_le_one (ans : X → Y → PMF (A × B)) : G.answersWinProb ans ≤ 1 :=
-  (ENNReal.toReal_mono ENNReal.one_ne_top
-    (Cslib.Probability.PMF.toOuterMeasure_le_one _ _)).trans_eq ENNReal.toReal_one
-
-/-- The winning probability `∑_r Pr[r] ∑_{a,b} [accepts r a b] Pr[(a, b) | query r]`. -/
-theorem answersWinProb_eq_sum [Fintype R] [Fintype A] [Fintype B]
-    [∀ r a b, Decidable (G.accepts r a b)] (ans : X → Y → PMF (A × B)) :
-    G.answersWinProb ans = ∑ r, (G.seed r).toReal * ∑ a, ∑ b,
-      if G.accepts r a b then (ans (G.query r).1 (G.query r).2 (a, b)).toReal else 0 := by
-  rw [answersWinProb, PMF.toOuterMeasure_bind_apply, tsum_fintype, ENNReal.toReal_sum
-    fun r _ => ENNReal.mul_ne_top (PMF.apply_ne_top _ _)
-      (Cslib.Probability.PMF.toOuterMeasure_ne_top _ _)]
-  refine Finset.sum_congr rfl fun r _ => ?_
-  rw [ENNReal.toReal_mul, PMF.toOuterMeasure_map_apply,
-    Cslib.Probability.PMF.toOuterMeasure_apply_toReal, ← Finset.univ_product_univ,
-    Finset.sum_product]
-  congr 1
-  refine Finset.sum_congr rfl fun a _ => Finset.sum_congr rfl fun b _ => ?_
-  simp only [Set.mem_preimage, Set.mem_ofPred_eq, AcceptsRound]
 
 /-- The probability that the tensor-product strategy `S` wins `G`. -/
 noncomputable def quantumWinProb [Fintype A] [Fintype B] {ι κ : Type*} [Fintype ι]
@@ -123,17 +79,21 @@ theorem commutingWinProb_eq_sum [Fintype R] [∀ r a b, Decidable (G.accepts r a
 
 end Commuting
 
+open scoped MatrixOrder ComplexOrder in
+/-- A tensor-product strategy and its commuting-operator form win with the same probability. -/
+theorem commutingWinProb_toCommuting [Fintype A] [Fintype B] {ι κ : Type*} [Fintype ι]
+    [DecidableEq ι] [Fintype κ] [DecidableEq κ] (S : QuantumStrategy X Y A B ι κ) :
+    G.commutingWinProb S.toCommuting = G.quantumWinProb S := by
+  rw [commutingWinProb, quantumWinProb]
+  congr 1
+  funext x y
+  exact S.answers_toCommuting x y
+
 end SeededGame
 
 namespace TwoProverGame
 
 variable {X Y A B : Type*} (G : TwoProverGame X Y A B)
-
-/-- A two-prover game as a seeded game: the seed is the pair of questions. -/
-def toSeeded : SeededGame (X × Y) X Y A B where
-  seed := G.questions
-  query := id
-  accepts q a b := G.accepts q.1 q.2 a b
 
 /-- A two-prover game and its seeded form have the same winning probabilities. -/
 theorem answersWinProb_toSeeded (ans : X → Y → PMF (A × B)) :

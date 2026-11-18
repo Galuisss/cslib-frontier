@@ -22,7 +22,7 @@ set_option linter.privateModule false
 namespace CslibFrontierTests.SeededGame
 
 open Cslib Cslib.PCP Cslib.Quantum
-open scoped Real
+open scoped Real MatrixOrder ComplexOrder
 
 /-- The winning probability of a seeded game as a sum over seeds and answers. -/
 example {R X Y A B : Type} [Fintype R] [Fintype A] [Fintype B] (G : SeededGame R X Y A B)
@@ -33,9 +33,10 @@ example {R X Y A B : Type} [Fintype R] [Fintype A] [Fintype B] (G : SeededGame R
 
 /-- **Concrete instance**: CHSH as a seeded game, with the questions as the seed, is won by the
 optimal EPR strategy with probability `cos²(π/8)`. -/
-example : TwoProverGame.chsh.toSeeded.quantumWinProb TwoProverGame.chshEPR =
+example : TwoProverGame.chsh.toSeeded.commutingWinProb TwoProverGame.chshEPR.toCommuting =
     Real.cos (π / 8) ^ 2 := by
-  rw [SeededGame.quantumWinProb, TwoProverGame.answersWinProb_toSeeded]
+  rw [SeededGame.commutingWinProb_toCommuting, SeededGame.quantumWinProb,
+    TwoProverGame.answersWinProb_toSeeded]
   exact TwoProverGame.quantumWinProb_chsh_chshEPR
 
 end CslibFrontierTests.SeededGame
