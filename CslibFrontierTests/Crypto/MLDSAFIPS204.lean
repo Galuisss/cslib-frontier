@@ -9,6 +9,7 @@ module
 
 import CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
 import CslibFrontier.Crypto.Computational.MLDSA.RejNTTExhaustion
+meta import CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
 meta import CslibFrontier.Crypto.Computational.MLDSA.ExpandAProgramming
 
@@ -70,9 +71,16 @@ private def keyAndSigningChecks : Option Bool := do
   let msg := [true, false, true]
   let ctx := List.replicate 255 11
   let σ ← sign .mlDSA44 keys.secretKey msg ctx (fun _ => 0)
+  let request : SigningQuery := ⟨[], [true]⟩
+  let reply ← sign .mlDSA44 keys.secretKey request.message request.context (fun _ => 0)
+  let log := request.logReply (some reply) []
+  let A ← Xofs.shake.expandA .mlDSA44 (keys.publicKey.take 32)
+  let fresh : Forgery := ⟨ctx, msg, σ⟩
+  let repeated : Forgery := ⟨request.context, request.message, reply⟩
+  let wins (f : Forgery) := SignedMatrixTrial.newDigestWin ⟨Xofs.shake, A, keys.publicKey, f, log⟩
   return Keccak.shake256 keys.publicKey 32 == publicKeyFingerprint &&
     Keccak.shake256 keys.secretKey 32 == secretKeyFingerprint &&
-    verify .mlDSA44 keys.publicKey msg ctx σ == some true &&
+    wins fresh && !wins repeated &&
     verify .mlDSA44 keys.publicKey msg [11] σ == some false &&
     (sign .mlDSA44 keys.secretKey msg (11 :: ctx) (fun _ => 0)).isNone
 

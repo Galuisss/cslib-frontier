@@ -69,12 +69,12 @@ example (C : QuantumSigningForger) (H : Xofs) (s : Level) {a b : ℕ}
   simp only [Xofs.winsForgery, Xofs.evalPure_verifyDigestQueries]
 
 -- A coherent query and a measurement select the message sent to the signer. The program
--- reuses the reply on a different message, after flipping the sampled commitment digest.
+-- chooses between two independent candidates according to whether signing succeeded.
 open Cslib.Crypto.MLDSA
 
 example (C : QuantumSigningForger) (s : Level) (H : Xofs) (A : PublicMatrix s)
     (m : BitString 512) (D : BitString s.commitmentInputBits → BitString (8 * digestBytes s))
-    (keys : KeyPair)
+    (keys : KeyPair) (onSignature onError : Forgery)
     (w : Fin C.Width) (d : C.Device) (log : List Forgery)
     (row : FixedBytes 2 → FixedBytes (maskPolyBytes s)) :
     let μ := signingMaskLaw s.params (by cases s <;> decide)
@@ -84,7 +84,7 @@ example (C : QuantumSigningForger) (s : Level) (H : Xofs) (A : PublicMatrix s)
       .liftBind (.inr (.inl .query)) fun _ =>
         .liftBind (.inr (.inl (.measure w))) fun bits =>
           .liftBind (.inr (.inr ⟨[], bits⟩)) fun sig =>
-            .pure ⟨[], [!bits.headD false], sig.getD []⟩
+            .pure (if sig.isSome then onSignature else onError)
     let win T := Game.succProbability (C.expansionContinuation s (H.withDigestRegister s T)
       A keys prog d log [row])
     ∑ y, (μ y).toReal * |(win (Function.update D (maskCommitmentAddress s A m y) (r y)) : ℝ) -
