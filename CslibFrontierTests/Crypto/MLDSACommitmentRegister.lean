@@ -124,22 +124,34 @@ example (C : QuantumSigningForger) (s : Level) (H : Xofs) (seed : FixedBytes 32)
     (qH := 0) (qS := 0) (fun r => .pure _ 0) (fun r => .pure _ 0)
   simpa [p, δ, sk, ha, ← mul_assoc, show (814 : ℝ) * 2 = 1628 by norm_num] using bound
 
--- The candidate includes the actual signature bytes and the result of a coherent query and
--- measurement made after signing, so both the signing reply and installed stream reach the score.
-private def afterOnlySignature (sig : Option (List Byte)) :
-    ProbOracleComp (OracleSpec.sum (fun _ : DeviceRequest (1 + 2 + 8 * 1 + 1) Empty => List Bool)
+-- Wires 0 and 1 encode SHAKE256 and the delimiter of a full-length address. A Hadamard on
+-- wire 2 gives two possible commitment-table inputs. Measure the first XOR response bit and
+-- use it together with the signing result to select independently supplied candidates.
+private def afterOnlySignature (s : Level) (fresh replay : Forgery) (sig : Option (List Byte)) :
+    ProbOracleComp (OracleSpec.sum
+      (fun _ : DeviceRequest (s.commitmentInputBits + 2 + 8 * 1 + 0) Empty => List Bool)
       (fun _ : SigningQuery => Option (List Byte))) Forgery :=
-  .liftBind (.inr (.inl .query)) fun _ =>
-    .liftBind (.inr (.inl (.measure 0))) fun bits => .pure ⟨[], bits, sig.getD []⟩
+  .liftBind (.inr (.inl (.gate (false, false, 0, [])))) fun _ =>
+    .liftBind (.inr (.inl (.gate (false, false, 1, [])))) fun _ =>
+      .liftBind (.inr (.inl (.gate (false, true, 2, [])))) fun _ =>
+        .liftBind (.inr (.inl .query)) fun _ =>
+          .liftBind (.inr (.inl (.measure ⟨s.commitmentInputBits + 2, by lia⟩))) fun bits =>
+            .pure (if bits.headD false = sig.isSome then fresh else replay)
 
-private def onceForger (q : SigningQuery) : QuantumSigningForger :=
-  ⟨1, 1, 1, fun _ => .liftBind (.inr (.inr q)) afterOnlySignature⟩
+private def onceForger (s : Level) (q : SigningQuery) (fresh replay : Forgery) :
+    QuantumSigningForger :=
+  ⟨s.commitmentInputBits, 1, 0, fun _ => .liftBind (.inr (.inr q))
+    (afterOnlySignature s fresh replay)⟩
 
-example (s : Level) (H : Xofs) (keys : KeyPair) (q : SigningQuery) (D) :
-    (onceForger q).freshDigestSigningCall s H keys q D false afterOnlySignature
-        (onceForger q).initialDevice [] [] =
-      ((onceForger q).freshMaskSigning s (H.withDigestRegister s D) keys).map
-        (·.any (·.trial.newDigestWin)) :=
-  (onceForger q).freshDigestSigningCall_eq_freshMaskSigning_of_single_call s H keys q D
-    afterOnlySignature rfl fun _ =>
-      .liftBind _ _ 0 fun _ => .liftBind _ _ 0 fun _ => .pure _ 0
+example (s : Level) (H : Xofs) (keys : KeyPair) (q : SigningQuery) (fresh replay : Forgery) :
+    let C := onceForger s q fresh replay
+    C.freshDigestSigningCall s H keys q (H.readDigestRegister s) false
+        (afterOnlySignature s fresh replay) C.initialDevice [] [] =
+      (C.freshMaskSigning s H keys).map (·.any (·.trial.newDigestWin)) := by
+  intro C
+  have h := C.freshDigestSigningCall_eq_freshMaskSigning_of_single_call s H keys q
+    (H.readDigestRegister s) (afterOnlySignature s fresh replay) rfl (fun _ =>
+      .liftBind _ _ 0 fun _ => .liftBind _ _ 0 fun _ => .liftBind _ _ 0 fun _ =>
+        .liftBind _ _ 0 fun _ => .liftBind _ _ 0 fun _ => .pure _ 0)
+  let score (G : Xofs) := (C.freshMaskSigning s G keys).map (·.any (·.trial.newDigestWin))
+  exact h.trans (congrArg score (H.withDigestRegister_readDigestRegister s))

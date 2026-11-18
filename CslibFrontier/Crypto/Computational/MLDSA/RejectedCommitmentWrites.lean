@@ -21,9 +21,9 @@ import all CslibFrontier.Crypto.Computational.MLDSA.DigestSigningQueries
 /-!
 # Erasing rejected commitment writes in one ML-DSA signing request
 
-Both experiments refresh the mask and commitment digest on each of the 814 attempts allowed by
-[NISTFIPS204], Algorithm 7 and Appendix C. The persistent experiment installs that digest on the
-shared SHAKE256 stream, reads it back through the native signing attempt, and retains the write
+Both experiments refresh the mask and commitment digest on each attempt. They use the minimum
+signing cap of 814 in [NISTFIPS204], Appendix C, Table 3. The persistent experiment installs the
+digest on the shared SHAKE256 stream, reads it through the native attempt, and retains the write
 on rejection. The other experiment runs the terminal-write handler used in the public-pair
 simulation. Algorithm 29 exhaustion terminates and publishes a digest in both.
 
