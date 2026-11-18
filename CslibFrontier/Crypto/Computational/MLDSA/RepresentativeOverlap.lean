@@ -17,8 +17,9 @@ import CslibFrontier.Probability.PMF.Bind
 
 [FIPS 204][NISTFIPS204], Algorithms 7 and 8, use the public-key hash as the first 512 bits
 of a representative input and the message representative as the first 512 bits of a
-commitment input. Both roles use SHAKE256. Searching the successful signing log for a match
-of these prefixes covers every overlap, for any choice of commitment high bits. The bound
+commitment input. Both roles use SHAKE256. In a fixed-oracle run, searching the successful
+signing log for a prefix match covers every overlap with a commitment for a logged message,
+for any choice of commitment high bits. The bound
 for the adaptive signing experiment is an original deduction from these encodings.
 -/
 
