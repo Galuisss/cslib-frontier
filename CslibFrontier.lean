@@ -5440,6 +5440,11 @@ public import CslibFrontier.DataStructure.AVLTree.PointerMachine.DictionaryRepre
 public import CslibFrontier.DataStructure.AVLTree.PointerMachine.Insert
 public import CslibFrontier.DataStructure.AVLTree.PointerMachine.Representation
 public import CslibFrontier.DataStructure.AVLTree.PointerMachine.Rotation
+public import CslibFrontier.DataStructure.AVLTree.PointerMachine.Structured.Balance
+public import CslibFrontier.DataStructure.AVLTree.PointerMachine.Structured.Dictionary
+public import CslibFrontier.DataStructure.AVLTree.PointerMachine.Structured.Insert
+public import CslibFrontier.DataStructure.AVLTree.PointerMachine.Structured.Rotation
+public import CslibFrontier.DataStructure.AVLTree.Side
 public import CslibFrontier.DataStructure.AVLTree.WordRAM
 public import CslibFrontier.DataStructure.AdjacencyList.Memory
 public import CslibFrontier.DataStructure.AdjacencyList.Spec
