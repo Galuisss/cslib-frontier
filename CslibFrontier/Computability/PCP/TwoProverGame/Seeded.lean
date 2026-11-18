@@ -40,7 +40,8 @@ Every two-prover game is a seeded game with the questions as the seed
 ## Main results
 
 * `Cslib.PCP.SeededGame.answersWinProb_eq_sum`: the winning probability as a sum.
-* `Cslib.PCP.TwoProverGame.answersWinProb_toSeeded`: two-prover games embed.
+* `Cslib.PCP.SeededGame.commutingWinProb_toCommuting`: converting a tensor-product strategy
+  to a commuting-operator strategy preserves its winning probability.
 -/
 
 @[expose] public section
