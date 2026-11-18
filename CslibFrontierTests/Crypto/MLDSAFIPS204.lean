@@ -8,7 +8,9 @@ module
 -- upstream: local-only (test driver)
 
 import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
+import CslibFrontier.Crypto.Computational.MLDSA.ExpandAProgramming
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
+meta import CslibFrontier.Crypto.Computational.MLDSA.ExpandAProgramming
 
 /-!
 # ML-DSA byte keys, signing and verification
@@ -21,6 +23,28 @@ set_option linter.privateModule false
 set_option linter.hashCommand false
 
 open Cslib.Crypto Cslib.Crypto.MLDSA.FIPS204
+
+-- Start with q itself (rejected), then accept a high-bit-set zero. The byte after the
+-- last swapped triple is a sentinel. The shorter prefix contains only 255 accepted triples.
+private def matrixStream (n : ℕ) : FixedBytes n := fun i =>
+  match i.val with
+  | 0 => 1
+  | 1 => 224
+  | 2 => 127
+  | 5 => 128
+  | 771 => 99
+  | _ => 0
+
+private def matrixStreamCheck : Bool := Id.run do
+  let target : Poly := fun _ => 66051
+  let (stream, saved) := exchangeRejNTT 894 (matrixStream 894, target)
+  let first := (List.ofFn stream).take 9
+  let short := (exchangeRejNTT 768 (matrixStream 768, target)).1
+  return first == [1, 224, 127, 3, 2, 129, 3, 2, 1] && saved 0 == 0 &&
+    stream 771 == 99 && (rejNTTPoly (List.ofFn stream)).map (· 255) == some 66051 &&
+    (rejNTTPoly (List.ofFn short)).isNone
+
+#guard matrixStreamCheck
 
 -- NIST ACVP-Server, ML-DSA-keyGen-FIPS204/internalProjection.json, tgId 1, tcId 1
 -- (commit 975de31eb83d87039ec88934fdc47d8c312b892d). Compare a SHAKE256 fingerprint of
@@ -95,6 +119,21 @@ private def constantStream (value : List Bool → Byte) : ExtendableOutput where
   read x n := List.replicate n (value x)
   length_read _ _ := List.length_replicate
   take_read _ _ _ h := by simp [Nat.min_eq_left h]
+
+-- Algorithm 32 appends the column before the row. Adjacent addresses, bit-length variants
+-- and longer reads exercise the same XOF that the verifier and an outside caller receive.
+private def matrixAddressChecks : Bool := Id.run do
+  let rho : List Byte := List.replicate 32 11
+  let base := Xofs.mk (constantStream fun _ => 77) (constantStream fun _ => 88)
+  let H := base.withMatrixPrefixes .mlDSA65 rho fun i j _ => Fin.ofNat 256 (16 * i.val + j.val)
+  let input := rho ++ [2, 5]
+  let x := Keccak.bytesToBitsLE input
+  return (H.h128.readBytes input 896).drop 893 == [82, 77, 77] &&
+    H.h128.readBytes (rho ++ [5, 2]) 1 == [77] &&
+    H.h128.readBytes (rho ++ [2, 3]) 1 == [50] &&
+    H.h128.read (x ++ [false]) 1 == [77] && H.h256.read x 1 == [88]
+
+#guard matrixAddressChecks
 
 private def markedNonce : Xofs :=
   let address := Keccak.bytesToBitsLE (List.replicate 64 0 ++ [1, 0])

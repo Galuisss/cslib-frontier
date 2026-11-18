@@ -188,19 +188,68 @@ private theorem unpack_packCoeffs {rows width : ℕ} (coeff : Fin rows → Fin 2
   have hj : idx.val % 256 = j.val := by dsimp [idx]; omega
   simpa only [flat, hi, hj, Fin.eta] using BitString.lsbValue_lowBits (hc i j)
 
-private def uniformCoeffs : List Byte → List (ZMod 8380417)
+/-- FIPS 204 Algorithm 14 reads the low 23 bits of three little-endian bytes. -/
+@[expose] def nttCandidate (a b c : Byte) : ℕ :=
+  a.val + 256 * b.val + 65536 * (c.val % 128)
+
+/-- The successive accepted coefficients of Algorithm 30 on a finite XOF prefix. -/
+@[expose] def rejNTTCoefficients : List Byte → List (ZMod 8380417)
   | a :: b :: c :: rest =>
-    let x := a.val + 256 * b.val + 65536 * (c.val % 128)
-    if x < 8380417 then (x : ZMod 8380417) :: uniformCoeffs rest else uniformCoeffs rest
+    let x := nttCandidate a b c
+    if x < 8380417 then (x : ZMod 8380417) :: rejNTTCoefficients rest else rejNTTCoefficients rest
   | _ => []
 
 private def asPoly (coeffs : List (ZMod 8380417)) : Option Poly :=
   let a := coeffs.toArray
   if a.size < 256 then none else some (fun j => a[j.val]!)
 
+/-- Algorithm 30 on a finite SHAKE128 stream, failing if it supplies fewer than 256
+accepted coefficients. The result is still in NTT order. -/
+def rejNTTPoly (bytes : List Byte) : Option Poly :=
+  asPoly (rejNTTCoefficients bytes)
+
+/-- Exhaustion occurs exactly when fewer than 256 coefficients were accepted. -/
+theorem rejNTTPoly_eq_none_iff (bytes : List Byte) :
+    rejNTTPoly bytes = none ↔ (rejNTTCoefficients bytes).length < 256 := by
+  simp [rejNTTPoly, asPoly]
+
+/-- The sampled NTT vector consists of the first 256 accepted coefficients in stream order. -/
+theorem rejNTTPoly_eq_some_iff (bytes : List Byte) (v : Poly) :
+    rejNTTPoly bytes = some v ↔ (rejNTTCoefficients bytes).take 256 = List.ofFn v := by
+  let xs := rejNTTCoefficients bytes
+  change asPoly xs = some v ↔ xs.take 256 = List.ofFn v
+  by_cases h : xs.length < 256
+  · have hne : xs.take 256 ≠ List.ofFn v := by
+      intro he
+      have := congrArg List.length he
+      simp only [List.length_take, List.length_ofFn] at this
+      omega
+    simp only [asPoly, List.size_toArray, h, ite_true, reduceCtorEq, hne]
+  · simp only [asPoly, List.size_toArray, ite_eq_right h, Option.some.injEq]
+    constructor
+    · rintro rfl
+      apply List.ext_getElem
+      · simp only [List.length_take, List.length_ofFn]; omega
+      · intro i hi _
+        have hx : i < xs.toArray.size := by
+          simp only [List.length_take] at hi
+          rw [List.size_toArray]
+          omega
+        simp only [List.getElem_take, List.getElem_ofFn, getElem!_pos xs.toArray i hx,
+          List.getElem_toArray]
+    · intro hv
+      funext i
+      have ha : i.val < xs.toArray.size := by rw [List.size_toArray]; omega
+      have ht : i.val < (xs.take 256).length := by rw [List.length_take]; omega
+      have hv' : i.val < (List.ofFn v).length := by simpa only [List.length_ofFn] using i.isLt
+      have he : (xs.take 256)[i.val] = (List.ofFn v)[i.val] := by simp only [hv]
+      simpa only [getElem!_pos xs.toArray i.val ha, List.getElem_toArray, List.getElem_take,
+        List.getElem_ofFn]
+        using he
+
 /-- The coefficient of degree `j` in the inverse NTT, using the evaluation points
 `ζ^(2 BitRev8(i)+1)` (FIPS 204 §2.5, equation (2.1)). The inverse of 256 modulo q is 8347681. -/
-private def fromNTT (values : Poly) : Vector (ZMod 8380417) 256 :=
+@[expose] def fromNTT (values : Poly) : Vector (ZMod 8380417) 256 :=
   let roots := Vector.ofFn fun a : Fin 512 => (1753 : ZMod 8380417) ^ a.val
   let inversePowers := Vector.ofFn fun i : Fin 256 =>
     511 - 2 * BitString.lsbValue (BitString.lowBits 8 i.val).reverse
@@ -216,8 +265,8 @@ def Xofs.expandA (H : Xofs) (s : Level) (rho : List Byte) :
     Option (PublicMatrix s) := do
   let matrix ← Vector.ofFnM fun row : Fin s.params.k =>
     Vector.ofFnM fun col : Fin s.params.ℓ =>
-      fromNTT <$> asPoly (uniformCoeffs (H.h128.readBytes
-        (rho ++ [Fin.ofNat 256 col.val, Fin.ofNat 256 row.val]) 894))
+      fromNTT <$> rejNTTPoly (H.h128.readBytes
+        (rho ++ [Fin.ofNat 256 col.val, Fin.ofNat 256 row.val]) 894)
   return fun i j => ((matrix.get i).get j).get
 
 /-- FIPS 202 specialization of `Xofs.expandA`. -/
