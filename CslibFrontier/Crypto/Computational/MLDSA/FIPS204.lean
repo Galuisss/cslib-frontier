@@ -426,8 +426,8 @@ def expandDigest (s : Level) (digest : FixedBytes (digestBytes s)) : Option Poly
 open ModuleSIS.SelfTarget in
 /-- Classical self-target forking for the three FIPS parameter sets, in the model where a fresh
 commitment query returns a uniform digest. Algorithm 29 acts on those digest bytes. The
-collision term counts other digests with the same successful expansion. The matrix has room
-for the low component, the response, and the challenge polynomial. -/
+collision term is the largest distinct-digest collision probability of the fixed SHAKE256
+expansion; the library gives it only the trivial bound of one. -/
 theorem selfTarget_digest_fork (s : Level) (Q : ℕ) {Coins : Type}
     (matrices : PMF (Matrix (Fin s.params.k) (Fin (s.params.k + s.params.ℓ + 1)) Poly))
     (coins : PMF Coins) (adv : Adversary s.params.k (s.params.k + s.params.ℓ) 256 8380417
@@ -436,12 +436,12 @@ theorem selfTarget_digest_fork (s : Level) (Q : ℕ) {Coins : Type}
     let radius := compressedSelfTargetRadius s.params 13
     ((matrices.bind (game (expandDigest s) radius coins adv)) true).toReal ≤
       (Q + 1 : ℕ) / ((256 : ℝ) ^ digestBytes s) + Real.sqrt ((Q + 1 : ℕ) *
-        ((matrices.bind fun A => (reduction (expandDigest s) radius Q coins adv A).map
+        ((matrices.bind fun A => (reductionLaw 0 (expandDigest s) radius Q coins adv A).map
           fun w => decide (ModuleSIS.IsSolution A (2 * radius) w)) true +
             collisionMass (expandDigest s)).toReal) := by
   have hbyte : (2 : ℝ) ^ 8 = 256 := by norm_num
   simpa only [Fintype.card_fun, Fintype.card_fin, Nat.cast_pow, Nat.cast_ofNat, hbyte] using
     success_le_fork_digest (expandDigest s) (compressedSelfTargetRadius s.params 13) Q
-      matrices coins adv hQ
+      matrices coins adv hQ 0
 
 end Cslib.Crypto.MLDSA.FIPS204
