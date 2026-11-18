@@ -7,7 +7,7 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Crypto.Computational.MLDSA.DigestSigningQueries
+import CslibFrontier.Crypto.Computational.MLDSA.CommitmentContinuation
 
 /-!
 # ML-DSA digest-register clients
@@ -67,3 +67,22 @@ example (C : QuantumSigningForger) (H : Xofs) (s : Level) {a b : ℕ}
               !log.contains f := by
   rw [C.randomPrefixGame_eq_digestRegister H s ha hb]
   simp only [Xofs.winsForgery, Xofs.evalPure_verifyDigestQueries]
+
+-- With no further instructions, flip every digest bit at the fresh commitment. The final
+-- native verifier still gets its two reads, even when the forger has an earlier signing log.
+open Cslib.Crypto.MLDSA in
+example (C : QuantumSigningForger) (s : Level) (H : Xofs) (A : PublicMatrix s)
+    (m : BitString 512) (D : BitString s.commitmentInputBits → BitString (8 * digestBytes s))
+    (keys : KeyPair) (d : C.Device) (log : List Forgery) (f : Forgery) :
+    let μ := signingMaskLaw s.params (by cases s <;> decide)
+    let addr := maskCommitmentAddress s A m
+    let flip y j := !(D (addr y) j)
+    let win T := Game.succProbability (C.expansionContinuation s (H.withDigestRegister s T)
+      A keys (.pure f) d log [])
+    ∑ y, (μ y).toReal * |(win (Function.update D (addr y) (flip y)) : ℝ) - (win D : ℝ)| ≤
+      2 * (commitmentGuessProbability s.params (by cases s <;> decide) A).toReal := by
+  classical
+  intro μ addr flip win
+  simpa only [Nat.cast_zero, mul_zero, zero_mul, zero_add] using
+    C.mean_expansionContinuation_gap_le s H A m D flip keys (.pure f) d log []
+      (qH := 0) (qS := 0) (.pure f 0) (.pure f 0)
