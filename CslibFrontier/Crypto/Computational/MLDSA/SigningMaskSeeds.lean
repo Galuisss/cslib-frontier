@@ -42,7 +42,7 @@ private def signingSeedBytes (H : Xofs) (s : Level) (seed : FixedBytes 32) : Lis
 
 private theorem signingSeedBytes_length (H : Xofs) (s : Level) (seed : FixedBytes 32) :
     (signingSeedBytes H s seed).length = 32 := by
-  simp [signingSeedBytes, Xofs.expandKeySeed, ExtendableOutput.readBytes, H.h256.length_read]
+  simp [signingSeedBytes, Xofs.expandKeySeed, H.h256.length_read]
 
 private def seedInput {n : ℕ} (key : List Byte) (t : Fin n ↪ FixedBytes 32)
     (p : Fin n × BitString 512) : List Bool :=
@@ -134,13 +134,9 @@ private theorem coupled_key {a b n : ℕ} (base : Xofs) (s : Level) (seed : Fixe
     let pair := coupled base s seed t ha hb r T₁ T₂
     pair.shared.expandKeySeed s seed = pair.background.expandKeySeed s seed := by
   let pair := coupled base s seed t ha hb r T₁ T₂
-  let x := Keccak.bytesToBitsLE
-    (seed.toList ++ [Fin.ofNat 256 s.params.k, Fin.ofNat 256 s.params.ℓ])
+  let x := keySeedInput s seed
   change pair.shared.h256.read x 128 = pair.background.h256.read x 128
-  have len : x.length = 272 := by
-    rw [show x.length = 8 * (seed.toList ++ [Fin.ofNat 256 s.params.k,
-      Fin.ofNat 256 s.params.ℓ]).length from Keccak.length_bytesToBitsLE _]
-    simp [FixedBytes.toList]
+  have len : x.length = 272 := length_keySeedInput s seed
   apply read_eq_of_byteAt_eq
   intro i _
   apply coupled_off _ _ _ _ _ _ _ _ _ _ _ (.inr _)
