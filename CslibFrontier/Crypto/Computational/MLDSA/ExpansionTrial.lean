@@ -180,10 +180,11 @@ private theorem afterTrial_read {C : QuantumSigningForger} (s : Level) (G : Xofs
       (k reply, q.logReply reply log, rows) := by
   intro m reply
   by_cases over : 255 < q.context.length
-  · simp [afterTrial, nativePreparation, reply, over]
+  · simp [afterTrial, nativePreparation, preparedPrefix, reply, over]
   · have bits : List.ofFn (BitString.ofList 512 m) = m := BitString.ofFn_ofList
       (by simp only [m, Xofs.representativeFromTr, Keccak.length_bytesToBitsLE, G.h256.length_read])
-    simp only [afterTrial, nativePreparation, rowAttempt, reply, over, ↓reduceIte, List.headD_cons,
+    simp only [afterTrial, nativePreparation, preparedPrefix, rowAttempt, reply, over, ↓reduceIte,
+      List.headD_cons,
       List.tail_cons, find_updated]
     cases done : (List.finRange j.val).findSome? (fun i => terminalReply
       (G.attemptWithMask s sk A m (ringVectorCoeffs (maskFromRow s r (i.val * s.params.ℓ))))) with
