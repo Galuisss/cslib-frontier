@@ -106,7 +106,8 @@ private theorem sum_node_ratio (k i : Fin 256) :
     rw [geom_sum_mul, div_pow, nttNode_pow, nttNode_pow]
     norm_num
 
-private theorem toNTT_fromNTT : Function.LeftInverse toNTT (fun v => (fromNTT v).get) := by
+/-- Evaluating a converted polynomial in the FIPS order recovers all its input NTT values. -/
+theorem toNTT_fromNTT : Function.LeftInverse toNTT (fun v => (fromNTT v).get) := by
   intro v
   funext k
   simp only [toNTT, fromNTT_get, mul_assoc, Finset.sum_mul, ← Finset.mul_sum]
