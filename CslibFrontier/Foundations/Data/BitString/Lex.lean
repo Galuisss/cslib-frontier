@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Init
 import Mathlib.Data.List.Lex
+import Mathlib.Data.List.OfFn
 
 /-!
 # Lexicographic order on fixed-width bit strings
@@ -24,5 +25,13 @@ namespace Cslib.BitString
 /-- Whether lexicographic sorting interchanges `a` and `b`. Ties preserve input order. -/
 @[expose] def lexSwap {n : ℕ} (a b : Fin n → Bool) : Bool :=
   decide (List.ofFn b < List.ofFn a)
+
+/-- Reversing distinct inputs reverses the sorting decision. -/
+theorem lexSwap_reverse {n : ℕ} {a b : Fin n → Bool} (h : a ≠ b) :
+    lexSwap b a = !(lexSwap a b) := by
+  have hn : List.ofFn a ≠ List.ofFn b := fun he => h (List.ofFn_injective he)
+  rcases lt_or_gt_of_ne hn with hab | hba
+  · simp [lexSwap, hab, not_lt_of_ge hab.le]
+  · simp [lexSwap, hba, not_lt_of_ge hba.le]
 
 end Cslib.BitString

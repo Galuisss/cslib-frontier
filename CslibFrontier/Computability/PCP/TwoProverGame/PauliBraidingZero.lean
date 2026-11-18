@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.LinearityDiagonal
 public import CslibFrontier.Computability.PCP.TwoProverGame.PauliBraidingGame
+import CslibFrontier.Foundations.Data.Finset.Expect
 
 /-!
 # Diagonal linearity seeds in the Pauli braiding game
@@ -30,6 +31,8 @@ This isolates the probability cost of using these rounds to analyze the zero str
 public section
 
 namespace Cslib.PCP
+
+open scoped BigOperators
 
 variable {n : ℕ} [Nonempty (Fin n)] {Q A : Type*}
 
@@ -99,6 +102,46 @@ theorem rejection_pauliBraidingDiagonalGame_le
   rw [div_eq_mul_inv, ← mul_assoc, ← mul_inv]
   ring
 
+/-- The visible question for zero with a dummy in one of the two bases. -/
+@[expose] def pauliBraidingZeroQuestion (basis : Bool) (dummy : Fin n → Bool) :
+    PauliBraidingQuestion n Q :=
+  .basis basis (cond (BitString.lexSwap (0 : Fin n → Bool) dummy) Prod.swap id (0, dummy))
+
+/-- Decode the bit checked at zero by the diagonal linearity test. Equal strings retain
+the original order, so when the dummy is zero the first bit is checked. -/
+@[expose] def pauliBraidingZeroBit (dummy : Fin n → Bool) : (Bool × Bool) ⊕ A → Bool :=
+  Sum.elim (fun bits => (cond (BitString.lexSwap (0 : Fin n → Bool) dummy) Prod.swap id bits).1)
+    (fun _ => false)
+
+omit [Nonempty (Fin n)] in
+open BitString in
+/-- The linearity and consistency decoders at zero agree away from the duplicated
+zero query. They also agree at the tie in the X basis. -/
+theorem pauliBraidingZero_decoding (basis : Bool) (dummy : Fin n → Bool)
+    (h : dummy ≠ 0 ∨ basis = false) :
+    let q := PauliConsistencyQuestion.ofChecked basis 0 dummy
+    q.toBraidingQuestion = (pauliBraidingZeroQuestion basis dummy : PauliBraidingQuestion n Q) ∧
+      (Sum.elim q.braidingCheckedBit (fun _ : A => false)) = pauliBraidingZeroBit dummy := by
+  intro q
+  cases basis
+  · exact ⟨rfl, rfl⟩
+  have hn : dummy ≠ 0 := h.resolve_right Bool.noConfusion
+  have hswap := lexSwap_reverse (Ne.symm hn)
+  change PauliConsistencyQuestion.toBraidingQuestion ⟨dummy, 0, true⟩ =
+      (pauliBraidingZeroQuestion true dummy : PauliBraidingQuestion n Q) ∧
+    Sum.elim (PauliConsistencyQuestion.braidingCheckedBit ⟨dummy, 0, true⟩)
+      (fun _ : A => false) = pauliBraidingZeroBit dummy
+  constructor
+  · simp only [PauliConsistencyQuestion.toBraidingQuestion, pauliBraidingZeroQuestion, hswap]
+    cases lexSwap (0 : Fin n → Bool) dummy <;> rfl
+  · funext answer
+    cases answer with
+    | inr malformed => rfl
+    | inl bits =>
+      simp only [pauliBraidingZeroBit, Sum.elim_inl,
+        PauliConsistencyQuestion.braidingCheckedBit, PauliConsistencyQuestion.checkedBit, hswap]
+      cases lexSwap (0 : Fin n → Bool) dummy <;> rfl
+
 open BitString Finset Quantum in
 /-- For either role assignment, the three checks of a diagonal round bound the point
 player’s probability of a true decoded answer at zero.
@@ -115,21 +158,17 @@ theorem prob_true_le_pauliBraidingDiagonal {𝒜 : Type*} [Fintype A] [Ring 𝒜
     let logical := cond roles S.swap S
     let loss (k : Fin 3) :=
       1 - ({ game with seed := PMF.pure (k, a, dummy) }).commutingWinProb S
-    let read : (Bool × Bool) ⊕ A → Bool :=
-      Sum.elim (fun bits => (cond (lexSwap (0 : Fin n → Bool) dummy) Prod.swap id bits).1)
-        (fun _ => false)
-    let q := game.query (2, a, dummy)
-    ((logical.bob (cond roles q.1 q.2)).map read).prob logical.state true ≤
-      loss 0 + loss 1 + loss 2 := by
+    ((logical.bob (pauliBraidingZeroQuestion basis dummy)).map
+      (pauliBraidingZeroBit dummy)).prob logical.state true ≤ loss 0 + loss 1 + loss 2 := by
   classical
-  intro game logical loss read queryAtZero
+  intro game logical loss
   let x : PauliBraidingQuestion n Q := .basis basis (a, a)
   let point (c : Fin n → Bool) : PauliBraidingQuestion n Q :=
     .basis basis (cond (lexSwap c dummy) Prod.swap id (c, dummy))
   let pair : (Bool × Bool) ⊕ A → Bool × Bool := Sum.elim id (fun _ => (false, false))
   let pointRead (c : Fin n → Bool) (ans : (Bool × Bool) ⊕ A) : Bool :=
     (cond (lexSwap c dummy) Prod.swap id (pair ans)).1
-  have hread : pointRead 0 = read := by
+  have hread : pointRead 0 = pauliBraidingZeroBit dummy := by
     funext ans
     cases ans with
     | inl bits => rfl
@@ -178,11 +217,8 @@ theorem prob_true_le_pauliBraidingDiagonal {𝒜 : Type*} [Fintype A] [Ring 𝒜
       · exact logical.prob_nonneg _ _ _ _
       · exact le_rfl
   have hzero : linearityQuery 2 a a = 0 := by simp [linearityQuery]
-  have hpoint : cond roles queryAtZero.1 queryAtZero.2 = point 0 := by
-    dsimp [queryAtZero]
-    rw [hquery, hzero]
-    cases roles <;> rfl
-  rw [hpoint, ← hread]
+  change ((logical.bob (point 0)).map (pauliBraidingZeroBit dummy)).prob logical.state true ≤ _
+  rw [← hread]
   have h := logical.prob_true_le_diagonal_linearity x (point a) (point 0) pair
     (pointRead a) (pointRead 0)
   have h0 := hcompare 0
@@ -193,5 +229,59 @@ theorem prob_true_le_pauliBraidingDiagonal {𝒜 : Type*} [Fintype A] [Ring 𝒜
   simp only [linearityCheck, Fin.reduceEq, ite_false] at h2
   dsimp only at h
   linarith only [h, h0, h1, h2]
+
+open Finset Quantum in
+/-- The probability of a true decoded zero answer, averaged over the dummy and weighted by
+the uniform mass of zero, is at most twelve times the linearity-branch rejection probability. -/
+theorem expect_prob_true_pauliBraidingZero_le {𝒜 : Type*} [Fintype A] [Ring 𝒜] [StarRing 𝒜]
+    [PartialOrder 𝒜] [StarOrderedRing 𝒜] [Algebra ℂ 𝒜] [TopologicalSpace 𝒜]
+    [ContinuousFunctionalCalculus ℝ 𝒜 IsSelfAdjoint] [NonnegSpectrumClass ℝ 𝒜]
+    (G : TwoProverGame Q Q A A) (special : Bool → Q) (decode : Bool → A → Bool)
+    (roles basis : Bool)
+    (S : CommutingStrategy (PauliBraidingQuestion n Q) (PauliBraidingQuestion n Q)
+      ((Bool × Bool) ⊕ A) ((Bool × Bool) ⊕ A) 𝒜) :
+    let logical := cond roles S.swap S
+    (𝔼 dummy, ((logical.bob (pauliBraidingZeroQuestion basis dummy)).map
+      (pauliBraidingZeroBit dummy)).prob logical.state true) / Fintype.card (Fin n → Bool) ≤
+      12 * (1 - (pauliBraidingBranchGame n G special decode 0).commutingWinProb S) := by
+  intro logical
+  let game := pauliBraidingDiagonalGame n G special decode roles basis
+  let lose (r : Fin 3 × (Fin n → Bool) × (Fin n → Bool)) :=
+    1 - ({ game with seed := PMF.pure r }).commutingWinProb S
+  let bad (dummy : Fin n → Bool) :=
+    ((logical.bob (pauliBraidingZeroQuestion basis dummy)).map
+      (pauliBraidingZeroBit dummy)).prob logical.state true
+  have hlocal (a dummy : Fin n → Bool) :
+      bad dummy ≤ lose (0, a, dummy) + lose (1, a, dummy) + lose (2, a, dummy) :=
+    prob_true_le_pauliBraidingDiagonal G special decode roles basis S a dummy
+  have havg : (𝔼 dummy, bad dummy) ≤ 3 * (𝔼 r, lose r) := by
+    have h := expect_le_expect (s := (univ : Finset (Fin n → Bool))) fun a _ =>
+      expect_le_expect (s := (univ : Finset (Fin n → Bool))) fun dummy _ => hlocal a dummy
+    simp only [Fintype.expect_const] at h
+    refine h.trans_eq ?_
+    rw [Fintype.expect_prod_type]
+    simp_rw [Fintype.expect_prod_type]
+    rw [Finset.expect_comm univ univ (fun k a => 𝔼 d, lose (k, a, d)), Finset.mul_expect]
+    refine expect_congr rfl fun a _ => ?_
+    rw [Finset.expect_comm univ univ (fun k d => lose (k, a, d)), Finset.mul_expect]
+    refine expect_congr rfl fun d _ => ?_
+    rw [Fintype.expect_eq_sum_div_card, Fin.sum_univ_three, Fintype.card_fin]
+    push_cast
+    ring
+  have hscore : (𝔼 r, lose r) = 1 - game.commutingWinProb S := by
+    unfold SeededGame.commutingWinProb
+    rw [SeededGame.rejection_eq_sum]
+    change _ = ∑ r, ((Probability.PMF.uniformOfFintype _) r).toReal * lose r
+    simp only [Probability.PMF.uniformOfFintype_apply, ENNReal.toReal_inv,
+      ENNReal.toReal_natCast, ← mul_sum, Fintype.expect_eq_sum_div_card]
+    ring
+  rw [hscore] at havg
+  have hbudget := rejection_pauliBraidingDiagonalGame_le G special decode roles basis S.answers
+  change (1 - game.commutingWinProb S) / (4 * Fintype.card (Fin n → Bool)) ≤ _ at hbudget
+  change (𝔼 dummy, bad dummy) / Fintype.card (Fin n → Bool) ≤ _
+  refine (div_le_div_of_nonneg_right havg (by positivity)).trans ?_
+  rw [show 3 * (1 - game.commutingWinProb S) / (Fintype.card (Fin n → Bool) : ℝ) =
+      12 * ((1 - game.commutingWinProb S) / (4 * Fintype.card (Fin n → Bool))) by ring]
+  exact mul_le_mul_of_nonneg_left hbudget (by norm_num)
 
 end Cslib.PCP
