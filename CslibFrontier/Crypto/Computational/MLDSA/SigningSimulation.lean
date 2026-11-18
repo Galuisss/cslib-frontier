@@ -32,6 +32,7 @@ public section
 namespace Cslib.Crypto.MLDSA
 
 open Cslib.Probability
+open scoped ENNReal
 
 variable (P : Params)
 
@@ -101,6 +102,19 @@ private theorem sub_mem_mask {v z : Fin P.ℓ → Fin P.n → ZMod P.q}
 /-- An ideal Algorithm 7 mask, uniform over the coefficient box `(-γ₁, γ₁]^(ℓ n)`. -/
 noncomputable def signingMaskLaw (hγ : 0 < P.γ₁) : PMF (Fin P.ℓ → Fin P.n → ZMod P.q) :=
   PMF.uniformOfFinset (maskSet P) (mask_nonempty P hγ)
+
+private theorem mask_card [NeZero P.q] (hγ : 0 < P.γ₁) (hq : 2 * P.γ₁ < P.q) :
+    (maskSet P).card = (2 * P.γ₁) ^ (P.ℓ * P.n) := by
+  rw [intervalVectors_card P (by lia) (by lia)]
+  congr 1
+  lia
+
+/-- Every individual ideal mask has probability at most the reciprocal of the full FIPS box. -/
+theorem signingMaskLaw_apply_le [NeZero P.q] (hγ : 0 < P.γ₁) (hq : 2 * P.γ₁ < P.q) (y) :
+    signingMaskLaw P hγ y ≤ ((2 * P.γ₁ : ℕ) ^ (P.ℓ * P.n) : ℝ≥0∞)⁻¹ := by
+  classical
+  simp only [signingMaskLaw, PMF.uniformOfFinset_apply, mask_card P hγ hq, Nat.cast_pow]
+  split <;> simp
 
 /-- The signing attempt with an ideal, coefficientwise uniform mask and the given fresh
 challenge. On success it emits the high bits of the original commitment `A y` and the

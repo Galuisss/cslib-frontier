@@ -7,7 +7,7 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
+import all CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitment
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 
 /-!
@@ -70,3 +70,52 @@ private def digest44 : List Byte := (List.finRange 32).map (fun i => Fin.ofNat 2
     match i.val with
     | 0 => 4096 | 1 => 4097 | 2 => -1 | 3 => 16384 | _ => 0).drop 32).take 5 ==
   [0, 4, 240, 191, 0]
+
+-- Every mask reaches the same encoded address at the zero matrix. A useful
+-- reprogramming estimate therefore has to account for the law of the public matrix.
+example (s : Level) (extra : Finset (List Bool)) (μ : Cslib.BitString 512) :
+    (signingAddressLaw s extra 0 μ).support.Subsingleton := by
+  have hz (y : Fin s.params.ℓ → Poly) : moduleSISMap (0 : PublicMatrix s) y = 0 := by
+    funext i
+    simp [moduleSISMap]
+  unfold signingAddressLaw
+  simp_rw [hz]
+  change (PMF.map (Function.const _ _) _).support.Subsingleton
+  rw [PMF.map_const, PMF.support_pure]
+  exact Set.subsingleton_singleton
+
+-- One update at the quantum hash-query budgets in Fallahpour–Fehr–Huang, Table 3.
+-- The three exponents bound its additive loss before any later signing calls.
+example (s : Level) :
+    let queries : ℕ := match s with | .mlDSA44 => 128 | .mlDSA65 => 192 | .mlDSA87 => 256
+    let bits : ℕ := match s with | .mlDSA44 => 106 | .mlDSA65 => 447 | .mlDSA87 => 639
+    2 * (2 : ℝ) ^ queries * ((11 / 10) / Real.sqrt (2 ^ s.commitmentBoxBits)) ≤ 1 / 2 ^ bits := by
+  intro queries bits
+  rw [← mul_div_assoc, div_le_div_iff₀ (by positivity) (by positivity), one_mul]
+  apply (Real.le_sqrt (by positivity) (by positivity)).2
+  have cert : (22 * 2 ^ queries * 2 ^ bits) ^ 2 ≤ 100 * 2 ^ s.commitmentBoxBits := by
+    cases s <;> decide +kernel
+  have bound : ((22 : ℝ) * 2 ^ queries * 2 ^ bits) ^ 2 ≤ 100 * 2 ^ s.commitmentBoxBits := by
+    exact_mod_cast cert
+  nlinarith only [bound]
+
+-- The classical comparison permits 814 attempts on each of 2^64 signing requests.
+-- At the three hash-query budgets its statistical-distance contribution remains below one.
+example (s : Level) :
+    let h : ℕ := match s with | .mlDSA44 => 128 | .mlDSA65 => 192 | .mlDSA87 => 256
+    let bits : ℕ := match s with | .mlDSA44 => 32 | .mlDSA65 => 373 | .mlDSA87 => 566
+    let t := 2 ^ 64 * 814
+    ((2 * t * 2 ^ h + t.choose 2 : ℕ) : ℝ) *
+      ((11 / 10) / Real.sqrt (2 ^ s.commitmentBoxBits)) ≤ 1 / 2 ^ bits := by
+  intro h bits t
+  rw [← mul_div_assoc, div_le_div_iff₀ (by positivity) (by positivity), one_mul]
+  apply (Real.le_sqrt (by positivity) (by positivity)).2
+  let count := 2 * t * 2 ^ h + t.choose 2
+  have cert : (11 * count * 2 ^ bits) ^ 2 ≤ 100 * 2 ^ s.commitmentBoxBits := by
+    dsimp only [count, t]
+    rw [Nat.choose_two_right]
+    cases s <;> decide +kernel
+  have bound : ((11 : ℝ) * count * 2 ^ bits) ^ 2 ≤ 100 * 2 ^ s.commitmentBoxBits := by
+    exact_mod_cast cert
+  change ((count : ℝ) * (11 / 10) * 2 ^ bits) ^ 2 ≤ _
+  nlinarith only [bound]
