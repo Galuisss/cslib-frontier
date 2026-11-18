@@ -1265,6 +1265,33 @@ theorem verifyWithExpansion_encodePublic (s : Level) (expand : List Byte → Opt
 then run Algorithm 8. Contexts longer than 255 bytes return the specified error. -/
 @[expose] def Xofs.verify (H : Xofs) (s : Level) := H.verifyWithExpansion s (H.expandA s)
 
+/-- The two verifiers return the same Boolean or error if their matrix, bounded sparse
+challenge, message representative and final commitment digest agree. The representative
+needs to agree only for a well-formed context and public-key length. -/
+theorem Xofs.verify_congr_of_reads {H G : Xofs} (s : Level) (pk : List Byte)
+    (msg : List Bool) (ctx sig : List Byte)
+    (matrix : H.expandA s (pk.take 32) = G.expandA s (pk.take 32))
+    (challenge : ∀ d : List Byte, d.length ≤ digestBytes s →
+      H.sampleInBall s d = G.sampleInBall s d)
+    (rep : ctx.length ≤ 255 → pk.length = 32 + 320 * s.params.k →
+      H.messageRepresentative pk (formatMessage msg ctx) =
+        G.messageRepresentative pk (formatMessage msg ctx))
+    (digest : ∀ w, H.commitmentDigest s w (G.messageRepresentative pk (formatMessage msg ctx)) =
+      G.commitmentDigest s w (G.messageRepresentative pk (formatMessage msg ctx))) :
+    H.verify s pk msg ctx sig = G.verify s pk msg ctx sig := by
+  by_cases hc : ctx.length ≤ 255
+  · simp only [Xofs.verify, Xofs.verifyWithExpansion, guard, hc, ↓reduceIte, Option.pure_def,
+      Option.bind_eq_bind, Option.bind_some, Xofs.verifyInternalWith]
+    by_cases hk : pk.length = 32 + 320 * s.params.k
+    · simp only [hk, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte]
+      cases hd : sigDecode s sig with
+      | none => rfl
+      | some σ =>
+        have short : σ.digest.length ≤ digestBytes s := by rw [← digest_of_sigDecode hd]; simp
+        simp only [matrix, challenge _ short, rep hc hk, Xofs.check, digest]
+    · simp [hk, bne_iff_ne]
+  · simp [Xofs.verify, Xofs.verifyWithExpansion, guard, hc]
+
 /-- FIPS 202 specialization of `Xofs.verify`. -/
 abbrev verify := Xofs.verify Xofs.shake
 

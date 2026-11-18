@@ -130,27 +130,15 @@ private theorem verify_eq_background {keys : KeyPair}
     p.shared.verify s keys.publicKey f.message f.context f.signature =
       p.background.verify s keys.publicKey f.message f.context f.signature := by
   have raw := read_ne_maskSeed_length hp
-  let pk := keys.publicKey
-  by_cases hc : f.context.length ≤ 255
-  · simp only [Xofs.verify, Xofs.verifyWithExpansion, guard, hc, ↓reduceIte, Option.pure_def,
-      Option.bind_eq_bind, Option.bind_some, Xofs.verifyInternalWith]
-    by_cases hk : keys.publicKey.length = 32 + 320 * s.params.k
-    · simp only [hk, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte]
-      cases hd : sigDecode s f.signature with
-      | none => rfl
-      | some σ =>
-        have dig : σ.digest.length ≤ digestBytes s := by rw [← digest_of_sigDecode hd]; simp
-        have short : 8 * σ.digest.length ≠ 1024 := by
-          have : digestBytes s ≤ 64 := by cases s <;> decide
-          lia
-        have hash w {μ : List Bool} (len : μ.length = 512) :
-            p.shared.commitmentDigest s w μ = p.background.commitmentDigest s w μ :=
-          raw _ (commitmentInput_length_ne_maskSeed s w len) _
-        simp only [Xofs.expandA_congr (agree_off_sampleSigningMaskSeeds hp).1,
-          challenge_unchanged raw s short, good, Xofs.check,
-          hash _ (length_messageRepresentative ..)]
-    · simp [hk]
-  · simp [Xofs.verify, Xofs.verifyWithExpansion, guard, hc]
+  apply Xofs.verify_congr_of_reads
+  · exact Xofs.expandA_congr (agree_off_sampleSigningMaskSeeds hp).1 s _
+  · intro d hd
+    apply challenge_unchanged raw s
+    have bound : digestBytes s ≤ 64 := by cases s <;> decide
+    lia
+  · exact fun _ _ => good _
+  · intro w
+    exact raw _ (commitmentInput_length_ne_maskSeed s w (length_messageRepresentative ..)) _
 
 end Coupled
 
