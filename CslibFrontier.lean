@@ -5740,6 +5740,14 @@ public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Representati
 public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Rotation
 public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Search
 public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Seek
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Structured.Allocation
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Structured.Height
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Structured.Reconnect
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Structured.ReconnectContext
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Structured.Registers
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Structured.Rotation
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Structured.Search
+public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Structured.Seek
 public import CslibFrontier.DataStructure.SearchTree.PointerMachine.Update
 public import CslibFrontier.DataStructure.SplayTree.AccessLemma
 public import CslibFrontier.DataStructure.SplayTree.Basic
