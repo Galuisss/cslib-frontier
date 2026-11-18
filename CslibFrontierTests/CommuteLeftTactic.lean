@@ -42,7 +42,7 @@ example (hXZ' : ∀ (a : ι) {b : ι}, Commute (X a) (Z' b)) (a d : ι) :
   commute_left [hXZ']
 
 /-- The tactic fails, rather than leaving a goal, when the commutations do not suffice. -/
-example (a d : ι) (h : X a * Z' d = Z' d * X a) : X a * Z' d = Z' d * X a := by
+example (u v w : A) (h : (u * v) * w = w * (u * v)) : (u * v) * w = w * (u * v) := by
   fail_if_success commute_left []
   exact h
 

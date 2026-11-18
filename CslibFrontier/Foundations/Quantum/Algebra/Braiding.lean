@@ -248,11 +248,6 @@ private theorem norm_braid_sq_le [Fintype ι] [DecidableEq ι] (φ : AlgState A)
     set y := φ.norm (Z (c + b) - Z' (c + b))
     set z := φ.norm (X a * Z c + Z c * X a)
     set w := φ.norm (X a * Z (c + b) + Z (c + b) * X a)
-    have hx : 0 ≤ x := φ.norm_nonneg _
-    have hy : 0 ≤ y := φ.norm_nonneg _
-    have hz : 0 ≤ z := φ.norm_nonneg _
-    have hw : 0 ≤ w := φ.norm_nonneg _
-    have hv : 0 ≤ κX := φ.norm_nonneg _
     calc φ.norm (Z b * X a - X a * Z b) ^ 2 ≤ (2 * x + 2 * y + z + w + 2 * κX) ^ 2 :=
           pow_le_pow_left₀ h0 h 2
       _ ≤ 8 * (2 * x ^ 2 + 2 * y ^ 2 + 2 * κX ^ 2 + z ^ 2 + w ^ 2) := by

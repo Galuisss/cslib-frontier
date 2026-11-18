@@ -82,6 +82,11 @@ theorem le_two_mul_expect_ite_of_forall {a : ι → Bool} (ha : a ≠ 0) {g : �
 def oddPairs (ι : Type*) [Fintype ι] [DecidableEq ι] : Finset ((ι → Bool) × (ι → Bool)) :=
   univ.filter fun p => p.1 ⬝ᵥ p.2 = true
 
+/-- A pair is odd exactly when its bitwise inner product is one. -/
+@[simp] theorem mem_oddPairs {p : (ι → Bool) × (ι → Bool)} :
+    p ∈ oddPairs ι ↔ p.1 ⬝ᵥ p.2 = true := by
+  simp [oddPairs]
+
 /-- The odd pairs have density `(1 - 2⁻ⁿ) / 2` among all pairs of `n`-bit strings; for `n = 0` there
 are none. -/
 theorem dens_oddPairs : ((oddPairs ι).dens : ℝ) = (1 - ((2 : ℝ) ^ Fintype.card ι)⁻¹) / 2 := by
@@ -123,8 +128,7 @@ theorem oddExpect_eq_dens_smul (f : (ι → Bool) → (ι → Bool) → ℝ) :
     oddExpect f = ((oddPairs ι).dens : ℝ) * 𝔼 p ∈ oddPairs ι, f p.1 p.2 := by
   rw [oddExpect_def, ← Finset.expect_product' univ univ (fun a b =>
     if a ⬝ᵥ b = true then f a b else 0), Finset.univ_product_univ]
-  simp_rw [show ∀ p : (ι → Bool) × (ι → Bool), (p.1 ⬝ᵥ p.2 = true) ↔ p ∈ oddPairs ι from
-    fun p => by simp [oddPairs]]
+  simp_rw [← mem_oddPairs]
   rw [Fintype.expect_ite_mem, NNRat.smul_def]
 
 theorem oddExpect_add (f g : (ι → Bool) → (ι → Bool) → ℝ) :

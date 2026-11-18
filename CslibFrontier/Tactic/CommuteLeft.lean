@@ -18,23 +18,18 @@ Rigidity arguments move an operator of one player past operators of the other, w
 with, many times in each chain of approximations: `X a * Z c * Z' d = Z' d * (X a * Z c)` when
 `Z' d` commutes with `X a` and `Z c`. `commute_left [h₁, …, hₖ]` proves such equalities. Each
 `hᵢ` states `Commute x y`, possibly quantified (`hXZ : ∀ a b, Commute (X a) (Z' b)`), and lets the
-factors `y` move to the left of the factors `x`. The tactic instantiates each hypothesis with one
-placeholder per binder and calls `simp only` with associativity and the instances of
-`Commute.left_comm` and `Commute.eq`, so both sides reach the same normal form: products
-associated to the right, with each `y` in front of the `x`s it commutes with.
+factors `y` move to the left of the factors `x`. The tactic calls `simp only` with associativity
+and the instances of `Commute.left_comm` and `Commute.eq`. It supplies one placeholder per explicit
+binder and leaves implicit and instance arguments to elaboration, so hypotheses such as
+`∀ (a : ι) {b : ι}, Commute (X a) (Z b)` work.
 
-The direction comes from the hypotheses: `Commute x y` moves `y` left, never `x`, so the rewriting
-terminates. The tactic is meant for **consistently oriented families**, as in rigidity proofs: the
-hypotheses say that every factor of one group (for instance the second player's operators) commutes
-with the factors of another (the first player's), all in the same direction. Then the normal form is
-unique and equal products are proved equal. Outside this setting the rewriting need not be
-confluent: from `Commute u v` and `Commute v w`, both `v * u * w` and `u * w * v` are normal forms,
-although they are equal. Do not pass both `Commute x y` and `Commute y x` for the same families,
-which would let the factors swap back and forth.
-
-Each hypothesis is instantiated with one placeholder per explicit binder; implicit and instance
-arguments are left to elaboration, so hypotheses such as `∀ (a : ι) {b : ι}, Commute (X a) (Z b)`
-work. The tactic fails, with the remaining goal, when the given commutations do not close it.
+In rigidity proofs the two players' operators form disjoint families. When the commutations
+cover all cross-family pairs and orient them consistently, each swap reduces the number of
+out-of-order pairs. The right-associated normal form has the second player's factors before the
+first player's, preserving the order within each family. With overlapping families,
+different normal forms can still be equal: under `Commute u v` and `Commute v w`, both
+`v * u * w` and `u * w * v` are irreducible. The tactic reports any goal left open by
+simplification.
 
 ## Main definitions
 
