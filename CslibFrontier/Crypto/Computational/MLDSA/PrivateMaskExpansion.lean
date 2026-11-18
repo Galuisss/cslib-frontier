@@ -159,51 +159,50 @@ private theorem keyGen_maskStreams {a b n : ℕ} (base : Xofs) (ha : 528 ≤ a)
 
 private abbrev ExpansionRow (b : ℕ) := FixedBytes 2 → Fin b → Byte
 
-private def nonceSuffix (i : ℕ) : FixedBytes 2 := ![Fin.ofNat 256 i, Fin.ofNat 256 (i / 256)]
-
-private theorem nonceSuffix_list (i : ℕ) :
-    (nonceSuffix i).toList = [Fin.ofNat 256 i, Fin.ofNat 256 (i / 256)] := by
-  simp [FixedBytes.toList, nonceSuffix, List.ofFn_succ]
-
-private def maskWidth (s : Level) := 32 * (s.params.γ₁.log2 + 1)
-
-private def maskFromRow (s : Level) {b : ℕ} (row : ExpansionRow b) (counter : ℕ) :
+private def maskFromRow (s : Level) (row : ExpansionRow (maskWidth s)) (counter : ℕ) :
     Fin s.params.ℓ → Poly :=
-  let width := s.params.γ₁.log2 + 1
-  fun i => ((unpackSigned 1 width s.params.γ₁
-    ((List.ofFn (row (nonceSuffix (counter + i.val)))).take (maskWidth s))).get 0).get
+  ringVectorCoeffs (expandMaskFrom s counter fun nonce => List.ofFn (row (nonceSuffix nonce)))
+
+private def slotRow {n b : ℕ} {s : Level} (hb : maskWidth s ≤ b)
+    (rows : MaskInput n × Fin b → Byte) (i : Fin n) : ExpansionRow (maskWidth s) :=
+  fun suffix j => rows ((i, suffix), j.castLE hb)
 
 private theorem expandMask_maskStreams {a b n : ℕ} (base : Xofs) (ha : 528 ≤ a)
     (s : Level) (hb : maskWidth s ≤ b) (t : Fin n ↪ FixedBytes 64) (T₁ T₂ : Table a b)
     (rows : MaskInput n × Fin b → Byte) (i : Fin n) (counter : ℕ) :
     ringVectorCoeffs ((maskStreams base ha t T₁ T₂ rows).expandMask s (t i).toList counter) =
-      maskFromRow s (fun suffix j => rows ((i, suffix), j)) counter := by
+      maskFromRow s (slotRow hb rows i) counter := by
   let G := maskStreams base ha t T₁ T₂ rows
   have read (v : ℕ) : G.h256.readBytes (nonceInput (t i).toList v) (maskWidth s) =
-      (List.ofFn fun j => rows ((i, nonceSuffix v), j)).take (maskWidth s) := by
+      List.ofFn (slotRow hb rows i (nonceSuffix v)) := by
     have raw : Keccak.bytesToBitsLE (nonceInput (t i).toList v) =
         maskWord t (i, nonceSuffix v) := by
-      simp only [nonceInput, maskWord, nonceSuffix_list]
+      simp [nonceInput, maskWord, FixedBytes.toList, List.ofFn_succ]
     change G.h256.read _ _ = _
     rw [raw]
     apply List.ext_getElem
-    · simp [G.h256.length_read, Nat.min_eq_left hb]
+    · simp [G.h256.length_read]
     · intro j hj _
       have small : j < maskWidth s := hj.trans_le (G.h256.length_read ..).le
-      rw [getElem_read _ _ small, List.getElem_take, List.getElem_ofFn]
+      rw [getElem_read _ _ small, List.getElem_ofFn]
       exact maskStreams_byteAt base ha t T₁ T₂ rows (i, nonceSuffix v) ⟨j, small.trans_le hb⟩
-  funext k j
-  simp only [Xofs.expandMask, ringVectorCoeffs, Vector.get_ofFn, maskFromRow]
-  rw [show 32 * (s.params.γ₁.log2 + 1) = maskWidth s from rfl, read]
+  simp only [Xofs.expandMask, ← show G = maskStreams base ha t T₁ T₂ rows from rfl,
+    maskFromRow, read]
 
 private def Xofs.signWithExpansionRow (H : Xofs) (s : Level) (key : List Byte)
-    (q : SigningQuery) {b : ℕ} (row : ExpansionRow b) : Option (List Byte) := do
+    (q : SigningQuery) (row : ExpansionRow (maskWidth s)) : Option (List Byte) := do
   guard (q.context.length ≤ 255)
   let sk ← decodePrivate s key
   let A ← H.expandA s sk.rho
   let μ := H.representativeFromTr sk.tr (formatMessage q.message q.context)
   firstAccepted s.params.ℓ (fun counter =>
     H.attemptWithMask s sk A μ (maskFromRow s row counter)) 814 0
+
+private theorem nonce_commitment_ne (s : Level)
+    (w : Fin s.params.k → Fin 256 → ℤ) {μ : List Bool} (len : μ.length = 512) :
+    (commitmentInput s w μ).length ≠ 528 := by
+  simp only [commitmentInput, List.length_append, len, bitsLength, length_packCoeffs]
+  cases s <;> decide
 
 -- Every commitment and sparse challenge read in an attempt has a different length from
 -- the 66-byte nonce input, at each of the three FIPS levels.
@@ -213,14 +212,12 @@ private theorem maskStreams_attempt {a b n : ℕ} (base : Xofs) (ha : 528 ≤ a)
     {μ : List Bool} (hμ : μ.length = 512) (i : Fin n) (counter : ℕ) :
     (maskStreams base ha t T₁ T₂ rows).attempt s sk A μ (t i).toList counter =
       (streams base T₁ T₂).attemptWithMask s sk A μ
-        (maskFromRow s (fun suffix j => rows ((i, suffix), j)) counter) := by
+        (maskFromRow s (slotRow hb rows i) counter) := by
   let G := maskStreams base ha t T₁ T₂ rows
   let H := streams base T₁ T₂
   have raw := maskStreams_off_length base ha t T₁ T₂ rows
-  have digest w : G.commitmentDigest s w μ = H.commitmentDigest s w μ := by
-    apply raw
-    simp only [commitmentInput, List.length_append, hμ, bitsLength, length_packCoeffs]
-    cases s <;> decide
+  have digest w : G.commitmentDigest s w μ = H.commitmentDigest s w μ :=
+    raw _ (nonce_commitment_ne s w hμ) _
   have challenge w : G.sampleInBall s (H.commitmentDigest s w μ) =
       H.sampleInBall s (H.commitmentDigest s w μ) :=
     challenge_unchanged raw s (by rw [length_commitmentDigest]; cases s <;> decide)
@@ -250,11 +247,6 @@ private theorem rep_maskStreams {a b n : ℕ} (base : Xofs) (ha : 528 ≤ a)
   rw [representativeInput, prefixSeed_append]
   rwa [← List.append_nil (Keccak.bytesToBitsLE r.toList), prefixSeed_append] at miss
 
-private theorem nonce_commitment_ne (s : Level)
-    (w : Fin s.params.k → Fin 256 → ℤ) {μ : List Bool} (len : μ.length = 512) :
-    (commitmentInput s w μ).length ≠ 528 := by
-  simp only [commitmentInput, List.length_append, len, bitsLength, length_packCoeffs]
-  cases s <;> decide
 
 private theorem sign_maskStreams {a b n : ℕ} (base : Xofs) (ha : 528 ≤ a)
     (s : Level) (hb : maskWidth s ≤ b) (t : Fin n ↪ FixedBytes 64) (T₁ T₂ : Table a b)
@@ -263,7 +255,7 @@ private theorem sign_maskStreams {a b n : ℕ} (base : Xofs) (ha : 528 ≤ a)
     (miss : trSeed (streams base T₁ T₂) (some keys) ∉ Set.range t) (i : Fin n) (q : SigningQuery) :
     (maskStreams base ha t T₁ T₂ rows).signWithRow s keys.secretKey q (fun _ => t i) =
       (streams base T₁ T₂).signWithExpansionRow s keys.secretKey q
-        (fun suffix j => rows ((i, suffix), j)) := by
+        (slotRow hb rows i) := by
   let G := maskStreams base ha t T₁ T₂ rows
   let H := streams base T₁ T₂
   obtain ⟨rho, sk, matrix, _, dec, _⟩ := privateKey_of_keyGen hk
@@ -334,21 +326,15 @@ private theorem maskSeedEmbedding {n : ℕ} (h : n ≤ 2 ^ 512) :
 
 private noncomputable def seedTapeTranscript (C : QuantumSigningForger) (H : Xofs) (s : Level)
     (keys : KeyPair) (tape : List (FixedBytes 64)) : PMF (Forgery × List Forgery) :=
-  ((OracleComp.interpret (OracleComp.withSampleListWhen isSigningCall (0 : FixedBytes 64)
-    (fun r => C.rowCommand H s keys (fun _ => r))) (C.program keys.publicKey)).run
-      (C.initial, tape)).map fun (f, st, _) => (f, st.2)
+  C.signingTapeTranscript H keys.publicKey
+    (fun r q => H.signWithRow s keys.secretKey q (fun _ => r)) tape
 
 private theorem uniform_seedTapeTranscript (C : QuantumSigningForger) (H : Xofs) (s : Level)
     (keys : KeyPair) {n : ℕ} (hn : C.SigningCallsLe n) :
     ((PMF.uniformOfFintype (Fin n → FixedBytes 64)).bind fun t =>
-      C.seedTapeTranscript H s keys (List.ofFn t)) = C.privateTranscript H s keys := by
-  have law := OracleComp.IsCostBounded.run_interpret_presample_when isSigningCall
-    (hn keys.publicKey) (PMF.uniformOfFintype (FixedBytes 64)) 0
-    (fun r => C.rowCommand H s keys (fun _ => r)) C.initial
-  rw [PMF.iid_uniformOfFintype] at law
-  have zeroSeed : (0 : FixedBytes 64) = (fun _ => 0) := rfl
-  simpa only [zeroSeed, seedTapeTranscript, privateTranscript, PMF.map_bind, PMF.bind_map,
-    PMF.map_comp, Function.comp_def] using congrArg (PMF.map (fun x => (x.1, x.2.2))) law
+      C.seedTapeTranscript H s keys (List.ofFn t)) = C.privateTranscript H s keys :=
+  C.uniform_signingTapeTranscript H keys.publicKey
+    (fun (r : FixedBytes 64) q => H.signWithRow s keys.secretKey q (fun _ => r)) hn
 
 private noncomputable def maskTapeScore (C : QuantumSigningForger) (H : Xofs) (s : Level)
     (tape : List (FixedBytes 64)) : Game :=
@@ -357,14 +343,13 @@ private noncomputable def maskTapeScore (C : QuantumSigningForger) (H : Xofs) (s
       (fun keys => C.seedTapeTranscript H s keys tape)
 
 private noncomputable def expansionTranscript (C : QuantumSigningForger) (device H : Xofs)
-    (s : Level) (keys : KeyPair) {b : ℕ} (tape : List (ExpansionRow b)) :
+    (s : Level) (keys : KeyPair) (tape : List (ExpansionRow (maskWidth s))) :
     PMF (Forgery × List Forgery) :=
-  ((OracleComp.interpret (OracleComp.withSampleListWhen isSigningCall (0 : ExpansionRow b)
-    (fun row => C.signingCommand device fun q => H.signWithExpansionRow s keys.secretKey q row))
-    (C.program keys.publicKey)).run (C.initial, tape)).map fun (f, st, _) => (f, st.2)
+  C.signingTapeTranscript device keys.publicKey
+    (fun row q => H.signWithExpansionRow s keys.secretKey q row) tape
 
 private noncomputable def expansionScore (C : QuantumSigningForger) (device H : Xofs)
-    (s : Level) (seed : FixedBytes 32) {b : ℕ} (tape : List (ExpansionRow b)) : Game :=
+    (s : Level) (seed : FixedBytes 32) (tape : List (ExpansionRow (maskWidth s))) : Game :=
   scoreTranscript H s SignedMatrixTrial.newDigestWin (H.keyGen s seed)
     (fun keys => C.expansionTranscript device H s keys tape)
 
@@ -381,7 +366,7 @@ private theorem maskScore_eq {a b n : ℕ} (C : QuantumSigningForger) (s : Level
     let H := streams base T₁ T₂
     scoreTranscript G s SignedMatrixTrial.newDigestWin (G.keyGen s seed)
       (fun keys => C.seedTapeTranscript G s keys (List.ofFn t)) =
-      C.expansionScore G H s seed (List.ofFn fun i suffix j => rows ((i, suffix), j)) := by
+      C.expansionScore G H s seed (List.ofFn (slotRow hb rows)) := by
   intro G H
   have kg : G.keyGen s seed = H.keyGen s seed :=
     keyGen_maskStreams base ha t T₁ T₂ rows s seed fun i eq => good.1 ⟨i, List.ofFn_inj.mp
@@ -397,11 +382,11 @@ private theorem maskScore_eq {a b n : ℕ} (C : QuantumSigningForger) (s : Level
     | none => rfl
     | some A =>
       let fs := fun r => C.rowCommand G s keys (fun _ => r)
-      let gs := fun (row : ExpansionRow b) =>
+      let gs := fun (row : ExpansionRow (maskWidth s)) =>
         C.signingCommand G fun q => H.signWithExpansionRow s keys.secretKey q row
-      let tape := List.ofFn fun i suffix j => rows ((i, suffix), j)
+      let tape := List.ofFn (slotRow hb rows)
       have run := OracleComp.IsCostBounded.run_interpret_sampleListWhen_congr isSigningCall
-        (hn keys.publicKey) (0 : FixedBytes 64) (0 : ExpansionRow b) fs gs (by
+        (hn keys.publicKey) (0 : FixedBytes 64) (0 : ExpansionRow (maskWidth s)) fs gs (by
           rintro (k | cmd | ask) h
           · simp only [fs, gs, rowCommand, signingCommand, OracleComp.sumHandler]
           · simp only [fs, gs, rowCommand, signingCommand, OracleComp.sumHandler]
@@ -413,13 +398,14 @@ private theorem maskScore_eq {a b n : ℕ} (C : QuantumSigningForger) (s : Level
             · simp only [tape, List.get_ofFn, Fin.cast_mk, fs, gs, rowCommand, signingCommand,
                 OracleComp.sumHandler]
               rw [show ∀ i, G.signWithRow s keys.secretKey ask (fun _ => t i) =
-                H.signWithExpansionRow s keys.secretKey ask (fun suffix j => rows ((i, suffix), j))
+                H.signWithExpansionRow s keys.secretKey ask (slotRow hb rows i)
                 from fun i => sign_maskStreams base ha s hb t T₁ T₂ rows hk miss i ask])
         C.initial
       have transcripts : C.seedTapeTranscript G s keys (List.ofFn t) =
           C.expansionTranscript G H s keys tape := by
-        simpa only [seedTapeTranscript, expansionTranscript, PMF.map_comp, Function.comp_def,
-          fs, gs, Width, probOracleSpec] using congrArg (PMF.map fun x => (x.1, x.2.2)) run
+        simpa only [seedTapeTranscript, expansionTranscript, signingTapeTranscript, rowCommand,
+          PMF.map_comp, Function.comp_def, fs, gs, Width, probOracleSpec]
+          using congrArg (PMF.map fun x => (x.1, x.2.2)) run
       dsimp only
       rw [transcripts]
       apply congrArg (fun k => PMF.map k _)
@@ -444,7 +430,7 @@ private theorem setup_advantage_le {a b n : ℕ} [Nonempty (Fin n ↪ FixedBytes
     (Game.advantage (tapes.bind fun t => scoreTranscript (G t) s SignedMatrixTrial.newDigestWin
       ((G t).keyGen s seed) (fun keys => C.seedTapeTranscript (G t) s keys (List.ofFn t)))
       (tapes.bind fun t => C.expansionScore (G t) H s seed
-        (List.ofFn fun i suffix j => rows ((i, suffix), j))) : ℝ) ≤ 2 * n / 2 ^ 512 := by
+        (List.ofFn (slotRow hb rows))) : ℝ) ≤ 2 * n / 2 ^ 512 := by
   intro tapes H G
   let short := prefixSeed (Keccak.bytesToBitsLE (secretSeed H s seed))
   let tr := trSeed H (H.keyGen s seed)
@@ -511,11 +497,12 @@ private theorem fixedHit_le {a b n : ℕ} [Nonempty (Fin n ↪ FixedBytes 64)]
     (by positivity)).mpr (prob_maskSeed_mem (addressSeed C addr)).le
 
 private theorem expansionScore_gap_le {a b n m : ℕ} [Nonempty (Fin n ↪ FixedBytes 64)]
-    (C : QuantumSigningForger) (s : Level) (base : Xofs) (ha : 528 ≤ a) (hm : C.XofCallsLe m)
+    (C : QuantumSigningForger) (s : Level) (base : Xofs) (ha : 528 ≤ a) (hb : maskWidth s ≤ b)
+    (hm : C.XofCallsLe m)
     (T₁ T₂ : Table a b) (rows : MaskInput n × Fin b → Byte) (seed : FixedBytes 32) :
     let H := streams base T₁ T₂
     let G := fun t => maskStreams base ha t T₁ T₂ rows
-    let tape := List.ofFn fun i suffix j => rows ((i, suffix), j)
+    let tape := List.ofFn (slotRow hb rows)
     gap ((PMF.uniformOfFintype (Fin n ↪ FixedBytes 64)).bind fun t =>
       C.expansionScore (G t) H s seed tape) (C.expansionScore H H s seed tape) ≤
       4 * m * m * (n / 2 ^ 512) := by
@@ -531,16 +518,16 @@ private theorem expansionScore_gap_le {a b n m : ℕ} [Nonempty (Fin n ↪ Fixed
     | none => simp only [PMF.bind_const, gap, sub_self, zero_pow (by decide : 2 ≠ 0)]; positivity
     | some A =>
       let prog := C.program keys.publicKey
-      let sign := fun (row : ExpansionRow b) (q : SigningQuery) =>
+      let sign := fun (row : ExpansionRow (maskWidth s)) (q : SigningQuery) =>
         H.signWithExpansionRow s keys.secretKey q row
-      let test := fun (f : Forgery) (log : List Forgery) (_ : List (ExpansionRow b)) =>
+      let test := fun (f : Forgery) (log : List Forgery) (_ : List (ExpansionRow (maskWidth s))) =>
         (POVM.const (SignedMatrixTrial.newDigestWin ⟨H, A, keys.publicKey, f, log⟩) : Test C)
       have law (T : Xofs) :
           (C.expansionTranscript T H s keys tape).map (fun (f, log) =>
             SignedMatrixTrial.newDigestWin ⟨H, A, keys.publicKey, f, log⟩) =
           scored prog T sign test C.initial.1 C.initial.2 tape := by
-        simp only [expansionTranscript, scored, test, POVM.measureDensity_const, PMF.map_comp,
-          Function.comp_def]
+        simp only [expansionTranscript, signingTapeTranscript, scored, test,
+          POVM.measureDensity_const, PMF.map_comp, Function.comp_def]
         rfl
       let run (T : Xofs) := scored prog T sign test C.initial.1 C.initial.2 tape
       let hits t j := hit prog (G t) H sign C.initial.1 C.initial.2 tape j
@@ -617,22 +604,19 @@ private theorem dist_privateMaskSeedGame_maskExpansionGame (C : QuantumSigningFo
   simpa only [Fintype.card_fin, card_maskSeed, Nat.cast_pow, Nat.cast_ofNat, ← pow_succ'] using h
 
 private noncomputable def freshExpansionTranscript (C : QuantumSigningForger) (s : Level)
-    (H : Xofs) (b : ℕ) (keys : KeyPair) : PMF (Forgery × List Forgery) :=
-  let command := fun (row : ExpansionRow b) =>
-    C.signingCommand H fun q => H.signWithExpansionRow s keys.secretKey q row
-  ((OracleComp.interpret (m := StateT (State C) PMF) (fun q st =>
-    if isSigningCall q then (PMF.uniformOfFintype (ExpansionRow b)).bind fun r => command r q st
-    else command 0 q st) (C.program keys.publicKey)).run C.initial).map fun x => (x.1, x.2.2)
+    (H : Xofs) (keys : KeyPair) : PMF (Forgery × List Forgery) :=
+  C.sampledSigningTranscript H keys.publicKey
+    (fun row q => H.signWithExpansionRow s keys.secretKey q row)
 
 /-- Fresh-digest forgery when the signer draws the raw Algorithm 34 expansion bytes
-independently for each signing call and two-byte nonce. All retries use the actual FIPS
-decoder and commitment hash. The device and verifier use the same public random XOFs. -/
+independently for each signing call and two-byte nonce, at the width of the parameter set.
+All retries use the FIPS decoder and commitment hash. The device and verifier use the same XOFs. -/
 noncomputable def freshExpansionGame (C : QuantumSigningForger) (s : Level)
     (base : Xofs) (a b : ℕ) : Game := do
   let H ← base.uniformPrefixes a b
   let seed ← PMF.uniformOfFintype (FixedBytes 32)
   scoreTranscript H s SignedMatrixTrial.newDigestWin (H.keyGen s seed)
-    (C.freshExpansionTranscript s H b)
+    (C.freshExpansionTranscript s H)
 
 private def slotRows {n b : ℕ} : (MaskInput n × Fin b → Byte) ≃ (Fin n → ExpansionRow b) where
   toFun f i suffix j := f ((i, suffix), j)
@@ -641,20 +625,19 @@ private def slotRows {n b : ℕ} : (MaskInput n × Fin b → Byte) ≃ (Fin n �
   right_inv _ := rfl
 
 private theorem uniform_expansionTranscript (C : QuantumSigningForger) (s : Level) (H : Xofs)
-    {n b : ℕ} (keys : KeyPair) (hn : C.SigningCallsLe n) :
+    {n b : ℕ} (hb : maskWidth s ≤ b) (keys : KeyPair) (hn : C.SigningCallsLe n) :
     ((PMF.uniformOfFintype (MaskInput n × Fin b → Byte)).bind fun rows =>
-      C.expansionTranscript H H s keys (List.ofFn fun i suffix j => rows ((i, suffix), j))) =
-      C.freshExpansionTranscript s H b keys := by
-  let command := fun (row : ExpansionRow b) =>
-    C.signingCommand H fun q => H.signWithExpansionRow s keys.secretKey q row
-  have law := OracleComp.IsCostBounded.run_interpret_presample_when isSigningCall
-    (hn keys.publicKey) (PMF.uniformOfFintype (ExpansionRow b)) 0 command C.initial
-  rw [PMF.iid_uniformOfFintype] at law
-  have push := PMF.uniformOfFintype_map_equiv (slotRows (n := n) (b := b))
-  rw [← push, PMF.bind_map] at law
-  simpa only [expansionTranscript, freshExpansionTranscript, command, PMF.map_bind, PMF.bind_map,
-    PMF.map_comp, Function.comp_def, slotRows, Equiv.coe_fn_mk]
-    using congrArg (PMF.map fun x => (x.1, x.2.2)) law
+      C.expansionTranscript H H s keys (List.ofFn (slotRow hb rows))) =
+      C.freshExpansionTranscript s H keys := by
+  have law := C.uniform_signingTapeTranscript H keys.publicKey
+    (fun row q => H.signWithExpansionRow s keys.secretKey q row) hn
+  let restrict := (Function.Embedding.refl (MaskInput n)).prodMap (Fin.castLEEmb hb)
+  have proj := PMF.uniformOfFintype_pi_map_comp_embedding (α := Byte) restrict
+  have project (r : MaskInput n × Fin b → Byte) :
+      slotRows (fun v => r (restrict v)) = slotRow hb r := rfl
+  have push := PMF.uniformOfFintype_map_equiv (slotRows (n := n) (b := maskWidth s))
+  rw [← push, ← proj, PMF.map_comp, PMF.bind_map] at law
+  simpa only [expansionTranscript, freshExpansionTranscript, Function.comp_def, project] using law
 
 private noncomputable def expansionSetup {α : Type} {a b n : ℕ}
     (run : Table a b → Table a b → (MaskInput n × Fin b → Byte) → FixedBytes 32 → PMF α) :
@@ -666,11 +649,11 @@ private noncomputable def expansionSetup {α : Type} {a b n : ℕ}
   run T₁ T₂ rows seed
 
 private theorem freshExpansionGame_eq_setup (C : QuantumSigningForger) (s : Level)
-    (base : Xofs) {a b n : ℕ} (hn : C.SigningCallsLe n) :
+    (base : Xofs) {a b n : ℕ} (hb : maskWidth s ≤ b) (hn : C.SigningCallsLe n) :
     C.freshExpansionGame s base a b =
       expansionSetup (a := a) (b := b) (n := n) fun T₁ T₂ rows seed =>
         let H := streams base T₁ T₂
-        C.expansionScore H H s seed (List.ofFn fun i suffix j => rows ((i, suffix), j)) := by
+        C.expansionScore H H s seed (List.ofFn (slotRow hb rows)) := by
   simp only [freshExpansionGame, expansionSetup, PMF.monad_bind_eq_bind, ← sample_streams,
     PMF.bind_bind, PMF.bind_map, Function.comp_def]
   apply congrArg (PMF.bind (PMF.uniformOfFintype (Table a b)) ·)
@@ -690,7 +673,7 @@ private theorem freshExpansionGame_eq_setup (C : QuantumSigningForger) (s : Leve
     | some A =>
       simpa only [PMF.map_bind] using congrArg
         (PMF.map fun (f, log) => SignedMatrixTrial.newDigestWin ⟨H, A, keys.publicKey, f, log⟩)
-        (C.uniform_expansionTranscript (b := b) s H keys hn)
+        (C.uniform_expansionTranscript s H hb keys hn)
 
 private theorem gap_bind_const {ι : Type} [Finite ι] (p : PMF ι) (f g : ι → PMF Bool) {B : ℝ}
     (h : ∀ i, gap (f i) (g i) ≤ B) : gap (p.bind f) (p.bind g) ≤ B := by
@@ -716,7 +699,7 @@ theorem privateMaskSeedGame_le_freshExpansionGame (C : QuantumSigningForger) (s 
   let middle := expansionSetup (n := n) fun (T₁ T₂ : Table a b) rows seed =>
     let H := streams base T₁ T₂
     tapes.bind fun t => C.expansionScore (maskStreams base ha t T₁ T₂ rows) H s seed
-      (List.ofFn fun i suffix j => rows ((i, suffix), j))
+      (List.ofFn (slotRow hb rows))
   have collide : dist (C.privateMaskSeedGame s base a b) shared ≤ _ :=
     C.dist_privateMaskSeedGame_maskExpansionGame s base ha hn hsize
   have setup : (Game.advantage shared middle : ℝ) ≤ 2 * n / 2 ^ 512 := by
@@ -734,7 +717,7 @@ theorem privateMaskSeedGame_le_freshExpansionGame (C : QuantumSigningForger) (s 
         setup_advantage_le C s base ha hb hn T₁ T₂ rows seed
   let loss : ℝ := 2 * m * √(n / 2 ^ 512)
   have sq : gap middle ideal ≤ loss ^ 2 := by
-    rw [show ideal = _ from C.freshExpansionGame_eq_setup (a := a) (b := b) s base hn]
+    rw [show ideal = _ from C.freshExpansionGame_eq_setup (a := a) s base hb hn]
     simp only [middle, expansionSetup, PMF.monad_bind_eq_bind]
     apply gap_bind_const
     intro T₁
@@ -744,7 +727,7 @@ theorem privateMaskSeedGame_le_freshExpansionGame (C : QuantumSigningForger) (s 
     intro rows
     apply gap_bind_const
     intro seed
-    apply (expansionScore_gap_le C s base ha hm T₁ T₂ rows seed).trans_eq
+    apply (expansionScore_gap_le C s base ha hb hm T₁ T₂ rows seed).trans_eq
     let rate : ℝ := n / 2 ^ 512
     change 4 * m * m * rate = (2 * m * √rate) ^ 2
     simp only [mul_pow, Real.sq_sqrt (show 0 ≤ rate by dsimp [rate]; positivity)]

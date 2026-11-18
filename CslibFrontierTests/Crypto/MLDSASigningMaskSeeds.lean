@@ -7,7 +7,10 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskExpansion
+import all CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskExpansion
+import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
+import all CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskSeedGame
+import all CslibFrontier.Crypto.Computational.MLDSA.SigningHedges
 import all CslibFrontier.Crypto.Computational.MLDSA.KeySeedSearch
 import all CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 import all CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
@@ -308,3 +311,14 @@ example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ}
     norm_num
   rw [root]
   norm_num
+
+-- The signer still draws all 576 private bytes per nonce when no public output is randomized.
+open QuantumSigningForger in
+example (C : QuantumSigningForger) (base : Xofs) :
+    C.freshExpansionGame .mlDSA44 base 528 0 = (do
+      let H ← base.uniformPrefixes 528 0
+      let seed ← PMF.uniformOfFintype (FixedBytes 32)
+      scoreTranscript H .mlDSA44 SignedMatrixTrial.newDigestWin (H.keyGen .mlDSA44 seed)
+        (fun keys => C.sampledSigningTranscript H keys.publicKey
+          (fun (row : FixedBytes 2 → FixedBytes 576) q =>
+            H.signWithExpansionRow .mlDSA44 keys.secretKey q row))) := rfl

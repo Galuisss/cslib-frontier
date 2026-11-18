@@ -33,15 +33,18 @@ namespace Cslib.Crypto.MLDSA.FIPS204
 
 open Cslib.Probability
 
+private def maskWidth (s : Level) := 32 * (s.params.γ₁.log2 + 1)
+
+private def expandMaskFrom (s : Level) (κ : ℕ) (read : ℕ → List Byte) :
+    Vector (Vector (ZMod 8380417) 256) s.params.ℓ :=
+  Vector.ofFn fun i : Fin s.params.ℓ =>
+    (unpackSigned 1 (s.params.γ₁.log2 + 1) s.params.γ₁ (read (κ + i.val))).get 0
+
 /-- ExpandMask (Algorithm 34). Each mask polynomial absorbs the same seed and its own
 two-byte little-endian counter, and decodes 256 coefficients in [1 − γ₁, γ₁]. -/
 def Xofs.expandMask (H : Xofs) (s : Level) (seed : List Byte) (κ : ℕ) :
     Vector (Vector (ZMod 8380417) 256) s.params.ℓ :=
-  let width := s.params.γ₁.log2 + 1
-  Vector.ofFn fun i : Fin s.params.ℓ =>
-    let nonce := κ + i.val
-    let bytes := H.h256.readBytes (nonceInput seed nonce) (32 * width)
-    (unpackSigned 1 width s.params.γ₁ bytes).get 0
+  expandMaskFrom s κ fun nonce => H.h256.readBytes (nonceInput seed nonce) (maskWidth s)
 
 /-- FIPS 202 specialization of `Xofs.expandMask`. -/
 abbrev expandMask := Xofs.expandMask Xofs.shake
