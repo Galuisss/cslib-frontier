@@ -7,7 +7,7 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Crypto.Computational.MLDSA.CommitmentContinuation
+import CslibFrontier.Crypto.Computational.MLDSA.RejectedCommitmentWrites
 
 /-!
 # ML-DSA digest-register clients
@@ -99,3 +99,25 @@ example (C : QuantumSigningForger) (s : Level) (H : Xofs) (A : PublicMatrix s)
     .liftBind _ _ 1 fun _ => .liftBind _ _ 1 fun _ => .liftBind _ _ 0 fun _ => .pure _ _
   simpa [μ, δ, win, show (815 : ℝ) + 2 = 817 by norm_num] using
     C.mean_expansionContinuation_gap_le s H A m D r keys prog d log [row] hH hS
+
+-- Start with a genuine seeded key. A signature or an error selects an independent candidate,
+-- and the actual verifier scores it on the stream left by the capped request.
+example (C : QuantumSigningForger) (s : Level) (H : Xofs) (seed : FixedBytes 32)
+    (keys : KeyPair) (hg : H.keyGen s seed = some keys) (A : PublicMatrix s)
+    (hm : H.expandA s (keys.publicKey.take 32) = some A) (q : SigningQuery) (D)
+    (dev : C.Device) (log : List Forgery)
+    (rows : List (FixedBytes 2 → FixedBytes (maskPolyBytes s)))
+    (onReply onError : Forgery) :
+    let k (r : Option (List Byte)) : C.Program Forgery :=
+      .pure (if r.isSome then onReply else onError)
+    let p keep := Game.succProbability (C.freshDigestSigningCall s H keys q D keep k dev log rows)
+    let δ := (commitmentGuessProbability s.params (by cases s <;> decide) A).toReal
+    |(p true : ℝ) - (p false : ℝ)| ≤ 1628 * δ := by
+  classical
+  intro k p δ
+  obtain ⟨rho, pair, ha, pk, sk, _⟩ := privateKey_of_keyGen hg
+  rw [pk, take_encodePublic, ha] at hm
+  cases hm
+  have bound := C.abs_freshDigestSigningCall_keep_sub_erase_le s H keys q D k dev log rows
+    (qH := 0) (qS := 0) (fun r => .pure _ 0) (fun r => .pure _ 0)
+  simpa [p, δ, sk, ha, ← mul_assoc, show (814 : ℝ) * 2 = 1628 by norm_num] using bound
