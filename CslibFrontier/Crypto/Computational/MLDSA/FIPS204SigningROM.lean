@@ -28,7 +28,8 @@ namespace Cslib.Crypto.MLDSA.FIPS204
 open Cslib.OracleComp Cslib.Probability Cslib.Crypto.Protocols.ROMSignature
 
 /-- The adaptive ROM signing hop for each FIPS parameter set, using the actual bounded SHAKE256
-challenge expansion. The error is expressed through the explicit two-mask Hermite MSIS solver.
+challenge expansion. The Hermite MSIS solver draws both masks from the same random sign box,
+so its radius is `max (γ₁−1) (2γ₂)` and the probability of two equal masks is `γ₁^(-256ℓ)`.
 The experiments use independent ideal masks and share a uniform matrix with the forger. -/
 theorem closeTo_simulateSigning_sampleInBall (s : Level)
     (s₁ : Fin s.params.ℓ → Poly) (s₂ : Fin s.params.k → Poly)
@@ -50,9 +51,9 @@ theorem closeTo_simulateSigning_sampleInBall (s : Level)
           dist expand pk (forger pk)).map Prod.fst)
       ((2 * (S * 814) * H + (S * 814).choose 2 : ℕ) * ENNReal.ofReal
         (Real.sqrt (Game.succProbability
-          (ModuleSIS.hermiteExperiment (max (2 * s.params.γ₁ - 1) (2 * s.params.γ₂))
+          (ModuleSIS.hermiteExperiment (max (s.params.γ₁ - 1) (2 * s.params.γ₂))
             (maskCollisionSolver s.params (by cases s <;> decide))).eval +
-          (↑((2 * s.params.γ₁) ^ (s.params.ℓ * 256)) : ℝ)⁻¹))) := by
+          (↑(s.params.γ₁ ^ (s.params.ℓ * 256)) : ℝ)⁻¹))) := by
   intro dist expand
   have hp : s.params.Valid := by
     cases s
