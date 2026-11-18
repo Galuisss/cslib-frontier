@@ -38,13 +38,14 @@ open scoped Cslib.Probability.PMF
 private abbrev Request (C : QuantumSigningForger) :=
   ℕ ⊕ DeviceRequest (Width C) Empty ⊕ SigningQuery
 
-local notation "signingRequest" =>
+/-- The requests charged against the classical signing budget in the quantum forgery game. -/
+abbrev isSigningCall {width : ℕ} : ℕ ⊕ DeviceRequest width Empty ⊕ SigningQuery → Bool :=
   Sum.elim (fun _ => false) (Sum.elim (fun _ => false) (fun _ => true))
 
 /-- The maximum number of classical signing requests on each path, for every published key.
 Private samples, measurements, gates and coherent XOF calls have zero signing cost. -/
 @[expose] def SigningCallsLe (C : QuantumSigningForger) (n : ℕ) : Prop :=
-  ∀ pk, OracleComp.IsCostBounded (fun q => (signingRequest q).toNat) (C.program pk) n
+  ∀ pk, OracleComp.IsCostBounded (fun q => (isSigningCall q).toNat) (C.program pk) n
 
 private noncomputable def signingCommand (C : QuantumSigningForger) (device : Xofs) (s : Level)
     (sk : List Byte) (sign : SigningQuery → Option (List Byte)) :=
@@ -65,7 +66,7 @@ The quantum device uses `device`, and signing uses `H`. The fallback supplies ze
 The signing budget ensures sufficient tape for the comparison with honest signing. -/
 noncomputable def transcriptWithHedges (C : QuantumSigningForger) (device H : Xofs) (s : Level)
     (keys : KeyPair) (tape : List (FixedBytes 32)) : PMF (Forgery × List Forgery) :=
-  ((OracleComp.interpret (OracleComp.withSampleListWhen signingRequest (fun _ => 0)
+  ((OracleComp.interpret (OracleComp.withSampleListWhen isSigningCall (fun _ => 0)
     (C.hedgeCommand device H s keys.secretKey)) (C.program keys.publicKey)).run
       (C.initial, tape)).map
       fun (f, st, _) => (f, st.2)
@@ -80,16 +81,16 @@ theorem uniform_transcriptWithHedges (C : QuantumSigningForger) (H : Xofs) (s : 
   let online := OracleComp.sumHandler (m := StateT (State C) PMF)
     (fun k => StateT.lift (ProbComp.unifOracle k)) (C.commands H s keys.secretKey)
   have step (q : Request C) (st : State C) :
-      (if signingRequest q then U.bind fun r => C.hedgeCommand H H s keys.secretKey r q st
+      (if isSigningCall q then U.bind fun r => C.hedgeCommand H H s keys.secretKey r q st
        else C.hedgeCommand H H s keys.secretKey (fun _ => 0) q st) = online q st := by
     rcases q with k | cmd | sign
     · rfl
     · rfl
-    · simp only [Sum.elim_inr, hedgeCommand, signingCommand, Xofs.signAndLog, online, commands,
-        OracleComp.sumHandler,
+    · simp only [isSigningCall, Sum.elim_inr, hedgeCommand, signingCommand, Xofs.signAndLog,
+        online, commands, OracleComp.sumHandler,
         Xofs.signingOracle, U, PMF.map_comp, Function.comp_def, ↓reduceIte]
       rfl
-  have joint := OracleComp.IsCostBounded.run_interpret_presample_when signingRequest
+  have joint := OracleComp.IsCostBounded.run_interpret_presample_when isSigningCall
     (hn keys.publicKey) U (fun _ => 0) (C.hedgeCommand H H s keys.secretKey) C.initial
   simp_rw [step] at joint
   rw [PMF.iid_uniformOfFintype] at joint
@@ -102,17 +103,26 @@ private theorem card_hedge : Fintype.card (FixedBytes 32) = 2 ^ 256 := by
   rw [Fintype.card_fun, Fintype.card_fin, Fintype.card_fin]
   decide
 
-private noncomputable def scoreHedgeTrial (C : QuantumSigningForger) (device H : Xofs) (s : Level)
-    (score : SignedMatrixTrial s → Bool) (tape : List (FixedBytes 32)) (keys : KeyPair) : Game :=
-  match H.expandA s (keys.publicKey.take 32) with
+private noncomputable def scoreTranscript (H : Xofs) (s : Level)
+    (score : SignedMatrixTrial s → Bool) (keys : Option KeyPair)
+    (run : KeyPair → PMF (Forgery × List Forgery)) : Game :=
+  match keys with
   | none => PMF.pure false
-  | some A => (C.transcriptWithHedges device H s keys tape).map fun (f, log) =>
-      score ⟨H, A, keys.publicKey, f, log⟩
+  | some keys =>
+    match H.expandA s (keys.publicKey.take 32) with
+    | none => PMF.pure false
+    | some A => (run keys).map fun (f, log) => score ⟨H, A, keys.publicKey, f, log⟩
+
+private noncomputable def scoreWithSetup (C : QuantumSigningForger) (s : Level)
+    (device H : Xofs) (keys : Option KeyPair) (tape : List (FixedBytes 32))
+    (score : SignedMatrixTrial s → Bool) : Game :=
+  scoreTranscript H s score keys fun k => C.transcriptWithHedges device H s k tape
 
 private noncomputable def fixedHedgeGame (C : QuantumSigningForger) (s : Level)
     (base : Xofs) (a b : ℕ) (score : SignedMatrixTrial s → Bool)
     (tape : List (FixedBytes 32)) : Game :=
-  (base.uniformPrefixes a b).bind fun H => H.keyExperiment s (C.scoreHedgeTrial H H s score tape)
+  (base.uniformPrefixes a b).bind fun H => (PMF.uniformOfFintype (FixedBytes 32)).bind fun seed =>
+    C.scoreWithSetup s H H (H.keyGen s seed) tape score
 
 /-- Run honest seeded key generation, signing and final scoring with a uniform injection
 providing the successive 32-byte signing hedges. The key, matrix, raw XOFs, adversary's
@@ -137,7 +147,7 @@ private theorem uniform_fixedHedgeGame (C : QuantumSigningForger) (s : Level) (b
   simp only [matrixTrial, PMF.monad_bind_eq_bind, PMF.map_bind]
   rw [show (fun H => (matrixSetup H s).bind fun z => (C.runAtSetup s z).map (·.any score)) =
     (fun H => (matrixSetup H s).bind eval) from rfl, eq]
-  unfold fixedHedgeGame Xofs.keyExperiment scoreHedgeTrial
+  unfold fixedHedgeGame scoreWithSetup scoreTranscript
   pmf_swap with H
   pmf_swap with seed
   dsimp only [eval, readSetup]
