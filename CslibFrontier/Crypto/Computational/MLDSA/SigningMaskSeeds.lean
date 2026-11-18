@@ -232,6 +232,17 @@ theorem keyGen_eq_of_mem_sampleSigningMaskSeeds {base : Xofs} {s : Level} {seed 
     rw [hx]
     cases level <;> decide
 
+private theorem publicKeyHash_eq_of_mem_sampleSigningMaskSeeds
+    {base : Xofs} {s : Level} {seed : FixedBytes 32} {a b n : ℕ} {t : Fin n ↪ FixedBytes 32}
+    {ha : 1024 ≤ a} {hb : 64 ≤ b} {rows : SigningMaskSeeds n} {p : SigningMaskSeedOracles}
+    (hp : p ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
+    {keys : KeyPair} (hg : p.background.keyGen s seed = some keys) :
+    p.shared.h256.readBytes keys.publicKey 64 = p.background.h256.readBytes keys.publicKey 64 := by
+  have shared := (keyGen_eq_of_mem_sampleSigningMaskSeeds hp s seed).trans hg
+  obtain ⟨_, _, _, _, dec, _⟩ := privateKey_of_keyGen shared
+  obtain ⟨_, _, _, _, dbg, _⟩ := privateKey_of_keyGen hg
+  exact congrArg PrivateKey.tr (Option.some.inj (dec.symm.trans dbg))
+
 private theorem sample_streams (base : Xofs) (a b : ℕ) :
     ((PMF.uniformOfFintype (Table a b)).bind fun T₁ =>
       (PMF.uniformOfFintype (Table a b)).map (streams base T₁)) = base.uniformPrefixes a b := by
@@ -339,13 +350,7 @@ theorem Xofs.prob_representative_ne_sampleSigningMaskSeeds (base : Xofs) (s : Le
       apply PMF.map_true_mono
       intro p hp hbad
       obtain ⟨keys, hg, formatted, ne⟩ := of_decide_eq_true hbad
-      have hshared := (keyGen_eq_of_mem_sampleSigningMaskSeeds hp s seed).trans hg
-      obtain ⟨_, _, _, _, dbg, _⟩ := privateKey_of_keyGen hg
-      obtain ⟨_, _, _, _, dsh, _⟩ := privateKey_of_keyGen hshared
-      have tr : p.shared.h256.readBytes keys.publicKey 64 =
-          p.background.h256.readBytes keys.publicKey 64 :=
-        congrArg PrivateKey.tr (Option.some.inj (dsh.symm.trans dbg))
-      rw [Xofs.messageRepresentative, tr] at ne
+      rw [Xofs.messageRepresentative, publicKeyHash_eq_of_mem_sampleSigningMaskSeeds hp hg] at ne
       apply decide_eq_true
       exact ⟨keys, hg, hedge_of_representative_ne hp _ (p.background.h256.length_read ..) _ ne⟩
     _ ≤ _ := by
@@ -372,13 +377,6 @@ theorem Xofs.prob_representative_ne_sampleSigningMaskSeeds (base : Xofs) (s : Le
           le_refl]
 
 namespace QuantumSigningForger
-
-private noncomputable def scoreWithSetup (C : QuantumSigningForger) (s : Level)
-    (device H : Xofs) (keys : Option KeyPair) (tape : List (FixedBytes 32))
-    (score : SignedMatrixTrial s → Bool) : Game :=
-  match keys with
-  | none => PMF.pure false
-  | some keys => C.scoreHedgeTrial device H s score tape keys
 
 /-- The two mask-seed experiments for the signed-game comparison. Key generation uses the
 background table, and the signer and scorer use the shared table. With `deviceSeesRows = true`
@@ -408,7 +406,6 @@ theorem shared_maskSeedGame_eq_distinctHedgeGame (C : QuantumSigningForger) (s :
   simp only [maskSeedGame, distinctHedgeGame, fixedHedgeGame, PMF.monad_bind_eq_bind, ↓reduceIte]
   congr 1
   funext t
-  unfold Xofs.keyExperiment
   rw [PMF.bind_comm (base.uniformPrefixes a b)]
   congr 1
   funext seed
