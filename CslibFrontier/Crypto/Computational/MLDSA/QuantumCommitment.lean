@@ -9,7 +9,7 @@ module
 
 public import CslibFrontier.Computability.QueryComplexity.Quantum.ValueQueryUpdate
 public import CslibFrontier.Crypto.Computational.MLDSA.CommitmentCollision
-public import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
+public import CslibFrontier.Crypto.Computational.MLDSA.CommitmentEntropy
 public import Mathlib.Algebra.Ring.BooleanRing
 import CslibFrontier.Foundations.Data.Finset.Expect
 import Mathlib.Algebra.Order.BigOperators.Expect
@@ -116,6 +116,24 @@ noncomputable def commitmentRefreshProbability (refresh : Bool) (T : ℕ)
       measureProb (post A H m i (projOutcomes (fun x => readout A x = m)
         (runValue addStep (U A) (ψ A) hv.1 T))) (accept A H m i)
 
+private theorem abs_refresh_sub_le_mean (T : ℕ)
+    (U ψ readout post accept) (hψ : ∀ A, ‖ψ A‖ = 1) :
+    |commitmentRefreshProbability s extra true (W := W) (κ := κ) T U ψ readout post accept -
+      commitmentRefreshProbability s extra false T U ψ readout post accept| ≤
+      2 * T * (𝔼 A, Real.sqrt (commitmentGuessProbability s.params (gamma_pos s) A).toReal) := by
+  classical
+  let d (A : PublicMatrix s) := (commitmentGuessProbability s.params (gamma_pos s) A).toNNReal
+  have finite (A : PublicMatrix s) : commitmentGuessProbability s.params (gamma_pos s) A ≠ ⊤ :=
+    ne_top_of_le_ne_top ENNReal.one_ne_top (iSup_le fun _ => PMF.coe_le_one _ _)
+  unfold commitmentRefreshProbability
+  rw [← expect_sub_distrib, mul_expect]
+  refine (abs_expect_le _ _).trans (expect_le_expect fun A _ => ?_)
+  simpa only [Bool.false_eq_true, ↓reduceIte, d, ENNReal.coe_toNNReal_eq_toReal] using
+    abs_readout_reprogrammed_measureProb_sub_le addStep (U A) (ψ A) (hψ A) T (readout A)
+        (signingAddressLaw s extra A) (δ := d A)
+        (fun m i => ENNReal.toReal_mono (finite A) (signingAddressLaw_le s extra A m i))
+        (post A) (accept A)
+
 /-- For all three FIPS parameter sets a coherent pre-query adversary sees at most the
 displayed difference caused by refreshing one adaptively requested signing commitment.
 The only computational term is success of the specified ordinary Module-SIS solver. -/
@@ -127,25 +145,28 @@ theorem abs_commitmentRefreshProbability_sub_le (T : ℕ)
         (ModuleSIS.hermiteExperiment (max (s.params.γ₁ - 1) (2 * s.params.γ₂))
           (maskCollisionSolver s.params (by cases s <;> decide))).eval +
         (↑(s.params.γ₁ ^ (s.params.ℓ * 256)) : ℝ)⁻¹)) := by
-  classical
+  refine (abs_refresh_sub_le_mean s extra T U ψ readout post accept hψ).trans ?_
   let d (A : PublicMatrix s) := (commitmentGuessProbability s.params (gamma_pos s) A).toNNReal
-  have finite (A : PublicMatrix s) : commitmentGuessProbability s.params (gamma_pos s) A ≠ ⊤ :=
-    ne_top_of_le_ne_top ENNReal.one_ne_top (iSup_le fun _ => PMF.coe_le_one _ _)
-  unfold commitmentRefreshProbability
-  rw [← expect_sub_distrib]
-  refine (abs_expect_le _ _).trans
-    ((expect_le_expect (g := fun A => 2 * T * Real.sqrt (d A)) fun A _ => ?_).trans ?_)
-  · simpa only [Bool.false_eq_true, ↓reduceIte] using
-      abs_readout_reprogrammed_measureProb_sub_le addStep (U A) (ψ A) (hψ A) T (readout A)
-        (signingAddressLaw s extra A) (δ := d A)
-        (fun m i => ENNReal.toReal_mono (finite A) (signingAddressLaw_le s extra A m i))
-        (post A) (accept A)
-  · rw [← mul_expect]
-    apply mul_le_mul_of_nonneg_left _ (by positivity)
-    apply Real.le_sqrt_of_sq_le
-    have hc := sq_expect_le_expect_sq univ (fun A => Real.sqrt (d A))
-    simp only [Real.sq_sqrt (d _).coe_nonneg] at hc
-    exact hc.trans (mean_commitmentGuessProbability_le_hermite s.params (gamma_pos s)
-      (by cases s <;> decide) (by cases s <;> decide))
+  apply mul_le_mul_of_nonneg_left _ (by positivity)
+  apply Real.le_sqrt_of_sq_le
+  have hc := sq_expect_le_expect_sq univ (fun A => Real.sqrt (d A))
+  simp only [Real.sq_sqrt (d _).coe_nonneg] at hc
+  exact hc.trans (mean_commitmentGuessProbability_le_hermite s.params (gamma_pos s)
+    (by cases s <;> decide) (by cases s <;> decide))
+
+/-- One quantum refresh, bounded by the actual average square root of the public submatrix's
+kernel size. The FIPS box contributes the explicit factor `2^(-b/2)` at each level. -/
+theorem abs_commitmentRefreshProbability_sub_le_kernel (T : ℕ)
+    (U ψ readout post accept) (hψ : ∀ A, ‖ψ A‖ = 1) :
+    |commitmentRefreshProbability s extra true (W := W) (κ := κ) T U ψ readout post accept -
+      commitmentRefreshProbability s extra false T U ψ readout post accept| ≤
+      2 * T * ((𝔼 A, Real.sqrt (commitmentKernelSize s A)) /
+        Real.sqrt (2 ^ s.commitmentBoxBits)) := by
+  refine (abs_refresh_sub_le_mean s extra T U ψ readout post accept hψ).trans ?_
+  apply mul_le_mul_of_nonneg_left _ (by positivity)
+  rw [div_eq_mul_inv, expect_mul]
+  refine expect_le_expect fun A _ => ?_
+  rw [← div_eq_mul_inv, ← Real.sqrt_div (Nat.cast_nonneg _)]
+  exact Real.sqrt_le_sqrt (commitmentGuessProbability_le_kernel_div_pow s A)
 
 end Cslib.Crypto.MLDSA.FIPS204

@@ -130,6 +130,13 @@ private theorem mask_card [NeZero P.q] (hγ : 0 < P.γ₁) (hq : 2 * P.γ₁ < P
   congr 1
   lia
 
+/-- Every individual ideal mask has probability at most the reciprocal of the full FIPS box. -/
+theorem signingMaskLaw_apply_le [NeZero P.q] (hγ : 0 < P.γ₁) (hq : 2 * P.γ₁ < P.q) (y) :
+    signingMaskLaw P hγ y ≤ ((2 * P.γ₁ : ℕ) ^ (P.ℓ * P.n) : ℝ≥0∞)⁻¹ := by
+  classical
+  simp only [signingMaskLaw, PMF.uniformOfFinset_apply, mask_card P hγ hq, Nat.cast_pow]
+  split <;> simp
+
 /-- A bit for each mask coefficient, selecting its nonpositive or positive half-interval. -/
 abbrev MaskSigns := Fin P.ℓ → Fin P.n → Bool
 
