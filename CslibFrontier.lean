@@ -4886,6 +4886,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
 public import CslibFrontier.Crypto.Computational.MLDSA.Signing
 public import CslibFrontier.Crypto.Computational.MLDSA.SigningHedges
 public import CslibFrontier.Crypto.Computational.MLDSA.SigningMaskSeeds
+public import CslibFrontier.Crypto.Computational.MLDSA.SigningQueryComparison
 public import CslibFrontier.Crypto.Computational.MerkleDamgard
 public import CslibFrontier.Crypto.Computational.MerkleDamgard.LengthPadding
 public import CslibFrontier.Crypto.Computational.MerkleDamgard.LengthStrengthened
