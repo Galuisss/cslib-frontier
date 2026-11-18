@@ -11,8 +11,10 @@ public import CslibFrontier.Crypto.Computational.MLDSA.MatrixOracle
 import CslibFrontier.Crypto.Game.Order
 import CslibFrontier.Languages.Probabilistic.Memoize
 import CslibFrontier.Languages.Probabilistic.Norm
+import CslibFrontier.Languages.Probabilistic.RandomOracle.Sum
 import CslibFrontier.Languages.Probabilistic.Vector
 import CslibFrontier.Probability.PMF.Bind
+import CslibFrontier.Tactic.PMFSwap
 
 /-!
 # The ML-DSA key-only game with shared classical matrix and commitment oracles
@@ -317,23 +319,86 @@ private theorem solver_bounded {Coins : Type} {s : Level} {adv : Forger s Coins}
 private def runDigest (s : Level) (program : OracleComp (DigestOracle s) Bool) : ProbComp Bool :=
   Prod.fst <$> (interpret (memoize fun _ => sampleBytes (digestBytes s)) program).run []
 
+private theorem memoize_digest (s : Level) (p : Point s) (cache : List (Point s × Digest s)) :
+      memoize (fun _ => PMF.uniformOfFintype (Digest s)) p cache =
+        Protocols.ROMSignature.oracle (Digest s) p cache := by
+  change _ = (Protocols.ROMSignature.oracle (Digest s) p).run cache
+  cases h : cache.lookup p with
+  | none =>
+    rw [memoize_of_none _ _ _ h, Protocols.ROMSignature.run_oracle_of_lookup_eq_none h]
+    rfl
+  | some d =>
+    rw [memoize_of_some _ _ _ _ h, Protocols.ROMSignature.run_oracle_of_lookup_eq_some h]
+    rfl
+
 private theorem eval_runDigest (s : Level) (program : OracleComp (DigestOracle s) Bool) :
     (runDigest s program).eval = ((interpret (Protocols.ROMSignature.oracle (Digest s))
       program).run []).map Prod.fst := by
   simp only [runDigest, ProbComp.eval_map, map_run_interpret ProbComp.isMonadHom_eval,
     ProbComp.eval_memoize, eval_sampleBytes]
-  have hhandler (p : Point s) (cache : List (Point s × Digest s)) :
-      memoize (fun _ => PMF.uniformOfFintype (Digest s)) p cache =
-        Protocols.ROMSignature.oracle (Digest s) p cache := by
-    change _ = (Protocols.ROMSignature.oracle (Digest s) p).run cache
-    cases h : cache.lookup p with
-    | none =>
-      rw [memoize_of_none _ _ _ h, Protocols.ROMSignature.run_oracle_of_lookup_eq_none h]
-      rfl
-    | some d =>
-      rw [memoize_of_some _ _ _ _ h, Protocols.ROMSignature.run_oracle_of_lookup_eq_some h]
-      rfl
-  simp only [hhandler]
+  simp only [memoize_digest]
+
+private abbrev Both (s : Level) :=
+  (fun _ : FixedBytes 32 => PublicMatrix s) ⊕ₒ DigestOracle s
+
+private abbrev DigestCache (s : Level) := List (Point s × Digest s)
+
+private noncomputable def stepAt (s : Level) (v : PublicMatrix s) :=
+  RandomOracle.memoizeSum (fun _ : FixedBytes 32 => PMF.pure v)
+    (fun _ : Point s => PMF.uniformOfFintype (Digest s))
+
+private theorem tape_run {s : Level} {α : Type} (program : OracleComp (Both s) α)
+    (mc : Cache s) (dc : DigestCache s) (tape : List (PublicMatrix s)) :
+    ((interpret (Protocols.ROMSignature.oracle (Digest s))
+      ((interpret (withSampleList 0 (handler s)) program).run (mc, tape))).run dc).map
+      (fun ((a, (mc', tape')), dc') => (a, (mc', dc'), tape')) =
+    (interpret (withSampleList 0 (stepAt s)) program).run ((mc, dc), tape) := by
+  rw [run_interpret_run_interpret]
+  simp only [PMF.monad_map_eq_map, PMF.map_comp, Function.comp_def]
+  refine run_interpret_map_state _ _ (fun st => ((st.1.1, st.2), st.1.2)) ?_ program
+    ((mc, tape), dc)
+  rintro (k | p) ⟨⟨m, t⟩, d⟩
+  · cases h : m.lookup k <;>
+      simp only [StateT.run, withSampleList, handler, sumHandler, memoize, h, bind_pure_comp,
+        map_pure, interpret_pure, stepAt, RandomOracle.memoizeSum_inl, pmf_norm, Function.comp_def]
+    all_goals
+      change PMF.map _ (PMF.pure _) = _
+      simp
+  · simp only [StateT.run, withSampleList, handler, sumHandler, interpret_map, interpret_query,
+      stepAt, RandomOracle.memoizeSum_inr, memoize_digest, Functor.map_map, pmf_norm,
+      Function.comp_def]
+    change PMF.map _ ((Protocols.ROMSignature.oracle (Digest s) p d).map
+      (fun (a, state) => ((a, m, t.tail), state))) = _
+    rw [PMF.map_comp]
+    rfl
+
+private theorem run_both {s : Level} {α : Type} {program : OracleComp (Both s) α} {Q : ℕ}
+    (hQ : program.IsQueryBounded Q) (mc : Cache s) (dc : DigestCache s) :
+    ((PMF.iid (PMF.uniformOfFintype (PublicMatrix s)) Q).map List.ofFn).bind (fun tape =>
+      (interpret (Protocols.ROMSignature.oracle (Digest s))
+        (Prod.fst <$> (interpret (withSampleList 0 (handler s)) program).run (mc, tape))).run dc) =
+      ((interpret (RandomOracle.memoizeSum
+        (fun _ : FixedBytes 32 => PMF.uniformOfFintype (PublicMatrix s))
+        (fun _ : Point s => PMF.uniformOfFintype (Digest s))) program).run (mc, dc)).map
+        fun (a, _, dc') => (a, dc') := by
+  let fresh := PMF.uniformOfFintype (PublicMatrix s)
+  have hp := hQ.run_interpret_presample fresh 0 (stepAt s) (mc, dc)
+  have online (q : FixedBytes 32 ⊕ Point s) (state : Cache s × DigestCache s) :
+      (fresh.bind fun v => stepAt s v q state) = RandomOracle.memoizeSum
+        (fun _ : FixedBytes 32 => fresh) (fun _ : Point s => PMF.uniformOfFintype (Digest s))
+        q state := by
+    rcases state with ⟨m, d⟩
+    rcases q with k | p
+    · cases h : m.lookup k with
+      | none => simp [stepAt, RandomOracle.memoizeSum_inl, memoize_of_none _ k m h, pmf_norm]
+      | some v => simp [stepAt, RandomOracle.memoizeSum_inl, memoize_of_some _ k m v h, pmf_norm]
+    · simp only [stepAt, RandomOracle.memoizeSum_inr, PMF.bind_const]
+  simp only [online] at hp
+  rw [← hp, PMF.map_bind]
+  congr 1 with tape
+  rw [run_interpret_map, ← tape_run]
+  simp only [PMF.map_comp, PMF.monad_map_eq_map, Function.comp_def]
+  rfl
 
 private def trial {Coins : Type} (s : Level) (adv : Forger s Coins) (r : Saved s Coins)
     (A : PublicMatrix s) (t : Fin s.params.k → Poly) : ProbComp Bool :=
@@ -384,16 +449,43 @@ private theorem fixed_le {Coins : Type} (s : Level) (adv : Forger s Coins) (r : 
       · simp [he]
   · simp [verify, hlen]
 
-/-- Key-only forgery in the classical shared-oracle model. Key generation draws independent
-short vectors and a uniform public matrix, and publishes the seed bound to that matrix and
-the rounded vector `A s₁ + s₂`. The byte verifier and forger query the same digest cache. -/
-noncomputable def keyOnlyGame {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
+private noncomputable def matrixDigestOracle (s : Level) :=
+  RandomOracle.memoizeSum (fun _ : FixedBytes 32 => PMF.uniformOfFintype (PublicMatrix s))
+    (fun _ : Point s => PMF.uniformOfFintype (Digest s))
+
+private noncomputable def onlineTrial {Coins : Type} (s : Level) (adv : Forger s Coins) (r : Coins)
+    (rho : FixedBytes 32) (A : PublicMatrix s) (t : Fin s.params.k → Poly)
+    (cache : Cache s × DigestCache s) : Game := do
+  let bytes := encodePublic s rho.toList t
+  let (f, _, dc) ← (interpret (matrixDigestOracle s) (adv bytes r)).run cache
+  ((interpret (Protocols.ROMSignature.oracle (Digest s)) (verify s bytes A f)).run dc).map Prod.fst
+
+private theorem trial_eq_online {Coins : Type} (s : Level) (Q : ℕ) (adv : Forger s Coins)
+    (hQ : ∀ bytes r, (adv bytes r).IsQueryBounded Q) (r : Coins) (rho : FixedBytes 32)
+    (A : PublicMatrix s) (t : Fin s.params.k → Poly) :
+    (PMF.iid (PMF.uniformOfFintype (PublicMatrix s)) Q).bind (fun tape =>
+      (trial s adv ⟨r, rho, List.ofFn tape⟩ A t).eval) =
+      onlineTrial s adv r rho A t ([(rho, A)], []) := by
+  let bytes := encodePublic s rho.toList t
+  let finish (x : Forgery × DigestCache s) :=
+    ((interpret (Protocols.ROMSignature.oracle (Digest s))
+      (verify s bytes A x.1)).run x.2).map Prod.fst
+  have h := congrArg (fun μ => PMF.bind μ finish)
+    (run_both (hQ bytes r) [(rho, A)] [])
+  simpa only [trial, eval_runDigest, runForger, onlineTrial, matrixDigestOracle, bytes, finish,
+    run_interpret_bind, pmf_norm, Function.comp_def] using h
+
+/-- Key-only forgery with two online random oracles. Key generation queries its matrix seed from
+empty caches, and the adversary starts with exactly the caches left by that call. The verifier
+uses the digest cache left by the adversary and compares all the bytes of the signature digest. -/
+noncomputable def keyOnlyGame {Coins : Type} (s : Level) (coins : ProbComp Coins)
     (adv : Forger s Coins) : Game := do
   let s₁ ← MatrixOracle.shortVectorLaw s s.params.ℓ
   let s₂ ← MatrixOracle.shortVectorLaw s s.params.k
-  let A ← PMF.uniformOfFintype (PublicMatrix s)
-  let r ← (sampleSaved s Q coins).eval
-  (trial s adv r A (moduleSISMap A s₁ + s₂)).eval
+  let r ← coins.eval
+  let rho ← PMF.uniformOfFintype (FixedBytes 32)
+  let (A, cache) ← matrixDigestOracle s (.inl rho) ([], [])
+  onlineTrial s adv r rho A (moduleSISMap A s₁ + s₂) cache
 
 /-- Structured Module-SIS distribution used in Dilithium v3.1, §6.1: independently uniform
 `A,t` in the systematic matrix `[I | A | -t]`. -/
@@ -403,13 +495,20 @@ noncomputable def instances (s : Level) : PMF
   let t ← PMF.uniformOfFintype (Fin s.params.k → Poly)
   return systematic s A t
 
-private theorem keyOnly_eq_real {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
-    (adv : Forger s Coins) :
-    keyOnlyGame s Q coins adv = ModuleLWE.realGame (MatrixOracle.shortVectorLaw s s.params.ℓ)
+/-- The real Module-LWE challenge with the explicit distinguisher reproduces the entire
+online key-only acceptance law, including adaptive seed lookups and continued verification
+with the digest cache. The query bound justifies presampling the reduction's matrix tape. -/
+theorem keyOnlyGame_eq_moduleLWE_realGame {Coins : Type} (s : Level) (Q : ℕ)
+    (coins : ProbComp Coins) (adv : Forger s Coins)
+    (hQ : ∀ bytes r, (adv bytes r).IsQueryBounded Q) :
+    keyOnlyGame s coins adv = ModuleLWE.realGame (MatrixOracle.shortVectorLaw s s.params.ℓ)
       (MatrixOracle.shortVectorLaw s s.params.k) (distinguisher s Q coins adv) := by
-  simp only [keyOnlyGame, ModuleLWE.realGame, ModuleLWE.eval_realExperiment, distinguisher,
-    ProbComp.eval_bind, PMF.monad_bind_eq_bind]
-  rfl
+  simp only [keyOnlyGame, matrixDigestOracle, RandomOracle.memoizeSum_inl,
+    memoize_of_none _ _ [] rfl, ModuleLWE.realGame, ModuleLWE.eval_realExperiment,
+    distinguisher, sampleSaved, ProbComp.eval_bind, ProbComp.eval_pure, eval_sampleBytes,
+    ProbComp.eval_replicateFin, MatrixOracle.eval_sampleMatrix, ← PMF.iid_eq_pi, pmf_norm,
+    trial_eq_online s Q adv hQ]
+  pmf_swap
 
 private theorem random_le_selfTarget {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
     (adv : Forger s Coins) :
@@ -434,7 +533,7 @@ and one final digest lookup is charged for a forgery on a fresh point. -/
 theorem keyOnly_le_moduleLWE_add_fork {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
     (adv : Forger s Coins) (hQ : ∀ bytes r, (adv bytes r).IsQueryBounded Q) :
     let radius := compressedSelfTargetRadius s.params 13
-    ((keyOnlyGame s Q coins adv) true).toReal ≤
+    ((keyOnlyGame s coins adv) true).toReal ≤
       ModuleLWE.advantage (MatrixOracle.shortVectorLaw s s.params.ℓ)
         (MatrixOracle.shortVectorLaw s s.params.k) (distinguisher s Q coins adv) +
       ((Q + 1 : ℕ) / ((256 : ℝ) ^ digestBytes s) + Real.sqrt ((Q + 1 : ℕ) *
@@ -447,11 +546,11 @@ theorem keyOnly_le_moduleLWE_add_fork {Coins : Type} (s : Level) (Q : ℕ) (coin
   have hr := (ENNReal.toReal_mono (PMF.apply_ne_top _ _)
     (random_le_selfTarget s Q coins adv)).trans hs
   have hl := Game.coe_succProbability_le_add_of_advantage_le
-    (g₀ := keyOnlyGame s Q coins adv) (g₁ := ModuleLWE.randomGame (distinguisher s Q coins adv))
+    (g₀ := keyOnlyGame s coins adv) (g₁ := ModuleLWE.randomGame (distinguisher s Q coins adv))
     (le_refl _)
   rw [Game.coe_succProbability, Game.coe_succProbability,
-    keyOnly_eq_real s Q coins adv] at hl
-  rw [keyOnly_eq_real s Q coins adv]
+    keyOnlyGame_eq_moduleLWE_realGame s Q coins adv hQ] at hl
+  rw [keyOnlyGame_eq_moduleLWE_realGame s Q coins adv hQ]
   exact hl.trans (by rw [add_comm]; exact add_le_add le_rfl hr)
 
 end Cslib.Crypto.MLDSA.FIPS204.SharedDigest
