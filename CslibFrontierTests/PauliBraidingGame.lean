@@ -42,10 +42,20 @@ example (r : SymmetricLinearitySeed 2) (a b : Bool × Bool) :
 /-- The CHSH subgame carries the same oriented pair to both players and swaps the questions
 and the answers together. -/
 example (x y a b : Bool) :
-    game.query (.anticommutation true odd x y) = (.anticommutation y odd, .anticommutation x odd) ∧
+    game.query (.anticommutation true odd x y) =
+        (.anticommutation true y odd, .anticommutation false x odd) ∧
       (game.accepts (.anticommutation true odd x y) (.inr b) (.inr a) ↔
         TwoProverGame.chsh.accepts x y a b) :=
   ⟨rfl, Iff.rfl⟩
+
+/-- A shared CHSH question token still produces two distinct questions. The special
+round sends precisely the second logical player's anticommutation question. -/
+example :
+    let q := game.query (.anticommutation false odd true true)
+    q.1 ≠ q.2 ∧ (game.query (.special false true odd true)).2 = q.2 := by
+  refine ⟨?_, rfl⟩
+  intro h
+  cases h
 
 /-- The matching special question compares the Z bit in the first sorted coordinate.
 An unmatched question accepts a well-typed answer automatically. -/

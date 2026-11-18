@@ -25,14 +25,18 @@ marginal. Agreement is checked when that question is the special question of the
 basis. The other outcome compares two basis answers on the shared checked string.
 
 The same-basis check shares the first string in basis X and the second in basis Z, using
-the basis setting and marginals of equation (11) and Lemma 17. The same-basis bullet in
+the X–Z coordinate convention of equation (11). The same-basis bullet in
 Figure 2 writes the shared first string and uses the symbol `N` for the second basis label.
 Here both players receive the sampled basis. This check still draws the first player's
-pair from the odd-pair law, unlike the uniform fixed-role game in `AveragedConsistency`.
+pair from the odd-pair law. The checked string is therefore nonzero. Controlling
+the uniform averages in Lemma 17 requires additional work at zero. The uniform fixed-role
+game in `AveragedConsistency` uses a different seed law.
 Basis questions send strings in lexicographic order and are shared by the linearity and
 consistency branches. Anticommutation questions carry the pair in X–Z coordinate order so
 that each player can identify which string belongs to which observable. This preserves the
 labels of the oriented pair even when the Z string comes first lexicographically.
+Anticommutation labels distinguish the two logical roles even when their question tokens
+coincide. The special consistency round uses the second logical role's label.
 
 ## Main definitions
 
@@ -57,8 +61,9 @@ open BitString
 inductive PauliBraidingQuestion (n : ℕ) (Q : Type*)
   /-- Two strings in lexicographic order, to be measured in the same basis. -/
   | basis (zBasis : Bool) (strings : (Fin n → Bool) × (Fin n → Bool))
-  /-- A question from the anticommutation game and the strings in X–Z order. -/
-  | anticommutation (question : Q) (strings : ↥(oddPairs (Fin n)))
+  /-- A role-tagged question and the strings in X–Z order. `secondRole` denotes the
+  second logical role, regardless of the physical player receiving it. -/
+  | anticommutation (secondRole : Bool) (question : Q) (strings : ↥(oddPairs (Fin n)))
 
 /-- The private choices for one round of the braiding verifier. In the last three
 constructors `swapRoles` is true when the second physical player plays the first logical role. -/
@@ -125,9 +130,10 @@ in the special branch when the sampled question would otherwise be accepted auto
       let (x, y) := (symmetricLinearityGame n).query r
       (.basis basis x, .basis basis y)
     | .anticommutation roles p x y =>
-      cond roles Prod.swap id (.anticommutation x p, .anticommutation y p)
+      cond roles Prod.swap id (.anticommutation false x p, .anticommutation true y p)
     | .special roles basis p y =>
-      cond roles Prod.swap id ((pairQuestion basis p).toBraidingQuestion, .anticommutation y p)
+      cond roles Prod.swap id
+        ((pairQuestion basis p).toBraidingQuestion, .anticommutation true y p)
     | .sameBasis roles basis p dummy =>
       let q := pairQuestion basis p
       cond roles Prod.swap id (q.toBraidingQuestion, (dummyQuestion q dummy).toBraidingQuestion)
