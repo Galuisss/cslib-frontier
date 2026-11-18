@@ -8,6 +8,8 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Crypto.Computational.MLDSA.MatrixOracle
+public import CslibFrontier.Crypto.Computational.SIS.Hermite
+import CslibFrontier.Probability.PMF.Uniform
 import CslibFrontier.Crypto.Game.Order
 import CslibFrontier.Languages.Probabilistic.Memoize
 import CslibFrontier.Languages.Probabilistic.Norm
@@ -33,11 +35,32 @@ open Probability OracleComp
 
 attribute [local instance 2000] instBEqOfDecidableEq
 
-/-- Systematic self-target instance on the full (unrounded) Module-LWE challenge. -/
+private abbrev RightBlock (s : Level) := Matrix (Fin s.params.k) (Fin (s.params.ℓ + 1)) Poly
+
+/-- The bijection `(A,t) ↦ [A | −t]` between the decision challenge and the right block of
+the standard Hermite Module-SIS instance. -/
+private def rightBlock (s : Level) : (PublicMatrix s × (Fin s.params.k → Poly)) ≃ RightBlock s where
+  toFun x i := Fin.snoc (x.1 i) (-x.2 i)
+  invFun B := (fun i j => B i j.castSucc, fun i => -B i (Fin.last _))
+  left_inv x := by
+    obtain ⟨A, t⟩ := x
+    simp only [Fin.snoc_castSucc, Fin.snoc_last, neg_neg]
+  right_inv B := by
+    funext i j
+    refine Fin.lastCases ?_ (fun j => ?_) j <;> simp
+
+/-- Systematic self-target matrix with the standard Hermite right block `[A | −t]`. -/
 def systematic (s : Level) (A : PublicMatrix s) (t : Fin s.params.k → Poly) :
-    Matrix (Fin s.params.k) (Fin (s.params.k + s.params.ℓ + 1)) Poly := fun i =>
-  Fin.snoc (Fin.append (fun j => if i = j then (1 : Negacyclic (ZMod 8380417) 256).coeffs else 0)
-    (A i)) (-t i)
+    Matrix (Fin s.params.k) (Fin (s.params.k + s.params.ℓ + 1)) Poly :=
+  ModuleSIS.hermiteMatrix (rightBlock s (A, t))
+
+private theorem systematic_row (s : Level) (A : PublicMatrix s) (t : Fin s.params.k → Poly)
+    (i : Fin s.params.k) : systematic s A t i =
+      Fin.snoc (Fin.append (fun j => if j = i then (1 : Negacyclic (ZMod 8380417) 256).coeffs
+        else 0) (A i)) (-t i) := by
+  unfold systematic ModuleSIS.hermiteMatrix
+  change Fin.append _ (Fin.snoc (A i) (-t i)) = _
+  exact Fin.append_snoc _ _ _
 
 /-- Integer lift of the three blocks of a self-target witness, with the challenge last. -/
 def liftWitness (s : Level) (y : SelfTargetCandidate s.params) :
@@ -50,18 +73,16 @@ theorem systematic_liftWitness (s : Level) (A : PublicMatrix s) (t : Fin s.param
     (y : SelfTargetCandidate s.params) :
     moduleSISMap (systematic s A t) (fun i j => (liftWitness s y i j : ZMod 8380417)) =
       selfTargetMap s.params ⟨A, t⟩ y.u y.z y.c := by
+  have hc : (fun i j => (liftWitness s y i j : ZMod 8380417)) =
+      Fin.append y.u (Fin.snoc y.z y.c) := by
+    funext i j
+    simp only [liftWitness, ZMod.coe_valMinAbs, Fin.append_snoc]
+  rw [hc, systematic, ModuleSIS.moduleSISMap_hermiteMatrix]
+  change y.u + moduleSISMap (fun i => Fin.snoc (A i) (-t i)) (Fin.snoc y.z y.c) = _
   funext i
-  have hid : (∑ j, negacyclicMul
-      (if i = j then (1 : Negacyclic (ZMod 8380417) 256).coeffs else 0) (y.u j)) = y.u i := by
-    rw [Finset.sum_eq_single i]
-    · simp
-    · intro j _ hji
-      simp [Ne.symm hji]
-    · simp
-  simp only [moduleSISMap, systematic, liftWitness, ZMod.coe_valMinAbs, Fin.sum_univ_castSucc,
-    Fin.snoc_castSucc, Fin.snoc_last, Fin.sum_univ_add, Fin.append_left, Fin.append_right,
-    neg_negacyclicMul, selfTargetMap, verifierCommitment, Pi.add_apply, Pi.neg_apply, hid,
-    sub_eq_add_neg, add_assoc, negacyclicMul_comm (t i) y.c]
+  simp only [moduleSISMap, Fin.sum_univ_castSucc,
+    Fin.snoc_castSucc, Fin.snoc_last, neg_negacyclicMul, selfTargetMap, verifierCommitment,
+    Pi.add_apply, Pi.neg_apply, sub_eq_add_neg, negacyclicMul_comm (t i) y.c]
 
 private theorem liftWitness_bound {s : Level} {y : SelfTargetCandidate s.params} {radius : ℕ}
     (hu : ModuleSIS.inInfNormBound radius y.u) (hz : ModuleSIS.inInfNormBound radius y.z)
@@ -87,7 +108,7 @@ private def fullKey (s : Level) (M : MatrixInstance s) : MLDSA.PublicKey s.param
 
 private theorem fullKey_systematic (s : Level) (A : PublicMatrix s) (t : Fin s.params.k → Poly) :
     fullKey s (systematic s A t) = ⟨A, t⟩ := by
-  simp only [fullKey, systematic, Fin.snoc_castSucc, Fin.append_right, Fin.snoc_last, neg_neg]
+  simp only [fullKey, systematic_row, Fin.snoc_castSucc, Fin.append_right, Fin.snoc_last, neg_neg]
 
 private structure Opening (s : Level) where
   signature : Signature s
@@ -482,13 +503,20 @@ noncomputable def observe {Coins : Type} (s : Level) (coins : ProbComp Coins)
   let r ← coins.eval
   onlineTrial s adv r rho A t (cache, [])
 
-/-- Structured Module-SIS distribution used in Dilithium v3.1, §6.1: independently uniform
-`A,t` in the systematic matrix `[I | A | -t]`. -/
+/-- The Hermite instance obtained by prefixing the identity to a single uniform right block. -/
 noncomputable def instances (s : Level) : PMF
-    (Matrix (Fin s.params.k) (Fin (s.params.k + s.params.ℓ + 1)) Poly) := do
-  let A ← PMF.uniformOfFintype (PublicMatrix s)
-  let t ← PMF.uniformOfFintype (Fin s.params.k → Poly)
-  return systematic s A t
+    (Matrix (Fin s.params.k) (Fin (s.params.k + s.params.ℓ + 1)) Poly) :=
+  (PMF.uniformOfFintype (RightBlock s)).map ModuleSIS.hermiteMatrix
+
+/-- Independent uniform draws of `A,t` produce precisely the standard Hermite distribution. -/
+theorem instances_eq_sample (s : Level) :
+    instances s = (do
+      let A ← PMF.uniformOfFintype (PublicMatrix s)
+      let t ← PMF.uniformOfFintype (Fin s.params.k → Poly)
+      return systematic s A t) := by
+  rw [instances, ← PMF.uniformOfFintype_map_equiv (rightBlock s), ← PMF.uniformOfFintype_prod]
+  simp only [PMF.map_comp, pmf_norm, systematic, Function.comp_def]
+  rfl
 
 /-- The real Module-LWE challenge with the explicit distinguisher reproduces the entire
 online key-only acceptance law, including adaptive seed lookups and continued verification
@@ -514,7 +542,7 @@ private theorem random_le_selfTarget {Coins : Type} (s : Level) (Q : ℕ) (coins
         (compressedSelfTargetRadius s.params 13) (sampleSaved s Q coins).eval
         (solver s adv))) true := by
   simp only [ModuleLWE.randomGame, ModuleLWE.eval_randomExperiment, distinguisher,
-    ProbComp.eval_bind, instances, ModuleSIS.SelfTarget.game, pmf_norm]
+    ProbComp.eval_bind, instances_eq_sample, ModuleSIS.SelfTarget.game, pmf_norm]
   apply Probability.PMF.bind_apply_mono_on_support
   intro A _
   apply Probability.PMF.bind_apply_mono_on_support
@@ -523,9 +551,34 @@ private theorem random_le_selfTarget {Coins : Type} (s : Level) (Q : ℕ) (coins
   intro r _
   simpa only [ModuleSIS.SelfTarget.game, pmf_norm] using fixed_le s adv r A t
 
+/-- Replay the two forgeries on a Hermite right block. Each of the two tapes has `Q + 1`
+independent FIPS digests, and both runs use the same adversary coins and matrix tape. -/
+def kernelSolver {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
+    (adv : Forger s Coins) (B : Matrix (Fin s.params.k) (Fin (s.params.ℓ + 1)) Poly) :
+    ProbComp (Fin (s.params.k + s.params.ℓ + 1) → Fin 256 → ℤ) :=
+  ModuleSIS.SelfTarget.reduction 0 (expandDigest s) (compressedSelfTargetRadius s.params 13) Q
+    (sampleSaved s Q coins) (replicateFin (Q + 1) (sampleBytes (digestBytes s)))
+    (solver s adv) (ModuleSIS.hermiteMatrix B)
+
+private theorem eval_hermite {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
+    (adv : Forger s Coins) :
+    let R := compressedSelfTargetRadius s.params 13
+    (ModuleSIS.hermiteExperiment (2 * R) (kernelSolver s Q coins adv)).eval =
+      (instances s).bind fun M => (ModuleSIS.SelfTarget.reductionLaw 0 (expandDigest s) R Q
+        (sampleSaved s Q coins).eval (solver s adv) M).map
+          fun z => decide (ModuleSIS.IsSolution M (2 * R) z) := by
+  dsimp only
+  have tape : ProbComp.eval (replicateFin (Q + 1) (sampleBytes (digestBytes s))) =
+      PMF.uniformOfFintype _ := by
+    simp only [ProbComp.eval_replicateFin, eval_sampleBytes, PMF.pi_uniformOfFintype]
+  simp only [ModuleSIS.hermiteExperiment, instances, ProbComp.eval_bind,
+    ProbComp.eval_uniform, ProbComp.eval_pure, kernelSolver, ModuleSIS.SelfTarget.eval_reduction
+      _ _ _ _ _ _ tape, PMF.bind_map, Function.comp_def]
+  rfl
+
 /-- Shared-oracle key-only forgery is bounded by short-secret MLWE, a two-run systematic
-Module-SIS experiment and the unbounded collision term for concrete Algorithm 29 on SHAKE256
-digests. One final digest lookup accounts for a forgery on a fresh point. -/
+Module-SIS experiment and the collision probability of concrete Algorithm 29 on SHAKE256
+digests. Its only bound here is one. A final digest lookup covers a forgery on a fresh point. -/
 theorem keyOnly_le_moduleLWE_add_fork {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
     (adv : Forger s Coins) (hQ : ∀ bytes r, (adv bytes r).IsQueryBounded Q) :
     let radius := compressedSelfTargetRadius s.params 13
@@ -533,10 +586,10 @@ theorem keyOnly_le_moduleLWE_add_fork {Coins : Type} (s : Level) (Q : ℕ) (coin
       ModuleLWE.advantage (MatrixOracle.shortVectorLaw s s.params.ℓ)
         (MatrixOracle.shortVectorLaw s s.params.k) (distinguisher s Q coins adv) +
       ((Q + 1 : ℕ) / ((256 : ℝ) ^ digestBytes s) + Real.sqrt ((Q + 1 : ℕ) *
-        (((instances s).bind fun M => (ModuleSIS.SelfTarget.reduction (expandDigest s) radius Q
-          (sampleSaved s Q coins).eval (solver s adv) M).map
-            fun z => decide (ModuleSIS.IsSolution M (2 * radius) z)) true +
-              ModuleSIS.SelfTarget.collisionMass (expandDigest s)).toReal)) := by
+        ((ModuleSIS.hermiteExperiment (2 * radius) (kernelSolver s Q coins adv)).eval true +
+            ModuleSIS.SelfTarget.collisionMass (expandDigest s)).toReal)) := by
+  dsimp only
+  rw [eval_hermite]
   have hs := selfTarget_digest_fork s Q (instances s) (sampleSaved s Q coins).eval
     (solver s adv) (solver_bounded hQ)
   have hr := (ENNReal.toReal_mono (PMF.apply_ne_top _ _)
