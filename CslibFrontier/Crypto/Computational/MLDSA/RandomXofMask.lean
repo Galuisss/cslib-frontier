@@ -88,7 +88,7 @@ private noncomputable def packedEquiv (s : Level) :
     rw [← centered u j, ← centered v j, ← unpack_row s u j, ← unpack_row s v j, h], by
     have size : Fintype.card (MaskCoefficient s) = 2 ^ width s := by
       rw [range_width]
-      simp [MaskCoefficient, Int.card_Ioc]
+      simp only [MaskCoefficient, Fintype.card_coe, Int.card_Ioc]
       lia
     simp only [FixedBytes, Fintype.card_fun, size, Fintype.card_fin, Byte]
     rw [← pow_mul, ← pow_mul]
@@ -281,8 +281,9 @@ theorem Xofs.uniformPrefixes_expandMask_schedule (base : Xofs) (s : Level) {a b 
 namespace QuantumSigningForger
 
 /-- The quantum signing trial with the independent uniform lattice matrix and a pre-sampled
-table of signed masking coefficients has the joint law of the original random-XOF
-matrix trial. The equality retains both raw oracles, the public key, final forgery, whole signing
+table of signed masking coefficients has the joint law of the matrix-prefix hybrid
+averaged over the finite random XOFs. The equality retains both raw oracles, the public key,
+final forgery, whole signing
 log and setup failures, so it applies in particular to the fresh-digest event. -/
 theorem uniform_matrix_masks_trial (C : QuantumSigningForger) (base : Xofs) (s : Level)
     {a b : ℕ} (ha : 528 ≤ a) (hb : maskPolyBytes s ≤ b) :
@@ -294,6 +295,22 @@ theorem uniform_matrix_masks_trial (C : QuantumSigningForger) (base : Xofs) (s :
     Xofs.uniform_sampleWithMasks]
   rw [PMF.bind_comm]
   simp only [C.uniform_programmedTrial]
+
+/-- The original finite random-XOF strong-forgery game equals the execution with independent
+uniform matrix and signed-mask table. The sampled widths cover the literal mask addresses and
+the full 894-byte matrix prefixes, in addition to the shorter Algorithm 34 reads. -/
+theorem randomPrefixGame_eq_matrix_masks (C : QuantumSigningForger) (base : Xofs) (s : Level)
+    {a b : ℕ} (ha : 528 ≤ a) (hb : 894 ≤ b) :
+    let hm : maskPolyBytes s ≤ b := (show maskPolyBytes s ≤ 894 by cases s <;> decide).trans hb
+    C.randomPrefixGame s base a b =
+      (PMF.uniformOfFintype (PublicMatrix s)).bind fun A =>
+        (PMF.uniformOfFintype (MaskTable s)).bind fun masks =>
+          (base.sampleWithMasks ha hm masks).bind fun H =>
+            (C.programmedTrial s H A).map (·.any SignedMatrixTrial.wins) := by
+  intro hm
+  rw [C.randomPrefixGame_eq_matrixTrial s base (by lia) hb, ← PMF.map_bind,
+    ← C.uniform_matrix_masks_trial base s ha hm]
+  simp only [PMF.map_bind]
 
 /-- The SHAKE128 matrix installation leaves the entire SHAKE256 stream from the supplied mask
 table intact. Thus even a seed selected after earlier coherent queries or signing replies reads
