@@ -399,37 +399,57 @@ theorem maskCommitmentAddress_mass_le (s : Level) (A : PublicMatrix s) (m : BitS
     exact eq_of_commitmentInput_eq (range z) (range y) bits
   · simp [(PMF.apply_eq_zero_iff ..).mpr hi]
 
+private theorem maskCommitmentAddress_singleton_le (s : Level) (A : PublicMatrix s)
+    (m : BitString 512) (i : BitString s.commitmentInputBits) :
+    (signingMaskLaw s.params (by cases s <;> decide)).toOuterMeasure
+      {y | maskCommitmentAddress s A m y = i} ≤
+        commitmentGuessProbability s.params (by cases s <;> decide) A := by
+  change _root_.PMF.toOuterMeasure _ (maskCommitmentAddress s A m ⁻¹' {i}) ≤ _
+  rw [← PMF.toOuterMeasure_map_apply, PMF.toOuterMeasure_apply_singleton]
+  exact maskCommitmentAddress_mass_le s A m i
+
+-- Only a raw address in the original execution trace can expose a change confined to one
+-- block. Single-cell writes use identity blocks. Refreshing a packed commitment drops the
+-- representative prefix before comparing block addresses.
+private theorem prob_mask_trace_changes {R V : Type} (s : Level) (A : PublicMatrix s)
+    (m : BitString 512) (D) (run : DigestReads s R) {K : ℕ} (bound : run.IsQueryBounded K)
+    (block : BitString s.commitmentInputBits → BitString s.commitmentInputBits)
+    (changed : (Fin s.params.ℓ → Poly) → V →
+      BitString s.commitmentInputBits → BitString (8 * digestBytes s))
+    (off : ∀ y v i, block i ≠ maskCommitmentAddress s A m y → changed y v i = D i) :
+    (signingMaskLaw s.params (by cases s <;> decide)).toOuterMeasure
+      {y | ∃ v, OracleComp.evalPure (changed y v) run ≠ OracleComp.evalPure D run} ≤
+      K * commitmentGuessProbability s.params (by cases s <;> decide) A := by
+  classical
+  let μ := signingMaskLaw s.params (by cases s <;> decide)
+  let addr := maskCommitmentAddress s A m
+  let reads := (OracleComp.queriesWith D run).map block
+  refine (μ.toOuterMeasure.mono (s₂ := {y | addr y ∈ reads}) ?_).trans
+    ((PMF.toOuterMeasure_mem_list_le μ addr
+      (δ := commitmentGuessProbability s.params (by cases s <;> decide) A)
+      (maskCommitmentAddress_singleton_le s A m) reads).trans ?_)
+  · rintro y ⟨v, different⟩
+    by_contra miss
+    apply different
+    apply (OracleComp.interpret_id_congr D (changed y v) run ?_).1
+    intro i hi
+    apply off y v i
+    intro eq
+    exact miss (show maskCommitmentAddress s A m y ∈ reads from
+      eq ▸ List.mem_map_of_mem (f := block) hi)
+  · simp only [reads, List.length_map]
+    gcongr
+    exact_mod_cast bound.length_queriesWith_le D
+
 private theorem prob_response_changes {R : Type} (s : Level) (A : PublicMatrix s)
     (m : BitString 512) (D) (run : DigestReads s R) {K : ℕ} (bound : run.IsQueryBounded K) :
     (signingMaskLaw s.params (by cases s <;> decide)).toOuterMeasure
       {y | ∃ v, OracleComp.evalPure (Function.update D (maskCommitmentAddress s A m y) v) run ≠
         OracleComp.evalPure D run} ≤
       K * commitmentGuessProbability s.params (by cases s <;> decide) A := by
-  classical
-  let reads := OracleComp.queriesWith D run
-  let addr := maskCommitmentAddress s A m
-  let μ := signingMaskLaw s.params (by cases s <;> decide)
-  let δ := commitmentGuessProbability s.params (by cases s <;> decide) A
-  have covered : {y | ∃ v, OracleComp.evalPure (Function.update D (addr y) v) run ≠
-      OracleComp.evalPure D run} ⊆
-      {y | addr y ∈ reads} := by
-    intro y hy
-    obtain ⟨v, hv⟩ := hy
-    by_contra off
-    apply hv
-    apply (OracleComp.interpret_id_congr D (Function.update D (addr y) v) run ?_).1
-    intro j hj
-    apply Function.update_of_ne
-    rintro rfl
-    exact off hj
-  have point (i) : μ.toOuterMeasure {y | addr y = i} ≤ δ := by
-    change μ.toOuterMeasure (addr ⁻¹' {i}) ≤ δ
-    rw [← PMF.toOuterMeasure_map_apply, PMF.toOuterMeasure_apply_singleton]
-    exact maskCommitmentAddress_mass_le s A m i
-  refine (μ.toOuterMeasure.mono covered).trans
-    ((PMF.toOuterMeasure_mem_list_le μ addr point reads).trans ?_)
-  gcongr
-  exact_mod_cast bound.length_queriesWith_le D
+  exact prob_mask_trace_changes s A m D run bound id
+    (fun y v => Function.update D (maskCommitmentAddress s A m y) v)
+    (fun _ _ _ ne => Function.update_of_ne ne ..)
 
 /-- Changing the entry at a fresh mask commitment can affect one whole native signing
 reply with probability at most 815 times the largest rounded-commitment atom. The digest

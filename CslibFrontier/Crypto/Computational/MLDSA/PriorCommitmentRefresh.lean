@@ -58,38 +58,15 @@ private def replaceSuffix (s : Level) (A : PublicMatrix s) (y : Mask s)
     (D E : Register s) (i : Word s) : Digest s :=
   if suffixKey s i = maskCommitmentAddress s A 0 y then E i else D i
 
-private theorem suffix_mass (s : Level) (A : PublicMatrix s) (i : Word s) :
-    (signingMaskLaw s.params (by cases s <;> decide)).toOuterMeasure
-      {y | maskCommitmentAddress s A 0 y = i} ≤
-        commitmentGuessProbability s.params (by cases s <;> decide) A := by
-  change _root_.PMF.toOuterMeasure _ (maskCommitmentAddress s A 0 ⁻¹' {i}) ≤ _
-  rw [← PMF.toOuterMeasure_map_apply, PMF.toOuterMeasure_apply_singleton]
-  exact maskCommitmentAddress_mass_le s A 0 i
-
 private theorem prob_read_diff {R : Type} (s : Level) (A : PublicMatrix s) (D E : Register s)
     (run : DigestReads s R) {K : ℕ} (bounded : run.IsQueryBounded K) :
     (signingMaskLaw s.params (by cases s <;> decide)).toOuterMeasure
       {y | OracleComp.evalPure (replaceSuffix s A y D E) run ≠ OracleComp.evalPure D run} ≤
         K * commitmentGuessProbability s.params (by cases s <;> decide) A := by
-  classical
   let μ := signingMaskLaw s.params (by cases s <;> decide)
-  let reads := (OracleComp.queriesWith D run).map (suffixKey s)
-  refine (μ.toOuterMeasure.mono (s₂ := {y | maskCommitmentAddress s A 0 y ∈ reads}) ?_).trans
-    ((PMF.toOuterMeasure_mem_list_le μ (maskCommitmentAddress s A 0)
-      (δ := commitmentGuessProbability s.params (by cases s <;> decide) A)
-      (suffix_mass s A) reads).trans ?_)
-  · intro y different
-    by_contra miss
-    apply different
-    apply (OracleComp.interpret_id_congr D (replaceSuffix s A y D E) run ?_).1
-    intro i hi
-    have ne : suffixKey s i ≠ maskCommitmentAddress s A 0 y :=
-      fun eq => miss (show maskCommitmentAddress s A 0 y ∈ reads from
-        eq ▸ List.mem_map_of_mem (f := suffixKey s) hi)
-    simp [replaceSuffix, ne]
-  · simp only [reads, List.length_map]
-    gcongr
-    exact_mod_cast bounded.length_queriesWith_le D
+  apply le_trans _ (prob_mask_trace_changes s A 0 D run bounded (suffixKey s)
+    (fun y T => replaceSuffix s A y D T) (fun y T i ne => by simp [replaceSuffix, ne]))
+  exact μ.toOuterMeasure.mono (fun _ different => ⟨E, different⟩)
 
 private theorem suffix_query_event (s : Level) (H : Xofs) (A : PublicMatrix s)
     (D E : Register s) (a b : ℕ) (x : BitString (a + 2)) :
@@ -98,7 +75,8 @@ private theorem suffix_query_event (s : Level) (H : Xofs) (A : PublicMatrix s)
         (H.withDigestRegister s D).queryTable a b x} ≤
       commitmentGuessProbability s.params (by cases s <;> decide) A := by
   let μ := signingMaskLaw s.params (by cases s <;> decide)
-  refine (μ.toOuterMeasure.mono ?_).trans (suffix_mass s A (suffixKey s (Xofs.digestLookup s x)))
+  refine (μ.toOuterMeasure.mono ?_).trans (maskCommitmentAddress_singleton_le s A 0
+    (suffixKey s (Xofs.digestLookup s x)))
   intro y different
   by_contra miss
   apply different
