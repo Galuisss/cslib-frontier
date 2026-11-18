@@ -244,7 +244,9 @@ private theorem forgeryGame_eq (C : QuantumSigningForger) {m a b : ℕ} {s : Lev
     intro q hq
     rcases q with n | dev | req
     · rfl
-    · simp only [OracleComp.sumHandler, commands, C.queryTable_eq h hc hd]
+    · change C.deviceCommand H dev = C.deviceCommand G dev
+      unfold deviceCommand
+      rw [C.queryTable_eq h hc hd]
     · funext st
       change ((H.signingOracle s keys.secretKey req st.2).map _) =
         ((G.signingOracle s keys.secretKey req st.2).map _)

@@ -147,7 +147,7 @@ namespace QuantumSigningForger
 
 private noncomputable def rowCommand (C : QuantumSigningForger) (H : Xofs) (s : Level)
     (keys : KeyPair) (row : Row) :=
-  C.signingCommand H s keys.secretKey (fun q => H.signWithRow s keys.secretKey q row)
+  C.signingCommand H (fun q => H.signWithRow s keys.secretKey q row)
 
 private noncomputable def rowTranscript (C : QuantumSigningForger) (H : Xofs) (s : Level)
     (keys : KeyPair) (tape : List Row) : PMF (Forgery × List Forgery) :=
