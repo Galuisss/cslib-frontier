@@ -529,7 +529,7 @@ theorem sum_mul_bhattacharyya_le_bhattacharyya_bind [Finite α] [Finite β]
 
 /-- Square roots of outcome weights, with each coordinate weighted by the square root of
 its sampling probability. -/
-noncomputable def weightedSqrt {α : Type*} [Fintype α] (p : PMF α) (f : α → ℝ) :
+noncomputable def weightedSqrt {α : Type*} (p : PMF α) (f : α → ℝ) :
     EuclideanSpace ℝ α := WithLp.toLp 2 fun i => √((p i).toReal) * √(f i)
 
 /-- The squared norm of the weighted square roots is the mean of the outcome weights. -/
