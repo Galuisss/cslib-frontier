@@ -17,6 +17,7 @@ public import Mathlib.Analysis.SpecialFunctions.Sqrt
 import CslibFrontier.Probability.PMF
 import CslibFrontier.Probability.PMF.Map
 import CslibFrontier.Probability.PMF.ToReal
+import Mathlib.Analysis.InnerProductSpace.PiL2
 import Mathlib.Algebra.Order.BigOperators.Ring.Finset
 
 /-!
@@ -525,6 +526,27 @@ theorem sum_mul_bhattacharyya_le_bhattacharyya_bind [Finite α] [Finite β]
     (Real.sqrt_mul
       (Finset.sum_nonneg fun _ _ => mul_nonneg ENNReal.toReal_nonneg ENNReal.toReal_nonneg) _).symm
   simpa only [← bind_apply_toReal] using hcs
+
+/-- Mixing nonnegative weights contracts the squared difference of their square roots.
+This is the single-outcome form of joint convexity used when only acceptance is scored. -/
+theorem sq_sqrt_mean_sub_le {α : Type*} [Fintype α] (p : PMF α) (a b : α → ℝ)
+    (ha : ∀ i, 0 ≤ a i) (hb : ∀ i, 0 ≤ b i) :
+    (√(∑ i, (p i).toReal * a i) - √(∑ i, (p i).toReal * b i)) ^ 2 ≤
+      ∑ i, (p i).toReal * (√(a i) - √(b i)) ^ 2 := by
+  let v (f : α → ℝ) : EuclideanSpace ℝ α := WithLp.toLp 2 fun i => √((p i).toReal) * √(f i)
+  have norm (f : α → ℝ) (hf : ∀ i, 0 ≤ f i) :
+      √(∑ i, (p i).toReal * f i) = ‖v f‖ := by
+    rw [EuclideanSpace.norm_eq]
+    simp [v, Real.norm_eq_abs, sq_abs, mul_pow, Real.sq_sqrt ENNReal.toReal_nonneg,
+      Real.sq_sqrt (hf _)]
+  rw [norm a ha, norm b hb, ← sq_abs]
+  have h := pow_le_pow_left₀ (abs_nonneg _) (abs_norm_sub_norm_le (v a) (v b)) 2
+  refine h.trans_eq ?_
+  rw [EuclideanSpace.real_norm_sq_eq]
+  apply Finset.sum_congr rfl
+  intro i _
+  change (√((p i).toReal) * √(a i) - √((p i).toReal) * √(b i)) ^ 2 = _
+  rw [← mul_sub, mul_pow, Real.sq_sqrt ENNReal.toReal_nonneg]
 
 /-- Joint convexity of squared Hellinger distance under mixing with weights `μ`. -/
 theorem hellingerSq_bind_le_sum [Finite α] [Finite β] (μ : PMF α) (p q : α → PMF β) :
