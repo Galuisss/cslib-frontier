@@ -473,6 +473,28 @@ noncomputable def expansionTrialGame (C : QuantumSigningForger) (s : Level) (bas
   let rows ← PMF.uniformOfFintype (Fin n → Row s)
   C.commitmentTrialGame s H keys i j (List.ofFn rows) write
 
+-- The independent uniform register can be reinstalled in a seeded raw-stream game without
+-- changing its distribution, including on inputs whose raw SHAKE domains overlap.
+private theorem average_register (s : Level) (base : Xofs) {a b : ℕ}
+    (ha : s.commitmentInputBits ≤ a) (hb : digestBytes s ≤ b)
+    (source target : Xofs → FixedBytes 32 → Game)
+    (law : ∀ H seed, source H seed = (PMF.uniformOfFintype (Register s)).bind fun D =>
+      target (H.withDigestRegister s D) seed) :
+    let U := PMF.uniformOfFintype (FixedBytes 32)
+    ((base.uniformPrefixes a b).bind fun H => U.bind (source H)) =
+      (base.uniformPrefixes a b).bind fun H => U.bind (target H) := by
+  intro U
+  let D := PMF.uniformOfFintype (Register s)
+  have reg := congrArg (fun p : PMF (Register s × Xofs) => p.bind fun x => U.bind (target x.2))
+    (base.uniformPrefixes_digestRegister s ha hb)
+  simp only [PMF.bind_bind, PMF.bind_map, Function.comp_def] at reg
+  rw [← reg]
+  apply congrArg (PMF.bind (base.uniformPrefixes a b) ·)
+  funext H
+  rw [show source H = (fun seed => D.bind fun t => target (H.withDigestRegister s t) seed)
+    from funext (law H), PMF.bind_comm U D]
+
+
 /-- Reading at the selected attempt has the exact fresh-digest forgery law of the original
 private-expansion signer, for every covered request and retry index. The row is sampled even
 when an earlier signature, fatal error, or early termination makes the selection unreachable. -/
@@ -480,26 +502,11 @@ theorem expansionTrialGame_read_eq_freshExpansionGame (C : QuantumSigningForger)
     (base : Xofs) {a b n : ℕ} (ha : s.commitmentInputBits ≤ a) (hb : digestBytes s ≤ b)
     (calls : C.SigningCallsLe n) (i : Fin n) (j : Fin 814) :
     C.expansionTrialGame s base a b i j false = C.freshExpansionGame s base a b := by
-  let check (G : Xofs) : Game := do
-    let seed ← PMF.uniformOfFintype (FixedBytes 32)
-    let some keys := G.keyGen s seed | return false
-    let some A := G.expandA s (keys.publicKey.take 32) | return false
-    let rows ← PMF.uniformOfFintype (Fin n → Row s)
-    C.expansionContinuation s G A keys (C.program keys.publicKey) C.initialDevice []
-      (List.ofFn rows)
-  have law := congrArg (fun p : PMF (Register s × Xofs) => p.bind (fun v => check v.2))
-    (base.uniformPrefixes_digestRegister s ha hb)
-  simp only [PMF.bind_bind, PMF.bind_map, Function.comp_def] at law
   rw [C.freshExpansionGame_eq_expansionContinuation s base a b calls]
-  change _ = (base.uniformPrefixes a b).bind check
-  rw [← law]
-  simp only [expansionTrialGame, PMF.monad_bind_eq_bind]
-  apply congrArg (PMF.bind (base.uniformPrefixes a b) ·)
-  funext H
-  simp only [check, PMF.monad_bind_eq_bind, PMF.monad_pure_eq_pure, Xofs.keyGen_withDigestRegister]
-  rw [PMF.bind_comm (PMF.uniformOfFintype (Register s))]
-  apply congrArg (PMF.bind (PMF.uniformOfFintype (FixedBytes 32)) ·)
-  funext seed
+  simp only [expansionTrialGame, PMF.monad_bind_eq_bind, PMF.monad_pure_eq_pure]
+  apply average_register s base ha hb
+  intro H seed
+  simp only [Xofs.keyGen_withDigestRegister]
   cases kg : H.keyGen s seed with
   | none => simp
   | some keys => exact C.read_at_generated s H seed keys kg i j

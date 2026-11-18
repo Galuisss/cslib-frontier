@@ -461,6 +461,29 @@ private theorem cut_cost_after {C : QuantumSigningForger} {cost : Request C → 
         exact sub r
       | succ i => exact earlier i rfl
 
+-- Average a bound at an adaptive signing boundary over the native execution which reaches it.
+private theorem cut_bind_gap (C : QuantumSigningForger) (s : Level) (G : Xofs) (keys : KeyPair)
+    (i : ℕ) (rows : List (Row s))
+    (left right : Boundary C × (C.Device × List Forgery) × List (Row s) → Game)
+    {e : ℝ} (he : 0 ≤ e)
+    (bound : ∀ x d l t, x ∈ OracleComp.supportWith (fun _ => Set.univ)
+      (cut (C := C) (C.program keys.publicKey) i) →
+      |prob (left (x, (d, l), t)) - prob (right (x, (d, l), t))| ≤ e) :
+    let past := C.cutInteraction s G keys i rows
+    |prob (past.bind left) - prob (past.bind right)| ≤ e := by
+  intro past
+  let ε : NNReal := ⟨e, he⟩
+  change |(Game.succProbability (past.bind left) : ℝ) - Game.succProbability (past.bind right)| ≤
+    (ε : ℝ)
+  rw [← Game.coe_advantage]
+  apply NNReal.coe_le_coe.mpr (Game.advantage_bind_le_of_support past _ _ ?_)
+  rintro ⟨x, ⟨d, l⟩, t⟩ hx
+  apply NNReal.coe_le_coe.mp
+  rw [Game.coe_advantage]
+  apply bound
+  rw [show past = _ from (OracleComp.runWith_eq_run_interpret _ _ _).symm] at hx
+  exact OracleComp.mem_supportWith_of_mem_support_runWith _ (fun _ _ _ _ _ => Set.mem_univ _) hx
+
 private theorem erase_at_cut (C : QuantumSigningForger) (s : Level) (H : Xofs)
     (keys : KeyPair) (sk : PrivateKey s) (A : PublicMatrix s)
     (key : decodePrivate s keys.secretKey = some sk) (mat : H.expandA s sk.rho = some A)
@@ -471,21 +494,9 @@ private theorem erase_at_cut (C : QuantumSigningForger) (s : Level) (H : Xofs)
       prob (C.chosenCall s H A keys i D false rows)| ≤ 814 * (4 * qH * √δ + (815 * n + 2) * δ) := by
   intro δ
   let G := H.withDigestRegister s D
-  let past := C.cutInteraction s G keys i rows
   unfold chosenCall
-  let ε : NNReal := ⟨814 * (4 * qH * √δ + (815 * n + 2) * δ), by dsimp [δ]; positivity⟩
-  change |(Game.succProbability (past.bind _) : ℝ) - Game.succProbability (past.bind _)| ≤ (ε : ℝ)
-  rw [← Game.coe_advantage]
-  apply NNReal.coe_le_coe.mpr (Game.advantage_bind_le_of_support past _ _ ?_)
-  rintro ⟨x, ⟨d, l⟩, t⟩ hx
-  apply NNReal.coe_le_coe.mp
-  rw [Game.coe_advantage]
-  change |(Game.succProbability _ : ℝ) - Game.succProbability _| ≤
-    814 * (4 * qH * √δ + (815 * n + 2) * δ)
-  have possible : x ∈ OracleComp.supportWith (fun _ => Set.univ)
-      (cut (C := C) (C.program keys.publicKey) i) := by
-    rw [show past = _ from (OracleComp.runWith_eq_run_interpret _ _ _).symm] at hx
-    exact OracleComp.mem_supportWith_of_mem_support_runWith _ (fun _ _ _ _ _ => Set.mem_univ _) hx
+  apply C.cut_bind_gap s G keys i rows _ _ (by positivity)
+  intro x d l t possible
   cases x with
   | finished f =>
     simp only [sub_self, abs_zero]

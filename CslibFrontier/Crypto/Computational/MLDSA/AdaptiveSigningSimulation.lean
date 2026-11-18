@@ -219,19 +219,8 @@ private theorem mixed_write_window (C : QuantumSigningForger) (s : Level) (H : X
       814 * (4 * qH * √δ + (n + 2) * δ) := by
   intro next δ
   let G := H.withDigestRegister s D
-  let past := C.cutInteraction s G keys i t
-  let ε : NNReal := ⟨814 * (4 * qH * √δ + (n + 2) * δ), by positivity⟩
-  change |(Game.succProbability (past.bind _) : ℝ) - Game.succProbability (past.bind _)| ≤ (ε : ℝ)
-  rw [← Game.coe_advantage]
-  apply NNReal.coe_le_coe.mpr (Game.advantage_bind_le_of_support past _ _ ?_)
-  rintro ⟨x, ⟨dev, l⟩, rows⟩ hx
-  apply NNReal.coe_le_coe.mp
-  rw [Game.coe_advantage]
-  change |prob _ - prob _| ≤ 814 * (4 * qH * √δ + (n + 2) * δ)
-  have possible : x ∈ OracleComp.supportWith (fun _ => Set.univ)
-      (cut (C := C) (C.program keys.publicKey) i) := by
-    rw [show past = _ from (OracleComp.runWith_eq_run_interpret _ _ _).symm] at hx
-    exact OracleComp.mem_supportWith_of_mem_support_runWith _ (fun _ _ _ _ _ => Set.mem_univ _) hx
+  apply C.cut_bind_gap s G keys i t _ _ (by positivity)
+  intro x dev l rows possible
   cases x with
   | finished f =>
     simp only [resumeRetries, resumeProgram, next, simulatedAfter, sub_self, abs_zero]
@@ -315,27 +304,6 @@ private noncomputable def seededHybrid (C : QuantumSigningForger) (s : Level) (n
   | some keys => match decodePrivate s keys.secretKey, H.expandA s (keys.publicKey.take 32) with
     | some sk, some A => C.fixedHybrid s H A keys sk n j
     | _, _ => pure false
-
--- The independent uniform register can be reinstalled in a seeded raw-stream game without
--- changing its distribution, including on inputs whose raw SHAKE domains overlap.
-private theorem average_register (s : Level) (base : Xofs) {a b : ℕ}
-    (ha : s.commitmentInputBits ≤ a) (hb : digestBytes s ≤ b)
-    (source target : Xofs → FixedBytes 32 → Game)
-    (law : ∀ H seed, source H seed = (PMF.uniformOfFintype (Register s)).bind fun D =>
-      target (H.withDigestRegister s D) seed) :
-    let U := PMF.uniformOfFintype (FixedBytes 32)
-    ((base.uniformPrefixes a b).bind fun H => U.bind (source H)) =
-      (base.uniformPrefixes a b).bind fun H => U.bind (target H) := by
-  intro U
-  let D := PMF.uniformOfFintype (Register s)
-  have reg := congrArg (fun p : PMF (Register s × Xofs) => p.bind fun x => U.bind (target x.2))
-    (base.uniformPrefixes_digestRegister s ha hb)
-  simp only [PMF.bind_bind, PMF.bind_map, Function.comp_def] at reg
-  rw [← reg]
-  apply congrArg (PMF.bind (base.uniformPrefixes a b) ·)
-  funext H
-  rw [show source H = (fun seed => D.bind fun t => target (H.withDigestRegister s t) seed)
-    from funext (law H), PMF.bind_comm U D]
 
 private theorem seeded_all_native (C : QuantumSigningForger) (s : Level) (base : Xofs)
     {a b n : ℕ} (ha : s.commitmentInputBits ≤ a) (hb : digestBytes s ≤ b)
