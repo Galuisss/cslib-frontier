@@ -69,15 +69,6 @@ theorem uniformOfFintype_bind_bind_adaptiveExtend [Fintype ι] [DecidableEq ι]
       (Function.extend_comp (e f).injective t f)
   exact uniformOfFintype_bind_bind_fst_equiv inv.toPerm g
 
-/-- The injective case: `(f, t) ↦ (Function.extend e t f, f ∘ e)` is an involution. -/
-private theorem uniformOfFintype_bind_bind_extend_of_injective [Fintype ι] [DecidableEq ι]
-    [Fintype ι'] [DecidableEq ι'] [Fintype κ] [Nonempty κ] {e : ι' → ι}
-    (he : Function.Injective e) (g : (ι → κ) → PMF ε) :
-    ((uniformOfFintype (ι → κ)).bind fun f =>
-      (uniformOfFintype (ι' → κ)).bind fun t => g (Function.extend e t f)) =
-      (uniformOfFintype (ι → κ)).bind g :=
-  uniformOfFintype_bind_bind_adaptiveExtend (fun _ => ⟨e, he⟩) (fun _ _ => rfl) g
-
 /-- **Resampling along a map**: a uniform function whose values on the range of `e` are replaced
 by entries of an independent uniform table is uniform. For injective `e`, the function
 `Function.extend e t f` takes the value `t j` at `e j` and the value of `f` off the range of `e`. -/
@@ -105,6 +96,7 @@ theorem uniformOfFintype_bind_bind_extend [Fintype ι] [DecidableEq ι] [Fintype
     rw [← uniformOfFintype_pi_map_comp_embedding ⟨σ, hσ⟩, PMF.bind_map]
     rfl
   simp only [hext, hpull]
-  exact uniformOfFintype_bind_bind_extend_of_injective Subtype.val_injective g
+  exact uniformOfFintype_bind_bind_adaptiveExtend (fun _ => ⟨Subtype.val, Subtype.val_injective⟩)
+    (fun _ _ => rfl) g
 
 end Cslib.Probability.PMF

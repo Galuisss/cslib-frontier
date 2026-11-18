@@ -212,26 +212,13 @@ theorem keyGen_eq_of_mem_sampleSigningMaskSeeds {base : Xofs} {s : Level} {seed 
     have len := congrArg List.length eq
     rw [seedInput_length (signingKeyBytes_length ..), bitsLength] at len
     lia
-  have expand : pair.shared.expandKeySeed level setup = pair.background.expandKeySeed level setup :=
-    bytes _ _ (by simp [FixedBytes.toList])
-  let ex := pair.background.expandKeySeed level setup
-  have len : ex.length = 128 := pair.background.h256.length_read ..
-  have mat : pair.shared.expandA level (ex.take 32) =
-      pair.background.expandA level (ex.take 32) := by
-    simp only [Xofs.expandA, same128]
-    rfl
-  have short (j : ℕ) : pair.shared.secretPoly level ((ex.drop 32).take 64) j =
-      pair.background.secretPoly level ((ex.drop 32).take 64) j := by
-    unfold Xofs.secretPoly
-    rw [bytes _ _ (by simp [nonceInput, len])]
-  have pk (v : Fin level.params.k → Poly) :
-      pair.shared.h256.readBytes (encodePublic level (ex.take 32) v) 64 =
-        pair.background.h256.readBytes (encodePublic level (ex.take 32) v) 64 := by
+  apply Xofs.keyGen_congr_of_reads level setup same128
+  · exact bytes _ _ (by simp [FixedBytes.toList])
+  · exact fun x hx => bytes x _ (by rw [hx]; decide)
+  · intro x hx
     apply bytes
-    simp only [encodePublic, List.length_append, List.length_take, len, length_packCoeffs]
+    rw [hx]
     cases level <;> decide
-  simp only [Xofs.keyGen, expand, ← show ex = pair.background.expandKeySeed level setup from rfl,
-    mat, short, pk]
 
 private theorem sample_streams (base : Xofs) (a b : ℕ) :
     ((PMF.uniformOfFintype (Table a b)).bind fun T₁ =>

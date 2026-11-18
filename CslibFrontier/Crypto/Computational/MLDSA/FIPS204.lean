@@ -497,6 +497,30 @@ def Xofs.keyGen (H : Xofs) (s : Level) (seed : FixedBytes 32) : Option KeyPair :
     fun i j => ((power2Round 8380417 13 (t i j)).2 : ZMod 8380417)⟩
   return ⟨pk, sk.encode⟩
 
+/-- Algorithm 6 gives the same keys or failure when the matrix stream, key expansion,
+66-byte secret-vector nonce reads and encoded-public-key hash reads agree. -/
+theorem Xofs.keyGen_congr_of_reads {H G : Xofs} (s : Level) (seed : FixedBytes 32)
+    (matrixStream : G.h128 = H.h128) (seedRead : G.expandKeySeed s seed = H.expandKeySeed s seed)
+    (nonceRead : ∀ x : List Byte, x.length = 66 → G.h256.readBytes x 481 = H.h256.readBytes x 481)
+    (publicRead : ∀ x : List Byte, x.length = 32 + 320 * s.params.k →
+      G.h256.readBytes x 64 = H.h256.readBytes x 64) : G.keyGen s seed = H.keyGen s seed := by
+  let ex := H.expandKeySeed s seed
+  have len : ex.length = 128 := H.h256.length_read ..
+  have matrix : G.expandA s (ex.take 32) = H.expandA s (ex.take 32) := by
+    simp only [Xofs.expandA, matrixStream]
+    rfl
+  have short (i : ℕ) : G.secretPoly s ((ex.drop 32).take 64) i =
+      H.secretPoly s ((ex.drop 32).take 64) i := by
+    unfold Xofs.secretPoly
+    rw [nonceRead _ (by simp [nonceInput, len])]
+  have pk (v : Fin s.params.k → Poly) :
+      G.h256.readBytes (encodePublic s (ex.take 32) v) 64 =
+        H.h256.readBytes (encodePublic s (ex.take 32) v) 64 := by
+    apply publicRead
+    simp only [encodePublic, List.length_append, List.length_take, len, length_packCoeffs]
+    rfl
+  simp only [Xofs.keyGen, seedRead, ← show ex = H.expandKeySeed s seed from rfl, matrix, short, pk]
+
 /-- The seed recovered from a successful public key is precisely the prefix used to index
 the SHAKE128 matrix streams during this execution of Algorithm 6. -/
 theorem publicSeed_of_keyGen {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys : KeyPair}
