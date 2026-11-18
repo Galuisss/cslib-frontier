@@ -3983,6 +3983,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 public import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystemConverse
 public import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystemPerfect
 public import CslibFrontier.Computability.PCP.TwoProverGame.Linearity
+public import CslibFrontier.Computability.PCP.TwoProverGame.LinearityDiagonal
 public import CslibFrontier.Computability.PCP.TwoProverGame.LinearitySoundness
 public import CslibFrontier.Computability.PCP.TwoProverGame.MagicSquare
 public import CslibFrontier.Computability.PCP.TwoProverGame.Naimark
