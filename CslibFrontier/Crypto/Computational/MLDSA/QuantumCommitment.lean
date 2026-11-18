@@ -23,8 +23,8 @@ its literal bit-string input. The measured message, the programmed address, the 
 table and the residual quantum state are available to the continuation.
 
 For a uniformly sampled public matrix this single refresh has advantage at most 2 T times
-the fourth root of the two-mask Module-SIS solver's success plus the reciprocal mask-box
-size (inside the fourth root). This combines the query-magnitude estimate of [BBBV1997]
+the fourth root of the sum of the common-subbox Module-SIS solver's success and the
+reciprocal subbox size. This combines the query-magnitude estimate of [BBBV1997]
 with the ordinary Module-SIS collision argument. Multiple signing calls are a further step.
 -/
 
@@ -124,9 +124,9 @@ theorem abs_commitmentRefreshProbability_sub_le (T : ℕ)
     |commitmentRefreshProbability s extra true (W := W) (κ := κ) T U ψ readout post accept -
       commitmentRefreshProbability s extra false T U ψ readout post accept| ≤
       2 * T * Real.sqrt (Real.sqrt (Game.succProbability
-        (ModuleSIS.hermiteExperiment (max (2 * s.params.γ₁ - 1) (2 * s.params.γ₂))
+        (ModuleSIS.hermiteExperiment (max (s.params.γ₁ - 1) (2 * s.params.γ₂))
           (maskCollisionSolver s.params (by cases s <;> decide))).eval +
-        (↑((2 * s.params.γ₁) ^ (s.params.ℓ * 256)) : ℝ)⁻¹)) := by
+        (↑(s.params.γ₁ ^ (s.params.ℓ * 256)) : ℝ)⁻¹)) := by
   classical
   let d (A : PublicMatrix s) := (commitmentGuessProbability s.params (gamma_pos s) A).toNNReal
   have finite (A : PublicMatrix s) : commitmentGuessProbability s.params (gamma_pos s) A ≠ ⊤ :=
