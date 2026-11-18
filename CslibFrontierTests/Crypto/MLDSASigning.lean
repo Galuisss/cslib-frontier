@@ -220,6 +220,26 @@ example : ∀ P ∈ [Params.mldsa44, Params.mldsa65, Params.mldsa87],
   simp only [List.mem_cons, List.not_mem_nil, or_false]
   rintro P (rfl | rfl | rfl) <;> decide +kernel
 
+-- A failed digest expansion terminates immediately, even when the next trial would sign.
+-- A response rejection consumes one attempt and permits that second trial.
+private def partialTrials (fatal : Bool) : (q : List Bool ⊕ SigningHashPoint toy) →
+    StateM ℕ (SigningTrialSpec toy Bool (Option (Bool × CompressedSignature toy)) q) :=
+  sumHandler (fun _ n =>
+    (if n == 0 then (if fatal then some none else none)
+     else some (some (true, ⟨0, fun _ _ => false, 0⟩)), n + 1))
+    (fun _ n => (n != 0, n))
+
+private def twoTrials (fatal : Bool) : Bool × ℕ :=
+  (interpret (partialTrials fatal)
+    (expandSigningRetries toy 2 (partialSigningProgram toy interleaved))).run 0
+
+example : twoTrials true = (false, 1) ∧ twoTrials false = (true, 2) := by
+  have hr : List.range 2 = [0, 1] := by decide
+  simp only [twoTrials, partialSigningProgram, expandSigningRetries, interleaved, hr,
+    List.findSomeM?_cons, List.findSomeM?_nil, sumHandler, interpret_bind, interpret_query,
+    interpret_map, partialTrials, StateT.run, bind_pure_comp]
+  exact ⟨rfl, rfl⟩
+
 -- The rejected point is the first coin, and its digest equals that coin. Among the four
 -- equiprobable two-coin tapes, reading `false` returns true once if the rejected write is kept,
 -- twice if it is erased. Comparing only the response of the signing attempt misses this effect.

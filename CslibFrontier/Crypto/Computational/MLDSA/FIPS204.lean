@@ -47,10 +47,12 @@ abbrev Level.params (s : Level) : Params :=
     | .mlDSA87 => Params.mldsa87
   { p with n := 256, q := 8380417 }
 
-private def digestBytes : Level → ℕ
+/-- Length in bytes of the FIPS challenge digest for each parameter set (Table 1). -/
+def digestBytes : Level → ℕ
   | .mlDSA44 => 32 | .mlDSA65 => 48 | .mlDSA87 => 64
 
-private def hintLimit : Level → ℕ
+/-- Maximum Hamming weight of the complete hint vector (Table 1). -/
+def hintLimit : Level → ℕ
   | .mlDSA44 => 80 | .mlDSA65 => 55 | .mlDSA87 => 75
 
 /-- A coefficient polynomial in the FIPS 204 negacyclic ring. -/

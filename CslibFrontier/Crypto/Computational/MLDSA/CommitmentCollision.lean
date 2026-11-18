@@ -175,6 +175,34 @@ theorem mean_commitmentGuessProbability_le_hermite [NeZero P.q] (hγ : 0 < P.γ�
     ProbComp.eval_pure, Probability.PMF.toReal_uniformOfFintype_bind_apply]
   rfl
 
+/-- Average a fixed-matrix game comparison whose loss is a multiple of the largest signing
+commitment atom. The two-mask MSIS solver discharges that loss for a uniform shared matrix. -/
+theorem closeTo_uniformMatrix_of_guessProbability [NeZero P.q] (hγ : 0 < P.γ₁)
+    (h₂ : 0 < P.γ₂) (hq : 2 * P.γ₁ < P.q) (count : ℕ)
+    {α : Type} {real sim : Matrix (Fin P.k) (Fin P.ℓ) (Fin P.n → ZMod P.q) → PMF α}
+    (h : ∀ A, CloseTo (real A) (sim A) (count * commitmentGuessProbability P hγ A)) :
+    CloseTo ((PMF.uniformOfFintype _).bind real) ((PMF.uniformOfFintype _).bind sim)
+      (count * ENNReal.ofReal (Real.sqrt (Game.succProbability
+        (ModuleSIS.hermiteExperiment (max (2 * P.γ₁ - 1) (2 * P.γ₂))
+          (maskCollisionSolver P hγ)).eval + (↑((2 * P.γ₁) ^ (P.ℓ * P.n)) : ℝ)⁻¹))) := by
+  classical
+  let err (A : Mat P) := (count : ℝ≥0∞) * commitmentGuessProbability P hγ A
+  refine (CloseTo.bind_right_tsum (PMF.uniformOfFintype (Mat P)) (err := err)
+    (fun A _ => h A)).mono ?_
+  have hmean := mean_commitmentGuessProbability_le_hermite P hγ h₂ hq
+  have finite (A : Mat P) : commitmentGuessProbability P hγ A ≠ ⊤ := by
+    apply ne_top_of_le_ne_top ENNReal.one_ne_top
+    unfold commitmentGuessProbability
+    exact iSup_le fun _ => PMF.coe_le_one _ _
+  rw [tsum_fintype]
+  simp only [err, PMF.uniformOfFintype_apply, mul_left_comm _ (count : ℝ≥0∞), ← mul_sum]
+  apply mul_le_mul_of_nonneg_left _ zero_le
+  apply (ENNReal.le_ofReal_iff_toReal_le ?_ (Real.sqrt_nonneg _)).2
+  · simpa only [ENNReal.toReal_mul, ENNReal.toReal_sum (fun a _ => finite a),
+      ENNReal.toReal_inv, ENNReal.toReal_natCast, Fintype.expect_eq_sum_div_card,
+      div_eq_inv_mul] using hmean
+  · exact ENNReal.mul_ne_top (by simp) (ENNReal.sum_ne_top.mpr fun a _ => finite a)
+
 /-- The adaptive signing simulation averaged over a uniform matrix, with the guessing loss
 discharged by the explicit two-mask Module-SIS solver. The short secrets may be fixed before
 drawing the matrix. The forger may choose its entire subsequent program using the public key. -/
@@ -199,25 +227,9 @@ theorem closeTo_simulateSigning_uniformMatrix [NeZero P.q] (hP : P.Valid)
         (Real.sqrt (Game.succProbability
           (ModuleSIS.hermiteExperiment (max (2 * P.γ₁ - 1) (2 * P.γ₂))
             (maskCollisionSolver P (by lia))).eval + (↑((2 * P.γ₁) ^ (P.ℓ * P.n)) : ℝ)⁻¹))) := by
-  classical
-  let hγ : 0 < P.γ₁ := by lia
-  let count := 2 * (S * K) * H + (S * K).choose 2
-  let err (A : Mat P) := (count : ℝ≥0∞) * commitmentGuessProbability P hγ A
-  refine (CloseTo.bind_right_tsum (PMF.uniformOfFintype (Mat P)) (err := err) (fun A _ =>
-    closeTo_runBoundedSigningROM_simulate P hP hq hβ d ω K dist expand ⟨A, s₁, s₂⟩
-      hs₁ hs₂ hc (hS _) (hH _))).mono ?_
-  have hmean := mean_commitmentGuessProbability_le_hermite P hγ hP.γ₂_pos hq
-  have finite (A : Mat P) : commitmentGuessProbability P hγ A ≠ ⊤ := by
-    apply ne_top_of_le_ne_top ENNReal.one_ne_top
-    unfold commitmentGuessProbability
-    exact iSup_le fun _ => PMF.coe_le_one _ _
-  rw [tsum_fintype]
-  simp only [err, PMF.uniformOfFintype_apply, mul_left_comm _ (count : ℝ≥0∞), ← mul_sum]
-  apply mul_le_mul_of_nonneg_left _ zero_le
-  apply (ENNReal.le_ofReal_iff_toReal_le ?_ (Real.sqrt_nonneg _)).2
-  · simpa only [ENNReal.toReal_mul, ENNReal.toReal_sum (fun a _ => finite a),
-      ENNReal.toReal_inv, ENNReal.toReal_natCast, Fintype.expect_eq_sum_div_card,
-      div_eq_inv_mul] using hmean
-  · exact ENNReal.mul_ne_top (by simp) (ENNReal.sum_ne_top.mpr fun a _ => finite a)
+  apply closeTo_uniformMatrix_of_guessProbability P (by lia) hP.γ₂_pos hq
+  intro A
+  exact closeTo_runBoundedSigningROM_simulate P hP hq hβ d ω K dist expand ⟨A, s₁, s₂⟩
+    hs₁ hs₂ hc (hS _) (hH _)
 
 end Cslib.Crypto.MLDSA
