@@ -195,6 +195,21 @@ theorem agree_off_sampleSigningMaskSeeds {base : Xofs} {s : Level} {seed : Fixed
   refine ⟨rfl, fun x j miss => coupled_off _ _ _ _ _ _ _ _ _ _ _ ?_⟩
   exact miss.imp_right fun m p => m p.1 p.2
 
+private theorem read_ne_maskSeed_length {base : Xofs} {s : Level} {seed : FixedBytes 32}
+    {a b n : ℕ} {t : Fin n ↪ FixedBytes 32} {ha : 1024 ≤ a} {hb : 64 ≤ b}
+    {rows : SigningMaskSeeds n} {pair : SigningMaskSeedOracles}
+    (h : pair ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
+    (x : List Bool) (hx : x.length ≠ 1024) (k : ℕ) :
+    pair.shared.h256.read x k = pair.background.h256.read x k := by
+  apply read_eq_of_byteAt_eq
+  intro j _
+  apply (agree_off_sampleSigningMaskSeeds h).2 _ _ (.inr _)
+  intro i μ eq
+  apply hx
+  rw [← eq, length_maskSeedInput, List.length_ofFn]
+  change 8 * ((signingKeyBytes pair.background s seed).length + 32) + 512 = 1024
+  rw [signingKeyBytes_length]
+
 /-- The original and the shared oracles produce identical FIPS key bytes, including on
 key-generation failures. The setup seed here can be chosen independently of the one used to
 locate the installed rows. -/
@@ -204,18 +219,12 @@ theorem keyGen_eq_of_mem_sampleSigningMaskSeeds {base : Xofs} {s : Level} {seed 
     (h : pair ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
     (level : Level) (setup : FixedBytes 32) :
     pair.shared.keyGen level setup = pair.background.keyGen level setup := by
-  obtain ⟨same128, off⟩ := agree_off_sampleSigningMaskSeeds h
   have bytes (x : List Byte) (k : ℕ) (hx : x.length ≠ 128) :
       pair.shared.h256.readBytes x k = pair.background.h256.readBytes x k := by
-    apply read_eq_of_byteAt_eq
-    intro j _
-    apply off _ _ (.inr _)
-    intro i μ eq
-    change seedInput (signingKeyBytes pair.background s seed) t (i, μ) = _ at eq
-    have len := congrArg List.length eq
-    rw [seedInput_length (signingKeyBytes_length ..), bitsLength] at len
+    apply read_ne_maskSeed_length h
+    rw [bitsLength]
     lia
-  apply Xofs.keyGen_congr_of_reads level setup same128
+  apply Xofs.keyGen_congr_of_reads level setup (agree_off_sampleSigningMaskSeeds h).1
   · exact bytes _ _ (by simp [FixedBytes.toList])
   · exact fun x hx => bytes x _ (by rw [hx]; decide)
   · intro x hx

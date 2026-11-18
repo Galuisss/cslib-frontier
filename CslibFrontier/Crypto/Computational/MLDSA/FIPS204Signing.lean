@@ -77,16 +77,20 @@ theorem length_maskSeedInput (key : List Byte) (rnd : FixedBytes 32) (μ : List 
     simp [Keccak.bytesToBitsLE, Keccak.byteBitsLE, Nat.mul_comm]
   rw [maskSeedInput, List.length_append, bits, List.length_append, FixedBytes.length_toList]
 
+private def Xofs.signInternalWithSeed (H : Xofs) (s : Level) (bytes : List Byte)
+    (formatted : List Bool) (derive : PrivateKey s → List Bool → List Byte) :
+    Option (List Byte) := do
+  let sk ← decodePrivate s bytes
+  let matrix ← H.expandA s sk.rho
+  let μ := H.representativeFromTr sk.tr formatted
+  firstAccepted s.params.ℓ (H.attempt s sk matrix μ (derive sk μ)) 814 0
+
 /-- Algorithm 7 on encoded secret keys, formatted bit-string messages and 32 hedging bytes.
 The signer distinguishes a rejected attempt (advance κ by ℓ) from XOF exhaustion (abort).
 After 814 rejected attempts it returns the single error of Appendix C. -/
 def Xofs.signInternal (H : Xofs) (s : Level) (bytes : List Byte) (formatted : List Bool)
-    (rnd : FixedBytes 32) : Option (List Byte) := do
-  let sk ← decodePrivate s bytes
-  let matrix ← H.expandA s sk.rho
-  let μ := H.representativeFromTr sk.tr formatted
-  let maskSeed := H.h256.read (maskSeedInput sk.key rnd μ) 64
-  firstAccepted s.params.ℓ (H.attempt s sk matrix μ maskSeed) 814 0
+    (rnd : FixedBytes 32) : Option (List Byte) :=
+  H.signInternalWithSeed s bytes formatted fun sk μ => H.h256.read (maskSeedInput sk.key rnd μ) 64
 
 /-- FIPS 202 specialization of `Xofs.signInternal`. -/
 abbrev signInternal := Xofs.signInternal Xofs.shake
@@ -173,7 +177,7 @@ theorem verify_of_sign {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys : Key
     by_contra h
     simp [Xofs.sign, guard, h] at hs
   simp only [Xofs.sign, guard, ctx, ↓reduceIte, Option.pure_def, Option.bind_eq_bind,
-    Option.bind_some, Xofs.signInternal, decoded, hA] at hs
+    Option.bind_some, Xofs.signInternal, Xofs.signInternalWithSeed, decoded, hA] at hs
   obtain ⟨κ, htry⟩ := attempt_of_firstAccepted hs
   rw [pk] at htry ⊢
   exact verified_of_attempt sk rho hA ctx short htry

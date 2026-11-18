@@ -269,6 +269,14 @@ def Xofs.expandA (H : Xofs) (s : Level) (rho : List Byte) :
         (rho ++ [Fin.ofNat 256 col.val, Fin.ofNat 256 row.val]) 894)
   return fun i j => ((matrix.get i).get j).get
 
+/-- Algorithm 32 depends only on SHAKE128. -/
+theorem Xofs.expandA_congr {H K : Xofs} (ha : K.h128 = H.h128) (s : Level) (rho : List Byte) :
+    K.expandA s rho = H.expandA s rho := by
+  cases H
+  cases K
+  cases ha
+  rfl
+
 /-- FIPS 202 specialization of `Xofs.expandA`. -/
 abbrev expandA := Xofs.expandA Xofs.shake
 
@@ -506,9 +514,7 @@ theorem Xofs.keyGen_congr_of_reads {H G : Xofs} (s : Level) (seed : FixedBytes 3
       G.h256.readBytes x 64 = H.h256.readBytes x 64) : G.keyGen s seed = H.keyGen s seed := by
   let ex := H.expandKeySeed s seed
   have len : ex.length = 128 := H.h256.length_read ..
-  have matrix : G.expandA s (ex.take 32) = H.expandA s (ex.take 32) := by
-    simp only [Xofs.expandA, matrixStream]
-    rfl
+  have matrix := Xofs.expandA_congr matrixStream s (ex.take 32)
   have short (i : ℕ) : G.secretPoly s ((ex.drop 32).take 64) i =
       H.secretPoly s ((ex.drop 32).take 64) i := by
     unfold Xofs.secretPoly

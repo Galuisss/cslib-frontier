@@ -46,15 +46,19 @@ Private samples, measurements, gates and coherent XOF calls have zero signing co
 @[expose] def SigningCallsLe (C : QuantumSigningForger) (n : ℕ) : Prop :=
   ∀ pk, OracleComp.IsCostBounded (fun q => (signingRequest q).toNat) (C.program pk) n
 
-private noncomputable def hedgeCommand (C : QuantumSigningForger) (device H : Xofs) (s : Level)
-    (sk : List Byte) (r : FixedBytes 32) :=
+private noncomputable def signingCommand (C : QuantumSigningForger) (device : Xofs) (s : Level)
+    (sk : List Byte) (sign : SigningQuery → Option (List Byte)) :=
   OracleComp.sumHandler (m := StateT (State C) PMF)
     (fun k => StateT.lift (ProbComp.unifOracle k))
     (OracleComp.sumHandler (spec₁ := fun _ : DeviceRequest (Width C) Empty => List Bool)
       (spec₂ := fun _ : SigningQuery => Option (List Byte))
       (fun cmd => C.commands device s sk (.inl cmd))
-      (fun q st => PMF.pure <| let (sig, log) := H.signAndLog s sk q st.2 r
-        (sig, st.1, log)))
+      (fun q st => PMF.pure <| let sig := sign q
+        (sig, st.1, q.logReply sig st.2)))
+
+private noncomputable def hedgeCommand (C : QuantumSigningForger) (device H : Xofs) (s : Level)
+    (sk : List Byte) (r : FixedBytes 32) :=
+  C.signingCommand device s sk fun q => H.sign s sk q.message q.context r
 
 /-- The honest signed transcript with the hedge for each call read from the supplied list.
 The quantum device uses `device`, and signing uses `H`. The fallback supplies zero bytes.
@@ -81,7 +85,8 @@ theorem uniform_transcriptWithHedges (C : QuantumSigningForger) (H : Xofs) (s : 
     rcases q with k | cmd | sign
     · rfl
     · rfl
-    · simp only [Sum.elim_inr, hedgeCommand, online, commands, OracleComp.sumHandler,
+    · simp only [Sum.elim_inr, hedgeCommand, signingCommand, Xofs.signAndLog, online, commands,
+        OracleComp.sumHandler,
         Xofs.signingOracle, U, PMF.map_comp, Function.comp_def, ↓reduceIte]
       rfl
   have joint := OracleComp.IsCostBounded.run_interpret_presample_when signingRequest
