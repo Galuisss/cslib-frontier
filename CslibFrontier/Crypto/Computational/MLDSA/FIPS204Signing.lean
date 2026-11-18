@@ -11,6 +11,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.FIPS204ResponseBinding
 public import CslibFrontier.Languages.Probabilistic.Oracle.Interaction
 import Batteries.Data.Vector.Lemmas
 import CslibFrontier.Languages.Probabilistic.Oracle.Simulation
+import CslibFrontier.Languages.Probabilistic.Vector
 
 /-!
 # FIPS 204 signing and the strong chosen-message forgery experiment
@@ -178,14 +179,37 @@ structure SigningQuery where
 abbrev SigningForger :=
   List Byte → ProbOracleComp (fun _ : SigningQuery => Option (List Byte)) Forgery
 
+private def Xofs.signAndLog (H : Xofs) (s : Level) (sk : List Byte) (q : SigningQuery)
+    (log : List Forgery) (rnd : FixedBytes 32) : Option (List Byte) × List Forgery :=
+  let sig := H.sign s sk q.message q.context rnd
+  (sig, match sig with
+    | none => log
+    | some bytes => ⟨q.context, q.message, bytes⟩ :: log)
+
 /-- Sign with fresh hedging randomness and log the context and message of a successful reply. -/
 noncomputable def Xofs.signingOracle (H : Xofs) (s : Level) (sk : List Byte) (q : SigningQuery)
     (log : List Forgery) : PMF (Option (List Byte) × List Forgery) :=
-  (PMF.uniformOfFintype (FixedBytes 32)).map fun rnd =>
-    let sig := H.sign s sk q.message q.context rnd
-    (sig, match sig with
-      | none => log
-      | some bytes => ⟨q.context, q.message, bytes⟩ :: log)
+  (PMF.uniformOfFintype (FixedBytes 32)).map (H.signAndLog s sk q log)
+
+/-- Run the forger against the actual signed responses with 32 independent byte draws per
+request. The program returns the adversary's output and the full successful signing log. -/
+def Xofs.runSigningForger (H : Xofs) (s : Level) (keys : KeyPair) (adv : SigningForger) :
+    ProbComp (Forgery × List Forgery) :=
+  let handler (q : SigningQuery) (log : List Forgery) :=
+    H.signAndLog s keys.secretKey q log <$> OracleComp.replicateFin 32 (ProbComp.unifFin 255)
+  (OracleComp.interpret (OracleComp.sumHandler (fun n => StateT.lift (ProbComp.unifFin n)) handler)
+    (adv keys.publicKey)).run []
+
+/-- The closed program produces the same joint transcript as the signing oracle in the
+strong chosen-message experiment. -/
+theorem eval_runSigningForger (H : Xofs) (s : Level) (keys : KeyPair) (adv : SigningForger) :
+    (H.runSigningForger s keys adv).eval =
+      ProbOracleComp.runWith (H.signingOracle s keys.secretKey) (adv keys.publicKey) [] := by
+  unfold Xofs.runSigningForger
+  rw [ProbOracleComp.eval_run_interpret_eq_runWith]
+  simp only [ProbComp.eval_map, ProbComp.eval_replicateFin, ProbComp.eval_unifFin,
+    PMF.pi_uniformOfFintype]
+  rfl
 
 /-- Signing service with the FIPS 202 XOFs. -/
 noncomputable abbrev signingOracle := Xofs.signingOracle Xofs.shake
@@ -204,6 +228,7 @@ theorem verify_of_mem_signingTranscript {H : Xofs} {s : Level} {seed : FixedByte
   apply ProbOracleComp.runWith_invariant _ inv ?_ _ [] (by simp [inv]) out log hrun
   intro q hist ih reply next hs
   obtain ⟨rnd, _, hr⟩ := (PMF.mem_support_map_iff _ _ _).mp hs
+  dsimp only [Xofs.signAndLog] at hr
   cases sig : H.sign s keys.secretKey q.message q.context rnd with
   | none =>
     simp only [sig, Prod.mk.injEq] at hr
