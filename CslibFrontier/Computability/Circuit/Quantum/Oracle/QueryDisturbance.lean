@@ -28,9 +28,10 @@ namespace Cslib.Quantum
 open Matrix
 open scoped ComplexOrder
 
-/-- Squared displacement of a placed XOR query on the retained joint state, including the
-untouched reference register. For a pure state this is the squared norm of the difference
-between the two amplitudes after the query. -/
+/-- Input-weighted squared norm of the difference of two placed XOR gates, including the
+untouched reference register. For any common purification of the input, it is the squared
+norm of the difference of its two output vectors. It can be positive for identical output
+density matrices when the outputs differ by a global phase. -/
 @[expose] noncomputable def xorQueryDisturbance {a b m : ℕ} {κ : Type*} [Fintype κ] [DecidableEq κ]
     (H G : (Fin a → Bool) → Fin b → Bool) (A : Fin (a + b) ↪ Fin m)
     (ρ : Matrix ((Fin m → Bool) × κ) ((Fin m → Bool) × κ) ℂ) : ℝ :=
@@ -38,7 +39,7 @@ between the two amplitudes after the query. -/
   let v := onFirst (κ := κ) (xorQuery G A).matrix
   (densityConj (u.val - v.val) ρ).trace.re
 
-/-- The squared displacement of an arbitrary joint state at one coherent call is at most four times
+/-- The squared amplitude displacement at one coherent call is at most four times
 the probability that a measurement of its live address reports different replies. -/
 theorem xorQueryDisturbance_le {a b m : ℕ} {κ : Type*} [Fintype κ] [DecidableEq κ]
     (H G : (Fin a → Bool) → Fin b → Bool) (A : Fin (a + b) ↪ Fin m)

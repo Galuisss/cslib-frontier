@@ -36,7 +36,9 @@ with probability at most `1 / 2^256`. Before its first coherent query the origin
 also satisfies the prediction bound, with arbitrary prior classical signing requests.
 
 For any retained density matrix independent of the hidden input seed, the mean squared
-displacement of one coherent query by the installed expansion is at most `4 / 2^256`.
+amplitude displacement of one coherent query by the installed expansion is at most `4 / 2^256`.
+The same bound holds for the mean square change in the square root of the acceptance probability
+of any seed-dependent measurement after that query.
 -/
 
 public section
@@ -574,6 +576,40 @@ theorem mean_keySeedQueryDisturbance_le (C : QuantumSigningForger) (s : Level) (
       exact Finset.sum_congr rfl fun _ _ => mul_left_comm ..
     _ ≤ _ := by
       simpa only [div_eq_mul_inv] using mul_le_mul_of_nonneg_left mean (by norm_num : 0 ≤ (4 : ℝ))
+
+open scoped ComplexOrder in
+/-- Apply any binary measurement after the native query, allowing the measurement to depend on
+the hidden seed. For a seed-independent input state, the mean square change in the square root
+of the acceptance probability is at most `4 / 2^256`. -/
+theorem mean_sq_sqrt_keySeedQuery_readout_le (C : QuantumSigningForger) (s : Level) (H : Xofs)
+    (out : FixedBytes 128) {κ σ : Type} [Fintype κ] [DecidableEq κ]
+    (st : DeviceState (C.addressBits + 2 + 8 * C.responseBytes + C.workQubits) κ σ)
+    (M : FixedBytes 32 → POVM Bool
+      ((Fin (C.addressBits + 2 + 8 * C.responseBytes + C.workQubits) → Bool) × κ)) :
+    let p := fun seed (G : Xofs) => (M seed).densityProb
+      (st.instruction (G.queryTable C.addressBits C.responseBytes) .query).density true
+    ∑ seed : FixedBytes 32, ((PMF.uniformOfFintype (FixedBytes 32)) seed).toReal *
+      (√(p seed (H.withKeySeedExpansion s seed out)) - √(p seed H)) ^ 2 ≤ 4 / 2 ^ 256 := by
+  classical
+  intro p
+  let A := Fin.castLEEmb (Nat.le_add_right (C.addressBits + 2 + 8 * C.responseBytes) C.workQubits)
+  let U := fun (G : Xofs) => (onFirst (κ := κ)
+    (xorQuery (G.queryTable C.addressBits C.responseBytes) A).matrix).val
+  have born (seed) (G : Xofs) :
+      p seed G = (M seed).densityProb (densityConj (U G) st.density) true := by
+    simp only [p, DeviceState.instruction_apply, OracleGateCode.toPlacedGate?,
+      Nat.le_add_right, ↓reduceDIte, DeviceState.evolve_density, U, coe_onFirst, A]
+  refine le_trans (Finset.sum_le_sum fun seed _ => mul_le_mul_of_nonneg_left ?_
+    ENNReal.toReal_nonneg) (C.mean_keySeedQueryDisturbance_le s H out st)
+  let G := H.withKeySeedExpansion s seed out
+  let D := U G - U H
+  have diff := (M seed).abs_sqrt_densityProb_sub_le true st.isDensityMatrix.posSemidef (U G) (U H)
+  rw [← born, ← born] at diff
+  have pos := (st.isDensityMatrix.posSemidef.mul_mul_conjTranspose_same D).trace_nonneg
+  change _ ≤ (densityConj D st.density).trace.re
+  rw [← sq_abs, ← Real.sq_sqrt (show 0 ≤ (densityConj D st.density).trace.re by
+    simpa only [densityConj_apply] using (Complex.nonneg_iff.mp pos).1)]
+  exact pow_le_pow_left₀ (abs_nonneg _) diff 2
 
 end QuantumSigningForger
 
