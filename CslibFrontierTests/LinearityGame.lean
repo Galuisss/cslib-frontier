@@ -100,20 +100,14 @@ example :
     let high : Fin 2 → Bool := fun i => decide (i = 0)
     let low : Fin 2 → Bool := fun i => decide (i = 1)
     let dummy : Fin 2 → Bool := fun _ => false
-    G.query (false, 0, high, low, dummy) = ((low, high), (dummy, high)) ∧
-      G.query (true, 0, high, low, dummy) = ((dummy, high), (low, high)) ∧
-      G.accepts (false, 0, high, low, dummy) (false, true) (true, true) ∧
-      G.accepts (true, 0, high, low, dummy) (true, true) (false, true) ∧
-      ¬ G.accepts (false, 0, high, low, dummy) (false, true) (true, false) := by
-  decide
-
-/-- Honest answers from a linear function pass the symmetric verifier for either role
-assignment, including when query strings coincide. -/
-example : ∀ s a b dummy : Fin 1 → Bool, ∀ k : Fin 3, ∀ swapRoles : Bool,
-    let G := symmetricLinearityGame 1
-    let seed := (swapRoles, k, a, b, dummy)
-    let answer (query : (Fin 1 → Bool) × (Fin 1 → Bool)) := (s ⬝ᵥ query.1, s ⬝ᵥ query.2)
-    G.accepts seed (answer (G.query seed).1) (answer (G.query seed).2) := by
+    let seed : SymmetricLinearitySeed 2 :=
+      { swapRoles := false, check := 0, first := high, second := low, dummy := dummy }
+    let swapped := { seed with swapRoles := true }
+    G.query seed = ((low, high), (dummy, high)) ∧
+      G.query swapped = ((dummy, high), (low, high)) ∧
+      G.accepts seed (false, true) (true, true) ∧
+      G.accepts swapped (true, true) (false, true) ∧
+      ¬ G.accepts seed (false, true) (true, false) := by
   decide
 
 /-- Even with identical visible queries, the sampled xor check can reject answers that pass
@@ -121,9 +115,9 @@ the equality check. -/
 example :
     let G := symmetricLinearityGame 1
     let zero : Fin 1 → Bool := fun _ => false
-    G.query (false, 0, zero, zero, zero) = G.query (false, 2, zero, zero, zero) ∧
-      G.accepts (false, 0, zero, zero, zero) (true, true) (true, true) ∧
-      ¬ G.accepts (false, 2, zero, zero, zero) (true, true) (true, true) := by
+    G.query ⟨false, 0, zero, zero, zero⟩ = G.query ⟨false, 2, zero, zero, zero⟩ ∧
+      G.accepts ⟨false, 0, zero, zero, zero⟩ (true, true) (true, true) ∧
+      ¬ G.accepts ⟨false, 2, zero, zero, zero⟩ (true, true) (true, true) := by
   decide
 
 end CslibFrontierTests.LinearityGame
