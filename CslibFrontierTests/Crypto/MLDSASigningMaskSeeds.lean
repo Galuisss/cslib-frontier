@@ -7,7 +7,7 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Crypto.Computational.MLDSA.AdaptiveKeySeed
+import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskExpansion
 import all CslibFrontier.Crypto.Computational.MLDSA.KeySeedSearch
 import all CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 import all CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
@@ -284,4 +284,27 @@ example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ}
   apply (mul_le_mul_of_nonneg_left (add_le_add root le_rfl) (by positivity)).trans
   apply (sq_le_sq₀ (by positivity) (by positivity)).mp
   simp only [mul_pow]
+  norm_num
+
+-- Replacing every Algorithm 34 expansion at all three levels, with a full quantum/signing budget.
+example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ}
+    (ha : 528 ≤ a) (hb : 640 ≤ b) (hn : C.SigningCallsLe (2 ^ 64))
+    (hm : C.XofCallsLe (2 ^ 64)) :
+    (Game.succProbability (C.privateMaskSeedGame s base a b) : ℝ) ≤
+      (√(Game.succProbability (C.freshExpansionGame s base a b) : ℝ) + 1 / 2 ^ 159) ^ 2 +
+      1 / 2 ^ 447 + 1 / 2 ^ 385 := by
+  have width : 32 * (s.params.γ₁.log2 + 1) ≤ 640 := by cases s <;> decide
+  have grow (i j : ℕ) (h : i ≤ j) : (2 : ℕ) ^ i ≤ 2 ^ j := Nat.pow_le_pow_right (by decide) h
+  apply (C.privateMaskSeedGame_le_freshExpansionGame s base ha (width.trans hb) hn
+    (grow 64 512 (by decide)) hm).trans
+  have pow512 : (2 : ℝ) ^ 512 = 2 ^ 256 * 2 ^ 256 := pow_add 2 256 256
+  have pow513 : (2 : ℝ) ^ 513 = 2 ^ 256 * 2 ^ 256 * 2 := by rw [← pow512, ← pow_succ]
+  have pow447 : (2 : ℝ) ^ 447 = 2 ^ 224 * 2 ^ 223 := pow_add 2 224 223
+  have pow385 : (2 : ℝ) ^ 385 = 2 ^ 193 * 2 ^ 192 := pow_add 2 193 192
+  rw [pow512, pow513, pow447, pow385]
+  simp only [Nat.cast_pow, Nat.cast_ofNat, Nat.cast_mul]
+  have root : √((2 : ℝ) ^ 64 / (2 ^ 256 * 2 ^ 256)) = 1 / 2 ^ 224 := by
+    apply (Real.sqrt_eq_iff_eq_sq (by positivity) (by positivity)).2
+    norm_num
+  rw [root]
   norm_num

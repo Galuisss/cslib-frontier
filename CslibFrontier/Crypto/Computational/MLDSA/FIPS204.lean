@@ -520,10 +520,12 @@ def Xofs.keyGen (H : Xofs) (s : Level) (seed : FixedBytes 32) : Option KeyPair :
   return ⟨pk, sk.encode⟩
 
 /-- Algorithm 6 gives the same keys or failure when the matrix stream, key expansion,
-66-byte secret-vector nonce reads and encoded-public-key hash reads agree. -/
+secret-vector nonce reads at the generated secret seed, and encoded-public-key hash reads agree. -/
 theorem Xofs.keyGen_congr_of_reads {H G : Xofs} (s : Level) (seed : FixedBytes 32)
     (matrixStream : G.h128 = H.h128) (seedRead : G.expandKeySeed s seed = H.expandKeySeed s seed)
-    (nonceRead : ∀ x : List Byte, x.length = 66 → G.h256.readBytes x 481 = H.h256.readBytes x 481)
+    (nonceRead : ∀ i : ℕ,
+      let x := nonceInput (((H.expandKeySeed s seed).drop 32).take 64) i
+      G.h256.readBytes x 481 = H.h256.readBytes x 481)
     (publicRead : ∀ x : List Byte, x.length = 32 + 320 * s.params.k →
       G.h256.readBytes x 64 = H.h256.readBytes x 64) : G.keyGen s seed = H.keyGen s seed := by
   let ex := H.expandKeySeed s seed
@@ -532,7 +534,7 @@ theorem Xofs.keyGen_congr_of_reads {H G : Xofs} (s : Level) (seed : FixedBytes 3
   have short (i : ℕ) : G.secretPoly s ((ex.drop 32).take 64) i =
       H.secretPoly s ((ex.drop 32).take 64) i := by
     unfold Xofs.secretPoly
-    rw [nonceRead _ (by simp [nonceInput, len])]
+    rw [nonceRead i]
   have pk (v : Fin s.params.k → Poly) :
       G.h256.readBytes (encodePublic s (ex.take 32) v) 64 =
         H.h256.readBytes (encodePublic s (ex.take 32) v) 64 := by

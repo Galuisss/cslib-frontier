@@ -82,7 +82,34 @@ private theorem attempt_congr_of_read {H G : Xofs} {bits : ℕ} {s : Level} {sk 
   have challenge w : H.sampleInBall s (G.commitmentDigest s w μ) =
       G.sampleInBall s (G.commitmentDigest s w μ) :=
     challenge_unchanged raw s (by rwa [length_commitmentDigest])
-  simp only [Xofs.attempt, mask, digest, challenge]
+  simp only [Xofs.attempt, Xofs.attemptWithMask, mask, digest, challenge]
+
+private theorem verify_eq_of_reads {G H : Xofs} {bits : ℕ} (s : Level) (pk : List Byte)
+    (hA : G.h128 = H.h128) (raw : Unchanged G H bits) (hb : 512 < bits)
+    (hw : ∀ w {μ : List Bool}, μ.length = 512 → (commitmentInput s w μ).length ≠ bits)
+    (good : ∀ m, G.messageRepresentative pk m = H.messageRepresentative pk m) (f : Forgery) :
+    G.verify s pk f.message f.context f.signature =
+      H.verify s pk f.message f.context f.signature := by
+  by_cases hc : f.context.length ≤ 255
+  · simp only [Xofs.verify, Xofs.verifyWithExpansion, guard, hc, ↓reduceIte, Option.pure_def,
+      Option.bind_eq_bind, Option.bind_some, Xofs.verifyInternalWith]
+    by_cases hk : pk.length = 32 + 320 * s.params.k
+    · simp only [hk, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte]
+      cases hd : sigDecode s f.signature with
+      | none => rfl
+      | some σ =>
+        have dig : σ.digest.length ≤ digestBytes s := by rw [← digest_of_sigDecode hd]; simp
+        have short : 8 * σ.digest.length ≠ bits := by
+          have : digestBytes s ≤ 64 := by cases s <;> decide
+          lia
+        have hash w {μ : List Bool} (len : μ.length = 512) :
+            G.commitmentDigest s w μ = H.commitmentDigest s w μ :=
+          raw _ (hw w len) _
+        simp only [Xofs.expandA_congr hA,
+          challenge_unchanged raw s short, good, Xofs.check,
+          hash _ (length_messageRepresentative ..)]
+    · simp [hk]
+  · simp [Xofs.verify, Xofs.verifyWithExpansion, guard, hc]
 
 section Coupled
 
@@ -123,33 +150,6 @@ private theorem sign_eq_row {keys : KeyPair} (hg : p.background.keyGen s seed = 
         (fun w => commitmentInput_length_ne_maskSeed s w len) (by cases s <;> decide))
   · simp [Xofs.sign, Xofs.signWithRow, guard, ctx]
 
-private theorem verify_eq_background {keys : KeyPair}
-    (good : ∀ m, p.shared.messageRepresentative keys.publicKey m =
-      p.background.messageRepresentative keys.publicKey m) (f : Forgery) :
-    p.shared.verify s keys.publicKey f.message f.context f.signature =
-      p.background.verify s keys.publicKey f.message f.context f.signature := by
-  have raw := read_ne_maskSeed_length hp
-  let pk := keys.publicKey
-  by_cases hc : f.context.length ≤ 255
-  · simp only [Xofs.verify, Xofs.verifyWithExpansion, guard, hc, ↓reduceIte, Option.pure_def,
-      Option.bind_eq_bind, Option.bind_some, Xofs.verifyInternalWith]
-    by_cases hk : keys.publicKey.length = 32 + 320 * s.params.k
-    · simp only [hk, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte]
-      cases hd : sigDecode s f.signature with
-      | none => rfl
-      | some σ =>
-        have dig : σ.digest.length ≤ digestBytes s := by rw [← digest_of_sigDecode hd]; simp
-        have short : 8 * σ.digest.length ≠ 1024 := by
-          have : digestBytes s ≤ 64 := by cases s <;> decide
-          lia
-        have hash w {μ : List Bool} (len : μ.length = 512) :
-            p.shared.commitmentDigest s w μ = p.background.commitmentDigest s w μ :=
-          raw _ (commitmentInput_length_ne_maskSeed s w len) _
-        simp only [Xofs.expandA_congr (agree_off_sampleSigningMaskSeeds hp).1,
-          challenge_unchanged raw s short, good, Xofs.check,
-          hash _ (length_messageRepresentative ..)]
-    · simp [hk]
-  · simp [Xofs.verify, Xofs.verifyWithExpansion, guard, hc]
 
 end Coupled
 
@@ -316,7 +316,8 @@ private theorem score_eq_rows (C : QuantumSigningForger) {base : Xofs} {s : Leve
       funext ⟨f, log⟩
       exact congrArg (fun v : Option Bool => (v.getD false && !log.contains f) &&
         !log.any (fun g => g.signature.take (digestBytes s) == f.signature.take (digestBytes s)))
-        (verify_eq_background hp rep f)
+        (verify_eq_of_reads s keys.publicKey (agree_off_sampleSigningMaskSeeds hp).1
+          (read_ne_maskSeed_length hp) (by decide) (commitmentInput_length_ne_maskSeed s) rep f)
 
 private theorem avg_score_rows (C : QuantumSigningForger) (H : Xofs) (s : Level)
     (keys : Option KeyPair) {n : ℕ} (hn : C.SigningCallsLe n) :

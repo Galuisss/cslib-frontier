@@ -46,16 +46,19 @@ def Xofs.expandMask (H : Xofs) (s : Level) (seed : List Byte) (κ : ℕ) :
 /-- FIPS 202 specialization of `Xofs.expandMask`. -/
 abbrev expandMask := Xofs.expandMask Xofs.shake
 
-private def Xofs.attempt (H : Xofs) (s : Level) (sk : PrivateKey s)
+private def Xofs.attemptWithMask (H : Xofs) (s : Level) (sk : PrivateKey s)
     (matrix : Matrix (Fin s.params.k) (Fin s.params.ℓ) Poly)
-    (μ : List Bool) (maskSeed : List Byte) (κ : ℕ) : Option (Option (List Byte)) := do
-  let y := ringVectorCoeffs (H.expandMask s maskSeed κ)
+    (μ : List Bool) (y : Fin s.params.ℓ → Poly) : Option (Option (List Byte)) := do
   let w := ringVectorCoeffs (tabulateRingVector (moduleSISMap matrix y))
   let digest := H.commitmentDigest s (highBitsVec s.params w) μ
   let c ← H.sampleInBall s digest
   let challenge := Vector.ofFn c
   let response := compressedResponse s.params (hintLimit s) sk.s₁ sk.s₂ sk.t₀ y w challenge.get
   return response.map (fun σ => encodeSignature s ⟨digest, σ.z, σ.h⟩)
+
+private def Xofs.attempt (H : Xofs) (s : Level) (sk : PrivateKey s) (matrix : PublicMatrix s)
+    (μ : List Bool) (maskSeed : List Byte) (κ : ℕ) : Option (Option (List Byte)) :=
+  H.attemptWithMask s sk matrix μ (ringVectorCoeffs (H.expandMask s maskSeed κ))
 
 private def firstAccepted (stride : ℕ) (tryAt : ℕ → Option (Option (List Byte))) :
     ℕ → ℕ → Option (List Byte)
@@ -141,14 +144,14 @@ private theorem verified_of_attempt {H : Xofs} {s : Level} (sk : MLDSA.SecretKey
     funext (Vector.get_ofFn g)
   cases hc : H.sampleInBall s digest with
   | none =>
-    simp only [Xofs.attempt, tabulateRingVector_eq] at hs
+    simp only [Xofs.attempt, Xofs.attemptWithMask, tabulateRingVector_eq] at hs
     change (H.sampleInBall s digest).bind _ = _ at hs
     simp [hc] at hs
   | some c =>
     let resp := compressedResponse s.params (hintLimit s) sk.s₁ sk.s₂
       (publicKeyLowPart s.params 13 sk.publicKey) y w c
     have out : resp.map (fun σ => encodeSignature s ⟨digest, σ.z, σ.h⟩) = some f.signature := by
-      simp only [Xofs.attempt, tabulateRingVector_eq, vecGet] at hs
+      simp only [Xofs.attempt, Xofs.attemptWithMask, tabulateRingVector_eq, vecGet] at hs
       change ((H.sampleInBall s digest).bind _) = _ at hs
       simpa [hc, resp, y, w] using hs
     cases he : resp with
