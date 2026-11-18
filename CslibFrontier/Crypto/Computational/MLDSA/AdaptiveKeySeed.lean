@@ -97,14 +97,8 @@ private theorem mean_keySeed_hit {C : QuantumSigningForger} {α V : Type} [Zero 
   have bound : (seeds.bind fun seed =>
       hit prog (H.withKeySeedExpansion s seed out) H sign d log tape j) true ≤
       (2 ^ 256 : ℝ≥0∞)⁻¹ := by
-    simp only [hit, scored]
-    rw [PMF.bind_comm]
-    apply PMF.bind_apply_le_on_support
-    rintro ⟨found, ⟨dev, hist⟩, rest⟩ _
-    simp only [detector, ← addressTest_law C _ found (dev, hist), ← PMF.bind_pure_comp,
-      Function.comp_def]
-    rw [PMF.bind_comm]
-    exact PMF.bind_apply_le_on_support _ fun a _ => changed_keySeed_le C s H out a
+    exact hit_mean_le seeds (fun seed => H.withKeySeedExpansion s seed out) H prog
+      sign d log tape j (fun a => changed_keySeed_le C s H out a)
   simpa only [PMF.bind_apply_toReal, ENNReal.toReal_inv, ENNReal.toReal_pow, ENNReal.toReal_ofNat,
     one_div, seeds] using ENNReal.toReal_mono (by simp) bound
 
@@ -321,11 +315,8 @@ theorem randomPrefixGame_forgery_le_of_query_budget (C : QuantumSigningForger) (
   let priv := C.privateMaskSeedGame s base a b
   let view (shared : Bool) := C.maskSeedGame s base ha ((by decide : 64 ≤ 894).trans hb)
     hn hsize shared SignedMatrixTrial.newDigestWin
-  have birthday : dist fresh (view true) ≤ ((n * (n - 1) : ℕ) : ℝ) / 2 ^ 257 := by
-    dsimp only [view]
-    rw [C.shared_maskSeedGame_eq_distinctHedgeGame]
-    exact C.dist_matrixTrial_distinctHedges s base ((by decide : 272 ≤ 1024).trans ha) hb
-      hn hsize _
+  have birthday : dist fresh (view true) ≤ ((n * (n - 1) : ℕ) : ℝ) / 2 ^ 257 :=
+    C.dist_matrixTrial_sharedMaskSeedGame s base ha hb hn hsize _
   have ref : dist (view false) priv ≤ n / 2 ^ 256 :=
     C.dist_maskSeedGame_privateMaskSeedGame s base ha _ hn hsize
   rw [← coe_nndist, ← Game.advantage_eq_nndist] at birthday ref

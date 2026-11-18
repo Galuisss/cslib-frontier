@@ -4987,6 +4987,7 @@ import CslibFrontier.Crypto.Computational.MLDSA.KeyOnly
 import CslibFrontier.Crypto.Computational.MLDSA.KeySeedSearch
 import CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 import CslibFrontier.Crypto.Computational.MLDSA.MatrixOracle
+import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskExpansion
 import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskSeedGame
 import CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitmentRegister
 import CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
