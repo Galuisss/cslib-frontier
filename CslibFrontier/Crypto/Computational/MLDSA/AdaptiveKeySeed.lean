@@ -321,11 +321,8 @@ theorem randomPrefixGame_forgery_le_of_query_budget (C : QuantumSigningForger) (
   let priv := C.privateMaskSeedGame s base a b
   let view (shared : Bool) := C.maskSeedGame s base ha ((by decide : 64 ≤ 894).trans hb)
     hn hsize shared SignedMatrixTrial.newDigestWin
-  have birthday : dist fresh (view true) ≤ ((n * (n - 1) : ℕ) : ℝ) / 2 ^ 257 := by
-    dsimp only [view]
-    rw [C.shared_maskSeedGame_eq_distinctHedgeGame]
-    exact C.dist_matrixTrial_distinctHedges s base ((by decide : 272 ≤ 1024).trans ha) hb
-      hn hsize _
+  have birthday : dist fresh (view true) ≤ ((n * (n - 1) : ℕ) : ℝ) / 2 ^ 257 :=
+    C.dist_matrixTrial_sharedMaskSeedGame s base ha hb hn hsize _
   have ref : dist (view false) priv ≤ n / 2 ^ 256 :=
     C.dist_maskSeedGame_privateMaskSeedGame s base ha _ hn hsize
   rw [← coe_nndist, ← Game.advantage_eq_nndist] at birthday ref
