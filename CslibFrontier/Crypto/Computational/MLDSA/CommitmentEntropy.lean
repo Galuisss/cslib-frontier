@@ -10,12 +10,14 @@ module
 public import CslibFrontier.Crypto.Computational.MLDSA.SigningROM
 public import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
+import Mathlib.GroupTheory.Index
 
 /-!
 # Counting preimages of an ML-DSA signing commitment
 
 The preimage count of Barbosa et al. [BarbosaEtAl2023, full version, Appendix A.1], used
-in [FallahpourFehrHuang2025, §4.1, equation (6)], bounds the largest atom of the rounded commitment by counting preimages on the first ℓ rows.
+in [FallahpourFehrHuang2025, §4.1, equation (6)], bounds the largest atom of the rounded commitment
+by counting preimages on the first ℓ rows.
 For the asymmetric FIPS 204 mask interval there are exactly `(2γ₁)^(nℓ)` possible masks.
 At a prescribed high part, each coefficient has at most `2γ₂ + 1` possible low parts.
 Each reconstructed vector has at most as many preimages as the kernel of the square submatrix.
@@ -73,11 +75,11 @@ theorem commitmentGuessProbability_le_kernel [NeZero P.q]
   have fibers (v : Mask P) : (same.filter fun y => f y = v).card ≤ kernel.card := by
     by_cases h : (same.filter fun y => f y = v).Nonempty
     · obtain ⟨z, hz⟩ := h
-      apply card_le_card_of_injOn (fun y => y - z)
-      · intro y hy
-        exact mem_filter.mpr ⟨mem_univ _, by rw [map_sub, (mem_filter.mp hy).2,
-          (mem_filter.mp hz).2, sub_self]⟩
-      · exact (sub_left_injective).injOn
+      calc
+        _ ≤ (univ.filter fun y : Mask P => f y = v).card :=
+          card_le_card (filter_subset_filter _ (subset_univ _))
+        _ = kernel.card := AddMonoidHom.card_fiber_eq_of_mem_range f
+          ⟨z, (mem_filter.mp hz).2⟩ ⟨0, map_zero f⟩
     · simp [not_nonempty_iff_eq_empty.mp h]
   have hbox : lowBox.card = (2 * P.γ₂ + 1) ^ (P.ℓ * P.n) := by
     have hi : ((P.γ₂ : ℤ) + 1 - -(P.γ₂ : ℤ)).toNat = 2 * P.γ₂ + 1 := by lia
