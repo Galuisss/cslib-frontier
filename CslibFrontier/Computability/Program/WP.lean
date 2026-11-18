@@ -36,7 +36,10 @@ A specification `∃ y, ExecWithin I c x y T ∧ P y` is `WP I c x fun y n => n 
 
 ## References
 
-This generalizes `Cslib.WordRAM.WP` to any instruction set.
+This generalizes `Cslib.WordRAM.WP.Exact` to any instruction set: the count `n` is the exact
+instruction count of an execution, where `Cslib.WordRAM.WP` holds of any bound on it. A
+postcondition that bounds the count from above, as in `WP.exists_execWithin`, reads the same in
+both.
 -/
 
 public section
@@ -75,11 +78,14 @@ theorem skip (h : Q x 0) : WP I .skip x Q := ⟨x, 0, .skip, h⟩
 theorem op {o : I.Op} (ho : I.eval o x = some y) (h : Q y 1) : WP I (.op o) x Q :=
   ⟨y, 1, .op ho, h⟩
 
-/-- Sequencing: run `c₁`, then run `c₂` from the data it reaches. -/
-theorem seq (h : WP I c₁ x fun y m => WP I c₂ y fun z n => Q z (m + n)) :
+/-- Sequencing: run `c₁`, then run `c₂` from the data it reaches. The count of `c₁` is added
+last, as in `Cslib.WordRAM.WP.seq`, so that the counts of a sequence accumulate as `(n + 1) + 1`
+with the numerals on the right and not as `1 + (1 + n)`: deciding whether such a sum is a given
+variable takes time exponential in its length. -/
+theorem seq (h : WP I c₁ x fun y m => WP I c₂ y fun z n => Q z (n + m)) :
     WP I (.seq c₁ c₂) x Q :=
   let ⟨_, m, he₁, _, n, he₂, hq⟩ := h
-  ⟨_, m + n, .seq he₁ he₂, hq⟩
+  ⟨_, m + n, .seq he₁ he₂, Nat.add_comm m n ▸ hq⟩
 
 /-- A conditional whose test holds. -/
 theorem branch_pos (ht : I.Holds t x) (h : WP I pos x fun y n => Q y (n + 1)) :
@@ -111,23 +117,25 @@ theorem call {R : I.Data → Prop} (spec : ∃ y, ExecWithin I c x y T ∧ R y)
 theorem loopUntil_exit (ht : I.Holds t x) (h : Q x 1) : WP I (.loopUntil t body) x Q :=
   ⟨x, 1, .loopUntil_exit ht, h⟩
 
-/-- One iteration of a loop that runs until its test holds, then the loop again. -/
+/-- One iteration of a loop that runs until its test holds, then the loop again. The count of
+the body is added last, as in `WP.seq`. -/
 theorem loopUntil_iter (ht : ¬I.Holds t x)
-    (h : WP I body x fun y m => WP I (.loopUntil t body) y fun z n => Q z (m + n + 2)) :
+    (h : WP I body x fun y m => WP I (.loopUntil t body) y fun z n => Q z (n + m + 2)) :
     WP I (.loopUntil t body) x Q :=
   let ⟨_, m, he₁, _, n, he₂, hq⟩ := h
-  ⟨_, m + n + 2, .loopUntil_iter ht he₁ he₂, hq⟩
+  ⟨_, m + n + 2, .loopUntil_iter ht he₁ he₂, Nat.add_comm m n ▸ hq⟩
 
 /-- Leaving a loop that runs while its test holds. -/
 theorem loop_exit (ht : ¬I.Holds t x) (h : Q x 2) : WP I (.loop t body) x Q :=
   ⟨x, 2, .loop_exit ht, h⟩
 
-/-- One iteration of a loop that runs while its test holds, then the loop again. -/
+/-- One iteration of a loop that runs while its test holds, then the loop again. The count of
+the body is added last, as in `WP.seq`. -/
 theorem loop_iter (ht : I.Holds t x)
-    (h : WP I body x fun y m => WP I (.loop t body) y fun z n => Q z (m + n + 2)) :
+    (h : WP I body x fun y m => WP I (.loop t body) y fun z n => Q z (n + m + 2)) :
     WP I (.loop t body) x Q :=
   let ⟨_, m, he₁, _, n, he₂, hq⟩ := h
-  ⟨_, m + n + 2, .loop_iter ht he₁ he₂, hq⟩
+  ⟨_, m + n + 2, .loop_iter ht he₁ he₂, Nat.add_comm m n ▸ hq⟩
 
 /-- **Until rule.** A loop that runs until its test holds, by an invariant `P` and a measure `μ`
 that every iteration of at most `T` instructions decreases. -/
