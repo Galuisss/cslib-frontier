@@ -29,6 +29,7 @@ cslib-community/cslib-frontier#6149.
 ## Main definitions
 
 * `Cslib.PCP.SeededGame.bitAgreement`: a seeded game comparing decoded bits.
+* `Cslib.PCP.PauliConsistencyQuestion`: the two strings and measurement basis.
 * `Cslib.PCP.pauliSpecialQuestionTest`: the matched-basis special-question rounds on odd pairs.
 
 ## Main results
@@ -123,6 +124,20 @@ theorem sum_norm_sub_sq_le_of_bitAgreement (seed : PMF R) (query : R → X × Y)
 end SeededGame
 
 
+/-- A question for the fixed-role special-question consistency test. -/
+structure PauliConsistencyQuestion (ι : Type*) where
+  /-- The bit string for the first coordinate, checked in the X basis. -/
+  xString : ι → Bool
+  /-- The bit string for the second coordinate, checked in the Z basis. -/
+  zString : ι → Bool
+  /-- The basis of the check: `false` for X and `true` for Z. -/
+  basis : Bool
+
+/-- The bit of the pair answer checked in the question's basis. -/
+@[expose] def PauliConsistencyQuestion.checkedBit {ι : Type*}
+    (q : PauliConsistencyQuestion ι) (bits : Bool × Bool) : Bool :=
+  if q.basis then bits.2 else bits.1
+
 section Pauli
 open BitString
 
@@ -133,12 +148,13 @@ Both questions carry the same pair and basis. The pair player returns two bits a
 special-question player returns one. The verifier checks the first bit for the X basis
 (`false`) and the second for the Z basis (`true`). -/
 @[expose] noncomputable def pauliSpecialQuestionTest (basis : Bool) :
-    SeededGame ↥(oddPairs ι) (((ι → Bool) × (ι → Bool)) × Bool)
-      (((ι → Bool) × (ι → Bool)) × Bool) (Bool × Bool) Bool :=
+    SeededGame ↥(oddPairs ι) (PauliConsistencyQuestion ι) (PauliConsistencyQuestion ι)
+      (Bool × Bool) Bool :=
   letI := oddPairs_nonempty (ι := ι)
+  let question (p : ↥(oddPairs ι)) : PauliConsistencyQuestion ι :=
+    ⟨p.val.fst, p.val.snd, basis⟩
   SeededGame.bitAgreement (Probability.PMF.uniformOfFintype _)
-    (fun p => ((p.val, basis), (p.val, basis)))
-    (fun _ bits => if basis then bits.2 else bits.1) (fun _ => id)
+    (fun p => (question p, question p)) (fun p => (question p).checkedBit) (fun _ => id)
 
 variable {ι} [StarModule ℂ 𝒜] [SelfAdjointDecompose 𝒜] [TopologicalSpace 𝒜]
   [ContinuousFunctionalCalculus ℝ 𝒜 IsSelfAdjoint] [NonnegSpectrumClass ℝ 𝒜]
@@ -150,23 +166,24 @@ the rejection probability. This is a step toward the special-question estimates 
 sampled pair; the source's observables also average over the other question coordinate. -/
 theorem expect_norm_sub_sq_le_of_pauliSpecialQuestionTest
     (basis : Bool)
-    (S : CommutingStrategy (((ι → Bool) × (ι → Bool)) × Bool)
-      (((ι → Bool) × (ι → Bool)) × Bool) (Bool × Bool) Bool 𝒜) :
-    (𝔼 p : ↥(oddPairs ι), S.state.norm
-      (((S.alice (p.val, basis)).map (fun bits => if basis then bits.2 else bits.1)).observable -
-        (S.bob (p.val, basis)).observable) ^ 2) ≤
+    (S : CommutingStrategy (PauliConsistencyQuestion ι) (PauliConsistencyQuestion ι)
+      (Bool × Bool) Bool 𝒜) :
+    (𝔼 p : ↥(oddPairs ι),
+      let q : PauliConsistencyQuestion ι := ⟨p.val.fst, p.val.snd, basis⟩
+      S.state.norm (((S.alice q).map q.checkedBit).observable - (S.bob q).observable) ^ 2) ≤
       4 * (1 - (pauliSpecialQuestionTest ι basis).commutingWinProb S) := by
   let := oddPairs_nonempty (ι := ι)
+  let question (p : ↥(oddPairs ι)) : PauliConsistencyQuestion ι :=
+    ⟨p.val.fst, p.val.snd, basis⟩
   have h := SeededGame.sum_norm_sub_sq_le_of_bitAgreement
     (Probability.PMF.uniformOfFintype ↥(oddPairs ι))
-    (fun p => ((p.val, basis), (p.val, basis)))
-    (fun _ (bits : Bool × Bool) => if basis then bits.2 else bits.1) (fun _ => id) S
+    (fun p => (question p, question p)) (fun p => (question p).checkedBit) (fun _ => id) S
   have hid (M : Measurement Bool 𝒜) : M.map id = M := by
     ext b
     simp only [Measurement.map_effect, sum_filter, id_eq, sum_ite_eq', mem_univ, ite_true]
-  simpa only [pauliSpecialQuestionTest, hid, Probability.PMF.uniformOfFintype_apply,
+  simpa only [pauliSpecialQuestionTest, question, hid, Probability.PMF.uniformOfFintype_apply,
     ENNReal.toReal_inv, ENNReal.toReal_natCast, ← mul_sum, expect_eq_sum_div_card,
-    card_univ, div_eq_mul_inv, mul_comm, Prod.fst, Prod.snd] using h
+    card_univ, div_eq_inv_mul, Prod.fst, Prod.snd] using h
 
 end Pauli
 
