@@ -34,7 +34,7 @@ public section
 namespace Cslib.Crypto.MLDSA.FIPS204.QuantumSigningForger
 
 open Cslib.Quantum Cslib.Probability
-open scoped ENNReal ComplexOrder
+open scoped ENNReal
 
 private abbrev Test (C : QuantumSigningForger) := POVM Bool ((Fin (Width C) → Bool) × Unit)
 
@@ -196,18 +196,19 @@ private theorem basisScore_law {C : QuantumSigningForger}
   simp only [basisScore, POVM.measureDensity_afterRead, POVM.measureDensity_const,
     PMF.bindOnSupport_pure]
 
-private theorem addressTest (C : QuantumSigningForger) (accept : Option (Address C) → Bool)
-    (found : Bool) : ∃ M : Test C, ∀ st : State C,
-      (addressRead C (found, st)).map accept =
-        M.measureDensity st.1.density st.1.isDensityMatrix := by
-  cases found with
-  | false => exact ⟨POVM.const (accept none), fun st => by simp [addressRead]⟩
-  | true =>
+private noncomputable def addressTest (C : QuantumSigningForger)
+    (accept : Option (Address C) → Bool) (found : Bool) : Test C :=
+  if found then
     let A := Fin.castLEEmb (Nat.le_add_right (C.addressBits + 2 + 8 * C.responseBytes) C.workQubits)
-    let f := fun (z : (Fin (Width C) → Bool) × Unit) =>
-      accept (some ((queryRegisters (a := C.addressBits + 2) (b := 8 * C.responseBytes) A z.1).1))
-    exact ⟨basisScore f, fun st => by
-      simp [addressRead, basisScore_law, PMF.map_comp, Function.comp_def, f, A]⟩
+    basisScore fun z => accept (some
+      ((queryRegisters (a := C.addressBits + 2) (b := 8 * C.responseBytes) A z.1).1))
+  else POVM.const (accept none)
+
+private theorem addressTest_law (C : QuantumSigningForger) (accept : Option (Address C) → Bool)
+    (found : Bool) (st : State C) :
+    (addressRead C (found, st)).map accept =
+      (addressTest C accept found).measureDensity st.1.density st.1.isDensityMatrix := by
+  cases found <;> simp [addressTest, addressRead, basisScore_law, PMF.map_comp, Function.comp_def]
 
 private noncomputable def gap (p q : PMF Bool) : ℝ :=
   (√((p true).toReal) - √((q true).toReal)) ^ 2
@@ -218,18 +219,7 @@ private noncomputable def changed (C : QuantumSigningForger) (G H : Xofs) (addr 
 
 private noncomputable def detector (C : QuantumSigningForger) (G H : Xofs)
     (found : Bool) : Test C :=
-  if found then
-    let A := Fin.castLEEmb (Nat.le_add_right (C.addressBits + 2 + 8 * C.responseBytes) C.workQubits)
-    basisScore fun z => changed C G H
-      ((queryRegisters (a := C.addressBits + 2) (b := 8 * C.responseBytes) A z.1).1)
-  else POVM.const false
-
-private theorem detector_address (C : QuantumSigningForger) (G H : Xofs)
-    (found : Bool) (dev : Device C) (log : List Forgery) :
-    ((addressRead C (found, dev, log)).map (fun a => a.any (changed C G H))) =
-      (detector C G H found).measureDensity dev.density dev.isDensityMatrix := by
-  cases found <;> simp [detector, addressRead, basisScore_law, POVM.measureDensity_const,
-    PMF.map_comp, Function.comp_def]
+  addressTest C (fun a => a.any (changed C G H)) found
 
 private noncomputable def hit {C : QuantumSigningForger} {α V : Type} [Zero V] (prog : Program C α)
     (G H : Xofs) (sign : V → SigningQuery → Option (List Byte)) (d : Device C)
@@ -284,27 +274,15 @@ private theorem single_gap (C : QuantumSigningForger) (G H : Xofs) (d : Device C
   classical
   intro next
   let A := Fin.castLEEmb (Nat.le_add_right (C.addressBits + 2 + 8 * C.responseBytes) C.workQubits)
-  let U := fun (T : Xofs) => (onFirst (κ := Unit)
-    (xorQuery (T.queryTable C.addressBits C.responseBytes) A).matrix).val
   have born (T : Xofs) :
       ((M.measureDensity (next T).density (next T).isDensityMatrix) true).toReal =
-      M.densityProb (densityConj (U T) d.density) true := by
+        M.densityProb (next T).density true := by
     rw [POVM.measureDensity_apply, ENNReal.toReal_ofReal
       (M.densityProb_nonneg (next T).isDensityMatrix.posSemidef true)]
-    simp only [next,
-      DeviceState.instruction_apply, OracleGateCode.toPlacedGate?, Nat.le_add_right, ↓reduceDIte,
-      DeviceState.evolve_density, U, coe_onFirst, A]
-  let D := U G - U H
-  have lhs := M.abs_sqrt_densityProb_sub_le true d.isDensityMatrix.posSemidef (U G) (U H)
-  have pos := (d.isDensityMatrix.posSemidef.mul_mul_conjTranspose_same D).trace_nonneg
-  have bound := xorQueryDisturbance_le (G.queryTable C.addressBits C.responseBytes)
-    (H.queryTable C.addressBits C.responseBytes) A d.isDensityMatrix
-  simp only [gap, born, detector, ↓reduceIte, basisScore_law]
-  apply le_trans _ bound
-  change _ ≤ (densityConj D d.density).trace.re
-  rw [← sq_abs, ← Real.sq_sqrt (show 0 ≤ (densityConj D d.density).trace.re by
-    simpa only [densityConj_apply] using (Complex.nonneg_iff.mp pos).1)]
-  exact pow_le_pow_left₀ (abs_nonneg _) lhs 2
+  simp only [gap, born, detector, addressTest, ↓reduceIte, Option.any_some, basisScore_law]
+  exact (d.sq_sqrt_query_readout_sub_le M true (G.queryTable C.addressBits C.responseBytes)
+    (H.queryTable C.addressBits C.responseBytes)).trans
+    (xorQueryDisturbance_le _ _ A d.isDensityMatrix)
 
 private theorem hit_skip {C : QuantumSigningForger} {α V : Type} [Zero V]
     (q : Request C) (k : _ → Program C α) (hq : isXofQuery q = false)
@@ -426,7 +404,9 @@ private theorem setup_gap_le (C : QuantumSigningForger) (s : Level) (seed : Fixe
               dev.isDensityMatrix := by
         have eq (a : Option (Address C)) : differs C pair a =
             a.any (changed C pair.shared pair.background) := by cases a <;> rfl
-        simpa only [funext eq] using detector_address C pair.shared pair.background found dev log
+        simpa only [funext eq, detector] using
+          addressTest_law C (fun a => a.any (changed C pair.shared pair.background))
+            found (dev, log)
       simp only [law, PMF.map_bind, PMF.bind_map, Function.comp_def, measure]
       exact scored_gap_le (hm keys.publicKey) pair.shared pair.background sign test
         C.initial.1 C.initial.2 (List.ofFn t)
