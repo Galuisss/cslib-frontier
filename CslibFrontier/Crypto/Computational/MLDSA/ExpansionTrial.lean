@@ -227,6 +227,91 @@ private theorem prefixRun_step (C : QuantumSigningForger) (s : Level) (G keys)
     PMF.monad_bind_eq_bind, PMF.bind_bind]
   rfl
 
+-- Past native replies depend only on the rows they have consumed. At a signing boundary all
+-- those rows have been spent. Early termination leaves the unused rows before the suffix.
+private theorem prefixRun_split (C : QuantumSigningForger) (s : Level) (G : Xofs) (keys : KeyPair)
+    (prog : C.Program Forgery) (d : C.Device) (log : List Forgery) (pre suffix : List (Row s))
+    (resume : Resume C s) :
+    C.prefixRun s G keys prog pre.length d log (pre ++ suffix) resume =
+      C.prefixRun s G keys prog pre.length d log pre (fun x st l t =>
+        resume x st l (match x with | .finished _ => t ++ suffix | .signing .. => suffix)) := by
+  induction prog generalizing d log pre with
+  | pure f =>
+    simp only [prefixRun, prefixInteraction, cut, PFunctor.FreeM.pure_eq_pure,
+      OracleComp.run_interpret_pure, PMF.monad_pure_eq_pure, PMF.pure_bind]
+  | liftBind cmd k ih =>
+    have off (skip : isSigningCall cmd = false) (push : ∀ i, cut (C := C) (.liftBind cmd k) i =
+        .liftBind cmd (fun b => cut (C := C) (k b) i)) :
+        C.prefixRun s G keys (.liftBind cmd k) pre.length d log (pre ++ suffix) resume =
+          C.prefixRun s G keys (.liftBind cmd k) pre.length d log pre (fun x st l t =>
+            resume x st l (match x with | .finished _ => t ++ suffix | .signing .. => suffix)) := by
+      simp only [prefixRun_step _ _ _ _ _ _ _ (push _), OracleComp.withSampleListWhen, skip,
+        Bool.false_eq_true, ↓reduceIte, StateT.run, PMF.bind_map, Function.comp_def]
+      apply congrArg (PMF.bind _ ·)
+      funext ⟨r, st, l⟩
+      exact ih r st l pre
+    rcases cmd with coin | op | q
+    · exact off rfl (fun _ => rfl)
+    · exact off rfl (fun _ => rfl)
+    · cases pre with
+      | nil =>
+        simp only [List.length_nil, List.nil_append, prefixRun, prefixInteraction, cut,
+          PFunctor.FreeM.pure_eq_pure, OracleComp.run_interpret_pure, PMF.monad_pure_eq_pure,
+          PMF.pure_bind]
+      | cons r pre =>
+        have push : cut (C := C) (.liftBind (.inr (.inr q)) k) (pre.length + 1) =
+            .liftBind (.inr (.inr q)) (fun b => cut (C := C) (k b) pre.length) := rfl
+        simp only [List.length_cons, List.cons_append, prefixRun_step _ _ _ _ _ _ _ push,
+          OracleComp.withSampleListWhen, isSigningCall, Sum.elim_inr, ↓reduceIte,
+          OracleComp.withSampleList, List.headD_cons, List.tail_cons, signingCommand,
+          OracleComp.sumHandler, StateT.run, pmf_norm]
+        exact ih _ _ _ pre
+
+private theorem cut_resume (C : QuantumSigningForger) (prog : C.Program Forgery) (i : ℕ) :
+    (cut prog i >>= resumeProgram) = prog := by
+  induction prog generalizing i with
+  | pure f => rfl
+  | liftBind cmd k ih =>
+    rcases cmd with coin | op | q
+    · change PFunctor.FreeM.liftBind _ _ = PFunctor.FreeM.liftBind _ _
+      congr 1
+      funext r
+      exact ih r i
+    · change PFunctor.FreeM.liftBind _ _ = PFunctor.FreeM.liftBind _ _
+      congr 1
+      funext r
+      exact ih r i
+    · cases i with
+      | zero => rfl
+      | succ i =>
+        change PFunctor.FreeM.liftBind _ _ = PFunctor.FreeM.liftBind _ _
+        congr 1
+        funext r
+        exact ih r i
+
+private theorem prefixRun_mix {V : Type} (C : QuantumSigningForger) (s : Level)
+    (G : Xofs) (keys : KeyPair) (μ : PMF V) (resume : V → Resume C s) (ref : Resume C s)
+    (finish : ∀ y f d l t, resume y (.finished f) d l t = ref (.finished f) d l t)
+    (sign : ∀ q k d l t, ((PMF.uniformOfFintype (Row s)).bind fun r =>
+        μ.bind fun y => resume y (.signing q k) d l (r :: t)) =
+      (PMF.uniformOfFintype (Row s)).bind fun r => ref (.signing q k) d l (r :: t))
+    (prog : C.Program Forgery) (dev : C.Device) (log : List Forgery) (pre rows : List (Row s)) :
+    let U := PMF.uniformOfFintype (Row s)
+    (U.bind fun r => μ.bind fun y =>
+      C.prefixRun s G keys prog pre.length dev log (pre ++ r :: rows) (resume y)) =
+    U.bind fun r => C.prefixRun s G keys prog pre.length dev log (pre ++ r :: rows) ref := by
+  intro U
+  let prior := C.prefixInteraction s G keys prog pre.length dev log pre
+  simp only [prefixRun_split]
+  unfold prefixRun
+  change (U.bind fun r => μ.bind fun y => prior.bind _) = U.bind fun r => prior.bind _
+  simp_rw [PMF.bind_comm μ prior, PMF.bind_comm U prior]
+  apply congrArg (PMF.bind prior ·)
+  funext ⟨x, ⟨d, l⟩, t⟩
+  cases x with
+  | finished f => simp only [finish, PMF.bind_const]
+  | signing q k => exact sign q k d l rows
+
 private theorem prefixRun_eq {V : Type} (C : QuantumSigningForger) (s : Level) (G : Xofs)
     (keys : KeyPair) (A : PublicMatrix s) (μ : PMF V) (resume : V → Resume C s)
     (finish : ∀ y f d l t, resume y (.finished f) d l t =
@@ -242,57 +327,24 @@ private theorem prefixRun_eq {V : Type} (C : QuantumSigningForger) (s : Level) (
       C.prefixRun s G keys prog pre.length dev log (pre ++ r :: rows) (resume y)) =
     U.bind fun r => C.expansionContinuation s G A keys prog dev log (pre ++ r :: rows) := by
   intro U
-  induction prog generalizing pre dev log with
-  | pure f =>
-    simp only [prefixRun, prefixInteraction, cut, PFunctor.FreeM.pure_eq_pure,
-      OracleComp.run_interpret_pure, PMF.monad_pure_eq_pure, PMF.pure_bind, finish, PMF.bind_const]
-  | liftBind cmd k ih =>
-    have step (c : Request C) (next : _ → C.Program Forgery) (d : C.Device) (l t) :
-        C.expansionContinuation s G A keys (.liftBind c next) d l t =
-        ((OracleComp.withSampleListWhen isSigningCall (0 : Row s) (fun r => C.signingCommand G
-          (fun q => G.signWithExpansionRow s keys.secretKey q r)) c).run ((d, l), t)).bind
-          fun (b, (st, log'), t') => C.expansionContinuation s G A keys (next b) st log' t' :=
-      scored_step (q := c) (k := next) ..
-    let handler (r : Row s) := C.signingCommand G
-      (fun q => G.signWithExpansionRow s keys.secretKey q r)
-    have off (skip : isSigningCall cmd = false) (push : ∀ i, cut (C := C) (.liftBind cmd k) i =
-        .liftBind cmd (fun b => cut (C := C) (k b) i)) :
-        (U.bind fun r => μ.bind fun y =>
-          C.prefixRun s G keys (.liftBind cmd k) pre.length dev log (pre ++ r :: rows) (resume y)) =
-        U.bind fun r => C.expansionContinuation s G A keys (.liftBind cmd k)
-          dev log (pre ++ r :: rows) := by
-      simp only [prefixRun_step _ _ _ _ _ _ _ (push _), step, OracleComp.withSampleListWhen,
-        skip, Bool.false_eq_true, ↓reduceIte, StateT.run, PMF.bind_map, Function.comp_def]
-      let p := handler 0 cmd (dev, log)
-      conv_rhs => rw [PMF.bind_comm U p]
-      conv_lhs =>
-        arg 2; ext r
-        rw [PMF.bind_comm μ p]
-      rw [PMF.bind_comm U p]
-      exact congrArg (PMF.bind p ·) (funext fun z => ih z.1 z.2.1 z.2.2 pre)
-    rcases cmd with coin | op | q
-    · exact off rfl (fun _ => rfl)
-    · exact off rfl (fun _ => rfl)
-    · have ordinary (d : C.Device) (l : List Forgery) (r : Row s) (t : List (Row s)) :
-          let sig := G.signWithExpansionRow s keys.secretKey q r
-          C.expansionContinuation s G A keys (.liftBind (.inr (.inr q)) k) d l (r :: t) =
-            C.expansionContinuation s G A keys (k sig) d (q.logReply sig l) t :=
-        scored_sign (ask := q) (k := k) ..
-      cases pre with
-      | nil =>
-        simp only [List.length_nil, List.nil_append, prefixRun, prefixInteraction, cut,
-          PFunctor.FreeM.pure_eq_pure, OracleComp.run_interpret_pure, PMF.monad_pure_eq_pure,
-          PMF.pure_bind, ordinary]
-        exact sign q k dev log rows
-      | cons p pre =>
-        have push : cut (C := C) (.liftBind (.inr (.inr q)) k) (pre.length + 1) =
-            .liftBind (.inr (.inr q)) (fun b => cut (C := C) (k b) pre.length) := rfl
-        simp only [List.length_cons, List.cons_append, prefixRun_step _ _ _ _ _ _ _ push,
-          ordinary, OracleComp.withSampleListWhen, isSigningCall, Sum.elim_inr, ↓reduceIte,
-          OracleComp.withSampleList,
-          List.headD_cons, List.tail_cons, signingCommand, OracleComp.sumHandler, StateT.run,
-          pmf_norm]
-        exact ih _ _ _ pre
+  let full : Resume C s := fun x d l t =>
+    C.expansionContinuation s G A keys (resumeProgram x) d l t
+  have ordinary (q : SigningQuery) (k : Option (List Byte) → C.Program Forgery) (d : C.Device)
+      (l : List Forgery) (r : Row s) (t : List (Row s)) :
+      full (.signing q k) d l (r :: t) = C.expansionContinuation s G A keys
+        (k (G.signWithExpansionRow s keys.secretKey q r)) d
+        (q.logReply (G.signWithExpansionRow s keys.secretKey q r) l) t :=
+    scored_sign (ask := q) (k := k) ..
+  have ref (t : List (Row s)) : C.prefixRun s G keys prog pre.length dev log t full =
+      C.expansionContinuation s G A keys prog dev log t := by
+    conv_rhs => rw [← C.cut_resume prog pre.length]
+    simp only [full, prefixRun, prefixInteraction, expansionContinuation, scored,
+      OracleComp.run_interpret_bind, PMF.monad_bind_eq_bind, PMF.bind_bind]
+  simp_rw [← ref]
+  apply prefixRun_mix
+  · exact finish
+  · intro q k d l t
+    simpa only [ordinary] using sign q k d l t
 
 private noncomputable def readUntil (C : QuantumSigningForger) (s : Level) (G : Xofs)
     (A : PublicMatrix s) (keys : KeyPair) (sk : PrivateKey s) (prog : C.Program Forgery)
