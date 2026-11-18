@@ -106,14 +106,14 @@ namespace FIPS204
 
 /-- The integral exponent in the rounded-commitment preimage bound for each FIPS 204 level.
 A kernel of size `K` gives maximum commitment probability at most `K / 2^b`. -/
-def Level.commitmentBoxBits : Level → ℕ
+@[expose] def Level.commitmentBoxBits : Level → ℕ
   | .mlDSA44 => 471
   | .mlDSA65 => 1281
   | .mlDSA87 => 1794
 
 /-- Number of masks that the first ℓ rows of the public matrix send to zero, counted on
 the entire coefficient module. This equals one for an invertible square submatrix. -/
-noncomputable def commitmentKernelSize (s : Level) (A : PublicMatrix s) : ℕ :=
+@[expose] noncomputable def commitmentKernelSize (s : Level) (A : PublicMatrix s) : ℕ :=
   let h : s.params.ℓ ≤ s.params.k := by cases s <;> decide
   Nat.card { y : Fin s.params.ℓ → Poly // moduleSISMap (A.submatrix (Fin.castLE h) id) y = 0 }
 

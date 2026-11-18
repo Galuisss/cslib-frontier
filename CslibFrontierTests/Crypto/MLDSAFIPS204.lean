@@ -8,6 +8,7 @@ module
 -- upstream: local-only (test driver)
 
 import all CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitment
+import CslibFrontier.Crypto.Computational.MLDSA.SplitMatrix
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 
 /-!
@@ -83,3 +84,18 @@ example (s : Level) (extra : Finset (List Bool)) (μ : Cslib.BitString 512) :
   change (PMF.map (Function.const _ _) _).support.Subsingleton
   rw [PMF.map_const, PMF.support_pure]
   exact Set.subsingleton_singleton
+
+-- One update at the quantum hash-query budgets in Fallahpour–Fehr–Huang, Table 3.
+-- The three exponents bound its additive loss before any later signing calls.
+example (s : Level) :
+    let queries : ℕ := match s with | .mlDSA44 => 128 | .mlDSA65 => 192 | .mlDSA87 => 256
+    let bits : ℕ := match s with | .mlDSA44 => 106 | .mlDSA65 => 447 | .mlDSA87 => 639
+    2 * (2 : ℝ) ^ queries * ((11 / 10) / Real.sqrt (2 ^ s.commitmentBoxBits)) ≤ 1 / 2 ^ bits := by
+  intro queries bits
+  rw [← mul_div_assoc, div_le_div_iff₀ (by positivity) (by positivity), one_mul]
+  apply (Real.le_sqrt (by positivity) (by positivity)).2
+  have cert : (22 * 2 ^ queries * 2 ^ bits) ^ 2 ≤ 100 * 2 ^ s.commitmentBoxBits := by
+    cases s <;> decide +kernel
+  have bound : ((22 : ℝ) * 2 ^ queries * 2 ^ bits) ^ 2 ≤ 100 * 2 ^ s.commitmentBoxBits := by
+    exact_mod_cast cert
+  nlinarith only [bound]
