@@ -236,7 +236,8 @@ theorem seqList_op (os : List (Op M L)) (x : State M L) :
       os.length := by
   induction os generalizing x with
   | nil => exact Program.ExecWithin.skip
-  | cons o os ih => exact (Program.ExecWithin.seq op (ih (o.effect x))).mono (by simp [Nat.add_comm])
+  | cons o os ih =>
+    exact (Program.ExecWithin.seq op (ih (o.effect x))).mono (by simp [Nat.add_comm])
 
 /-- When no data instruction of the program allocates or stores `field`, every execution
 preserves that field at every address, including the absence of a record. -/
