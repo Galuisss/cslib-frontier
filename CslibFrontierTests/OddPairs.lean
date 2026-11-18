@@ -12,8 +12,8 @@ import CslibFrontier.Foundations.Data.BitString.OddPairs
 /-! # Averages over the odd pairs of bit strings
 
 Concrete instances: on one bit, the only odd pair is `(1, 1)`, so the masked average of the
-constant `1` is `1/4`; and a bound for the one string `c` with `1 · c = 1` gives twice the masked
-average.
+constant `1` is `1/4`, the density of the odd pairs; with no bits there are no odd pairs; and with
+both functions equal to `1`, the half-average bound is an equality.
 -/
 
 set_option linter.privateModule false
@@ -40,9 +40,20 @@ example : oddExpect (ι := Unit) (fun _ _ => (1 : ℝ)) = 1 / 4 := by
   simp only [div_eq_mul_inv, ← Finset.sum_mul, hsum]
   norm_num
 
-/-- **Half average**: the bound `0 ≤ 1` on the odd strings gives `0 ≤ 2 E_c [a · c = 1] 1`. -/
-example : (0 : ℝ) ≤ 2 * 𝔼 c : Unit → Bool, if (fun _ => true) ⬝ᵥ c = true then 1 else 0 :=
+/-- **Half average**, with both functions equal to `1`: the factor `2` is exactly what is needed,
+since half of the strings `c` have `a · c = 1`. -/
+example : (1 : ℝ) ≤ 2 * 𝔼 c : Unit → Bool, if (fun _ => true) ⬝ᵥ c = true then 1 else 0 :=
   le_two_mul_expect_ite_of_forall (a := fun _ : Unit => true) (fun h => by
-    simpa using congrFun h ()) (h := fun _ => (1 : ℝ)) fun _ _ => zero_le_one
+    simpa using congrFun h ()) (h := fun _ => (1 : ℝ)) fun _ _ => le_rfl
+
+/-- The odd pairs of one-bit strings have density `1/4`. -/
+example : ((oddPairs Unit).dens : ℝ) = 1 / 4 := by
+  rw [dens_oddPairs, Fintype.card_unit]
+  norm_num
+
+/-- With no bits there are no odd pairs, and every masked average vanishes. -/
+example (f : (Empty → Bool) → (Empty → Bool) → ℝ) : oddExpect f = 0 := by
+  rw [oddExpect_eq_dens_smul, dens_oddPairs, Fintype.card_empty]
+  norm_num
 
 end CslibFrontierTests.OddPairs

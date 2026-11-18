@@ -12,6 +12,7 @@ public import CslibFrontier.Foundations.Data.BitString.Basic
 public import CslibFrontier.Foundations.Data.BitString.Sign
 public import CslibFrontier.Foundations.Data.BitString.OddPairs
 import CslibFrontier.Tactic.CommuteLeft
+import Mathlib.Algebra.Order.Chebyshev
 
 /-!
 # Braiding relations from anticommutation, consistency and linearity
@@ -32,13 +33,13 @@ star-ordered algebra, for Alice's unitaries `X(a)`, `Z(b)` and Bob's consistent 
 * **Commutation** (their §4.3.3, Lemma 19, p. 22): for `a · b = 0`, write `Z(b) ≈ Z(c) Z(c + b)`
   with `c · a = 1` and anticommute `X(a)` past both factors
   (`Cslib.Quantum.norm_mul_sub_mul_le_of_anticommute`).
-  Averaging over the half of the `c` with `c · a = 1`, and using `X(0) = 1` for `a = 0`, gives
-  the braiding defect for every pair (`Cslib.Quantum.norm_braid_sq_le`,
-  `Cslib.Quantum.expect_norm_braid_sq_le`):
+  Averaging over the half of the `c` with `c · a = 1`
+  (`Cslib.BitString.le_two_mul_expect_ite_of_forall`), and using `X(0) = 1` for `a = 0`, gives
+  the braiding defect for every pair (`Cslib.Quantum.expect_norm_braid_sq_le`):
   `E_{a,b} ‖Z(b) X(a) - (-1)^{a·b} X(a) Z(b)‖²_φ ≤ 33 E_{a,b} [a · b = 1] α(a, b)² +
   32 (E ‖Z(c) Z(c') - Z(c + c')‖² + E κ_Z² + E κ_X²)`,
-  where `α(a, b) = ‖X(a) Z(b) + Z(b) X(a)‖_φ` (`Cslib.Quantum.anticommDefectSq`) and `κ` are the
-  consistency distances.
+  where `α(a, b) = ‖X(a) Z(b) + Z(b) X(a)‖_φ`, the masked average over the pairs with `a · b = 1` is
+  `Cslib.BitString.oddExpect`, and `κ` are the consistency distances.
 * **The Pauli-family defect** then follows from anticommutation, consistency and linearity
   (`Cslib.Quantum.expect_norm_pauliFamily_sub_sq_le_of_anticommute`).
 
@@ -56,12 +57,6 @@ commutation step likewise averages over all `c` with the mask `c · a = 1` and u
 (`Cslib.Quantum.Measurement.charObs_zero`), such as the rounded observables of the linearity test.
 Deriving the anticommutation defects from a strategy's success in an anticommutation game, and the
 remaining steps toward Pauli rigidity, are tracked in cslib-community/cslib-frontier#6149.
-
-## Main definitions
-
-* `Cslib.Quantum.anticommDefectSq`: the masked squared anticommutation defect, evaluated by
-  `Cslib.Quantum.anticommDefectSq_of_dotProduct_eq_true` and
-  `Cslib.Quantum.anticommDefectSq_of_dotProduct_eq_false`.
 
 ## Main results
 
@@ -261,21 +256,11 @@ private theorem norm_braid_sq_le [Fintype ι] [DecidableEq ι] (φ : AlgState A)
     calc φ.norm (Z b * X a - X a * Z b) ^ 2 ≤ (2 * x + 2 * y + z + w + 2 * κX) ^ 2 :=
           pow_le_pow_left₀ h0 h 2
       _ ≤ 8 * (2 * x ^ 2 + 2 * y ^ 2 + 2 * κX ^ 2 + z ^ 2 + w ^ 2) := by
-          have hCS := Finset.sum_sq_le_sum_mul_sum_of_sq_le_mul Finset.univ
-            (r := ![2 * x, 2 * y, z, w, 2 * κX]) (f := ![(2 : ℝ), 2, 1, 1, 2])
-            (g := ![2 * x ^ 2, 2 * y ^ 2, z ^ 2, w ^ 2, 2 * κX ^ 2])
-            (fun i _ => by fin_cases i <;> norm_num)
-            (fun i _ => by
-              fin_cases i <;>
-                simp only [Fin.zero_eta, Fin.mk_one, Fin.reduceFinMk, Fin.isValue,
-                  Matrix.cons_val_zero, Matrix.cons_val_one, Matrix.cons_val] <;>
-                positivity)
-            (fun i _ => by
-              fin_cases i <;>
-                simp only [Fin.zero_eta, Fin.mk_one, Fin.reduceFinMk, Fin.isValue,
-                  Matrix.cons_val_zero, Matrix.cons_val_one, Matrix.cons_val] <;>
-                nlinarith)
-          simp only [Fin.sum_univ_five, Matrix.cons_val] at hCS
+          have hCS := sq_sum_le_card_mul_sum_sq (s := Finset.univ)
+            (f := ![x, x, y, y, κX, κX, z, w])
+          simp only [Finset.card_univ, Fintype.card_fin, Fin.sum_univ_eight, Matrix.cons_val]
+            at hCS
+          push_cast at hCS
           linarith
   -- half of the `c` have `a · c = 1`: twice the masked average of the bound
   have hβ := BitString.le_two_mul_expect_ite_of_forall ha hpt

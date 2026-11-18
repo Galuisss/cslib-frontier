@@ -36,4 +36,14 @@ example (hXZ' : ∀ a b, Commute (X a) (Z' b)) (hZZ' : ∀ b b', Commute (Z b) (
 example {u v w : A} (huv : Commute u v) (hwv : Commute w v) : u * w * v = v * u * w := by
   commute_left [huv, hwv]
 
+/-- Mixed explicit and implicit binders (regression). -/
+example (hXZ' : ∀ (a : ι) {b : ι}, Commute (X a) (Z' b)) (a d : ι) :
+    X a * Z' d = Z' d * X a := by
+  commute_left [hXZ']
+
+/-- The tactic fails, rather than leaving a goal, when the commutations do not suffice. -/
+example (a d : ι) (h : X a * Z' d = Z' d * X a) : X a * Z' d = Z' d * X a := by
+  fail_if_success commute_left []
+  exact h
+
 end CslibFrontierTests.CommuteLeftTactic

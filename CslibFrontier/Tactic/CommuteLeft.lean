@@ -24,8 +24,17 @@ placeholder per binder and calls `simp only` with associativity and the instance
 associated to the right, with each `y` in front of the `x`s it commutes with.
 
 The direction comes from the hypotheses: `Commute x y` moves `y` left, never `x`, so the rewriting
-terminates. Do not pass both `Commute x y` and `Commute y x` for the same families, which would let
-the factors swap back and forth.
+terminates. The tactic is meant for **consistently oriented families**, as in rigidity proofs: the
+hypotheses say that every factor of one group (for instance the second player's operators) commutes
+with the factors of another (the first player's), all in the same direction. Then the normal form is
+unique and equal products are proved equal. Outside this setting the rewriting need not be
+confluent: from `Commute u v` and `Commute v w`, both `v * u * w` and `u * w * v` are normal forms,
+although they are equal. Do not pass both `Commute x y` and `Commute y x` for the same families,
+which would let the factors swap back and forth.
+
+Each hypothesis is instantiated with one placeholder per explicit binder; implicit and instance
+arguments are left to elaboration, so hypotheses such as `∀ (a : ι) {b : ι}, Commute (X a) (Z b)`
+work. The tactic fails, with the remaining goal, when the given commutations do not close it.
 
 ## Main definitions
 
@@ -49,11 +58,18 @@ def evalCommuteLeft : Tactic := fun stx => do
   let mut lemmas : Array (TSyntax `Lean.Parser.Tactic.simpLemma) := #[]
   for h in hs.getElems do
     let e ← elabTerm h none
-    let n ← forallTelescopeReducing (← inferType e) fun xs _ => pure xs.size
+    -- one placeholder per explicit binder; implicit arguments are inserted by elaboration
+    let n ← forallTelescopeReducing (← inferType e) fun xs _ =>
+      xs.foldlM (init := 0) fun k x => do
+        return if (← x.fvarId!.getBinderInfo).isExplicit then k + 1 else k
     let holes : Array (TSyntax `term) ← (List.replicate n ()).toArray.mapM fun _ => `(_)
     let app ← if n = 0 then pure h else `($h $holes*)
     lemmas := lemmas.push (← `(Lean.Parser.Tactic.simpLemma| ($app).left_comm))
     lemmas := lemmas.push (← `(Lean.Parser.Tactic.simpLemma| ($app).eq))
-  evalTactic (← `(tactic| simp only [mul_assoc, $lemmas,*]))
+  try
+    evalTactic (← `(tactic| focus (simp only [mul_assoc, $lemmas,*]; done)))
+  catch e =>
+    throwError "commute_left: the given commutations do not close the goal; both sides must reach \
+      the same normal form when each `y` with `Commute x y` moves left of `x`.\n{e.toMessageData}"
 
 end Cslib.Tactic.CommuteLeft
