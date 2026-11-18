@@ -320,8 +320,7 @@ chosen after any number of signing replies or measurements. -/
 theorem Xofs.prob_representative_ne_sampleSigningMaskSeeds (base : Xofs) (s : Level)
     (seed : FixedBytes 32) {a b n : ℕ} (ha : 1024 ≤ a) (hb : 64 ≤ b)
     (hn : n ≤ 2 ^ 256) (rows : SigningMaskSeeds n) :
-    letI : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-      (by simpa only [Fintype.card_fin, QuantumSigningForger.card_hedge] using hn)
+    letI : Nonempty (Fin n ↪ FixedBytes 32) := QuantumSigningForger.hedgeEmbedding_nonempty hn
     (((PMF.uniformOfFintype (Fin n ↪ FixedBytes 32)).bind fun t =>
       base.sampleSigningMaskSeeds s seed t ha hb rows).toOuterMeasure
         {pair | ∃ keys, pair.background.keyGen s seed = some keys ∧ ∃ formatted,
@@ -329,8 +328,7 @@ theorem Xofs.prob_representative_ne_sampleSigningMaskSeeds (base : Xofs) (s : Le
             pair.background.messageRepresentative keys.publicKey formatted}).toReal ≤
       (n : ℝ) / 2 ^ 256 := by
   classical
-  let _ : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-    (by simpa only [Fintype.card_fin, QuantumSigningForger.card_hedge] using hn)
+  let _ : Nonempty (Fin n ↪ FixedBytes 32) := QuantumSigningForger.hedgeEmbedding_nonempty hn
   let tapes := PMF.uniformOfFintype (Fin n ↪ FixedBytes 32)
   let draw := fun t => base.sampleSigningMaskSeeds s seed t ha hb rows
   let bad (p : SigningMaskSeedOracles) := ∃ keys, p.background.keyGen s seed = some keys ∧
@@ -385,8 +383,7 @@ The same setup seed and tape determine the installed addresses and the actual si
 noncomputable def maskSeedGame (C : QuantumSigningForger) (s : Level) (base : Xofs)
     {a b n : ℕ} (ha : 1024 ≤ a) (hb : 64 ≤ b) (_hn : C.SigningCallsLe n)
     (hsize : n ≤ 2 ^ 256) (deviceSeesRows : Bool) (score : SignedMatrixTrial s → Bool) : Game :=
-  let _ : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-    (by simpa only [Fintype.card_fin, card_hedge] using hsize)
+  let _ : Nonempty (Fin n ↪ FixedBytes 32) := hedgeEmbedding_nonempty hsize
   do
     let t ← PMF.uniformOfFintype (Fin n ↪ FixedBytes 32)
     let seed ← PMF.uniformOfFintype (FixedBytes 32)

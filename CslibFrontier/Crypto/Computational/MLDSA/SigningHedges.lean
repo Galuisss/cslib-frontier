@@ -103,6 +103,11 @@ private theorem card_hedge : Fintype.card (FixedBytes 32) = 2 ^ 256 := by
   rw [Fintype.card_fun, Fintype.card_fin, Fintype.card_fin]
   decide
 
+/-- The 256-bit hedge space supplies a distinct hedge for each of at most `2^256` slots. -/
+theorem hedgeEmbedding_nonempty {n : ℕ} (hn : n ≤ 2 ^ 256) :
+    Nonempty (Fin n ↪ FixedBytes 32) :=
+  Function.Embedding.nonempty_of_card_le (by simpa only [Fintype.card_fin, card_hedge] using hn)
+
 private noncomputable def scoreTranscript (H : Xofs) (s : Level)
     (score : SignedMatrixTrial s → Bool) (keys : Option KeyPair)
     (run : KeyPair → PMF (Forgery × List Forgery)) : Game :=
@@ -130,8 +135,7 @@ output and log used for scoring all come from this execution. -/
 noncomputable def distinctHedgeGame (C : QuantumSigningForger) (s : Level)
     (base : Xofs) (a b : ℕ) {n : ℕ} (_hn : C.SigningCallsLe n) (hsize : n ≤ 2 ^ 256)
     (score : SignedMatrixTrial s → Bool) : Game :=
-  let _ : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-    (by simpa only [Fintype.card_fin, card_hedge] using hsize)
+  let _ : Nonempty (Fin n ↪ FixedBytes 32) := hedgeEmbedding_nonempty hsize
   (PMF.uniformOfFintype (Fin n ↪ FixedBytes 32)).bind fun t =>
     C.fixedHedgeGame s base a b score (List.ofFn t)
 
