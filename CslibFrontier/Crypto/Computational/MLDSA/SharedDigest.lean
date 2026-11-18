@@ -227,18 +227,122 @@ theorem verify_shakeReply_iff (s : Level) (bytes : List Byte) (A : PublicMatrix 
     · simp [verify, opening, guard, hctx, hlen]
   · simp [verify, hlen]
 
-/-- The final byte verifier reads its digest at a 512-bit message representative. Agreement
-there suffices even if the two digest functions differ at all other inputs. -/
-theorem interpret_verify_congr {s : Level} (bytes : List Byte) (A : PublicMatrix s) (f : Forgery)
-    (R S : ModuleSIS.SelfTarget.Point s.params.k 256 8380417 → FixedBytes (digestBytes s))
-    (agree : ∀ p, p.1.length = 512 → R p = S p) :
-    interpret (m := Id) R (verify s bytes A f) = interpret (m := Id) S (verify s bytes A f) := by
+/-- A module product on the canonical FIPS commitment grid is determined by its high bits. -/
+@[expose] def OnCommitmentGrid (s : Level) (v : Fin s.params.k → Poly) : Prop :=
+  ∀ i j, v i j = ((highBitsVec s.params v i j * (2 * s.params.γ₂ : ℕ) : ℤ) : ZMod 8380417)
+
+instance (s : Level) (v : Fin s.params.k → Poly) : Decidable (OnCommitmentGrid s v) :=
+  by unfold OnCommitmentGrid; infer_instance
+
+/-- The raw FIPS address of a module product and message representative. Products with
+the same high bits give the same word. -/
+def pointAddress (s : Level) (p : ModuleSIS.SelfTarget.Point s.params.k 256 8380417) : List Bool :=
+  commitmentInput s (highBitsVec s.params p.2) p.1
+
+private def decodePoint (s : Level) (raw : List Bool) : Point s :=
+  (raw.take 512, fun i j =>
+    ((unpackCommitment s 512 raw i j * (2 * s.params.γ₂ : ℕ) : ℤ) : ZMod 8380417))
+
+private theorem decodePoint_address {s : Level} {p : Point s}
+    (hm : p.1.length = 512) (hv : OnCommitmentGrid s p.2) :
+    decodePoint s (pointAddress s p) = p := by
+  have hw (i j) : 0 ≤ highBitsVec s.params p.2 i j ∧ highBitsVec s.params p.2 i j <
+      (((s.params.q - 1) / (2 * s.params.γ₂) : ℕ) : ℤ) :=
+    ⟨highBits_nonneg s.valid.γ₂_pos _, highBits_lt s.valid.γ₂_pos s.valid.two_mul_γ₂_dvd
+      s.valid.one_lt_q _⟩
+  apply Prod.ext
+  · change (commitmentInput s _ _).take 512 = _
+    simpa only [hm] using take_commitmentInput s (highBitsVec s.params p.2) p.1
+  · funext i j
+    change ((unpackCommitment s 512 (pointAddress s p) i j * _ : ℤ) : ZMod 8380417) = _
+    rw [← hm, pointAddress, unpackCommitment_input p.1 hw]
+    exact (hv i j).symm
+
+/-- Inject arbitrary raw hash words into the algebraic oracle. A canonical FIPS word
+uses its decoded verifier point. Other words use disjoint internal memoization keys. -/
+def rawPoint (s : Level) : List Bool ↪ ModuleSIS.SelfTarget.Point s.params.k 256 8380417 :=
+  let represent (raw : List Bool) :=
+    let p := decodePoint s raw
+    if p.1.length = 512 ∧ pointAddress s p = raw then p
+    else (List.replicate 513 false ++ raw, 0)
+  let recover (p : Point s) := if p.1.length = 512 then pointAddress s p else p.1.drop 513
+  ⟨represent, Function.LeftInverse.injective (g := recover) (by
+    intro raw
+    simp only [represent]
+    split
+    · rename_i h
+      simp [recover, h.1, h.2]
+    · have hlen : (List.replicate 513 false ++ raw).length ≠ 512 := by
+        rw [List.length_append, List.length_replicate]
+        omega
+      simp only [recover, hlen, ite_false]
+      simpa only [List.length_replicate] using List.drop_left (l₁ := List.replicate 513 false)
+        (l₂ := raw))⟩
+
+/-- The raw simulator's address coincides with the algebraic verifier's query. -/
+theorem rawPoint_pointAddress {s : Level} {p : ModuleSIS.SelfTarget.Point s.params.k 256 8380417}
+    (hm : p.1.length = 512) (hv : OnCommitmentGrid s p.2) :
+    rawPoint s (pointAddress s p) = p := by
+  change (if (decodePoint s (pointAddress s p)).1.length = 512 ∧
+    pointAddress s (decodePoint s (pointAddress s p)) = pointAddress s p then _ else _) = _
+  rw [decodePoint_address hm hv]
+  simp only [hm, and_self, ite_true]
+
+/-- A fixed-width message representative and a ring product on the verifier's grid. -/
+abbrev GridPoint (s : Level) := BitString 512 × {v : Fin s.params.k → Poly // OnCommitmentGrid s v}
+
+/-- The FIPS raw address is injective on full grid points, including its message prefix. -/
+@[expose] def gridAddress (s : Level) : GridPoint s ↪ BitString (commitmentInputWidth s) where
+  toFun p := BitString.ofList _ (commitmentInput s (highBitsVec s.params p.2.val) (List.ofFn p.1))
+  inj' := by
+    rintro ⟨mx, x, hx⟩ ⟨my, y, hy⟩ h
+    let raw (m : BitString 512) (v : Fin s.params.k → Poly) :=
+      commitmentInput s (highBitsVec s.params v) (List.ofFn m)
+    have lens (m : BitString 512) (v : Fin s.params.k → Poly) :
+        (raw m v).length = commitmentInputWidth s :=
+      length_commitmentInput s (highBitsVec s.params v) (μ := List.ofFn m) List.length_ofFn
+    have he : raw mx x = raw my y := by
+      simpa only [BitString.ofFn_ofList (lens mx x), BitString.ofFn_ofList (lens my y)] using
+        congrArg List.ofFn (show BitString.ofList _ (raw mx x) =
+          BitString.ofList _ (raw my y) from h)
+    have prefix_eq (m : BitString 512) (v : Fin s.params.k → Poly) :
+        (raw m v).take 512 = List.ofFn m := by
+      simpa only [List.length_ofFn] using take_commitmentInput s (highBitsVec s.params v)
+        (List.ofFn m)
+    have hm : mx = my := List.ofFn_injective (by
+      simpa only [prefix_eq] using congrArg (List.take 512) he)
+    subst my
+    have hb (v : Fin s.params.k → Poly) (i j) :
+        0 ≤ highBits s.params.q s.params.γ₂ (v i j) ∧ highBits s.params.q s.params.γ₂ (v i j) <
+          (((s.params.q - 1) / (2 * s.params.γ₂) : ℕ) : ℤ) :=
+      ⟨highBits_nonneg s.valid.γ₂_pos _, highBits_lt s.valid.γ₂_pos s.valid.two_mul_γ₂_dvd
+        s.valid.one_lt_q _⟩
+    have hh := eq_of_commitmentInput_eq (hb x) (hb y) he
+    have hxy : x = y := by
+      funext i j
+      exact (hx i j).trans ((congrArg (fun z : ℤ => ((z * (2 * s.params.γ₂ : ℕ) : ℤ) :
+        ZMod 8380417)) (congrFun (congrFun hh i) j)).trans (hy i j).symm)
+    exact Prod.ext rfl (Subtype.ext hxy)
+
+private theorem commitmentPoint_onGrid (s : Level) (bytes : List Byte) (A : PublicMatrix s)
+    (f : Forgery) (o : Opening s) : OnCommitmentGrid s (commitmentPoint s bytes A f o).2 := by
+  unfold OnCommitmentGrid
+  rw [highBits_commitmentPoint]
+  exact fun _ _ => rfl
+
+/-- The byte verifier only queries canonical grid points with a 512-bit message prefix. -/
+theorem interpret_verify_congr {m : Type → Type} [Monad m] [LawfulMonad m] {s : Level}
+    (bytes : List Byte) (A : PublicMatrix s) (f : Forgery)
+    (R S : ModuleSIS.SelfTarget.Point s.params.k 256 8380417 → m (FixedBytes (digestBytes s)))
+    (agree : ∀ p, p.1.length = 512 → OnCommitmentGrid s p.2 → R p = S p) :
+    interpret R (verify s bytes A f) = interpret S (verify s bytes A f) := by
   by_cases hl : bytes.length = 32 + 320 * s.params.k
   · cases ho : opening s f with
     | none => simp [verify, hl, ho]
     | some o =>
       simp only [verify, hl, ite_true, ho, bind_pure_comp, interpret_map, interpret_query]
-      rw [agree (commitmentPoint s bytes A f o) (length_messageRepresentative _ _)]
+      rw [agree (commitmentPoint s bytes A f o) (length_messageRepresentative _ _)
+        (commitmentPoint_onGrid s bytes A f o)]
   · simp [verify, hl]
 
 private def witness (s : Level) (pk : MLDSA.PublicKey s.params) (bytes : List Byte)
@@ -343,13 +447,6 @@ def extract (s : Level) (pk : MLDSA.PublicKey s.params) (bytes : List Byte)
     let y := witness s pk bytes f o
     (y.msg, liftWitness s y)
 
-/-- A module product on the canonical FIPS commitment grid is determined by its high bits. -/
-@[expose] def OnCommitmentGrid (s : Level) (v : Fin s.params.k → Poly) : Prop :=
-  ∀ i j, v i j = ((highBitsVec s.params v i j * (2 * s.params.γ₂ : ℕ) : ℤ) : ZMod 8380417)
-
-instance (s : Level) (v : Fin s.params.k → Poly) : Decidable (OnCommitmentGrid s v) :=
-  by unfold OnCommitmentGrid; infer_instance
-
 /-- Fixed-table extraction from an accepted byte output. The verifier checks the complete
 digest, and the last witness coordinate is the Algorithm 29 expansion of that very digest.
 The adversary that produced the bytes may have accessed its table coherently. -/
@@ -377,9 +474,7 @@ theorem accepts_extract_of_verify {s : Level} (rho : FixedBytes 32) (A : PublicM
       refine ⟨⟨length_messageRepresentative _ _, ?_⟩, accepts_digest_of_opening _ _ ho he⟩
       rw [show moduleSISMap (systematic s A t) _ =
           (commitmentPoint s (encodePublic s rho.toList t) A f o).2 from congrArg Prod.snd hp]
-      unfold OnCommitmentGrid
-      rw [highBits_commitmentPoint]
-      exact fun _ _ => rfl
+      exact commitmentPoint_onGrid s (encodePublic s rho.toList t) A f o
   · simp [verify, hl] at accept
 
 /-- Run the byte-key adversary on the original matrix seed and rounded bytes while it
@@ -564,6 +659,100 @@ noncomputable def observe {Coins : Type} (s : Level) (coins : ProbComp Coins)
   let r ← coins.eval
   onlineTrial s adv r rho A t (cache, [])
 
+/-- The raw classical matrix-seed and digest-word interfaces. -/
+abbrev RawOracleSpec (s : Level) := (fun _ : FixedBytes 32 => PublicMatrix s) ⊕ₒ
+  (fun _ : List Bool => FixedBytes (digestBytes s))
+
+/-- Classical byte forgers may query the digest at arbitrary bit strings. -/
+abbrev RawForger (s : Level) (Coins : Type) :=
+  List Byte → Coins → OracleComp (RawOracleSpec s) Forgery
+
+private def rawQueries (s : Level) : (q : FixedBytes 32 ⊕ List Bool) →
+    OracleComp (Both s) (RawOracleSpec s q) :=
+  sumHandler (fun k => query (spec := Both s) (.inl k))
+    (fun w => query (spec := Both s) (.inr (rawPoint s w)))
+
+/-- Run a raw byte forger using one algebraic-oracle query for each raw-word query. -/
+def pointForger {Coins : Type} (s : Level) (adv : RawForger s Coins) : Forger s Coins :=
+  fun pk r => interpret (rawQueries s) (adv pk r)
+
+theorem pointForger_bounded {Coins : Type} {s : Level} {adv : RawForger s Coins} {bytes r Q}
+    (h : (adv bytes r).IsQueryBounded Q) : (pointForger s adv bytes r).IsQueryBounded Q := by
+  apply h.interpret
+  rintro (k | w) <;> exact IsCostBounded.query _
+
+private def rawVerifier (s : Level) (bytes : List Byte) (A : PublicMatrix s) (f : Forgery) :
+    OracleComp (RawOracleSpec s) Bool :=
+  interpret (fun p => query (.inr (pointAddress s p))) (verify s bytes A f)
+
+private theorem rawVerifier_point (s : Level) (bytes : List Byte) (A : PublicMatrix s)
+    (f : Forgery) :
+    interpret (rawQueries s) (rawVerifier s bytes A f) =
+      liftRight (spec₁ := fun _ : FixedBytes 32 => PublicMatrix s) (verify s bytes A f) := by
+  rw [rawVerifier, interpret_interpret, liftRight, substitute_eq_interpret]
+  apply interpret_verify_congr
+  intro p hm hv
+  simp only [interpret_query, rawQueries, sumHandler]
+  rw [rawPoint_pointAddress (s := s) (p := p) hm hv]
+
+private noncomputable def rawOracle (s : Level) :=
+  RandomOracle.memoizeSum (fun _ : FixedBytes 32 => PMF.uniformOfFintype (PublicMatrix s))
+    (fun _ : List Bool => PMF.uniformOfFintype (Digest s))
+
+private theorem run_raw {s : Level} {α : Type} (prog : OracleComp (RawOracleSpec s) α)
+    (mc : Cache s) (dc : List (List Bool × Digest s)) :
+    ((interpret (rawOracle s) prog).run (mc, dc)).map
+        (fun (a, m, d) => (a, m, d.map fun e => (rawPoint s e.1, e.2))) =
+      (interpret (matrixDigestOracle s) (interpret (rawQueries s) prog)).run
+        (mc, dc.map fun e => (rawPoint s e.1, e.2)) := by
+  rw [interpret_interpret]
+  refine run_interpret_map_state _ _ (fun st => (st.1, st.2.map fun e => (rawPoint s e.1, e.2)))
+    ?_ prog (mc, dc)
+  rintro (k | w) ⟨m, d⟩
+  · simp only [rawOracle, rawQueries, sumHandler, interpret_query, matrixDigestOracle,
+      RandomOracle.memoizeSum_inl, PMF.map_comp, Function.comp_def]
+  · simp only [rawOracle, rawQueries, sumHandler, interpret_query, matrixDigestOracle,
+      RandomOracle.memoizeSum_inr, PMF.map_comp, Function.comp_def]
+    have h := memoize_map (m := PMF) (rawPoint s) (id : Digest s → _)
+      (fun _ => PMF.uniformOfFintype _) (fun _ => PMF.uniformOfFintype _)
+      (fun _ => (PMF.map_id _).symm) w d
+    have h' := congrArg (PMF.map (fun (a, d') => (a, m, d'))) h
+    simpa only [PMF.monad_map_eq_map, PMF.map_comp, Function.comp_def, id_eq] using h'
+
+/-- The raw classical game runs the verifier on the same digest cache as the adversary.
+Both use the literal untagged FIPS commitment string. -/
+noncomputable def observeRaw {Coins : Type} (s : Level) (coins : ProbComp Coins)
+    (adv : RawForger s Coins) : MatrixOracle.Observable s := fun rho A t mc => do
+  let r ← coins.eval
+  let bytes := encodePublic s rho.toList t
+  ((interpret (rawOracle s) (adv bytes r >>= rawVerifier s bytes A)).run (mc, [])).map Prod.fst
+
+/-- Exact raw-address simulation, including the final byte check, unrestricted adaptive
+queries, repeated words and words outside the FIPS commitment grid. -/
+theorem observeRaw_eq {Coins : Type} (s : Level) (coins : ProbComp Coins)
+    (adv : RawForger s Coins) :
+    observeRaw s coins adv = observe s coins (pointForger s adv) := by
+  funext rho A t mc
+  apply congrArg (PMF.bind coins.eval)
+  funext r
+  let bytes := encodePublic s rho.toList t
+  let checked := adv bytes r >>= rawVerifier s bytes A
+  have h := congrArg (PMF.map Prod.fst) (run_raw checked mc [])
+  simp only [PMF.map_comp, Function.comp_def, List.map_nil] at h
+  refine h.trans ?_
+  simp only [checked, interpret_bind, rawVerifier_point, StateT.run_bind, PMF.monad_bind_eq_bind,
+    onlineTrial, pointForger, PMF.map_bind]
+  apply congrArg (PMF.bind _)
+  funext ⟨f, m, d⟩
+  rw [show matrixDigestOracle s = RandomOracle.memoizeSum _ _ from rfl,
+    RandomOracle.run_interpret_memoizeSum_liftRight, PMF.map_comp]
+  have same : memoize (fun _ : Point s => PMF.uniformOfFintype (Digest s)) =
+      Protocols.ROMSignature.oracle (Digest s) := by
+    funext p cache
+    exact memoize_digest s p cache
+  rw [same]
+  rfl
+
 /-- The Hermite instance obtained by prefixing the identity to a single uniform right block. -/
 noncomputable def instances (s : Level) : PMF
     (Matrix (Fin s.params.k) (Fin (s.params.k + s.params.ℓ + 1)) Poly) :=
@@ -637,30 +826,34 @@ private theorem eval_hermite {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbC
       _ _ _ _ _ _ tape, PMF.bind_map, Function.comp_def]
   rfl
 
-/-- Shared-oracle key-only forgery is bounded by short-secret MLWE, a two-run systematic
+/-- Raw-word classical key-only forgery is bounded by short-secret MLWE, a two-run Hermite
 Module-SIS experiment and the collision probability of concrete Algorithm 29 on SHAKE256
 digests. Its only bound here is one. A final digest lookup covers a forgery on a fresh point. -/
 theorem keyOnly_le_moduleLWE_add_fork {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
-    (adv : Forger s Coins) (hQ : ∀ bytes r, (adv bytes r).IsQueryBounded Q) :
+    (rawAdv : RawForger s Coins) (hQ : ∀ bytes r, (rawAdv bytes r).IsQueryBounded Q) :
+    let adv := pointForger s rawAdv
     let radius := compressedSelfTargetRadius s.params 13
-    ((MatrixOracle.realKeyGame s (observe s coins adv)) true).toReal ≤
+    ((MatrixOracle.realKeyGame s (observeRaw s coins rawAdv)) true).toReal ≤
       ModuleLWE.advantage (MatrixOracle.shortVectorLaw s s.params.ℓ)
         (MatrixOracle.shortVectorLaw s s.params.k) (distinguisher s Q coins adv) +
       ((Q + 1 : ℕ) / ((256 : ℝ) ^ digestBytes s) + Real.sqrt ((Q + 1 : ℕ) *
         ((ModuleSIS.hermiteExperiment (2 * radius) (kernelSolver s Q coins adv)).eval true +
             ModuleSIS.SelfTarget.collisionMass (expandDigest s)).toReal)) := by
+  let adv := pointForger s rawAdv
+  have bounded (bytes r) : (adv bytes r).IsQueryBounded Q := pointForger_bounded (hQ bytes r)
   dsimp only
+  rw [observeRaw_eq]
   rw [eval_hermite]
   have hs := selfTarget_digest_fork s Q (instances s) (sampleSaved s Q coins).eval
-    (solver s adv) (solver_bounded hQ)
+    (solver s adv) (solver_bounded bounded)
   have hr := (ENNReal.toReal_mono (PMF.apply_ne_top _ _)
     (random_le_selfTarget s Q coins adv)).trans hs
   have hl := Game.coe_succProbability_le_add_of_advantage_le
     (g₀ := MatrixOracle.realKeyGame s (observe s coins adv))
     (g₁ := ModuleLWE.randomGame (distinguisher s Q coins adv)) (le_refl _)
   rw [Game.coe_succProbability, Game.coe_succProbability,
-    keyOnlyGame_eq_moduleLWE_realGame s Q coins adv hQ] at hl
-  rw [keyOnlyGame_eq_moduleLWE_realGame s Q coins adv hQ]
+    keyOnlyGame_eq_moduleLWE_realGame s Q coins adv bounded] at hl
+  rw [keyOnlyGame_eq_moduleLWE_realGame s Q coins adv bounded]
   exact hl.trans (by rw [add_comm]; exact add_le_add le_rfl hr)
 
 end Cslib.Crypto.MLDSA.FIPS204.SharedDigest

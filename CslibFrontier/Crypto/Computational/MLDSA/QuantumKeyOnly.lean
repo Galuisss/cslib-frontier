@@ -38,6 +38,7 @@ public section
 namespace Cslib.Crypto.MLDSA.FIPS204.QuantumKeyOnly
 
 open Cslib.Probability Cslib.Quantum Turing Turing.MultiTapeTM OracleComp
+open SharedDigest (GridPoint gridAddress)
 
 variable (s : Level)
 
@@ -56,43 +57,6 @@ def pointReply (H : DigestTable s) (p : ModuleSIS.SelfTarget.Point s.params.k 25
   if p.1.length = 512 then
     registerBytes _ (H (BitString.ofList _ (commitmentInput s (highBitsVec s.params p.2) p.1)))
   else 0
-
-/-- A source message representative together with a full ring product on the canonical
-commitment grid. Every extracted accepting witness has such a product. -/
-abbrev GridPoint := BitString 512 × {v : Fin s.params.k → Poly // SharedDigest.OnCommitmentGrid s v}
-
-/-- The FIPS raw address is injective on full grid points, including its message prefix. -/
-def gridAddress : GridPoint s ↪ BitString (commitmentInputWidth s) where
-  toFun p := BitString.ofList _ (commitmentInput s (highBitsVec s.params p.2.val) (List.ofFn p.1))
-  inj' := by
-    rintro ⟨mx, x, hx⟩ ⟨my, y, hy⟩ h
-    let raw (m : BitString 512) (v : Fin s.params.k → Poly) :=
-      commitmentInput s (highBitsVec s.params v) (List.ofFn m)
-    have lens (m : BitString 512) (v : Fin s.params.k → Poly) :
-        (raw m v).length = commitmentInputWidth s :=
-      length_commitmentInput s (highBitsVec s.params v) (μ := List.ofFn m) List.length_ofFn
-    have he : raw mx x = raw my y := by
-      simpa only [BitString.ofFn_ofList (lens mx x), BitString.ofFn_ofList (lens my y)] using
-        congrArg List.ofFn (show BitString.ofList _ (raw mx x) =
-          BitString.ofList _ (raw my y) from h)
-    have prefix_eq (m : BitString 512) (v : Fin s.params.k → Poly) :
-        (raw m v).take 512 = List.ofFn m := by
-      simpa only [List.length_ofFn] using take_commitmentInput s (highBitsVec s.params v)
-        (List.ofFn m)
-    have hm : mx = my := List.ofFn_injective (by
-      simpa only [prefix_eq] using congrArg (List.take 512) he)
-    subst my
-    have hb (v : Fin s.params.k → Poly) (i j) :
-        0 ≤ highBits s.params.q s.params.γ₂ (v i j) ∧ highBits s.params.q s.params.γ₂ (v i j) <
-          (((s.params.q - 1) / (2 * s.params.γ₂) : ℕ) : ℤ) :=
-      ⟨highBits_nonneg s.valid.γ₂_pos _, highBits_lt s.valid.γ₂_pos s.valid.two_mul_γ₂_dvd
-        s.valid.one_lt_q _⟩
-    have hh := eq_of_commitmentInput_eq (hb x) (hb y) he
-    have hxy : x = y := by
-      funext i j
-      exact (hx i j).trans ((congrArg (fun z : ℤ => ((z * (2 * s.params.γ₂ : ℕ) : ℤ) :
-        ZMod 8380417)) (congrFun (congrFun hh i) j)).trans (hy i j).symm)
-    exact Prod.ext rfl (Subtype.ext hxy)
 
 private theorem pointReply_grid (H : DigestTable s) (p : GridPoint s) :
     pointReply s H (List.ofFn p.1, p.2.val) = registerBytes _ (H (gridAddress s p)) := by
@@ -138,9 +102,9 @@ theorem verify_shakeTable_iff (bytes : List Byte) (A : PublicMatrix s) (f : Forg
       (SharedDigest.verify s bytes A f) = true ↔
       verifyWithExpansion s (fun _ => some A) bytes f.message f.context f.signature =
         some true := by
-  rw [SharedDigest.interpret_verify_congr bytes A f _ (SharedDigest.shakeReply s)]
+  rw [SharedDigest.interpret_verify_congr (m := Id) bytes A f _ (SharedDigest.shakeReply s)]
   · exact SharedDigest.verify_shakeReply_iff s bytes A f
-  · intro p hp
+  · intro p hp _
     simp only [pointReply, hp, ite_true, shakeTable, Equiv.apply_symm_apply,
       BitString.ofFn_ofList (length_commitmentInput s _ hp)]
     rfl

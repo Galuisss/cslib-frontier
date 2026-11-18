@@ -619,25 +619,33 @@ theorem length_commitmentInput (s : Level) (w : Fin s.params.k → Fin 256 → �
 theorem take_commitmentInput (s : Level) (w : Fin s.params.k → Fin 256 → ℤ) (μ : List Bool) :
     (commitmentInput s w μ).take μ.length = μ := by simp [commitmentInput]
 
+/-- Read the packed high-bit coefficients after a message prefix of the given bit length. -/
+def unpackCommitment (s : Level) (prefixLength : ℕ) (raw : List Bool) :
+    Fin s.params.k → Fin 256 → ℤ := fun i j =>
+  unpackCoeff (raw.drop prefixLength) (((s.params.q - 1) / (2 * s.params.γ₂) - 1).log2 + 1)
+    (256 * i.val + j.val)
+
+/-- Unpacking the canonical FIPS address recovers each bounded high-bit coefficient. -/
+theorem unpackCommitment_input {s : Level} {w : Fin s.params.k → Fin 256 → ℤ} (μ : List Bool)
+    (hw : ∀ i j, 0 ≤ w i j ∧ w i j < (((s.params.q - 1) / (2 * s.params.γ₂) : ℕ) : ℤ)) :
+    unpackCommitment s μ.length (commitmentInput s w μ) = w := by
+  let width := ((s.params.q - 1) / (2 * s.params.γ₂) - 1).log2 + 1
+  have size : (s.params.q - 1) / (2 * s.params.γ₂) ≤ 2 ^ width := by cases s <;> decide
+  have strict (i j) : (w i j).toNat < 2 ^ width := by
+    have := (hw i j).2
+    have pos : 0 < 2 ^ width := by positivity
+    omega
+  funext i j
+  simp only [unpackCommitment, commitmentInput, List.drop_left]
+  rw [unpack_packCoeffs _ strict, Int.toNat_of_nonneg (hw i j).1]
+
 /-- Fixed-width packing distinguishes all high-bit vectors in the range of UseHint. -/
 theorem eq_of_commitmentInput_eq {s : Level} {w v : Fin s.params.k → Fin 256 → ℤ} {μ : List Bool}
     (hw : ∀ i j, 0 ≤ w i j ∧ w i j < (((s.params.q - 1) / (2 * s.params.γ₂) : ℕ) : ℤ))
     (hv : ∀ i j, 0 ≤ v i j ∧ v i j < (((s.params.q - 1) / (2 * s.params.γ₂) : ℕ) : ℤ))
     (he : commitmentInput s w μ = commitmentInput s v μ) : w = v := by
-  let width := ((s.params.q - 1) / (2 * s.params.γ₂) - 1).log2 + 1
-  have size : (s.params.q - 1) / (2 * s.params.γ₂) ≤ 2 ^ width := by cases s <;> decide
-  funext i j
-  have strict {z : ℤ} (hz : z < (((s.params.q - 1) / (2 * s.params.γ₂) : ℕ) : ℤ)) :
-      z.toNat < 2 ^ width := by
-    have pos : 0 < 2 ^ width := by positivity
-    omega
-  have values := congrArg (fun bits => unpackCoeff bits width (256 * i.val + j.val))
-    (List.append_cancel_left he)
-  rw [unpack_packCoeffs _ (fun i j => strict (hw i j).2),
-    unpack_packCoeffs _ (fun i j => strict (hv i j).2)] at values
-  have := (hw i j).1
-  have := (hv i j).1
-  omega
+  simpa only [unpackCommitment_input μ hw, unpackCommitment_input μ hv] using
+    congrArg (unpackCommitment s μ.length) he
 
 /-- The full FIPS hash of the message representative and packed reconstructed commitment. -/
 @[expose] def commitmentDigest (s : Level) (w : Fin s.params.k → Fin 256 → ℤ) (μ : List Bool) :
