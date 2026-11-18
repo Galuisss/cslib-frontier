@@ -113,6 +113,21 @@ theorem answersWinProb_bind_seed {I : Type*} [Fintype I] (law : PMF I)
   rw [PMF.bind_bind, Cslib.Probability.PMF.toOuterMeasure_bind_toReal]
   rfl
 
+/-- The weighted rejection probability of one conditional law is bounded by the
+rejection probability under the mixed law. -/
+theorem weighted_rejection_le_of_bind_seed {I : Type*} [Finite I] (law : PMF I)
+    (conditional : I → PMF R) (ans : X → Y → PMF (A × B)) (i : I) :
+    (law i).toReal * (1 - ({ G with seed := conditional i }).answersWinProb ans) ≤
+      1 - ({ G with seed := law.bind conditional }).answersWinProb ans := by
+  let := Fintype.ofFinite I
+  let score (j : I) := ({ G with seed := conditional j }).answersWinProb ans
+  have h := Finset.single_le_sum (f := fun j => (law j).toReal * (1 - score j))
+    (fun j _ => mul_nonneg ENNReal.toReal_nonneg
+      (sub_nonneg.mpr (answersWinProb_le_one _ _))) (Finset.mem_univ i)
+  simp only [mul_sub, mul_one, Finset.sum_sub_distrib, Cslib.Probability.PMF.sum_toReal] at h
+  rw [answersWinProb_bind_seed]
+  simpa only [mul_sub, mul_one, score] using h
+
 end SeededGame
 
 namespace TwoProverGame
