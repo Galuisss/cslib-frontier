@@ -69,37 +69,56 @@ private def attemptQuery (H : Xofs) (s : Level) (sk : PrivateKey s) (A : PublicM
   let d := (digestBytesAt s v).toList
   return terminalReply (finishSigningAttempt s sk prep.mask prep.product d (H.sampleInBall s d))
 
+-- Preserve the distinction between running out of attempts and a terminal challenge failure
+-- when a caller pauses the signer partway through its retry loop.
+private def terminalDigestQueries (H : Xofs) (s : Level) (sk : PrivateKey s) (A : PublicMatrix s)
+    (μ : List.Vector Bool 512) (mask : ℕ → Vector (Vector (ZMod 8380417) 256) s.params.ℓ)
+    (fuel nonce : ℕ) : DigestReads s (Option (Option (List Byte))) :=
+  (List.finRange fuel).findSomeM? fun i =>
+    attemptQuery H s sk A μ.toList (ringVectorCoeffs (mask (nonce + i.val * s.params.ℓ)))
+
+private theorem terminalDigestQueries_bounded (H : Xofs) (s : Level)
+    (sk A μ mask) (fuel nonce : ℕ) :
+    (terminalDigestQueries H s sk A μ mask fuel nonce).IsQueryBounded fuel := by
+  simpa only [terminalDigestQueries, List.length_finRange, Nat.mul_one] using
+    (OracleComp.IsCostBounded.findSomeM? (cost := fun _ => 1) (n := 1)
+      (xs := List.finRange fuel) (f := fun i => attemptQuery H s sk A μ.toList
+        (ringVectorCoeffs (mask (nonce + i.val * s.params.ℓ))))
+      (fun _ _ => .liftBind _ _ 0 fun _ => .pure _ _))
+
 /-- Run the remaining FIPS signing attempts with a supplied mask schedule. Each retry consults
 the table on the literal commitment input. The other SHAKE reads use the background streams. -/
 def Xofs.retryDigestQueries (H : Xofs) (s : Level) (sk : PrivateKey s) (A : PublicMatrix s)
     (μ : List.Vector Bool 512) (mask : ℕ → Vector (Vector (ZMod 8380417) 256) s.params.ℓ)
     (fuel nonce : ℕ) :
     DigestReads s (Option (List Byte)) :=
-  Option.join <$> (List.finRange fuel).findSomeM? fun i =>
-    attemptQuery H s sk A μ.toList (ringVectorCoeffs (mask (nonce + i.val * s.params.ℓ)))
+  Option.join <$> terminalDigestQueries H s sk A μ mask fuel nonce
 
-/-- Even a run reaching its last retry makes at most one digest lookup per available attempt. -/
+/-- The retry program makes at most one digest lookup per available attempt. -/
 theorem Xofs.retryDigestQueries_bounded (H : Xofs) (s : Level) (sk A μ mask) (fuel nonce : ℕ) :
     (H.retryDigestQueries s sk A μ mask fuel nonce).IsQueryBounded fuel := by
   rw [Xofs.retryDigestQueries, ← bind_pure_comp]
-  apply OracleComp.IsCostBounded.bind (n := fuel) (m := 0)
-  · simpa only [List.length_finRange, Nat.mul_one] using
-      (OracleComp.IsCostBounded.findSomeM? (cost := fun _ => 1) (n := 1)
-        (xs := List.finRange fuel) (f := fun i => attemptQuery H s sk A μ.toList
-          (ringVectorCoeffs (mask (nonce + i.val * s.params.ℓ))))
-        (fun _ _ => .liftBind _ _ 0 fun _ => .pure _ _))
-  · exact fun _ => .pure _ _
+  exact OracleComp.IsCostBounded.bind (n := fuel) (m := 0)
+    (terminalDigestQueries_bounded ..) (fun _ => .pure _ _)
+
+private theorem eval_terminalDigestQueries (H : Xofs) (s : Level) (D) (sk A)
+    (μ : List.Vector Bool 512) (mask) (fuel nonce : ℕ) :
+    OracleComp.evalPure D (terminalDigestQueries H s sk A μ mask fuel nonce) =
+      (List.finRange fuel).findSome? fun i => terminalReply
+        ((H.withDigestRegister s D).attemptWithMask s sk A μ.toList
+          (ringVectorCoeffs (mask (nonce + i.val * s.params.ℓ)))) := by
+  rw [terminalDigestQueries, OracleComp.evalPure_findSomeM?]
+  simp only [attemptQuery, OracleComp.evalPure_bind, OracleComp.evalPure_query,
+    OracleComp.evalPure_pure, Xofs.attemptWithMask, digest_at H s D _ μ.toList_length,
+    challenge_off]
 
 private theorem eval_retries (H : Xofs) (s : Level) (D) (sk A) (μ : List.Vector Bool 512)
     (mask) (fuel nonce : ℕ) :
     OracleComp.evalPure D (H.retryDigestQueries s sk A μ mask fuel nonce) =
       firstAccepted s.params.ℓ (fun n => (H.withDigestRegister s D).attemptWithMask s sk A μ.toList
         (ringVectorCoeffs (mask n))) fuel nonce := by
-  rw [Xofs.retryDigestQueries, OracleComp.evalPure_map, OracleComp.evalPure_findSomeM?,
+  rw [Xofs.retryDigestQueries, OracleComp.evalPure_map, eval_terminalDigestQueries,
     firstAccepted_eq_terminal, Fin.findSome?_eq_findSome?_finRange]
-  simp only [attemptQuery, OracleComp.evalPure_bind, OracleComp.evalPure_query,
-    OracleComp.evalPure_pure, Xofs.attemptWithMask, digest_at H s D _ μ.toList_length,
-    challenge_off]
 
 /-- The full 814-attempt native signer with any fixed mask schedule computes exactly the
 table program's reply. Sparse-challenge exhaustion and reaching the retry cap both return error. -/
