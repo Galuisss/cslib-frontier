@@ -144,21 +144,8 @@ private theorem simulated_readout (C : QuantumSigningForger) (s : Level) (H : Xo
     rcases cmd with coin | cmd | q
     · exact ⟨POVM.mixture (ProbComp.unifOracle coin) (fun i => M i D log), fun d => by
         simp only [simulated, law, observe, POVM.measureDensity_mixture]⟩
-    · cases cmd with
-      | service op _ => exact op.elim
-      | gate g =>
-        simpa only [simulated, deviceCommand, deviceHandler_gate, pmf_norm, law, G, observe] using
-          test_instruction G (.gate g) (M [] D log)
-      | query =>
-        simpa only [simulated, deviceCommand, deviceHandler_query, pmf_norm, law, G, observe] using
-          test_instruction G .query (M [] D log)
-      | measure wire =>
-        let f := fun (z : (Fin (Width C) → Bool) × Unit) => z.1 wire
-        refine ⟨POVM.afterRead f (fun y => M [y] D log), fun d => ?_⟩
-        simp only [simulated, deviceCommand, deviceHandler_measure, pmf_norm, law, observe,
-          POVM.measureDensity_afterRead]
-        exact DeviceState.measure_bind (fun x => x wire) d
-          (fun y st => observe (M [y] D log) st)
+    · simp only [simulated]
+      exact device_readout G cmd _ (fun r => ⟨M r D log, law r D log⟩)
     · by_cases big : 255 < q.context.length
       · exact ⟨M none D (q.logReply none log), fun d => by
           simp only [simulated, registerRequest, big, ↓reduceIte, law]⟩
@@ -191,39 +178,23 @@ private theorem simulated_gap (C : QuantumSigningForger) (s : Level) (H : Xofs)
     · simp only [simulated, isXofQuery, Bool.toNat_false, Nat.add_zero]
       apply PMF.meanAbsDiffAt_bind_le μ (ProbComp.unifOracle coin) true
       exact fun i => ih i (cont i) D rep d log
-    · cases cmd with
-      | service op _ => exact op.elim
-      | gate g =>
-        let G := H.withDigestRegister s D
-        let next := d.instruction (G.queryTable C.addressBits C.responseBytes) (.gate g)
-        simpa only [simulated, deviceCommand, deviceHandler_gate, pmf_norm,
-          DeviceState.instruction_apply, OracleGateCode.toPlacedGate?, isSigningCall, isXofQuery,
-          Sum.elim_inr, Sum.elim_inl, Bool.toNat_false, Nat.add_zero, Nat.sub_zero, next, G]
-          using ih [] (cont []) D rep next log
-      | measure wire =>
-        obtain ⟨ν, next, hm⟩ := measure_map d wire
-        simp only [simulated, deviceCommand, deviceHandler_measure, pmf_norm, hm, PMF.bind_map,
-          Function.comp_def, isXofQuery, Bool.toNat_false, Nat.add_zero]
-        apply PMF.meanAbsDiffAt_bind_le μ ν true
-        exact fun b => ih [b] (cont [b]) D rep (next b) log
-      | query =>
-        let G := H.withDigestRegister s D
-        let K y := H.withDigestRegister s (W y)
-        let tail y dev := C.simulated s H A sk pk (k []) (W y) dev log
-        choose M law using fun y => C.simulated_readout s H A sk pk (k []) (W y) log
-        have one : PMF.meanAbsDiffAt μ true (fun y => tail y (stepState (K y) d))
-            (fun y => tail y (stepState G d)) ≤ 4 * √δ := by
-          simp only [tail, law]
-          exact mean_query_gap_of_root μ G K d M ENNReal.toReal_nonneg
-            (H.sq_sqrt_readout_after_maskCommitment_le s A m D rep C.addressBits C.responseBytes
-              C.workQubits d M true)
-        have rest := ih [] (cont []) D rep (stepState G d) log
-        simp only [isSigningCall, Sum.elim_inr, Sum.elim_inl, Bool.toNat_false,
-          Nat.sub_zero] at rest
-        simp only [simulated, deviceCommand, deviceHandler_query, pmf_norm, isXofQuery,
-          Bool.toNat_true, Nat.cast_add_one]
-        exact (PMF.meanAbsDiffAt_triangle μ true _ _ _).trans
-          ((add_le_add one rest).trans_eq (by ring))
+    · simp only [simulated]
+      let G := H.withDigestRegister s D
+      let K y := H.withDigestRegister s (W y)
+      let left y r st := C.simulated s H A sk pk (k r) (W y) st log
+      let right (_ : Mask s) r st := C.simulated s H A sk pk (k r) D st log
+      apply (device_meanGap_le μ G K cmd left right d
+        (Q := 4 * √δ) (B := qH * (4 * √δ) + n * δ + 2 * δ)
+        (fun y r => C.simulated_readout s H A sk pk (k r) (W y) log) ?_ ?_).trans_eq
+      · rw [Nat.cast_add]
+        ring
+      · intro M
+        exact mean_query_gap_of_root μ G K d M ENNReal.toReal_nonneg
+          (H.sq_sqrt_readout_after_maskCommitment_le s A m D rep C.addressBits C.responseBytes
+            C.workQubits d M true)
+      · intro r st
+        simpa only [left, right, isSigningCall, Sum.elim_inr, Sum.elim_inl, Bool.toNat_false,
+          Nat.sub_zero, δ] using ih r (cont r) D rep st log
     · let done T r := C.simulated s H A sk pk (k r) T d (ask.logReply r log)
       have bound := registerRequest_gap s H A sk ask m D rep done
         (B := qH * (4 * √δ) + ((n - 1 : ℕ) : ℝ) * δ + 2 * δ) (fun T value r => by
