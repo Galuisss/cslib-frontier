@@ -40,8 +40,7 @@ def Xofs.expandMask (H : Xofs) (s : Level) (seed : List Byte) (κ : ℕ) :
   let width := s.params.γ₁.log2 + 1
   Vector.ofFn fun i : Fin s.params.ℓ =>
     let nonce := κ + i.val
-    let bytes := H.h256.readBytes (seed ++ [Fin.ofNat 256 nonce, Fin.ofNat 256 (nonce / 256)])
-      (32 * width)
+    let bytes := H.h256.readBytes (nonceInput seed nonce) (32 * width)
     (unpackSigned 1 width s.params.γ₁ bytes).get 0
 
 /-- FIPS 202 specialization of `Xofs.expandMask`. -/
