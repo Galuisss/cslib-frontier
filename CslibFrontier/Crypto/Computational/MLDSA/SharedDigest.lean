@@ -496,10 +496,10 @@ with the digest cache. The query bound justifies presampling the reduction's mat
 theorem keyOnlyGame_eq_moduleLWE_realGame {Coins : Type} (s : Level) (Q : ℕ)
     (coins : ProbComp Coins) (adv : Forger s Coins)
     (hQ : ∀ bytes r, (adv bytes r).IsQueryBounded Q) :
-    MatrixOracle.keyOnlyGame s (observe s coins adv) =
+    MatrixOracle.realKeyGame s (observe s coins adv) =
       ModuleLWE.realGame (MatrixOracle.shortVectorLaw s s.params.ℓ)
         (MatrixOracle.shortVectorLaw s s.params.k) (distinguisher s Q coins adv) := by
-  apply MatrixOracle.keyOnlyGame_eq_realGame_of_planted
+  apply MatrixOracle.realKeyGame_eq_realGame_of_planted
   intro A t
   simp only [MatrixOracle.planted, observe, distinguisher, sampleSaved, ProbComp.eval_bind,
     ProbComp.eval_pure, eval_sampleBytes, ProbComp.eval_replicateFin,
@@ -529,7 +529,7 @@ digests. One final digest lookup accounts for a forgery on a fresh point. -/
 theorem keyOnly_le_moduleLWE_add_fork {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
     (adv : Forger s Coins) (hQ : ∀ bytes r, (adv bytes r).IsQueryBounded Q) :
     let radius := compressedSelfTargetRadius s.params 13
-    ((MatrixOracle.keyOnlyGame s (observe s coins adv)) true).toReal ≤
+    ((MatrixOracle.realKeyGame s (observe s coins adv)) true).toReal ≤
       ModuleLWE.advantage (MatrixOracle.shortVectorLaw s s.params.ℓ)
         (MatrixOracle.shortVectorLaw s s.params.k) (distinguisher s Q coins adv) +
       ((Q + 1 : ℕ) / ((256 : ℝ) ^ digestBytes s) + Real.sqrt ((Q + 1 : ℕ) *
@@ -542,7 +542,7 @@ theorem keyOnly_le_moduleLWE_add_fork {Coins : Type} (s : Level) (Q : ℕ) (coin
   have hr := (ENNReal.toReal_mono (PMF.apply_ne_top _ _)
     (random_le_selfTarget s Q coins adv)).trans hs
   have hl := Game.coe_succProbability_le_add_of_advantage_le
-    (g₀ := MatrixOracle.keyOnlyGame s (observe s coins adv))
+    (g₀ := MatrixOracle.realKeyGame s (observe s coins adv))
     (g₁ := ModuleLWE.randomGame (distinguisher s Q coins adv)) (le_refl _)
   rw [Game.coe_succProbability, Game.coe_succProbability,
     keyOnlyGame_eq_moduleLWE_realGame s Q coins adv hQ] at hl
