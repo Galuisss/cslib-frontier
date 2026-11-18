@@ -96,6 +96,20 @@ variable {n : ℕ} {Q A : Type*}
   let r := PauliConsistencyQuestion.ofChecked basis (if basis then q.zString else q.xString) dummy
   cond swapRoles Prod.swap id (q, r)
 
+/-- The conditional seed law of the consistency branch. The basis and role are already
+fixed, and `specialRound` selects between the special-question and same-basis checks. -/
+@[expose] noncomputable def pauliBraidingConsistencyLaw (n : ℕ) [Nonempty (Fin n)]
+    (questions : PMF (Q × Q)) (swapRoles basis specialRound : Bool) :
+    PMF (PauliBraidingSeed n Q) :=
+  letI := oddPairs_nonempty (ι := Fin n)
+  let odd := Probability.PMF.uniformOfFintype ↥(oddPairs (Fin n))
+  if specialRound then
+    (questions.map Prod.snd).bind fun y => odd.map fun strings =>
+      .special swapRoles basis strings y
+  else
+    (Probability.PMF.uniformOfFintype (↥(oddPairs (Fin n)) × (Fin n → Bool))).map
+      fun (strings, dummy) => .sameBasis swapRoles basis strings dummy
+
 /-- A verifier conditioned on the linearity (0), anticommutation (1), or consistency (2)
 branch. It uses the same questions and checks as the full game. It takes a game, two
 distinguished second-player questions and a
@@ -116,19 +130,13 @@ in the special branch when the sampled question would otherwise be accepted auto
     if branch = 0 then
       uniformBit.bind fun basis =>
         (symmetricLinearityGame n).seed.map (.linearity basis)
-    else
+    else if branch = 1 then
       uniformBit.bind fun roles =>
-        odd.bind fun strings =>
-          if branch = 1 then
-            G.questions.map fun (x, y) => .anticommutation roles strings x y
-          else
-            uniformBit.bind fun basis =>
-              uniformBit.bind fun special =>
-                if special then
-                  G.questions.map fun (_, y) => .special roles basis strings y
-                else
-                  (Probability.PMF.uniformOfFintype (Fin n → Bool)).map
-                    (.sameBasis roles basis strings)
+        odd.bind fun strings => G.questions.map fun (x, y) => .anticommutation roles strings x y
+    else
+      (Probability.PMF.uniformOfFintype (Bool × Bool × Bool)).bind fun
+      | (roles, basis, specialRound) =>
+        pauliBraidingConsistencyLaw n G.questions roles basis specialRound
   { seed := law
     query := fun
     | .linearity basis r =>
