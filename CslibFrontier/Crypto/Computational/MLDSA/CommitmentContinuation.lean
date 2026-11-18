@@ -128,36 +128,9 @@ private theorem mean_abs_of_root {ι : Type} [Fintype ι] (μ : PMF ι) (p q : �
       exact Finset.sum_congr rfl fun _ _ => mul_left_comm ..
     _ ≤ _ := mul_le_mul_of_nonneg_left avg_le (by norm_num)
 
-private noncomputable def meanGap {ι : Type} [Fintype ι] (μ : PMF ι)
-    (p q : ι → PMF Bool) := ∑ y, (μ y).toReal * |prob (p y) - prob (q y)|
-
-private theorem meanGap_triangle {ι : Type} [Fintype ι] (μ : PMF ι) (p q r : ι → PMF Bool) :
-    meanGap μ p r ≤ meanGap μ p q + meanGap μ q r := by
-  unfold meanGap
-  rw [← Finset.sum_add_distrib]
-  refine Finset.sum_le_sum fun y _ => ?_
-  rw [← mul_add]
-  exact mul_le_mul_of_nonneg_left (abs_sub_le ..) ENNReal.toReal_nonneg
-
-private theorem meanGap_mix {ι β : Type} [Fintype ι] [Finite β] (μ : PMF ι) (ν : PMF β)
-    (p q : β → ι → PMF Bool) {B : ℝ} (bound : ∀ j, meanGap μ (p j) (q j) ≤ B) :
-    meanGap μ (fun y => ν.bind fun j => p j y) (fun y => ν.bind fun j => q j y) ≤ B := by
-  let _ := Fintype.ofFinite β
-  unfold meanGap prob
-  simp only [PMF.bind_apply_toReal, ← Finset.sum_sub_distrib, ← mul_sub]
-  calc
-    _ ≤ ∑ y, (μ y).toReal * ∑ j, |(ν j).toReal * (prob (p j y) - prob (q j y))| :=
-      Finset.sum_le_sum fun y _ =>
-        mul_le_mul_of_nonneg_left (Finset.abs_sum_le_sum_abs ..) ENNReal.toReal_nonneg
-    _ = ∑ j, (ν j).toReal * meanGap μ (p j) (q j) := by
-      simp only [abs_mul, abs_of_nonneg ENNReal.toReal_nonneg, meanGap, Finset.mul_sum]
-      rw [Finset.sum_comm]
-      exact Finset.sum_congr rfl fun j _ => Finset.sum_congr rfl fun y _ => mul_left_comm ..
-    _ ≤ B := PMF.sum_mul_le ν _ _ bound
-
 private theorem meanGap_of_agree {ι : Type} [Fintype ι] (μ : PMF ι) (p q : ι → PMF Bool)
     (bad : Set ι) (same : ∀ y, y ∉ bad → p y = q y) :
-    meanGap μ p q ≤ (μ.toOuterMeasure bad).toReal := by
+    PMF.meanAbsDiffAt μ true p q ≤ (μ.toOuterMeasure bad).toReal := by
   classical
   rw [PMF.toOuterMeasure_toReal_eq_sum_ite]
   refine Finset.sum_le_sum fun y _ => mul_le_mul_of_nonneg_left ?_ ENNReal.toReal_nonneg
@@ -182,16 +155,16 @@ private theorem scored_meanGap_le {C : QuantumSigningForger} {α V ι : Type} [Z
     (test : α → List Forgery → List V → Test C) (test' : ι → α → List Forgery → List V → Test C)
     {Q S T : ℝ} (nonQ : 0 ≤ Q) (nonS : 0 ≤ S)
     (coherent : ∀ (d : Device C) (M : ι → Test C),
-      meanGap μ (fun y => observe (M y) (stepState (write y) d))
+      PMF.meanAbsDiffAt μ true (fun y => observe (M y) (stepState (write y) d))
         (fun y => observe (M y) (stepState base d)) ≤ Q)
     (signing : ∀ v q, (μ.toOuterMeasure {y | sign' y v q ≠ sign v q}).toReal ≤ S)
-    (terminal : ∀ x log tape d, meanGap μ (fun y => observe (test' y x log tape) d)
+    (terminal : ∀ x log tape d, PMF.meanAbsDiffAt μ true (fun y => observe (test' y x log tape) d)
       (fun _ => observe (test x log tape) d) ≤ T)
     {prog : Program C α} {m n : ℕ}
     (cost : OracleComp.IsCostBounded (fun q => (isXofQuery q).toNat) prog m)
     (calls : OracleComp.IsCostBounded (fun q => (isSigningCall q).toNat) prog n)
     (d : Device C) (log : List Forgery) (tape : List V) :
-    meanGap μ (fun y => scored prog (write y) (sign' y) (test' y) d log tape)
+    PMF.meanAbsDiffAt μ true (fun y => scored prog (write y) (sign' y) (test' y) d log tape)
       (fun _ => scored prog base sign test d log tape) ≤ m * Q + n * S + T := by
   classical
   induction cost generalizing n d log tape with
@@ -204,7 +177,7 @@ private theorem scored_meanGap_le {C : QuantumSigningForger} {α V ι : Type} [Z
     rcases q with coin | cmd | ask
     · simp only [scored_coin (C := C) (coin := coin) (k := k), isXofQuery,
         Bool.toNat_false, Nat.add_zero]
-      apply meanGap_mix μ (ProbComp.unifOracle coin)
+      apply PMF.meanAbsDiffAt_bind_le μ (ProbComp.unifOracle coin) true
       exact fun i => ih i (cont i) d log tape
     · cases cmd with
       | service op _ => exact op.elim
@@ -219,24 +192,25 @@ private theorem scored_meanGap_le {C : QuantumSigningForger} {α V ι : Type} [Z
         simp only [scored_measure (C := C) (wire := wire) (k := k), hm, PMF.bind_map,
           Function.comp_def, isXofQuery,
           Bool.toNat_false, Nat.add_zero]
-        apply meanGap_mix μ ν
+        apply PMF.meanAbsDiffAt_bind_le μ ν true
         exact fun b => ih [b] (cont [b]) (next b) log tape
       | query =>
         let tail y st := scored (k []) (write y) (sign' y) (test' y) st log tape
         have readout (y) := scored_readout (k []) (write y) (sign' y) (test' y) log tape
         choose M law using readout
-        have one : meanGap μ (fun y => tail y (stepState (write y) d))
+        have one : PMF.meanAbsDiffAt μ true (fun y => tail y (stepState (write y) d))
             (fun y => tail y (stepState base d)) ≤ Q := by
           simpa only [tail, law, observe] using coherent d M
         have rest := ih [] (cont []) (stepState base d) log tape
         simp only [isSigningCall, Sum.elim_inr, Sum.elim_inl, Bool.toNat_false,
           Nat.sub_zero] at rest
         simp only [scored_query (C := C) (k := k), isXofQuery, Bool.toNat_true, Nat.cast_add_one]
-        exact (meanGap_triangle μ _ _ _).trans ((add_le_add one rest).trans_eq (by ring))
+        exact (PMF.meanAbsDiffAt_triangle μ true _ _ _).trans
+          ((add_le_add one rest).trans_eq (by ring))
     · let sig := sign (tape.headD 0) ask
       let sig' y := sign' y (tape.headD 0) ask
       let tail y v := scored (k v) (write y) (sign' y) (test' y) d (ask.logReply v log) tape.tail
-      have one : meanGap μ (fun y => tail y (sig' y)) (fun y => tail y sig) ≤ S :=
+      have one : PMF.meanAbsDiffAt μ true (fun y => tail y (sig' y)) (fun y => tail y sig) ≤ S :=
         (meanGap_of_agree μ _ _ {y | sig' y ≠ sig} fun y h => by
           rw [show sig' y = sig from not_not.mp h]).trans (signing _ ask)
       have rest := ih sig (cont sig) d (ask.logReply sig log) tape.tail
@@ -248,7 +222,7 @@ private theorem scored_meanGap_le {C : QuantumSigningForger} {α V ι : Type} [Z
       have eq : S + (m * Q + (n - 1 : ℕ) * S + T) = m * Q + n * S + T := by
         conv_rhs => rw [len, Nat.cast_add_one]
         ring
-      exact (meanGap_triangle μ _ _ _).trans ((add_le_add one rest).trans_eq eq)
+      exact (PMF.meanAbsDiffAt_triangle μ true _ _ _).trans ((add_le_add one rest).trans_eq eq)
 
 private theorem prob_row_changes (H : Xofs) (s : Level) (A : PublicMatrix s) (m : BitString 512)
     (D) (key : List Byte) (q : SigningQuery) (row : ExpansionRow (maskPolyBytes s)) :
@@ -297,7 +271,7 @@ theorem mean_expansionContinuation_gap_le (C : QuantumSigningForger) (s : Level)
   have finite : commitmentGuessProbability s.params (by cases s <;> decide) A ≠ ⊤ :=
     ne_top_of_le_ne_top ENNReal.one_ne_top (iSup_le fun _ => PMF.coe_le_one _ _)
   simp only [win, Game.coe_succProbability]
-  change meanGap μ _ _ ≤ _
+  change PMF.meanAbsDiffAt μ true _ _ ≤ _
   have bound := scored_meanGap_le (C := C) μ base write
     (fun row q => base.signWithExpansionRow s keys.secretKey q row)
     (fun y row q => (write y).signWithExpansionRow s keys.secretKey q row)

@@ -16,6 +16,8 @@ Check the native signing oracle and forgery score, a nonconstant little-endian d
 coherent reads past the digest.
 -/
 
+set_option linter.privateModule false
+
 open Cslib Cslib.Crypto Cslib.Crypto.MLDSA.FIPS204 Cslib.Quantum Cslib.Probability
 
 example : Level.mlDSA44.commitmentInputBits = 6656 ∧
@@ -121,3 +123,23 @@ example (C : QuantumSigningForger) (s : Level) (H : Xofs) (seed : FixedBytes 32)
   have bound := C.abs_freshDigestSigningCall_keep_sub_erase_le s H keys q D k dev log rows
     (qH := 0) (qS := 0) (fun r => .pure _ 0) (fun r => .pure _ 0)
   simpa [p, δ, sk, ha, ← mul_assoc, show (814 : ℝ) * 2 = 1628 by norm_num] using bound
+
+-- The candidate includes the actual signature bytes and the result of a coherent query and
+-- measurement made after signing, so both the signing reply and installed stream reach the score.
+private def afterOnlySignature (sig : Option (List Byte)) :
+    ProbOracleComp (OracleSpec.sum (fun _ : DeviceRequest (1 + 2 + 8 * 1 + 1) Empty => List Bool)
+      (fun _ : SigningQuery => Option (List Byte))) Forgery :=
+  .liftBind (.inr (.inl .query)) fun _ =>
+    .liftBind (.inr (.inl (.measure 0))) fun bits => .pure ⟨[], bits, sig.getD []⟩
+
+private def onceForger (q : SigningQuery) : QuantumSigningForger :=
+  ⟨1, 1, 1, fun _ => .liftBind (.inr (.inr q)) afterOnlySignature⟩
+
+example (s : Level) (H : Xofs) (keys : KeyPair) (q : SigningQuery) (D) :
+    (onceForger q).freshDigestSigningCall s H keys q D false afterOnlySignature
+        (onceForger q).initialDevice [] [] =
+      ((onceForger q).freshMaskSigning s (H.withDigestRegister s D) keys).map
+        (·.any (·.trial.newDigestWin)) :=
+  (onceForger q).freshDigestSigningCall_eq_freshMaskSigning_of_single_call s H keys q D
+    afterOnlySignature rfl fun _ =>
+      .liftBind _ _ 0 fun _ => .liftBind _ _ 0 fun _ => .pure _ 0

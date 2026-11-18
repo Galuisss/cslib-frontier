@@ -12,6 +12,9 @@ public import CslibFrontier.Crypto.Computational.MLDSA.PublicPairSigning
 import all CslibFrontier.Crypto.Computational.MLDSA.PublicPairSigning
 import all CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitmentRegister
 import all CslibFrontier.Crypto.Computational.MLDSA.CommitmentContinuation
+import all CslibFrontier.Crypto.Computational.MLDSA.SigningQueryComparison
+import all CslibFrontier.Crypto.Computational.MLDSA.SigningHedges
+import all CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
 import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
 import all CslibFrontier.Crypto.Computational.MLDSA.DigestSigningQueries
 
@@ -64,7 +67,7 @@ theorem Xofs.withDigestRegister_update (H : Xofs) (s : Level) (D)
         eq, len]
 
 namespace QuantumSigningForger
-open Cslib.Probability
+open Cslib.Probability Cslib.Quantum
 
 section Retry
 variable {Y I V R : Type} [Fintype Y] [Finite V] [DecidableEq I]
@@ -98,18 +101,19 @@ private theorem update_then_write (D : I → V) (x i : I) (v w : V) :
 private theorem terminalRetries_stable (μ : PMF Y) (ν : PMF V) (addr : Y → I)
     (out : Y → V → Option (Option R)) (done : (I → V) → Option R → Game) {B : ℝ}
     (tail : ∀ D (rep : Y → V) r,
-      meanGap μ (fun y => done (Function.update D (addr y) (rep y)) r) (fun _ => done D r) ≤ B)
+      PMF.meanAbsDiffAt μ true (fun y => done (Function.update D (addr y) (rep y)) r)
+        (fun _ => done D r) ≤ B)
     (fuel : ℕ) (D : I → V) (rep : Y → V) :
-    meanGap μ (fun y => runRetries μ ν addr out done false fuel
+    PMF.meanAbsDiffAt μ true (fun y => runRetries μ ν addr out done false fuel
         (Function.update D (addr y) (rep y)))
       (fun _ => runRetries μ ν addr out done false fuel D) ≤ B := by
   induction fuel generalizing D with
   | zero => exact tail D rep none
   | succ fuel ih =>
     simp only [runRegisterRetries, PMF.monad_bind_eq_bind, Bool.false_eq_true, ↓reduceIte]
-    apply meanGap_mix μ ν
+    apply PMF.meanAbsDiffAt_bind_le μ ν true
     intro v
-    apply meanGap_mix μ μ
+    apply PMF.meanAbsDiffAt_bind_le μ μ true
     intro z
     cases h : out z v with
     | none => exact ih D
@@ -117,36 +121,31 @@ private theorem terminalRetries_stable (μ : PMF Y) (ν : PMF V) (addr : Y → I
       simp only [update_then_write D _ (addr z) _ v]
       exact tail _ _ r
 
-private theorem abs_mix_gap_le (μ : PMF Y) (p q : Y → Game) :
-    |prob (μ.bind p) - prob (μ.bind q)| ≤ meanGap μ p q := by
-  simp only [prob, PMF.bind_apply_toReal, meanGap, ← Finset.sum_sub_distrib, ← mul_sub]
-  simpa only [abs_mul, abs_of_nonneg ENNReal.toReal_nonneg] using
-    Finset.abs_sum_le_sum_abs (fun y => (μ y).toReal * (prob (p y) - prob (q y))) Finset.univ
-
 private theorem eraseRetries_le (μ : PMF Y) (ν : PMF V) (addr : Y → I)
     (out : Y → V → Option (Option R)) (done : (I → V) → Option R → Game) {B : ℝ} (hb : 0 ≤ B)
     (tail : ∀ D (rep : Y → V) r,
-      meanGap μ (fun y => done (Function.update D (addr y) (rep y)) r) (fun _ => done D r) ≤ B)
+      PMF.meanAbsDiffAt μ true (fun y => done (Function.update D (addr y) (rep y)) r)
+        (fun _ => done D r) ≤ B)
     (fuel : ℕ) (D : I → V) :
-    |prob (runRetries μ ν addr out done true fuel D) -
-      prob (runRetries μ ν addr out done false fuel D)| ≤ fuel * B := by
+    |(runRetries μ ν addr out done true fuel D true).toReal -
+      (runRetries μ ν addr out done false fuel D true).toReal| ≤ fuel * B := by
   let _ := Fintype.ofFinite V
   induction fuel generalizing D with
   | zero => simp [runRegisterRetries]
   | succ fuel ih =>
     simp only [runRegisterRetries, PMF.monad_bind_eq_bind, Bool.false_eq_true, ↓reduceIte,
       Nat.cast_add_one]
-    apply (abs_mix_gap_le ν _ _).trans
+    apply (PMF.abs_bind_sub_le_meanAbsDiffAt ν true _ _).trans
     apply PMF.sum_mul_le
     intro v
-    apply (abs_mix_gap_le μ _ _).trans
+    apply (PMF.abs_bind_sub_le_meanAbsDiffAt μ true _ _).trans
     let W y := Function.update D (addr y) v
     let go keep T := runRetries μ ν addr out done keep fuel T
     let mid y := match out y v with
       | some r => done (W y) r
       | none => go false (W y)
-    refine (meanGap_triangle μ _ mid _).trans ?_
-    have h₁ : meanGap μ (fun y => match out y v with
+    refine (PMF.meanAbsDiffAt_triangle μ true _ mid _).trans ?_
+    have h₁ : PMF.meanAbsDiffAt μ true (fun y => match out y v with
         | some r => done (W y) r | none => go true (W y)) mid ≤ fuel * B := by
       apply PMF.sum_mul_le
       intro y
@@ -154,7 +153,7 @@ private theorem eraseRetries_le (μ : PMF Y) (ν : PMF V) (addr : Y → I)
       | none => simpa only [mid, e] using ih (W y)
       | some r => simpa only [mid, e, sub_self, abs_zero] using mul_nonneg (Nat.cast_nonneg fuel) hb
     -- Charge the fresh mask at its original mass even if the norm or hint test rejects it.
-    have h₂ : meanGap μ mid (fun y => match out y v with
+    have h₂ : PMF.meanAbsDiffAt μ true mid (fun y => match out y v with
         | some r => done (W y) r | none => go false D) ≤ B := by
       apply le_trans _ (terminalRetries_stable μ ν addr out done tail fuel D (fun _ => v))
       apply Finset.sum_le_sum
@@ -409,6 +408,67 @@ theorem abs_freshDigestSigningCall_keep_sub_erase_le (C : QuantumSigningForger) 
       rw [same] at bound
       simpa only [hm, Option.pure_def, Option.bind_eq_bind, Option.bind_some, Option.getD_some,
         Bool.false_eq_true, ↓reduceIte, st, G] using bound
+
+private theorem scored_no_sign (C : QuantumSigningForger) (s : Level) (base : Xofs)
+    (A : PublicMatrix s) (keys : KeyPair) (sk : PrivateKey s) (prog : C.Program Forgery)
+    (nosign : OracleComp.IsCostBounded (fun cmd => (isSigningCall cmd).toNat) prog 0)
+    (d : C.Device) (st : History s base sk.tr) :
+    C.expansionContinuation s st.xofs A keys prog d st.log [] =
+      (ProbOracleComp.runWith (C.programmedCommands s base sk.tr (freshMaskDraw s A sk)) prog
+        (d, st)).bind fun (f, _, state) => PMF.pure (SignedMatrixTrial.newDigestWin
+          ⟨state.xofs, A, keys.publicKey, f, state.log⟩) := by
+  classical
+  induction prog using OracleComp.induction generalizing d st with
+  | pure f => simp [expansionContinuation, scored, interp_norm, pmf_norm, POVM.measureDensity_const]
+  | query_bind cmd k ih =>
+    obtain ⟨fits, tail⟩ := OracleComp.IsCostBounded.liftBind_iff.mp nosign
+    simp only [PFunctor.FreeM.bind_eq_bind]
+    rcases cmd with coin | cmd | ask
+    · simp only [expansionContinuation, scored_coin (C := C) (coin := coin) (k := k),
+        ProbOracleComp.runWith, OracleComp.runWith_bind, OracleComp.runWith_query,
+        OracleComp.sumHandler, PMF.bind_map, PMF.bind_bind, Function.comp_def]
+      exact congrArg (PMF.bind _ ·) (funext fun i => ih i (tail i) d st)
+    · simp only [ProbOracleComp.runWith, OracleComp.runWith_bind, OracleComp.runWith_query,
+        OracleComp.sumHandler]
+      simp only [programmedCommands, OracleComp.sumHandler, PMF.bind_map, PMF.bind_bind,
+        Function.comp_def, expansionContinuation, scored_step (C := C) (q := .inr (.inl cmd))
+          (k := k), OracleComp.withSampleListWhen,
+        isSigningCall, Sum.elim_inr, Sum.elim_inl, Bool.false_eq_true, ↓reduceIte,
+        signingCommand, StateT.run, pmf_norm]
+      apply congrArg (PMF.bind _ ·)
+      funext ⟨bits, next⟩
+      exact ih bits (tail bits) next st
+    · simp [isSigningCall] at fits
+
+/-- For a forger whose first instruction requests the only signature, the terminal-write
+experiment on encoded keys has exactly the fresh-digest win law of `freshMaskSigning`.
+The continuation may branch on the reply, toss coins, measure and query SHAKE coherently. -/
+theorem freshDigestSigningCall_eq_freshMaskSigning_of_single_call
+    (C : QuantumSigningForger) (s : Level) (H : Xofs) (keys : KeyPair) (q : SigningQuery)
+    (D : BitString s.commitmentInputBits → BitString (8 * digestBytes s))
+    (k : Option (List Byte) → C.Program Forgery)
+    (first : C.program keys.publicKey = OracleComp.query (.inr (.inr q)) >>= k)
+    (last : ∀ r, OracleComp.IsCostBounded (fun cmd => (isSigningCall cmd).toNat) (k r) 0) :
+    C.freshDigestSigningCall s H keys q D false k C.initialDevice [] [] =
+      (C.freshMaskSigning s (H.withDigestRegister s D) keys).map
+        (·.any (·.trial.newDigestWin)) := by
+  classical
+  let G := H.withDigestRegister s D
+  have matrix (rho) : G.expandA s rho = H.expandA s rho := rfl
+  simp only [freshDigestSigningCall, freshMaskSigning, ← show G = H.withDigestRegister s D from rfl,
+    matrix, Bool.false_eq_true, ↓reduceIte]
+  cases hd : decodePrivate s keys.secretKey with
+  | none => simp [pmf_norm]
+  | some sk =>
+    cases ha : H.expandA s sk.rho with
+    | none => simp [ha, pmf_norm]
+    | some A =>
+      simp only [ha, runProgrammed, first, ProbOracleComp.runWith, OracleComp.runWith_bind,
+        OracleComp.runWith_query, OracleComp.sumHandler, programmedCommands, PMF.map_bind,
+        PMF.bind_map, Function.comp_def, pmf_norm]
+      apply congrArg (PMF.bind _ ·)
+      funext ⟨r, state⟩
+      exact scored_no_sign C s G A keys sk (k r) (last r) C.initialDevice state
 
 end QuantumSigningForger
 end Cslib.Crypto.MLDSA.FIPS204
