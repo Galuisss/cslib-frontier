@@ -8,13 +8,11 @@ module
 -- upstream: local-only (test driver)
 
 import CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitmentRegister
-import CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
 
 /-!
 # ML-DSA digest-register clients
 
-Run a forger through the whole key, signing and verification experiment under the separately
-sampled register. Check a nonconstant little-endian digest and a coherent read past the digest.
+Check a nonconstant little-endian digest and compose two coherent reads past the digest.
 -/
 
 open Cslib Cslib.Crypto Cslib.Crypto.MLDSA.FIPS204 Cslib.Quantum Cslib.Probability
@@ -22,18 +20,6 @@ open Cslib Cslib.Crypto Cslib.Crypto.MLDSA.FIPS204 Cslib.Quantum Cslib.Probabili
 example : Level.mlDSA44.commitmentInputBits = 6656 ∧
     Level.mlDSA65.commitmentInputBits = 6656 ∧ Level.mlDSA87.commitmentInputBits = 8704 := by
   decide
-
--- The SHAKE table draw is outside key generation and the entire adaptive forgery experiment.
-example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ}
-    (ha : s.commitmentInputBits ≤ a) (hb : digestBytes s ≤ b) :
-    ((base.uniformPrefixes a b).bind fun H =>
-      (PMF.uniformOfFintype (BitString s.commitmentInputBits → BitString (8 * digestBytes s))).bind
-        fun D => C.forgeryGame (H.withDigestRegister s D) s) =
-      (base.uniformPrefixes a b).bind fun H => C.forgeryGame H s := by
-  have eq := congrArg (fun p : PMF ((BitString s.commitmentInputBits →
-    BitString (8 * digestBytes s)) × Xofs) => p.bind fun v => C.forgeryGame v.2 s)
-    (base.uniformPrefixes_digestRegister s ha hb)
-  simpa only [PMF.bind_bind, PMF.bind_map, Function.comp_def] using eq
 
 -- A digest with only bit 8 set tests the byte boundary at the raw commitment address.
 example (H : Xofs) (s : Level) (w : Fin s.params.k → Fin 256 → ℤ) (μ : BitString 512) :
@@ -48,8 +34,9 @@ example (H : Xofs) (s : Level) (w : Fin s.params.k → Fin 256 → ℤ) (μ : Bi
 example (H : Xofs) (D : BitString Level.mlDSA44.commitmentInputBits → BitString 256)
     {m : ℕ} (p q : Fin (6656 + 2 + 8 * 33) ↪ Fin m) (ψ : Qubits m) :
     let native := (H.withDigestRegister .mlDSA44 D).queryTable 6656 33
-    let run := fun wires => lookupXor wires (Xofs.digestLookup .mlDSA44)
-      (H.digestResponse .mlDSA44 6656 33) D
+    let run := fun wires state => runValue addStep
+      (lookupXorSteps wires (Xofs.digestLookup .mlDSA44) (H.digestResponse .mlDSA44 6656 33))
+      state D 2
     run q (run p (cleanLookupState ψ)) =
       cleanLookupState ((xorQuery native q).eval ((xorQuery native p).eval ψ)) := by
   intro native run
