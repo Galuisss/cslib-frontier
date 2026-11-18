@@ -20,7 +20,7 @@ set_option linter.privateModule false
 open Cslib Cslib.Crypto Cslib.Crypto.MLDSA.FIPS204 Cslib.Probability
 open scoped Cslib.Probability.PMF
 
--- The address formed from the actual decoded signing key and the actual formatted message
+-- The address formed from the decoded private signing seed K and the actual formatted message
 -- representative gives the assigned seed both to the signer and to the coherent device.
 -- A query extending one byte beyond the seed reads the original suffix.
 example (base : Xofs) (s : Level) (seed : FixedBytes 32) {a b n : ℕ}
@@ -162,12 +162,12 @@ example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ}
   (C.maskSeedQueryHit_le s base ha hb hn (by decide) j).trans (by norm_num)
 
 -- At a large signing budget the entire measured-query loss scales with the chance of
--- predicting the secret prefix, including the public-key-hash candidate.
+-- predicting the private signing seed K, including the public-key-hash candidate.
 example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ} (ha : 1024 ≤ a)
     (hb : 64 ≤ b) (hn : C.SigningCallsLe (2 ^ 64)) (j : ℕ) :
     (Game.succProbability (C.maskSeedQueryHit s base (n := 2 ^ 64) ha hb (by decide) j) : ℝ) ≤
-      (1 / 2 ^ 191) * Game.succProbability (C.maskSeedKeyPrediction s base a b (2 ^ 64) j) := by
-  have h := C.maskSeedQueryHit_le_keyPrediction s base ha hb hn (by decide) j
+      (1 / 2 ^ 191) * Game.succProbability (C.signingSeedPredictionGame s base a b (2 ^ 64) j) := by
+  have h := C.maskSeedQueryHit_le_signingSeedPrediction s base ha hb hn (by decide) j
   convert h using 2
   norm_num
 
@@ -188,10 +188,10 @@ example (C : QuantumSigningForger) (x : List Bool) (hx : x.length ≤ C.addressB
       Fin.cons_zero, guard, ↓reduceIte, Option.pure_def, Fin.cons_succ, BitString.ofFn_ofList len,
       Xofs.unpad_word]
 
--- If the forger stops early, only the public-key hash can predict the secret prefix.
+-- If the forger stops early, only the public-key hash can predict the private signing seed K.
 open QuantumSigningForger in
 example (C : QuantumSigningForger) (H : Xofs) (s : Level) (seed : FixedBytes 32) (keys : KeyPair)
     (hg : H.keyGen s seed = some keys) :
-    keyCandidates (C := C) (publicHash H ((H.keyGen s seed).map KeyPair.publicKey)) none =
+    signingSeedCandidates (C := C) (publicHash H ((H.keyGen s seed).map KeyPair.publicKey)) none =
       [Keccak.bytesToBitsLE ((H.h256.readBytes keys.publicKey 64).take 32)] := by
-  simp [keyCandidates, publicHash, hg, queryKeyPrefix]
+  simp [signingSeedCandidates, publicHash, hg, queryKeyPrefix]

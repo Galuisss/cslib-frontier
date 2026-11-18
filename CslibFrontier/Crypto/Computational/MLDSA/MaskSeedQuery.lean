@@ -26,7 +26,7 @@ the forger's adaptive classical signing requests and earlier coherent operations
 
 For a budget of `n` signatures the probability of this event is at most `2 * n / 2^256`.
 The sharper bound multiplies this coefficient by the probability that a candidate from the
-public-key hash or the measured SHAKE256 input predicts the actual 32-byte signing key.
+public-key hash or the measured SHAKE256 input predicts the 32-byte private signing seed `K`.
 -/
 
 public section
@@ -140,7 +140,7 @@ private def queryKeyPrefix {C : QuantumSigningForger} (addr : Option (Address C)
   let x ← Xofs.unpad (List.ofFn fun i : Fin (C.addressBits + 1) => a i.succ)
   return x.take 256
 
-private theorem key_hedge_of_differs {C : QuantumSigningForger} {base : Xofs} {s : Level}
+private theorem seed_hedge_of_differs {C : QuantumSigningForger} {base : Xofs} {s : Level}
     {seed : FixedBytes 32} {a b n : ℕ} {t : Fin n ↪ FixedBytes 32} {ha : 1024 ≤ a}
     {hb : 64 ≤ b} {rows : SigningMaskSeeds n} {p : SigningMaskSeedOracles}
     (hp : p ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support) {addr : Option (Address C)}
@@ -171,8 +171,8 @@ private theorem key_hedge_of_differs {C : QuantumSigningForger} {base : Xofs} {s
         obtain ⟨i, μ, eq⟩ := hit
         refine ⟨?_, i, ?_⟩
         · have len : (Keccak.bytesToBitsLE key).length = 256 := by
-            change (Keccak.bytesToBitsLE (signingKeyBytes p.background s seed)).length = 256
-            rw [bitsLength, signingKeyBytes_length]
+            change (Keccak.bytesToBitsLE (signingSeedBytes p.background s seed)).length = 256
+            rw [bitsLength, signingSeedBytes_length]
           simp only [queryKeyPrefix, Option.bind_eq_bind, Option.bind_some, strength, guard,
             ↓reduceIte, Option.pure_def, hx]
           rw [← eq]
@@ -212,7 +212,7 @@ noncomputable def maskSeedQueryHit (C : QuantumSigningForger) (s : Level) (base 
 private def publicHash (H : Xofs) (pk : Option (List Byte)) : Option (List Byte) :=
   pk.map fun bytes => H.h256.readBytes bytes 64
 
-private def keyCandidates {C : QuantumSigningForger} (hash : Option (List Byte))
+private def signingSeedCandidates {C : QuantumSigningForger} (hash : Option (List Byte))
     (addr : Option (Address C)) : List (List Bool) :=
   (hash.map (fun tr => Keccak.bytesToBitsLE (tr.take 32))).toList ++
     (queryKeyPrefix (C := C) addr).toList
@@ -223,14 +223,15 @@ private noncomputable def fixedPrediction (C : QuantumSigningForger) (s : Level)
     let keys := H.keyGen s seed
     let hash := publicHash H (keys.map KeyPair.publicKey)
     (C.rowAddress s keys rows H j).map fun addr =>
-      (keyCandidates (C := C) hash addr).contains (Keccak.bytesToBitsLE (signingKeyBytes H s seed))
+      (signingSeedCandidates (C := C) hash addr).contains
+        (Keccak.bytesToBitsLE (signingSeedBytes H s seed))
 
-/-- Two candidates for the FIPS signing key, in the background experiment with independent
-mask-seed rows. Compare the first 32 bytes of the public-key hash and the first 256 input bits
-at the selected SHAKE256 query with the actual signing key. The experiment makes one extra
+/-- Predict the 32-byte private signing seed `K` in the encoded FIPS 204 private key.
+The candidates are the first 32 bytes of the public-key hash and the first 256 input bits
+at the selected SHAKE256 query, using independent mask-seed rows. The experiment makes one extra
 64-byte SHAKE256 read at the published key on successful key generation, independently of the
 forger's register widths. Missing candidates cannot win. -/
-noncomputable def maskSeedKeyPrediction (C : QuantumSigningForger) (s : Level) (base : Xofs)
+noncomputable def signingSeedPredictionGame (C : QuantumSigningForger) (s : Level) (base : Xofs)
     (a b n j : ℕ) : Game := do
   let seed ← PMF.uniformOfFintype (FixedBytes 32)
   let rows ← PMF.uniformOfFintype (SigningMaskSeeds n)
@@ -242,12 +243,12 @@ private theorem representative_collision {base : Xofs} {s : Level} {seed : Fixed
     (hp : p ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
     (bad : representativeBad s seed p) :
     ∃ i, publicHash p.background ((p.background.keyGen s seed).map KeyPair.publicKey) =
-      some (signingKeyBytes p.background s seed ++ (t i).toList) := by
+      some (signingSeedBytes p.background s seed ++ (t i).toList) := by
   obtain ⟨keys, hg, m, ne⟩ := bad
   rw [Xofs.messageRepresentative, publicKeyHash_eq_of_mem_sampleSigningMaskSeeds hp hg] at ne
-  obtain ⟨i, h⟩ := key_hedge_of_representative_ne hp _ (p.background.h256.length_read ..) _ ne
+  obtain ⟨i, h⟩ := seed_hedge_of_representative_ne hp _ (p.background.h256.length_read ..) _ ne
   exact ⟨i, by simpa only [publicHash, hg, Option.map_some, Option.some.injEq,
-    signingKeyBytes, ExtendableOutput.readBytes] using h⟩
+    signingSeedBytes, ExtendableOutput.readBytes] using h⟩
 
 private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base : Xofs)
     (seed : FixedBytes 32) {a b n : ℕ} (ha : 1024 ≤ a) (hb : 64 ≤ b)
@@ -258,7 +259,7 @@ private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base :
   classical
   let tapes := PMF.uniformOfFintype (Fin n ↪ FixedBytes 32)
   let draw := fun t => base.sampleSigningMaskSeeds s seed t ha hb rows
-  let key (H : Xofs) := signingKeyBytes H s seed
+  let key (H : Xofs) := signingSeedBytes H s seed
   let hash (H : Xofs) := publicHash H ((H.keyGen s seed).map KeyPair.publicKey)
   let covers (H : Xofs) (t : Fin n ↪ FixedBytes 32) :=
     ∃ i, hash H = some (key H ++ (t i).toList)
@@ -278,7 +279,7 @@ private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base :
         rw [PMF.bind_const, PMF.pure_apply_self])
     · rw [actualAddress_eq hp bad hn j]
       apply PMF.map_true_mono
-      exact fun addr _ diff => decide_eq_true (Or.inr (key_hedge_of_differs hp diff))
+      exact fun addr _ diff => decide_eq_true (Or.inr (seed_hedge_of_differs hp diff))
   have ref : C.fixedQueryGame s base seed ha hb rows j true ≤
       (tapes.bind fun t => (base.uniformPrefixes a b).bind fun H => report H t) true := by
     apply PMF.bind_apply_mono_on_support tapes
@@ -302,7 +303,8 @@ private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base :
       (PMF.toOuterMeasure_ne_top _ _) (by positivity), prob_uniformOfFintype_embedding_mem_range]
     simp only [Fintype.card_fin, card_hedge, Nat.cast_pow, Nat.cast_ofNat, le_refl]
   simp only [Function.comp_apply]
-  by_cases guess : (keyCandidates (C := C) (hash H) addr).contains (Keccak.bytesToBitsLE (key H))
+  by_cases guess : (signingSeedCandidates (C := C) (hash H) addr).contains
+      (Keccak.bytesToBitsLE (key H))
   · rw [guess, PMF.pure_apply_self, mul_one]
     have publicBound : (tapes.map (fun t => decide (covers H t))) true ≤ R := by
       by_cases existsTarget : ∃ r : FixedBytes 32, hash H = some (key H ++ r.toList)
@@ -332,26 +334,26 @@ private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base :
   · have no t : ¬ (covers H t ∨ atQuery H addr t) := by
       intro hit
       apply guess
-      rw [List.contains_iff_mem, keyCandidates, List.mem_append]
+      rw [List.contains_iff_mem, signingSeedCandidates, List.mem_append]
       rcases hit with ⟨i, eq⟩ | ⟨eq, _⟩
       · left
         rw [eq]
         simp only [Option.map_some, Option.toList_some, List.mem_singleton]
         apply congrArg Keccak.bytesToBitsLE
-        simpa only [key, signingKeyBytes_length] using
-          (List.take_left (l₁ := signingKeyBytes H s seed) (l₂ := (t i).toList)).symm
+        simpa only [key, signingSeedBytes_length] using
+          (List.take_left (l₁ := signingSeedBytes H s seed) (l₂ := (t i).toList)).symm
       · right
         simp [eq]
     simp only [no, decide_false, PMF.bind_const]
     simp
 
-/-- Detecting a changed row requires the hedge tape to cover a candidate and the signing
-key to match one of two predicted prefixes in the independent background execution. -/
-theorem maskSeedQueryHit_le_keyPrediction (C : QuantumSigningForger) (s : Level) (base : Xofs)
-    {a b n : ℕ} (ha : 1024 ≤ a) (hb : 64 ≤ b) (hn : C.SigningCallsLe n)
+/-- Detecting a changed row requires the hedge tape to cover a candidate and the private
+signing seed `K` to match one of two predicted prefixes in the independent background execution. -/
+theorem maskSeedQueryHit_le_signingSeedPrediction (C : QuantumSigningForger) (s : Level)
+    (base : Xofs) {a b n : ℕ} (ha : 1024 ≤ a) (hb : 64 ≤ b) (hn : C.SigningCallsLe n)
     (hsize : n ≤ 2 ^ 256) (j : ℕ) :
     (Game.succProbability (C.maskSeedQueryHit s base ha hb hsize j) : ℝ) ≤
-      (2 * n / 2 ^ 256) * Game.succProbability (C.maskSeedKeyPrediction s base a b n j) := by
+      (2 * n / 2 ^ 256) * Game.succProbability (C.signingSeedPredictionGame s base a b n j) := by
   let _ : Nonempty (Fin n ↪ FixedBytes 32) := hedgeEmbedding_nonempty hsize
   have law : C.maskSeedQueryHit s base ha hb hsize j =
       (PMF.uniformOfFintype (FixedBytes 32)).bind fun seed =>
@@ -362,7 +364,7 @@ theorem maskSeedQueryHit_le_keyPrediction (C : QuantumSigningForger) (s : Level)
     pmf_swap with rows
     rfl
   have h : C.maskSeedQueryHit s base ha hb hsize j true ≤
-      ENNReal.ofReal (2 * n / 2 ^ 256) * C.maskSeedKeyPrediction s base a b n j true := by
+      ENNReal.ofReal (2 * n / 2 ^ 256) * C.signingSeedPredictionGame s base a b n j true := by
     rw [law]
     apply PMF.bind_apply_le_mul_bind_apply
     intro seed
@@ -382,7 +384,7 @@ theorem maskSeedQueryHit_le (C : QuantumSigningForger) (s : Level) (base : Xofs)
     (hsize : n ≤ 2 ^ 256) (j : ℕ) :
     (Game.succProbability (C.maskSeedQueryHit s base (n := n) ha hb hsize j) : ℝ) ≤
       2 * n / 2 ^ 256 := by
-  apply (C.maskSeedQueryHit_le_keyPrediction s base ha hb hn hsize j).trans
+  apply (C.maskSeedQueryHit_le_signingSeedPrediction s base ha hb hn hsize j).trans
   apply mul_le_of_le_one_right (by positivity)
   exact_mod_cast Game.succProbability_le_one _
 
