@@ -125,22 +125,14 @@ private def rowSigner (H : Xofs) (s : Level) (seed : FixedBytes 32) : Option Row
   (H.keyGen s seed).map fun k =>
     ⟨k.publicKey, H.h256.readBytes k.publicKey 64, fun row q => H.signWithRow s k.secretKey q row⟩
 
-private theorem encoded_size {s : Level} (w : PrivateKey s)
-    (hr : w.rho.length = 32) (hk : w.key.length = 32) (ht : w.tr.length = 64) :
-    w.encode.length = 128 +
-      32 * ((2 * s.params.η).log2 + 1) * s.params.ℓ +
-      32 * ((2 * s.params.η).log2 + 1) * s.params.k + 32 * 13 * s.params.k := by
-  simp only [PrivateKey.encode, List.length_append, hr, hk, ht, packSigned, length_packCoeffs]
-  lia
-
 private theorem decode_rekey {s : Level} (sk : PrivateKey s) (rhoLen : sk.rho.length = 32)
     (keyLen : sk.key.length = 32) (trLen : sk.tr.length = 64) (K : FixedBytes 32) :
     decodePrivate s ({sk with key := K.toList} : PrivateKey s).encode =
       (decodePrivate s sk.encode).map fun v => { v with key := K.toList } := by
   unfold decodePrivate
   dsimp only
-  rw [encoded_size sk rhoLen keyLen trLen,
-    encoded_size {sk with key := K.toList} rhoLen (FixedBytes.length_toList K) trLen]
+  rw [sk.length_encode rhoLen keyLen trLen,
+    PrivateKey.length_encode {sk with key := K.toList} rhoLen (FixedBytes.length_toList K) trLen]
   simp only [guard,
     ↓reduceIte, Option.pure_def, Option.bind_eq_bind, Option.bind_some, Option.map_some,
     PrivateKey.encode, List.drop_left' rhoLen, List.drop_left' keyLen,
@@ -152,38 +144,12 @@ private theorem decoded_tr {s : Level} (sk v : PrivateKey s) (rhoLen : sk.rho.le
     (hv : decodePrivate s sk.encode = some v) : v.tr = sk.tr := by
   unfold decodePrivate at hv
   dsimp only at hv
-  rw [encoded_size sk rhoLen keyLen trLen] at hv
+  rw [sk.length_encode rhoLen keyLen trLen] at hv
   simp only [guard, ↓reduceIte,
     Option.pure_def, Option.bind_eq_bind, Option.bind_some, Option.some.injEq] at hv
   rw [← hv]
   simp only [PrivateKey.encode, List.drop_left' rhoLen, List.drop_left' keyLen,
     List.take_left' trLen]
-
-private theorem attempt_plant (H : Xofs) (s : Level) (seed : FixedBytes 32) (out : FixedBytes 128)
-    (v : PrivateKey s) (K : FixedBytes 32) (A : PublicMatrix s) {μ : List Bool}
-    (hμ : μ.length = 512) (mask : FixedBytes 64) (κ : ℕ) :
-    (H.plant s seed out).attempt s {v with key := K.toList} A μ mask.toList κ =
-      H.attempt s v A μ mask.toList κ := by
-  let G := H.plant s seed out
-  have nonce i k : G.h256.readBytes (nonceInput mask.toList i) k =
-      H.h256.readBytes (nonceInput mask.toList i) k := by
-    apply plant_off
-    simp [bitsLength, nonceInput]
-  have expand : G.expandMask s mask.toList κ = H.expandMask s mask.toList κ := by
-    simp only [Xofs.expandMask, nonce]
-  have dig w : G.commitmentDigest s w μ = H.commitmentDigest s w μ := by
-    apply plant_off
-    simp only [commitmentInput, List.length_append, hμ]
-    lia
-  have chal w :
-      G.sampleInBall s (H.commitmentDigest s w μ) =
-        H.sampleInBall s (H.commitmentDigest s w μ) := by
-    unfold Xofs.sampleInBall
-    rw [show G.h256.readBytes (H.commitmentDigest s w μ) 221 =
-          H.h256.readBytes (H.commitmentDigest s w μ) 221 from plant_off _ _ _ _ (by
-            rw [bitsLength, length_commitmentDigest]; cases s <;> decide) _]
-  change G.attempt s _ A μ mask.toList κ = _
-  simp only [Xofs.attempt, expand, dig, chal]
 
 private abbrev signDecoded (H : Xofs) (s : Level) (m : List Bool) (r : Row) (v : PrivateKey s) :=
   H.signDecodedWithSeed s v m fun μ => (r (BitString.ofList 512 μ)).toList
@@ -205,8 +171,13 @@ private theorem signDecoded_plant (H : Xofs) (s : Level) (seed : FixedBytes 32)
   rw [rep, Xofs.expandA_congr (H := H) (K := H.plant s seed out) rfl]
   apply congrArg (Option.bind (H.expandA s v.rho))
   funext A
-  exact congrArg (fun f => firstAccepted s.params.ℓ f 814 0)
-    (funext (attempt_plant H s seed out v K A hμ (r (BitString.ofList 512 μ))))
+  apply congrArg (fun f => firstAccepted s.params.ℓ f 814 0)
+  funext κ
+  apply attempt_congr_of_read (s := s) (sk := v) (r := r (BitString.ofList 512 μ))
+    (fun _ h => plant_off H s seed out h) (by decide) _ (by cases s <;> decide)
+  intro w
+  simp only [commitmentInput, List.length_append, hμ]
+  lia
 
 private theorem row_eq_decoded (H : Xofs) (s : Level) (sk : List Byte) (q : SigningQuery)
     (r : Row) (hc : q.context.length ≤ 255) :
