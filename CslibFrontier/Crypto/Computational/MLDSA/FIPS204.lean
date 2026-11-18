@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Crypto.Computational.MLDSA.Signing
+public import CslibFrontier.Crypto.Computational.SIS.SelfTargetFork
 public import CslibFrontier.Crypto.Primitives.Hash.ExtendableOutput
 public import CslibFrontier.Crypto.Primitives.Hash.Keccak.SHAKE128
 public import CslibFrontier.Probability.PMF
@@ -18,7 +19,6 @@ import Mathlib.Data.List.Sort
 import Mathlib.Order.Interval.Finset.Fin
 import CslibFrontier.Foundations.Data.List.Flatten
 import CslibFrontier.Foundations.Data.BitString.List
-import all Batteries.Data.List.Basic
 
 /-!
 # ML-DSA verification on byte keys and signatures
@@ -205,12 +205,17 @@ theorem rejNTTPoly_eq_some_iff (bytes : List Byte) (v : Poly) :
         List.getElem_ofFn]
         using he
 
+/-- Reverse the eight bits of the FIPS evaluation index (§§2.5 and 7.5). -/
+@[expose] def bitRev8 (i : Fin 256) : Fin 256 :=
+  ⟨BitString.lsbValue (BitString.lowBits 8 i.val).reverse, by
+    simpa using BitString.lsbValue_lt (BitString.lowBits 8 i.val).reverse⟩
+
 /-- The coefficient of degree `j` in the inverse NTT, using the evaluation points
 `ζ^(2 BitRev8(i)+1)` (FIPS 204 §2.5, equation (2.1)). The inverse of 256 modulo q is 8347681. -/
 @[expose] def fromNTT (values : Poly) : Vector (ZMod 8380417) 256 :=
   let roots := Vector.ofFn fun a : Fin 512 => (1753 : ZMod 8380417) ^ a.val
   let inversePowers := Vector.ofFn fun i : Fin 256 =>
-    511 - 2 * BitString.lsbValue (BitString.lowBits 8 i.val).reverse
+    511 - 2 * (bitRev8 i).val
   Vector.ofFn fun j : Fin 256 =>
     8347681 * ∑ i, values i * roots.get (Fin.ofNat 512 (inversePowers.get i * j.val))
 
@@ -1508,5 +1513,31 @@ theorem succProbability_verify_le_seededSelfTarget (s : Level)
       cases b
       · simp [hv]
       · simp [hv, solves_extract_of_verify hv]
+
+/-- Expand an oracle's fixed-length commitment digest by Algorithm 29, including XOF
+exhaustion at the Appendix C limit. -/
+def expandDigest (s : Level) (digest : FixedBytes (digestBytes s)) : Option Poly :=
+  sampleInBall s digest.toList
+
+open ModuleSIS.SelfTarget in
+/-- Classical self-target forking for the three FIPS parameter sets, in the model where a fresh
+commitment query returns a uniform digest. Algorithm 29 acts on those digest bytes. The
+collision term is the largest distinct-digest collision probability of the fixed SHAKE256
+expansion; the library gives it only the trivial bound of one. -/
+theorem selfTarget_digest_fork (s : Level) (Q : ℕ) {Coins : Type}
+    (matrices : PMF (Matrix (Fin s.params.k) (Fin (s.params.k + s.params.ℓ + 1)) Poly))
+    (coins : PMF Coins) (adv : Adversary s.params.k (s.params.k + s.params.ℓ) 256 8380417
+      (FixedBytes (digestBytes s)) Coins)
+    (hQ : ∀ A r, (adv A r).IsQueryBounded Q) :
+    let radius := compressedSelfTargetRadius s.params 13
+    ((matrices.bind (game (expandDigest s) radius coins adv)) true).toReal ≤
+      (Q + 1 : ℕ) / ((256 : ℝ) ^ digestBytes s) + Real.sqrt ((Q + 1 : ℕ) *
+        ((matrices.bind fun A => (reductionLaw 0 (expandDigest s) radius Q coins adv A).map
+          fun w => decide (ModuleSIS.IsSolution A (2 * radius) w)) true +
+            collisionMass (expandDigest s)).toReal) := by
+  have hbyte : (2 : ℝ) ^ 8 = 256 := by norm_num
+  simpa only [Fintype.card_fun, Fintype.card_fin, Nat.cast_pow, Nat.cast_ofNat, hbyte] using
+    success_le_fork_digest (expandDigest s) (compressedSelfTargetRadius s.params 13) Q
+      matrices coins adv hQ 0
 
 end Cslib.Crypto.MLDSA.FIPS204

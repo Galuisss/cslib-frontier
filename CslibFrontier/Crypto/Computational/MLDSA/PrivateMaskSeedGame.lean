@@ -54,8 +54,8 @@ private theorem commitment_unchanged {H G : Xofs} (raw : Unchanged H G) (s : Lev
     (w : Fin s.params.k → Fin 256 → ℤ) {μ : List Bool} (hμ : μ.length = 512) :
     H.commitmentDigest s w μ = G.commitmentDigest s w μ := by
   apply raw
-  simp only [commitmentInput, List.length_append, hμ, Keccak.length_bytesToBitsLE,
-    length_packCoeffs]
+  simp only [commitmentInput, List.length_append, hμ, Keccak.length_bytesToBitsLE]
+  rw [length_packCoeffs]
   cases s <;> decide
 
 private theorem challenge_unchanged {H G : Xofs} (raw : Unchanged H G) (s : Level)

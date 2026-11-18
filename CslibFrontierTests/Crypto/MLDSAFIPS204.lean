@@ -7,8 +7,12 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
+import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
+import CslibFrontier.Crypto.Computational.MLDSA.RejNTTProgramming
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
+meta import CslibFrontier.Crypto.Computational.MLDSA.RejNTTProgramming
+
+import CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
 meta import CslibFrontier.Crypto.Computational.MLDSA.ExpandAProgramming
 
 /-!
@@ -38,10 +42,10 @@ private def matrixStreamCheck : Bool := Id.run do
   let target : Poly := fun _ => 66051
   let (stream, saved) := exchangeRejNTT 894 (matrixStream 894, target)
   let first := (List.ofFn stream).take 9
-  let short := (exchangeRejNTT 768 (matrixStream 768, target)).1
+  let (short, partialSaved) := exchangeRejNTT 768 (matrixStream 768, target)
   return first == [1, 224, 127, 3, 2, 129, 3, 2, 1] && saved 0 == 0 &&
     stream 771 == 99 && (rejNTTPoly (List.ofFn stream)).map (· 255) == some 66051 &&
-    (rejNTTPoly (List.ofFn short)).isNone
+    (rejNTTPoly (List.ofFn short)).isNone && partialSaved 254 == 0 && partialSaved 255 == 66051
 
 #guard matrixStreamCheck
 
@@ -63,20 +67,20 @@ private def secretKeyFingerprint : List Byte := [
     0x52, 0x20, 0x41, 0x45, 0x9d, 0xbd, 0xcd, 0x23, 0xde, 0x69, 0x8d, 0x5b,
     0x8b, 0xa9, 0x61, 0x04, 0x3c, 0x1f, 0x13, 0x62]
 
--- Use a message ending mid-byte and a nonempty context; changing the context must invalidate it.
+-- Sign a message ending mid-byte at the 255-byte context limit. One more byte must fail.
 private def keyAndSigningChecks : Option Bool := do
   let keys ← keyGen .mlDSA44 fun i => keyGenSeed[i.val]!
   let msg := [true, false, true]
-  let ctx := [11, 22]
+  let ctx := List.replicate 255 11
   let σ ← sign .mlDSA44 keys.secretKey msg ctx (fun _ => 0)
   return Keccak.shake256 keys.publicKey 32 == publicKeyFingerprint &&
     Keccak.shake256 keys.secretKey 32 == secretKeyFingerprint &&
     verify .mlDSA44 keys.publicKey msg ctx σ == some true &&
-    verify .mlDSA44 keys.publicKey msg [11] σ == some false
+    verify .mlDSA44 keys.publicKey msg [11] σ == some false &&
+    (sign .mlDSA44 keys.secretKey msg (11 :: ctx) (fun _ => 0)).isNone
 
 #guard keyAndSigningChecks == some true
 #guard (sign .mlDSA44 [] [] [] (fun _ => 0)).isNone
-#guard (sign .mlDSA44 [] [] (List.replicate 256 0) (fun _ => 0)).isNone
 
 -- Independent SHAKE256(0^256) expansion followed by the FIPS 204 Algorithm 29 shuffle.
 private def zeroDigestSupport (value : ZMod 8380417) : Option (List ℕ) := do
