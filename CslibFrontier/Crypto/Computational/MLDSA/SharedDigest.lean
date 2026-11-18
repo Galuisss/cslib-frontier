@@ -292,7 +292,7 @@ theorem rawPoint_pointAddress {s : Level} {p : ModuleSIS.SelfTarget.Point s.para
 abbrev GridPoint (s : Level) := BitString 512 × {v : Fin s.params.k → Poly // OnCommitmentGrid s v}
 
 /-- The FIPS raw address is injective on full grid points, including its message prefix. -/
-def gridAddress (s : Level) : GridPoint s ↪ BitString (commitmentInputWidth s) where
+@[expose] def gridAddress (s : Level) : GridPoint s ↪ BitString (commitmentInputWidth s) where
   toFun p := BitString.ofList _ (commitmentInput s (highBitsVec s.params p.2.val) (List.ofFn p.1))
   inj' := by
     rintro ⟨mx, x, hx⟩ ⟨my, y, hy⟩ h
