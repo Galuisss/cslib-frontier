@@ -278,6 +278,35 @@ noncomputable def expansionContinuation (C : QuantumSigningForger) (s : Level) (
       ⟨H, A, keys.publicKey, f, history⟩))
     d log tape
 
+private theorem mean_verify_gap_le (s : Level) (H : Xofs) (A : PublicMatrix s)
+    (m : BitString 512) (D) (replacement : (Fin s.params.ℓ → Poly) → BitString (8 * digestBytes s))
+    (pk : List Byte) (f : Forgery) (history : List Forgery) :
+    let μ := signingMaskLaw s.params (by cases s <;> decide)
+    let δ := (commitmentGuessProbability s.params (by cases s <;> decide) A).toReal
+    let base := H.withDigestRegister s D
+    let write y := H.withDigestRegister s (Function.update D (maskCommitmentAddress s A m y)
+      (replacement y))
+    let score (G : Xofs) := PMF.pure (SignedMatrixTrial.newDigestWin ⟨G, A, pk, f, history⟩)
+    PMF.meanAbsDiffAt μ true (fun y => score (write y)) (fun _ => score base) ≤ 2 * δ := by
+  intro μ δ base write score
+  have finite : commitmentGuessProbability s.params (by cases s <;> decide) A ≠ ⊤ :=
+    ne_top_of_le_ne_top ENNReal.one_ne_top (iSup_le fun _ => PMF.coe_le_one _ _)
+  let bad := {y | (write y).verify s pk f.message f.context f.signature ≠
+    base.verify s pk f.message f.context f.signature}
+  refine (meanGap_of_agree μ _ _ bad ?_).trans ?_
+  · intro y off
+    have eq : (write y).verify s pk f.message f.context f.signature =
+        base.verify s pk f.message f.context f.signature := not_not.mp off
+    simp only [score, SignedMatrixTrial.newDigestWin, SignedMatrixTrial.wins, Xofs.winsForgery,
+      SignedMatrixTrial.repeatsDigest, eq]
+  · have h := H.prob_verify_changes_at_maskCommitment_le s A m D pk f
+    have le : μ.toOuterMeasure bad ≤
+        2 * commitmentGuessProbability s.params (by cases s <;> decide) A := by
+      refine le_trans (μ.toOuterMeasure.mono ?_) h
+      exact fun y hy => ⟨replacement y, hy⟩
+    simpa only [δ, ENNReal.toReal_mul, ENNReal.toReal_ofNat] using
+      ENNReal.toReal_mono (ENNReal.mul_ne_top (by simp) finite) le
+
 /-- For any remaining adaptive program, changing the digest at one fresh mask commitment changes
 the probability of a verified fresh-digest strong forgery by at most the coherent-query, signing
 and verification terms shown. The initial state and remaining tape are fixed before the mask
@@ -331,21 +360,8 @@ theorem mean_expansionContinuation_gap_le (C : QuantumSigningForger) (s : Level)
     simpa only [δ, ENNReal.toReal_mul, ENNReal.toReal_ofNat] using
       ENNReal.toReal_mono (ENNReal.mul_ne_top (by simp) finite) le
   · intro f history rest dev
-    let bad := {y | (write y).verify s keys.publicKey f.message f.context f.signature ≠
-      base.verify s keys.publicKey f.message f.context f.signature}
-    refine (meanGap_of_agree μ _ _ bad ?_).trans ?_
-    · intro y off
-      have eq : (write y).verify s keys.publicKey f.message f.context f.signature =
-          base.verify s keys.publicKey f.message f.context f.signature := not_not.mp off
-      simp only [observe, SignedMatrixTrial.newDigestWin, SignedMatrixTrial.wins, Xofs.winsForgery,
-        SignedMatrixTrial.repeatsDigest, eq]
-    · have h := H.prob_verify_changes_at_maskCommitment_le s A m D keys.publicKey f
-      have le : μ.toOuterMeasure bad ≤
-          2 * commitmentGuessProbability s.params (by cases s <;> decide) A := by
-        refine le_trans (μ.toOuterMeasure.mono ?_) h
-        exact fun y hy => ⟨replacement y, hy⟩
-      simpa only [δ, ENNReal.toReal_mul, ENNReal.toReal_ofNat] using
-        ENNReal.toReal_mono (ENNReal.mul_ne_top (by simp) finite) le
+    simpa only [observe, POVM.measureDensity_const] using
+      mean_verify_gap_le s H A m D replacement keys.publicKey f history
 
 /-- Running the resumed comparison at the initial device with independent mask-expansion
 rows gives the fresh-digest game in the original forgery bound, including failed key
