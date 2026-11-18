@@ -199,8 +199,7 @@ def repeatedDigestMatrixSolver (H : Xofs) (s : Level) (adv : ClassicalForger) (A
 
 /-- The strong chosen-message win event on the completed trial. -/
 def SignedMatrixTrial.wins {s : Level} (u : SignedMatrixTrial s) : Bool :=
-  let f := u.forgery
-  (u.xofs.verify s u.publicKey f.message f.context f.signature).getD false && !u.log.contains f
+  u.xofs.winsForgery s u.publicKey u.forgery u.log
 
 /-- The full digest of the output is present in a successful signing reply. -/
 private def SignedMatrixTrial.repeatsDigest {s : Level} (u : SignedMatrixTrial s) : Bool :=
@@ -235,7 +234,7 @@ private theorem extracted_of_programmedWin {H : Xofs} {s : Level} {adv : Classic
       PMF.mem_support_bind_iff, PMF.mem_support_pure_iff, Option.some.injEq] at h
     obtain ⟨⟨f, log⟩, hr, rfl⟩ := h
     rw [eval_runSigningForger] at hr
-    simp only [SignedMatrixTrial.wins, Bool.and_eq_true, Bool.not_eq_true'] at hw
+    simp only [SignedMatrixTrial.wins, Xofs.winsForgery, Bool.and_eq_true, Bool.not_eq_true'] at hw
     simp only [SignedMatrixTrial.repeatsDigest, List.any_eq_true, beq_iff_eq] at repeated
     have verify : G.verify s keys.publicKey f.message f.context f.signature = some true := by
       cases hv : G.verify s keys.publicKey f.message f.context f.signature <;> simp_all
