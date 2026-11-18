@@ -51,7 +51,7 @@ by the sampled choice even when candidate query strings coincide. -/
       (cond (lexSwap c dummy) Prod.swap id point).1 =
         linearityCheck k (cond (lexSwap a b) Prod.swap id pair) }
 
-instance (seed : Bool × Fin 3 × (Fin n → Bool) × (Fin n → Bool) × (Fin n → Bool))
+instance {n : ℕ} (seed : Bool × Fin 3 × (Fin n → Bool) × (Fin n → Bool) × (Fin n → Bool))
     (alice bob : Bool × Bool) : Decidable ((symmetricLinearityGame n).accepts seed alice bob) := by
   rcases seed with ⟨swapRoles, k, a, b, dummy⟩
   unfold symmetricLinearityGame
