@@ -8,9 +8,9 @@ module
 -- upstream: local-only (test driver)
 
 import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
-import CslibFrontier.Crypto.Computational.MLDSA.RejNTTProgramming
+import CslibFrontier.Crypto.Computational.MLDSA.ExpandAProgramming
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
-meta import CslibFrontier.Crypto.Computational.MLDSA.RejNTTProgramming
+meta import CslibFrontier.Crypto.Computational.MLDSA.ExpandAProgramming
 
 import CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
 meta import CslibFrontier.Crypto.Computational.MLDSA.ExpandAProgramming
