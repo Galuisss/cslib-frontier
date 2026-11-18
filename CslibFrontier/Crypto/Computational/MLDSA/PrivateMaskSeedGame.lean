@@ -83,7 +83,7 @@ private theorem attempt_congr_of_read {H G : Xofs} {bits : ℕ} {s : Level} {sk 
   have challenge w : H.sampleInBall s (G.commitmentDigest s w μ) =
       G.sampleInBall s (G.commitmentDigest s w μ) :=
     challenge_unchanged raw s (by rwa [length_commitmentDigest])
-  simp only [Xofs.attempt, Xofs.prepareAttempt, mask, digest, challenge]
+  simp only [Xofs.attempt, Xofs.attemptWithMask, mask, digest, challenge]
 
 section Coupled
 
