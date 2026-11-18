@@ -54,7 +54,8 @@ private theorem commitment_unchanged {H G : Xofs} (raw : Unchanged H G) (s : Lev
     (w : Fin s.params.k → Fin 256 → ℤ) {μ : List Bool} (hμ : μ.length = 512) :
     H.commitmentDigest s w μ = G.commitmentDigest s w μ := by
   apply raw
-  simp only [commitmentInput, List.length_append, hμ, bitsLength, length_packCoeffs]
+  simp only [commitmentInput, List.length_append, hμ, Keccak.length_bytesToBitsLE,
+    length_packCoeffs]
   cases s <;> decide
 
 private theorem challenge_unchanged {H G : Xofs} (raw : Unchanged H G) (s : Level)
@@ -63,7 +64,7 @@ private theorem challenge_unchanged {H G : Xofs} (raw : Unchanged H G) (s : Leve
   have len : digestBytes s ≤ 64 := by cases s <;> decide
   have eq : H.h256.readBytes d 221 = G.h256.readBytes d 221 := by
     apply raw
-    rw [bitsLength]
+    rw [Keccak.length_bytesToBitsLE]
     lia
   simp only [Xofs.sampleInBall, eq]
 
@@ -74,8 +75,8 @@ private theorem attempt_unchanged {H G : Xofs} (raw : Unchanged H G) (s : Level)
   have nonce (i k : ℕ) : H.h256.readBytes (nonceInput r.toList i) k =
       G.h256.readBytes (nonceInput r.toList i) k := by
     apply raw
-    simp only [bitsLength, nonceInput, List.length_append, FixedBytes.length_toList,
-      List.length_cons, List.length_nil]
+    simp only [Keccak.length_bytesToBitsLE, nonceInput, List.length_append, FixedBytes.toList,
+      List.length_ofFn, List.length_cons, List.length_nil]
     decide
   have mask : H.expandMask s r.toList κ = G.expandMask s r.toList κ := by
     simp only [Xofs.expandMask, nonce]
