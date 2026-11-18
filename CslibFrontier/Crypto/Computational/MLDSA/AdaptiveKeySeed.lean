@@ -24,16 +24,17 @@ import CslibFrontier.Foundations.Quantum.Measurement.Classical
 After at most `j` prior coherent SHAKE calls, the probability of predicting the 32-byte
 private signing seed in the experiment of `KeySeedSearch` is at most
 `(√(2 / 2^256) + 2j / 2^128)^2` at every FIPS level. A classical signature or a measured wire
-can determine the next operation. The signer uses the existing mask-seed rows and retry loop.
+can determine the next operation. The signer supplies an independent private row of mask seeds
+for each signing call, with a fallback when its tape runs out. It runs the FIPS retry loop
+using those seeds. If the program stops before query `j`, the public-key hash can still score.
 
 The proof applies the query-magnitude argument of [Bennett et al.][BBBV1997], §3.1,
 Theorem 3.3, to the key-generation input of [FIPS 204][NISTFIPS204], Algorithm 6.
 For fixed classical history, we pull the continuation measurement back to the retained register.
-Replacing a query changes
-the vector of square roots of acceptance probabilities by at most `2 / 2^128` in norm,
-with one coordinate per uniformly weighted hidden key-generation seed. Classical branching
-contracts this distance. The background experiment gives two guesses for the independent
-signing seed, giving the first term.
+Replacing a query changes this vector of square roots of acceptance probabilities by at most
+`2 / 2^128` in norm, with one coordinate per uniformly weighted hidden key-generation seed.
+Classical branching contracts this distance. The background experiment gives two guesses for
+the independent signing seed, giving the first term.
 -/
 
 public section
@@ -194,20 +195,13 @@ private theorem scored_readout {C : QuantumSigningForger} {α : Type} (prog : Pr
 
 private noncomputable def amps (games : FixedBytes 32 → PMF Bool) :
     EuclideanSpace ℝ (FixedBytes 32) :=
-  WithLp.toLp 2 fun seed =>
-    √(((PMF.uniformOfFintype (FixedBytes 32)) seed).toReal) * √((games seed true).toReal)
+  PMF.weightedSqrt (PMF.uniformOfFintype (FixedBytes 32)) fun seed => (games seed true).toReal
 
 private theorem amps_sq (f g : FixedBytes 32 → PMF Bool) :
     ‖amps f - amps g‖ ^ 2 = ∑ seed : FixedBytes 32,
       ((PMF.uniformOfFintype (FixedBytes 32)) seed).toReal *
-        (√((f seed true).toReal) - √((g seed true).toReal)) ^ 2 := by
-  rw [EuclideanSpace.real_norm_sq_eq]
-  apply Finset.sum_congr rfl
-  intro i _
-  let weight := √(((PMF.uniformOfFintype (FixedBytes 32)) i).toReal)
-  change (weight * √((f i true).toReal) - weight * √((g i true).toReal)) ^ 2 = _
-  dsimp only [weight]
-  rw [← mul_sub, mul_pow, Real.sq_sqrt ENNReal.toReal_nonneg]
+        (√((f seed true).toReal) - √((g seed true).toReal)) ^ 2 :=
+  PMF.norm_sub_weightedSqrt_sq ..
 
 private theorem amps_bind_le {β : Type} [Finite β] (p : PMF β)
     (f g : β → FixedBytes 32 → PMF Bool) {r : ℝ} (hr : 0 ≤ r)
@@ -363,11 +357,7 @@ private theorem observations_bound (C : QuantumSigningForger) (s : Level) (H : X
 
 private theorem norm_amps_sq (f : FixedBytes 32 → PMF Bool) :
     ‖amps f‖ ^ 2 = (((PMF.uniformOfFintype (FixedBytes 32)).bind f) true).toReal := by
-  rw [EuclideanSpace.real_norm_sq_eq, PMF.bind_apply_toReal]
-  apply Finset.sum_congr rfl
-  intro i _
-  change (√(((PMF.uniformOfFintype (FixedBytes 32)) i).toReal) * √((f i true).toReal)) ^ 2 = _
-  rw [mul_pow, Real.sq_sqrt ENNReal.toReal_nonneg, Real.sq_sqrt ENNReal.toReal_nonneg]
+  rw [amps, PMF.norm_weightedSqrt_sq _ _ (fun _ => ENNReal.toReal_nonneg), PMF.bind_apply_toReal]
 
 -- Average over the signing seed K before taking norms. The background gives two guesses
 -- independent of K even after the forger has used every available signing row.
@@ -414,9 +404,10 @@ private theorem fixed_observations_le (C : QuantumSigningForger) (s : Level) (H 
   rw [← norm_amps_sq]
   exact pow_le_pow_left₀ (norm_nonneg _) bound 2
 
-/-- For every selected coherent query in the FIPS signing-seed prediction game, at most `j`
-earlier coherent calls can raise the square root of success by `2j / 2^128` above the
-two-guess background bound. Adaptive classical signatures and measurements are included. -/
+/-- Predict the 32-byte signing seed with adaptive signatures generated from independent private
+mask-seed rows. After `j` earlier coherent queries the square root of success is at most
+`2j / 2^128` above the two-guess background bound. On runs ending before the selected call,
+the public-key hash remains the only candidate. The probability includes these runs. -/
 theorem signingSeedPredictionGame_le (C : QuantumSigningForger) (s : Level) (base : Xofs)
     {a b : ℕ} (ha : 272 ≤ a) (hb : 128 ≤ b) (n j : ℕ) :
     (Game.succProbability (C.signingSeedPredictionGame s base a b n j) : ℝ) ≤
