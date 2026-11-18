@@ -4975,6 +4975,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.Basic
 public import CslibFrontier.Crypto.Computational.MLDSA.ChallengeRowProgramming
 public import CslibFrontier.Crypto.Computational.MLDSA.CompressedKeyOnly
 public import CslibFrontier.Crypto.Computational.MLDSA.Decompose
+public import CslibFrontier.Crypto.Computational.MLDSA.DigestSigningQueries
 public import CslibFrontier.Crypto.Computational.MLDSA.ExpandAProgramming
 public import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 public import CslibFrontier.Crypto.Computational.MLDSA.FIPS204NTT
