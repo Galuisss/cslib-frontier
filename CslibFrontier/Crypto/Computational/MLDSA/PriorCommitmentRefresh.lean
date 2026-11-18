@@ -368,6 +368,11 @@ private theorem probeTrials_bounded {C : QuantumSigningForger} (s : Level) (H : 
       exact OracleComp.IsCostBounded.bind (n := j.val) (m := 0) (terminalDigestQueries_bounded ..)
         (fun _ => .pure _ _)
 
+-- Decode the nonce row into a vector once before the signing attempt looks up its coefficients.
+private def rowAttempt (s : Level) (G : Xofs) (A : PublicMatrix s) (sk : PrivateKey s)
+    (m : List Bool) (row : Row s) (nonce : ℕ) : Option (Option (List Byte)) :=
+  G.attemptWithMask s sk A m (ringVectorCoeffs (maskFromRow s row nonce))
+
 -- On the public game side the earlier attempts read their digests through the actual XOF.
 private def nativePreparation {C : QuantumSigningForger} (s : Level) (G : Xofs) (A : PublicMatrix s)
     (sk : PrivateKey s) (j : Fin 814) : Boundary C → List (Row s) → Preparation
@@ -376,8 +381,7 @@ private def nativePreparation {C : QuantumSigningForger} (s : Level) (G : Xofs) 
     if 255 < q.context.length then .answered none else
       let m := G.representativeFromTr sk.tr (formatMessage q.message q.context)
       match (List.finRange j.val).findSome? (fun i => terminalReply
-        (G.attemptWithMask s sk A m (ringVectorCoeffs
-          (maskFromRow s (rows.headD 0) (i.val * s.params.ℓ))))) with
+        (rowAttempt s G A sk m (rows.headD 0) (i.val * s.params.ℓ))) with
       | some reply => .answered reply
       | none => .ready (BitString.ofList 512 m)
 
@@ -389,7 +393,7 @@ private theorem eval_probe {C : QuantumSigningForger} (s : Level) (H : Xofs) (D 
   | finished => rfl
   | signing q k =>
     by_cases h : 255 < q.context.length <;>
-      simp [probeTrials, nativePreparation, h, OracleComp.evalPure_bind,
+      simp [probeTrials, nativePreparation, rowAttempt, h, OracleComp.evalPure_bind,
         OracleComp.evalPure_pure, eval_terminalDigestQueries, eval_rep]
 
 -- Everything after the cut, including all remaining retries, sees the table selected at the
@@ -407,8 +411,7 @@ private def afterTrial {C : QuantumSigningForger} (s : Level) (G : Xofs) (A : Pu
         match result with
         | some sig => some sig
         | none =>
-          let mask n := ringVectorCoeffs (maskFromRow s (rows.headD 0) n)
-          firstAccepted s.params.ℓ (fun n => G.attemptWithMask s sk A (List.ofFn m) (mask n))
+          firstAccepted s.params.ℓ (rowAttempt s G A sk (List.ofFn m) (rows.headD 0))
             (813 - j.val) ((j.val + 1) * s.params.ℓ)
     (k reply, q.logReply reply log, rows.tail)
 
