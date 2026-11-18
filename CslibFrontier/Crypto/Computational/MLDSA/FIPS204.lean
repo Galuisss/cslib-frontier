@@ -591,6 +591,34 @@ def commitmentInput (s : Level) (w : Fin s.params.k → Fin 256 → ℤ) (μ : L
   let width := ((s.params.q - 1) / (2 * s.params.γ₂) - 1).log2 + 1
   μ ++ Keccak.bytesToBitsLE (packCoeffs width fun i j => (w i j).toNat)
 
+/-- The width of the raw Algorithm 8 commitment-hash input for a 512-bit message
+representative. The coefficient width and row count depend on the parameter set. -/
+@[expose] def commitmentInputWidth (s : Level) : ℕ :=
+  512 + s.params.k * 256 * (((s.params.q - 1) / (2 * s.params.γ₂) - 1).log2 + 1)
+
+/-- The Algorithm 8 commitment preimage fills its quantum query register exactly. -/
+theorem length_commitmentInput (s : Level) (w : Fin s.params.k → Fin 256 → ℤ)
+    {μ : List Bool} (hμ : μ.length = 512) :
+    (commitmentInput s w μ).length = commitmentInputWidth s := by
+  let width := ((s.params.q - 1) / (2 * s.params.γ₂) - 1).log2 + 1
+  let bits := (List.finRange s.params.k).flatMap fun i =>
+    (List.finRange 256).flatMap fun j => BitString.lowBits width (w i j).toNat
+  have hlen : bits.length = s.params.k * 256 * width := by
+    simp only [bits, List.length_flatMap, BitString.length_lowBits, List.map_const',
+      List.length_finRange, List.sum_replicate, nsmul_eq_mul, Nat.cast_id, Nat.mul_assoc]
+  change (μ ++ Keccak.bytesToBitsLE ((bits.toChunks 8).map Keccak.bitsToByteLE)).length = _
+  rw [bitsOfChunks (by rw [hlen]; exact ⟨s.params.k * 32 * width, by ring⟩),
+    List.length_append, hμ, hlen]
+  rfl
+
+@[simp] theorem length_messageRepresentative (pk : List Byte) (formatted : List Bool) :
+    (messageRepresentative pk formatted).length = 512 := by
+  simp [messageRepresentative, Keccak.bytesToBitsLE, Keccak.byteBitsLE, List.map_const']
+
+/-- The message representative occupies the prefix of the Algorithm 8 preimage. -/
+theorem take_commitmentInput (s : Level) (w : Fin s.params.k → Fin 256 → ℤ) (μ : List Bool) :
+    (commitmentInput s w μ).take μ.length = μ := by simp [commitmentInput]
+
 /-- Fixed-width packing distinguishes all high-bit vectors in the range of UseHint. -/
 theorem eq_of_commitmentInput_eq {s : Level} {w v : Fin s.params.k → Fin 256 → ℤ} {μ : List Bool}
     (hw : ∀ i j, 0 ≤ w i j ∧ w i j < (((s.params.q - 1) / (2 * s.params.γ₂) : ℕ) : ℤ))
@@ -612,7 +640,7 @@ theorem eq_of_commitmentInput_eq {s : Level} {w v : Fin s.params.k → Fin 256 �
   omega
 
 /-- The full FIPS hash of the message representative and packed reconstructed commitment. -/
-def commitmentDigest (s : Level) (w : Fin s.params.k → Fin 256 → ℤ) (μ : List Bool) :
+@[expose] def commitmentDigest (s : Level) (w : Fin s.params.k → Fin 256 → ℤ) (μ : List Bool) :
     List Byte :=
   Keccak.bitSponge Keccak.shake256Layout [true, true, true, true]
     (commitmentInput s w μ) (digestBytes s)
