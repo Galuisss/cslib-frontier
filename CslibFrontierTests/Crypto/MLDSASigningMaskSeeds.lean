@@ -7,7 +7,8 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskSeedGame
+import all CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
+import all CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 import CslibFrontier.Probability.PMF.ToReal
 import CslibFrontier.Probability.PMF.Uniform
@@ -106,3 +107,91 @@ example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ}
     dist (C.maskSeedGame s base ha hb hn (by decide) false SignedMatrixTrial.newDigestWin)
       (C.privateMaskSeedGame s base a b) ≤ 1 / 2 ^ 192 := by
   exact (C.dist_maskSeedGame_privateMaskSeedGame s base ha hb hn (by decide)).trans (by norm_num)
+
+-- The second probe follows an observed signing result. It stops before the second query,
+-- and a failed signature ends this branch without measuring the address.
+open Cslib.Quantum QuantumSigningForger in
+example (C : QuantumSigningForger) (q : SigningQuery) :
+    queryPrefix (C := C) (α := Unit) (do
+      let _ ← OracleComp.query (.inr (.inl .query))
+      let sig ← (OracleComp.query (Sum.inr (Sum.inr q) : ℕ ⊕
+        DeviceRequest (Width C) Empty ⊕ SigningQuery) : Program C (Option (List Byte)))
+      match sig with
+      | none => pure ()
+      | some _ =>
+        let _ ← OracleComp.query (.inr (.inl (.gate (false, true, 0, []))))
+        let _ ← OracleComp.query (.inr (.inl .query))
+        pure ()) 1 = (do
+      let _ ← OracleComp.query (.inr (.inl .query))
+      let sig ← (OracleComp.query (Sum.inr (Sum.inr q) : ℕ ⊕
+        DeviceRequest (Width C) Empty ⊕ SigningQuery) : Program C (Option (List Byte)))
+      match sig with
+      | none => pure false
+      | some _ =>
+        let _ ← OracleComp.query (.inr (.inl (.gate (false, true, 0, []))))
+        pure true) := by
+  change (.liftBind _ _ : Program C Bool) = .liftBind _ _
+  congr 1
+  funext _
+  change (.liftBind _ _ : Program C Bool) = .liftBind _ _
+  congr 1
+  funext sig
+  cases sig <;> rfl
+
+-- For any pre-query density, including a superposition correlated with the response or work
+-- wires, the observed address is the marginal of its computational-basis Born distribution.
+open Cslib.Quantum QuantumSigningForger in
+example (C : QuantumSigningForger) (st : C.State) :
+    C.addressRead (true, st) =
+      (st.1.measure (fun z => fun i : Fin (C.addressBits + 2) =>
+        z ⟨i.val, i.isLt.trans_le (by dsimp only [Width]; lia)⟩)).map (some ∘ Prod.fst) := by
+  unfold addressRead
+  simp only [ite_true]
+  rw [← PMF.map_comp, DeviceState.measure_map_fst, PMF.map_comp]
+  congr 1
+  funext z
+  simp only [Function.comp_apply, Option.some.injEq]
+  rw [queryRegisters_apply (a := C.addressBits + 2) (b := 8 * C.responseBytes)]
+  rfl
+
+-- A per-query detection probability, at any of the three FIPS levels.
+example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ}
+    (ha : 1024 ≤ a) (hb : 64 ≤ b) (hn : C.SigningCallsLe (2 ^ 64)) (j : ℕ) :
+    (Game.succProbability (C.maskSeedQueryHit s base (n := 2 ^ 64) ha hb (by decide) j) : ℝ) ≤
+      1 / 2 ^ 191 :=
+  (C.maskSeedQueryHit_le s base ha hb hn (by decide) j).trans (by norm_num)
+
+-- At a large signing budget the entire measured-query loss scales with the chance of
+-- predicting the secret prefix, including the public-key-hash candidate.
+example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ} (ha : 1024 ≤ a)
+    (hb : 64 ≤ b) (hn : C.SigningCallsLe (2 ^ 64)) (j : ℕ) :
+    (Game.succProbability (C.maskSeedQueryHit s base (n := 2 ^ 64) ha hb (by decide) j) : ℝ) ≤
+      (1 / 2 ^ 191) * Game.succProbability (C.maskSeedKeyPrediction s base a b (2 ^ 64) j) := by
+  have h := C.maskSeedQueryHit_le_keyPrediction s base ha hb hn (by decide) j
+  convert h using 2
+  norm_num
+
+-- Decode the candidate from the raw SHAKE256 input. SHAKE128 has no candidate.
+open QuantumSigningForger in
+example (C : QuantumSigningForger) (x : List Bool) (hx : x.length ≤ C.addressBits)
+    (strength : Bool) :
+    queryKeyPrefix (C := C) (some (Xofs.queryAddress C.addressBits strength x hx)) =
+      if strength then some (x.take 256) else none := by
+  have len : (List.replicate (C.addressBits - x.length) false ++ true :: x).length =
+      C.addressBits + 1 := by
+    simp only [List.length_append, List.length_replicate, List.length_cons]
+    lia
+  cases strength with
+  | false => rfl
+  | true =>
+    simp only [queryKeyPrefix, Xofs.queryAddress, Option.bind_eq_bind, Option.bind_some,
+      Fin.cons_zero, guard, ↓reduceIte, Option.pure_def, Fin.cons_succ, BitString.ofFn_ofList len,
+      Xofs.unpad_word]
+
+-- If the forger stops early, only the public-key hash can predict the secret prefix.
+open QuantumSigningForger in
+example (C : QuantumSigningForger) (H : Xofs) (s : Level) (seed : FixedBytes 32) (keys : KeyPair)
+    (hg : H.keyGen s seed = some keys) :
+    keyCandidates (C := C) (publicHash H ((H.keyGen s seed).map KeyPair.publicKey)) none =
+      [Keccak.bytesToBitsLE ((H.h256.readBytes keys.publicKey 64).take 32)] := by
+  simp [keyCandidates, publicHash, hg, queryKeyPrefix]

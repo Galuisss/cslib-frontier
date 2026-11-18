@@ -15,6 +15,7 @@ import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
 import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 import all CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
 import CslibFrontier.Crypto.Game.CloseTo.UntilBad
+import CslibFrontier.Crypto.Game.Order
 import CslibFrontier.Crypto.Game.Statistical
 import CslibFrontier.Languages.Probabilistic.Presample
 import CslibFrontier.Probability.StatisticalDistance.ClosedForm
@@ -158,19 +159,27 @@ private noncomputable def rowTranscript (C : QuantumSigningForger) (H : Xofs) (s
     (C.rowCommand H s keys)) (C.program keys.publicKey)).run (C.initial, tape)).map
     fun (f, st, _) => (f, st.2)
 
-private theorem transcript_eq_rows (C : QuantumSigningForger) {base : Xofs} {s : Level}
+private theorem run_eq_rows (C : QuantumSigningForger) {base : Xofs} {s : Level}
     {seed : FixedBytes 32} {a b n : ℕ} {t : Fin n ↪ FixedBytes 32} {ha : 1024 ≤ a}
     {hb : 64 ≤ b} {rows : SigningMaskSeeds n} {p : SigningMaskSeedOracles}
     (hp : p ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
     {keys : KeyPair} (hg : p.background.keyGen s seed = some keys)
     (good : ∀ m, p.shared.messageRepresentative keys.publicKey m =
-      p.background.messageRepresentative keys.publicKey m) (hn : C.SigningCallsLe n) :
-    C.transcriptWithHedges p.background p.shared s keys (List.ofFn t) =
-      C.rowTranscript p.background s keys (List.ofFn fun i μ => rows (i, μ)) := by
+      p.background.messageRepresentative keys.publicKey m)
+    {α : Type} {program : ProbOracleComp (OracleSpec.sum
+      (fun _ : DeviceRequest (Width C) Empty => List Bool)
+      (fun _ : SigningQuery => Option (List Byte))) α}
+    (hn : OracleComp.IsCostBounded (fun q => (isSigningCall q).toNat) program n) :
+    ((OracleComp.interpret (OracleComp.withSampleListWhen isSigningCall (fun _ => 0)
+      (C.hedgeCommand p.background p.shared s keys.secretKey)) program).run
+      (C.initial, List.ofFn t)).map (fun (a, st, _) => (a, st)) =
+    ((OracleComp.interpret (OracleComp.withSampleListWhen isSigningCall (fun _ _ => 0)
+      (C.rowCommand p.background s keys)) program).run
+      (C.initial, List.ofFn fun i μ => rows (i, μ))).map (fun (a, st, _) => (a, st)) := by
   let f := C.hedgeCommand p.background p.shared s keys.secretKey
   let g := C.rowCommand p.background s keys
-  have joint := OracleComp.IsCostBounded.run_interpret_sampleListWhen_congr isSigningCall
-    (hn keys.publicKey) (fun _ => 0) (fun _ _ => 0) f g (by
+  exact OracleComp.IsCostBounded.run_interpret_sampleListWhen_congr isSigningCall
+    hn (fun _ => 0) (fun _ _ => 0) f g (by
       rintro (k | cmd | sign) h
       · simp only [f, g, hedgeCommand, rowCommand, signingCommand, OracleComp.sumHandler]
       · simp only [f, g, hedgeCommand, rowCommand, signingCommand, OracleComp.sumHandler]
@@ -184,9 +193,20 @@ private theorem transcript_eq_rows (C : QuantumSigningForger) {base : Xofs} {s :
       · contradiction
       · simp only [f, g, hedgeCommand, rowCommand, signingCommand, OracleComp.sumHandler,
           sign_eq_row hp hg good]) C.initial
+
+private theorem transcript_eq_rows (C : QuantumSigningForger) {base : Xofs} {s : Level}
+    {seed : FixedBytes 32} {a b n : ℕ} {t : Fin n ↪ FixedBytes 32} {ha : 1024 ≤ a}
+    {hb : 64 ≤ b} {rows : SigningMaskSeeds n} {p : SigningMaskSeedOracles}
+    (hp : p ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
+    {keys : KeyPair} (hg : p.background.keyGen s seed = some keys)
+    (good : ∀ m, p.shared.messageRepresentative keys.publicKey m =
+      p.background.messageRepresentative keys.publicKey m) (hn : C.SigningCallsLe n) :
+    C.transcriptWithHedges p.background p.shared s keys (List.ofFn t) =
+      C.rowTranscript p.background s keys (List.ofFn fun i μ => rows (i, μ)) := by
   simpa only [transcriptWithHedges, rowTranscript, PMF.map_comp, Function.comp_def, probOracleSpec,
-    unifSpec, Width, Row, f, g]
-    using congrArg (PMF.map fun (out, st) => (out, st.2)) joint
+    unifSpec, Width, Row]
+    using congrArg (PMF.map fun (out, st) => (out, st.2))
+      (run_eq_rows C hp hg good (hn keys.publicKey))
 
 private noncomputable def privateTranscript (C : QuantumSigningForger) (H : Xofs) (s : Level)
     (keys : KeyPair) : PMF (Forgery × List Forgery) :=
@@ -277,7 +297,7 @@ private theorem score_eq_rows (C : QuantumSigningForger) {base : Xofs} {s : Leve
         p.background.messageRepresentative keys.publicKey m := by
       by_contra ne
       exact good ⟨keys, hg, m, ne⟩
-    simp only [scoreWithSetup, scoreTranscript,
+    simp only [scoreWithSetup, scoreTranscript, withTrialSetup,
       Xofs.expandA_congr (agree_off_sampleSigningMaskSeeds hp).1,
       transcript_eq_rows C hp hg rep hn]
     cases p.background.expandA s (keys.publicKey.take 32) with
@@ -299,7 +319,7 @@ private theorem avg_score_rows (C : QuantumSigningForger) (H : Xofs) (s : Level)
   cases keys with
   | none => exact PMF.bind_const _ _
   | some k =>
-    simp only [scoreTranscript]
+    simp only [scoreTranscript, withTrialSetup]
     cases H.expandA s (k.publicKey.take 32) with
     | none => exact PMF.bind_const _ _
     | some A =>
@@ -309,8 +329,7 @@ private theorem avg_score_rows (C : QuantumSigningForger) (H : Xofs) (s : Level)
 private theorem fixed_rows_bound (C : QuantumSigningForger) (s : Level) (base : Xofs)
     (seed : FixedBytes 32) {a b n : ℕ} (ha : 1024 ≤ a) (hb : 64 ≤ b)
     (hn : C.SigningCallsLe n) (hsize : n ≤ 2 ^ 256) (rows : SigningMaskSeeds n) :
-    let _ : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-      (by simpa only [Fintype.card_fin, card_hedge] using hsize)
+    let _ : Nonempty (Fin n ↪ FixedBytes 32) := hedgeEmbedding_nonempty hsize
     (Game.advantage
       ((PMF.uniformOfFintype (Fin n ↪ FixedBytes 32)).bind fun t =>
         (base.sampleSigningMaskSeeds s seed t ha hb rows).bind fun p =>
@@ -321,8 +340,7 @@ private theorem fixed_rows_bound (C : QuantumSigningForger) (s : Level) (base : 
           (fun k => C.rowTranscript H s k (List.ofFn fun i μ => rows (i, μ)))) : ℝ) ≤
       n / 2 ^ 256 := by
   classical
-  let _ : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-    (by simpa only [Fintype.card_fin, card_hedge] using hsize)
+  let _ : Nonempty (Fin n ↪ FixedBytes 32) := hedgeEmbedding_nonempty hsize
   let tapes := PMF.uniformOfFintype (Fin n ↪ FixedBytes 32)
   let draw := fun t => base.sampleSigningMaskSeeds s seed t ha hb rows
   let joint := tapes.bind fun t => (draw t).map (t, ·)
@@ -366,8 +384,7 @@ theorem dist_maskSeedGame_privateMaskSeedGame (C : QuantumSigningForger) (s : Le
     (hsize : n ≤ 2 ^ 256) :
     dist (C.maskSeedGame s base ha hb hn hsize false SignedMatrixTrial.newDigestWin)
       (C.privateMaskSeedGame s base a b) ≤ (n : ℝ) / 2 ^ 256 := by
-  let _ : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-    (by simpa only [Fintype.card_fin, card_hedge] using hsize)
+  let _ : Nonempty (Fin n ↪ FixedBytes 32) := hedgeEmbedding_nonempty hsize
   let R := base.uniformPrefixes a b
   let seeds := PMF.uniformOfFintype (FixedBytes 32)
   let tables := PMF.uniformOfFintype (SigningMaskSeeds n)
@@ -381,7 +398,8 @@ theorem dist_maskSeedGame_privateMaskSeedGame (C : QuantumSigningForger) (s : Le
       C.rowTranscript H s k (List.ofFn fun i μ => rows (i, μ)))
   have actual : C.maskSeedGame s base ha hb hn hsize false SignedMatrixTrial.newDigestWin =
       seeds.bind (fun seed => tables.bind (L seed)) := by
-    simp only [maskSeedGame, PMF.monad_bind_eq_bind, Bool.false_eq_true, ↓reduceIte, seeds, tables,
+    simp only [maskSeedGame, withMaskSeedOracles, PMF.monad_bind_eq_bind, Bool.false_eq_true,
+      ↓reduceIte, seeds, tables,
       L, tapes]
     pmf_swap with seed
     pmf_swap with rows
@@ -436,12 +454,13 @@ theorem randomPrefixGame_forgery_le_privateMaskSeedGame (C : QuantumSigningForge
         add_le_add (dist_triangle ..) privateSeed
       _ ≤ _ := add_le_add (add_le_add birthday le_rfl) le_rfl
   change (Game.succProbability _ : ℝ) ≤ Game.succProbability priv + _ + _ + _ + _ + _
-  simp only [NNReal.coe_add, Game.coe_succProbability] at branch ⊢
-  rw [PMF.dist_bool] at loss
-  change _ ≤ (fresh true).toReal + _ at branch
-  have finish {w f p d b r c m : ℝ} (h : w ≤ f + (c + m)) (h' : f - p ≤ b + d + r) :
-      w ≤ p + d + b + r + c + m := by linarith only [h, h']
-  exact finish branch ((le_abs_self _).trans loss)
+  simp only [NNReal.coe_add] at branch
+  change _ ≤ (Game.succProbability fresh : ℝ) + _ at branch
+  rw [← coe_nndist, ← Game.advantage_eq_nndist] at loss
+  apply branch.trans
+  apply (add_le_add (Game.coe_succProbability_le_add_of_advantage_le loss) le_rfl).trans_eq
+  abel
+
 
 end QuantumSigningForger
 
