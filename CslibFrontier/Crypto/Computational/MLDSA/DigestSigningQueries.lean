@@ -231,7 +231,7 @@ def Xofs.verifyDigestQueries (H : Xofs) (s : Level) (pk : List Byte) (f : Forger
       let pair := publicKey s pk A
       let x := commitmentInput s (hintedCommitment s pair σ c) μ
       let v ← OracleComp.query (BitString.ofList _ x)
-      return some ((H.withDigestRegister s fun _ => v).check s pair μ σ c)
+      return some (σ.acceptDigest (digestBytesAt s v).toList)
     | _, _ => pure none
 
 /-- Two classical digest-table queries suffice to evaluate a candidate forgery, including
@@ -294,10 +294,7 @@ theorem Xofs.evalPure_verifyDigestQueries (H : Xofs) (s : Level) (D) (pk : List 
                 (representativeInput (H.h256.readBytes pk 64) (formatMessage f.message f.context))
                 64) from rfl, Keccak.length_bytesToBitsLE, ExtendableOutput.length_read]
             let w := hintedCommitment s (publicKey s pk A) σ c
-            let x := BitString.ofList s.commitmentInputBits (commitmentInput s w μ)
-            have both := (digest_at H s (fun _ => D x) w hμ).trans (digest_at H s D w hμ).symm
-            exact congrArg (fun bytes : List Byte => some (decide (ResponseShort s.params σ.z) &&
-              decide (bytes = σ.digest))) both
+            exact congrArg (fun bytes => some (σ.acceptDigest bytes)) (digest_at H s D w hμ).symm
     · simp [hk, bne_iff_ne]
   · simp [Xofs.verifyDigestQueries, Xofs.verify, Xofs.verifyWithExpansion, hc, guard,
       Nat.lt_of_not_ge hc]
