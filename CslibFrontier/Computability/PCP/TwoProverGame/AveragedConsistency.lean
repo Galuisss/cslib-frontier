@@ -123,17 +123,6 @@ theorem expect_norm_sub_sq_le_of_pauliSameBasisTest :
   let B := PauliConsistencyQuestion.averagedObservable S.bob basis a
   exact S.state.norm_expect_sub_sq_le univ univ_nonempty A B
 
-omit [TopologicalSpace 𝒜] [ContinuousFunctionalCalculus ℝ 𝒜 IsSelfAdjoint]
-  [NonnegSpectrumClass ℝ 𝒜] [Module ℚ≥0 𝒜] in
-private theorem norm_sub_sq_le_through (φ : AlgState 𝒜) (a b c : 𝒜) :
-    φ.norm (a - c) ^ 2 ≤ 2 * φ.norm (a - b) ^ 2 + 2 * φ.norm (b - c) ^ 2 := by
-  have h := φ.norm_add_le (a - b) (b - c)
-  rw [sub_add_sub_cancel] at h
-  calc
-    _ ≤ (φ.norm (a - b) + φ.norm (b - c)) ^ 2 :=
-      pow_le_pow_left₀ (φ.norm_nonneg _) h 2
-    _ ≤ _ := by nlinarith [sq_nonneg (φ.norm (a - b) - φ.norm (b - c))]
-
 open BitString
 
 /-- Averaging Alice's dummy coordinate preserves consistency with the special-question observable
@@ -180,7 +169,7 @@ theorem oddExpect_norm_sub_sq_le_of_pauliConsistency [Nonempty ι]
           2 * S.state.norm (A x z - Bavg x z) ^ 2) := by
       refine expect_le_expect fun x _ => expect_le_expect fun z _ => ?_
       rw [S.state.norm_sub_comm (A x z) (Bavg x z)]
-      exact norm_sub_sq_le_through S.state _ _ _
+      exact S.state.norm_sub_sq_le_through _ _ _
     simp only [expect_add_distrib, ← mul_expect] at htri
     linarith
   have hd : oddExpect d ≤ 16 * (1 - (pauliSameBasisTest ι basis).commutingWinProb S) := by
@@ -201,7 +190,7 @@ theorem oddExpect_norm_sub_sq_le_of_pauliConsistency [Nonempty ι]
     simpa only [expect, card_attach, sum_attach (oddPairs ι) (fun p => e p.fst p.snd)] using h
   have htri : oddExpect (fun x z => S.state.norm (Aavg x z - B x z) ^ 2) ≤
       oddExpect (fun x z => 2 * d x z + 2 * e x z) :=
-    oddExpect_mono fun x z _ => norm_sub_sq_le_through _ _ _ _
+    oddExpect_mono fun x z _ => S.state.norm_sub_sq_le_through _ _ _
   rw [oddExpect_add, oddExpect_const_mul, oddExpect_const_mul] at htri
   change oddExpect (fun x z => S.state.norm (Aavg x z - B x z) ^ 2) ≤ _
   linarith

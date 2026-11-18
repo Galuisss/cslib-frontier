@@ -55,7 +55,8 @@ namespace Cslib.BitString
 
 variable {ι : Type*} [Fintype ι] [DecidableEq ι]
 
-private theorem dens_oddFiber {a : ι → Bool} (ha : a ≠ 0) :
+/-- Exactly half the strings have odd inner product with a fixed nonzero string. -/
+theorem dens_oddFiber {a : ι → Bool} (ha : a ≠ 0) :
     (((univ.filter fun b => a ⬝ᵥ b = true).dens : ℚ≥0) : ℝ) = 1 / 2 := by
   set S := (univ : Finset (ι → Bool)).filter fun c => a ⬝ᵥ c = true
   have hcard : 2 * (S.card : ℝ) = Fintype.card (ι → Bool) := by
@@ -68,7 +69,8 @@ private theorem dens_oddFiber {a : ι → Bool} (ha : a ≠ 0) :
   have hS : (S.card : ℝ) ≠ 0 := by linarith
   field_simp
 
-private theorem oddFiber_nonempty {a : ι → Bool} (ha : a ≠ 0) :
+/-- Every nonzero string has a partner with odd inner product. -/
+theorem oddFiber_nonempty {a : ι → Bool} (ha : a ≠ 0) :
     (univ.filter fun b => a ⬝ᵥ b = true).Nonempty := by
   by_contra! h
   have hd := dens_oddFiber ha

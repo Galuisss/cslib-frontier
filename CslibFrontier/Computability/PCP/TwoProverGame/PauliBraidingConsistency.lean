@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.PauliBraidingGame
+public import CslibFrontier.Foundations.Quantum.Algebra.Expect
 
 /-!
 # Consistency rounds of the Pauli braiding verifier
@@ -36,7 +37,8 @@ public section
 
 namespace Cslib.PCP
 
-open BitString Quantum
+open BitString Finset Quantum
+open scoped BigOperators
 
 variable {n : ℕ} [Nonempty (Fin n)] {Q A 𝒜 : Type*}
 
@@ -206,5 +208,33 @@ theorem weighted_sum_norm_sub_sq_le_of_pauliBraidingMatchedGame [Finite Q]
     (4 * (1 - test.answersWinProb S.answers)) ≤ _
   unfold SeededGame.commutingWinProb
   linarith only [h]
+
+omit [Nonempty (Fin n)] [Fintype A] [TopologicalSpace 𝒜]
+  [ContinuousFunctionalCalculus ℝ 𝒜 IsSelfAdjoint] [NonnegSpectrumClass ℝ 𝒜] in
+/-- On nonzero checked strings, both role assignments of the same-basis round control
+the distance between the two observables averaged over unrestricted dummies. The right
+side uses masked odd-pair averages. The left side is a uniform average with zero masked. -/
+theorem expect_norm_averaged_sub_sq_nonzero_le [Module ℚ≥0 𝒜]
+    (φ : AlgState 𝒜) (a b : (Fin n → Bool) → (Fin n → Bool) → 𝒜) :
+    (𝔼 x, if x = 0 then 0 else
+      φ.norm ((𝔼 y, a x y) - (𝔼 y, b x y)) ^ 2) ≤
+      24 * oddExpect (fun x y => 𝔼 z, φ.norm (a x y - b x z) ^ 2) +
+      4 * oddExpect (fun x y => 𝔼 z, φ.norm (a x z - b x y) ^ 2) := by
+  classical
+  rw [oddExpect_def, oddExpect_def, Finset.mul_expect, Finset.mul_expect,
+    ← Finset.expect_add_distrib]
+  refine expect_le_expect fun x _ => ?_
+  by_cases hx : x = 0
+  · subst x
+    simp
+  let partners := (univ : Finset (Fin n → Bool)).filter fun y => x ⬝ᵥ y = true
+  have hmem (y : Fin n → Bool) : (x ⬝ᵥ y = true) ↔ y ∈ partners := by simp [partners]
+  simp only [hx, ite_false]
+  simp_rw [hmem]
+  rw [Fintype.expect_ite_mem, Fintype.expect_ite_mem, NNRat.smul_def, NNRat.smul_def,
+    dens_oddFiber hx]
+  have h := φ.norm_expect_sub_expect_sq_le_of_half partners (oddFiber_nonempty hx)
+    (le_of_eq (dens_oddFiber hx).symm) (a x) (b x)
+  linarith
 
 end Cslib.PCP
