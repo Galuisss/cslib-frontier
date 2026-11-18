@@ -224,19 +224,13 @@ theorem eval_runSigningForger (H : Xofs) (s : Level) (keys : KeyPair) (adv : Sig
 /-- Signing service with the FIPS 202 XOFs. -/
 noncomputable abbrev signingOracle := Xofs.signingOracle Xofs.shake
 
-/-- Every signature in the actual adaptive signing transcript passes the FIPS byte verifier
-under the public key returned by the same seed. -/
-theorem verify_of_mem_signingTranscript {H : Xofs} {s : Level} {seed : FixedBytes 32}
-    {keys : KeyPair} {adv : SigningForger} {out f : Forgery} {log : List Forgery}
-    (hg : H.keyGen s seed = some keys)
-    (hrun : (out, log) ∈ (ProbOracleComp.runWith (H.signingOracle s keys.secretKey)
-      (adv keys.publicKey) []).support) (hf : f ∈ log) :
-    H.verify s keys.publicKey f.message f.context f.signature = some true := by
-  let inv (history : List Forgery) := ∀ g ∈ history,
-    H.verify s keys.publicKey g.message g.context g.signature = some true
-  suffices maintained : inv log from maintained f hf
-  apply ProbOracleComp.runWith_invariant _ inv ?_ _ [] (by simp [inv]) out log hrun
-  intro q hist ih reply next hs
+/-- A hedged signing call under a generated key preserves verification of every logged triple. -/
+theorem signingOracle_preserves_verified {H : Xofs} {s : Level} {seed : FixedBytes 32}
+    {keys : KeyPair} (hg : H.keyGen s seed = some keys) (q : SigningQuery) (hist : List Forgery)
+    (ih : ∀ g ∈ hist, H.verify s keys.publicKey g.message g.context g.signature = some true)
+    {reply : Option (List Byte)} {next : List Forgery}
+    (hs : (reply, next) ∈ (H.signingOracle s keys.secretKey q hist).support) :
+    ∀ g ∈ next, H.verify s keys.publicKey g.message g.context g.signature = some true := by
   obtain ⟨rnd, _, hr⟩ := (PMF.mem_support_map_iff _ _ _).mp hs
   dsimp only [Xofs.signAndLog] at hr
   cases sig : H.sign s keys.secretKey q.message q.context rnd with
@@ -251,12 +245,53 @@ theorem verify_of_mem_signingTranscript {H : Xofs} {s : Level} {seed : FixedByte
     · exact verify_of_sign hg sig
     · exact ih g htail
 
+/-- Every signature in the actual adaptive signing transcript passes the FIPS byte verifier
+under the public key returned by the same seed. -/
+theorem verify_of_mem_signingTranscript {H : Xofs} {s : Level} {seed : FixedBytes 32}
+    {keys : KeyPair} {adv : SigningForger} {out f : Forgery} {log : List Forgery}
+    (hg : H.keyGen s seed = some keys)
+    (hrun : (out, log) ∈ (ProbOracleComp.runWith (H.signingOracle s keys.secretKey)
+      (adv keys.publicKey) []).support) (hf : f ∈ log) :
+    H.verify s keys.publicKey f.message f.context f.signature = some true := by
+  let inv (history : List Forgery) := ∀ g ∈ history,
+    H.verify s keys.publicKey g.message g.context g.signature = some true
+  suffices maintained : inv log from maintained f hf
+  apply ProbOracleComp.runWith_invariant _ inv ?_ _ [] (by simp [inv]) out log hrun
+  exact fun q hist ih _ _ hs => signingOracle_preserves_verified hg q hist ih hs
+
 /-- Search the actual signing log for a reply sharing the forgery's digest, then extract from
 the two triples using the public bytes and the matrix supplied to the solver. -/
 def Xofs.extractLoggedDigest (H : Xofs) (s : Level) (bytes : List Byte) (A : PublicMatrix s)
     (f : Forgery) (log : List Forgery) : Option (RepeatedDigestWitness s) := do
   let old ← log.find? fun g => g.signature.take (digestBytes s) == f.signature.take (digestBytes s)
   H.extractRepeatedDigest s bytes A f old
+
+/-- A fresh verifying triple and a verified signing log at the same public matrix give a
+computed witness whenever the full challenge digest occurs in the log. -/
+theorem extractLoggedDigest_of_verifiedLog {H : Xofs} {s : Level} {pk : List Byte}
+    {A : PublicMatrix s} {out : Forgery} {log : List Forgery}
+    (matrix : H.expandA s (pk.take 32) = some A)
+    (logged : ∀ g ∈ log, H.verify s pk g.message g.context g.signature = some true)
+    (fresh : out ∉ log)
+    (repeated : ∃ g ∈ log, g.signature.take (digestBytes s) = out.signature.take (digestBytes s))
+    (valid : H.verify s pk out.message out.context out.signature = some true) :
+    ∃ w, H.extractLoggedDigest s pk A out log = some w ∧ w.Valid H A := by
+  let same (g : Forgery) := g.signature.take (digestBytes s) == out.signature.take (digestBytes s)
+  cases h : log.find? same with
+  | none =>
+    obtain ⟨g, hg', eq⟩ := repeated
+    have bad := List.find?_eq_none.mp h g hg'
+    simp [same, eq] at bad
+  | some old =>
+    have prior := List.mem_of_find?_eq_some h
+    have distinct : out ≠ old := fun e => fresh (e ▸ prior)
+    have digest : old.signature.take (digestBytes s) = out.signature.take (digestBytes s) :=
+      beq_iff_eq.mp (List.find?_some (p := same) h)
+    obtain ⟨w, hw, good⟩ :=
+      extractRepeatedDigest_of_verify matrix distinct digest.symm valid (logged old prior)
+    refine ⟨w, ?_, good⟩
+    change (log.find? same >>= _) = some w
+    rwa [h, Option.bind_eq_bind, Option.bind_some]
 
 /-- Every fresh accepted forgery with a previously signed digest yields a valid computed witness.
 Key generation, the adaptive hedged signing service, verification and extraction use one XOF pair.
@@ -273,22 +308,9 @@ theorem extractLoggedDigest_of_signingTranscript {H : Xofs} {s : Level} {seed : 
   obtain ⟨rho, sk, _, hA, hpk, _, _⟩ := privateKey_of_keyGen hg
   have matrix : H.expandA s (keys.publicKey.take 32) = some sk.A := by
     rwa [hpk, take_encodePublic]
-  let same (g : Forgery) := g.signature.take (digestBytes s) == out.signature.take (digestBytes s)
-  cases h : log.find? same with
-  | none =>
-    obtain ⟨g, hg', eq⟩ := repeated
-    have bad := List.find?_eq_none.mp h g hg'
-    simp [same, eq] at bad
-  | some old =>
-    have prior := List.mem_of_find?_eq_some h
-    have distinct : out ≠ old := fun e => fresh (e ▸ prior)
-    have digest : old.signature.take (digestBytes s) = out.signature.take (digestBytes s) :=
-      beq_iff_eq.mp (List.find?_some (p := same) h)
-    have signed := verify_of_mem_signingTranscript hg hrun prior
-    obtain ⟨w, hw, good⟩ := extractRepeatedDigest_of_verify matrix distinct digest.symm valid signed
-    refine ⟨sk.A, w, matrix, ?_, good⟩
-    change (log.find? same >>= _) = some w
-    rwa [h, Option.bind_eq_bind, Option.bind_some]
+  obtain ⟨w, he, good⟩ := extractLoggedDigest_of_verifiedLog matrix
+    (fun _ h => verify_of_mem_signingTranscript hg hrun h) fresh repeated valid
+  exact ⟨sk.A, w, matrix, he, good⟩
 
 /-- The strong chosen-message forgery experiment for FIPS 204's finite parameter sets:
 generate both keys from one uniform seed, answer adaptive signing calls with the secret key,
