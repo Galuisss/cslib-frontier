@@ -1207,14 +1207,15 @@ private def hintedCommitment (s : Level) (pk : MLDSA.PublicKey s.params)
   fun i => useHintVec s.params.q s.params.γ₂ (σ.h i)
     (moduleSISMap pk.A σ.z i - negacyclicMul c (pk.t i))
 
-private abbrev Signature.acceptDigest {s : Level} (σ : Signature s) (digest : List Byte) : Bool :=
-  decide (ResponseShort s.params σ.z) && decide (digest = σ.digest)
+private abbrev Signature.acceptDigest {s : Level} (σ : Signature s) (digest : Unit → List Byte) :
+    Bool :=
+  decide (ResponseShort s.params σ.z) && decide (digest () = σ.digest)
 
 /-- Algorithm 8 after successful parsing and expansion. The digest from the signature must match
 the full SHAKE output byte for byte. -/
 private def Xofs.check (H : Xofs) (s : Level) (pk : MLDSA.PublicKey s.params) (μ : List Bool)
     (σ : Signature s) (c : Poly) : Bool :=
-  σ.acceptDigest (H.commitmentDigest s (hintedCommitment s pk σ c) μ)
+  σ.acceptDigest fun _ => H.commitmentDigest s (hintedCommitment s pk σ c) μ
 
 private abbrev check := Xofs.check Xofs.shake
 
