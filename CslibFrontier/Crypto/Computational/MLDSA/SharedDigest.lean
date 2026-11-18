@@ -475,17 +475,12 @@ private theorem trial_eq_online {Coins : Type} (s : Level) (Q : ℕ) (adv : Forg
   simpa only [trial, eval_runDigest, runForger, onlineTrial, matrixDigestOracle, bytes, finish,
     run_interpret_bind, pmf_norm, Function.comp_def] using h
 
-/-- Key-only forgery with two online random oracles. Key generation queries its matrix seed from
-empty caches, and the adversary starts with exactly the caches left by that call. The verifier
-uses the digest cache left by the adversary and compares all the bytes of the signature digest. -/
-noncomputable def keyOnlyGame {Coins : Type} (s : Level) (coins : ProbComp Coins)
-    (adv : Forger s Coins) : Game := do
-  let s₁ ← MatrixOracle.shortVectorLaw s s.params.ℓ
-  let s₂ ← MatrixOracle.shortVectorLaw s s.params.k
+/-- Run the byte forger and final digest check with the matrix cache left by key generation
+and an initially empty digest cache. Both share all digest entries throughout the trial. -/
+noncomputable def observe {Coins : Type} (s : Level) (coins : ProbComp Coins)
+    (adv : Forger s Coins) : MatrixOracle.Observable s := fun rho A t cache => do
   let r ← coins.eval
-  let rho ← PMF.uniformOfFintype (FixedBytes 32)
-  let (A, cache) ← matrixDigestOracle s (.inl rho) ([], [])
-  onlineTrial s adv r rho A (moduleSISMap A s₁ + s₂) cache
+  onlineTrial s adv r rho A t (cache, [])
 
 /-- Structured Module-SIS distribution used in Dilithium v3.1, §6.1: independently uniform
 `A,t` in the systematic matrix `[I | A | -t]`. -/
@@ -501,13 +496,15 @@ with the digest cache. The query bound justifies presampling the reduction's mat
 theorem keyOnlyGame_eq_moduleLWE_realGame {Coins : Type} (s : Level) (Q : ℕ)
     (coins : ProbComp Coins) (adv : Forger s Coins)
     (hQ : ∀ bytes r, (adv bytes r).IsQueryBounded Q) :
-    keyOnlyGame s coins adv = ModuleLWE.realGame (MatrixOracle.shortVectorLaw s s.params.ℓ)
-      (MatrixOracle.shortVectorLaw s s.params.k) (distinguisher s Q coins adv) := by
-  simp only [keyOnlyGame, matrixDigestOracle, RandomOracle.memoizeSum_inl,
-    memoize_of_none _ _ [] rfl, ModuleLWE.realGame, ModuleLWE.eval_realExperiment,
-    distinguisher, sampleSaved, ProbComp.eval_bind, ProbComp.eval_pure, eval_sampleBytes,
-    ProbComp.eval_replicateFin, MatrixOracle.eval_sampleMatrix, ← PMF.iid_eq_pi, pmf_norm,
-    trial_eq_online s Q adv hQ]
+    MatrixOracle.keyOnlyGame s (observe s coins adv) =
+      ModuleLWE.realGame (MatrixOracle.shortVectorLaw s s.params.ℓ)
+        (MatrixOracle.shortVectorLaw s s.params.k) (distinguisher s Q coins adv) := by
+  apply MatrixOracle.keyOnlyGame_eq_realGame_of_planted
+  intro A t
+  simp only [MatrixOracle.planted, observe, distinguisher, sampleSaved, ProbComp.eval_bind,
+    ProbComp.eval_pure, eval_sampleBytes, ProbComp.eval_replicateFin,
+    MatrixOracle.eval_sampleMatrix,
+    ← PMF.iid_eq_pi, pmf_norm, trial_eq_online s Q adv hQ]
   pmf_swap
 
 private theorem random_le_selfTarget {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
@@ -526,14 +523,13 @@ private theorem random_le_selfTarget {Coins : Type} (s : Level) (Q : ℕ) (coins
   intro r _
   simpa only [ModuleSIS.SelfTarget.game, pmf_norm] using fixed_le s adv r A t
 
-/-- Concrete key-only reduction for the shared classical matrix and digest oracles. It uses one
-short-law Module-LWE distinguisher and the explicit two-run systematic Module-SIS solver at
-twice the compressed radius. Distinct digest collisions are counted at actual Algorithm 29,
-and one final digest lookup is charged for a forgery on a fresh point. -/
+/-- Shared-oracle key-only forgery is bounded by short-secret MLWE, a two-run systematic
+Module-SIS experiment and the unbounded collision term for concrete Algorithm 29 on SHAKE256
+digests. One final digest lookup accounts for a forgery on a fresh point. -/
 theorem keyOnly_le_moduleLWE_add_fork {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
     (adv : Forger s Coins) (hQ : ∀ bytes r, (adv bytes r).IsQueryBounded Q) :
     let radius := compressedSelfTargetRadius s.params 13
-    ((keyOnlyGame s coins adv) true).toReal ≤
+    ((MatrixOracle.keyOnlyGame s (observe s coins adv)) true).toReal ≤
       ModuleLWE.advantage (MatrixOracle.shortVectorLaw s s.params.ℓ)
         (MatrixOracle.shortVectorLaw s s.params.k) (distinguisher s Q coins adv) +
       ((Q + 1 : ℕ) / ((256 : ℝ) ^ digestBytes s) + Real.sqrt ((Q + 1 : ℕ) *
@@ -546,8 +542,8 @@ theorem keyOnly_le_moduleLWE_add_fork {Coins : Type} (s : Level) (Q : ℕ) (coin
   have hr := (ENNReal.toReal_mono (PMF.apply_ne_top _ _)
     (random_le_selfTarget s Q coins adv)).trans hs
   have hl := Game.coe_succProbability_le_add_of_advantage_le
-    (g₀ := keyOnlyGame s coins adv) (g₁ := ModuleLWE.randomGame (distinguisher s Q coins adv))
-    (le_refl _)
+    (g₀ := MatrixOracle.keyOnlyGame s (observe s coins adv))
+    (g₁ := ModuleLWE.randomGame (distinguisher s Q coins adv)) (le_refl _)
   rw [Game.coe_succProbability, Game.coe_succProbability,
     keyOnlyGame_eq_moduleLWE_realGame s Q coins adv hQ] at hl
   rw [keyOnlyGame_eq_moduleLWE_realGame s Q coins adv hQ]

@@ -77,29 +77,62 @@ private def trial (s : Level) (adv : Forger s) (rho : FixedBytes 32)
   let f ← adv bytes
   return (verifyWithExpansion s (fun _ => some A) bytes f.message f.context f.signature).getD false
 
-/-- The honest matrix query starts from the empty cache. The forger sees the seed and rounded
-bytes and continues with the cache populated by that key-generation query. -/
-private noncomputable def withVector (s : Level) (adv : Forger s)
+/-- The post-key computation sees the published seed, the matrix, the full vector for
+rounding and the matrix-oracle cache left by key generation. The concrete SHAKE and the
+shared digest-oracle experiments supply different verification computations here. -/
+abbrev Observable (s : Level) := FixedBytes 32 → PublicMatrix s → (Fin s.params.k → Poly) →
+  List (FixedBytes 32 × PublicMatrix s) → Game
+
+/-- Use a matrix query to generate the key and continue with the resulting oracle cache. -/
+private noncomputable def withVector (s : Level) (observe : Observable s)
     (vector : PublicMatrix s → Fin s.params.k → Poly) : Game := do
   let rho ← PMF.uniformOfFintype (FixedBytes 32)
-  let client : ProbOracleComp (fun _ : FixedBytes 32 => PublicMatrix s) Bool := do
-    let A ← ProbOracleComp.query rho
-    trial s adv rho A (vector A)
-  (ProbOracleComp.runWith (memoize fun _ => PMF.uniformOfFintype (PublicMatrix s))
-    client []).map Prod.fst
+  let (A, cache) ← memoize (fun _ => PMF.uniformOfFintype (PublicMatrix s)) rho []
+  observe rho A (vector A) cache
 
-/-- Key-only forgery under the matrix oracle. The two short vectors are sampled
-independently; the public bytes encode the high part of `A s₁ + s₂`. -/
-noncomputable def keyOnlyGame (s : Level) (adv : Forger s) : Game := do
+/-- The key generator samples its short secret and error, obtains its matrix through the
+public seed oracle and passes the populated cache to the supplied post-key computation. -/
+noncomputable def keyOnlyGame (s : Level) (observe : Observable s) : Game := do
   let s₁ ← shortVectorLaw s s.params.ℓ
   let s₂ ← shortVectorLaw s s.params.k
-  withVector s adv fun A => moduleSISMap A s₁ + s₂
+  withVector s observe fun A => moduleSISMap A s₁ + s₂
 
-/-- The uniform-vector hybrid publishes the high part of an independent uniform ring vector.
-Rounding is performed after sampling the full vector. -/
-noncomputable def uniformVectorGame (s : Level) (adv : Forger s) : Game := do
+/-- The uniform-vector hybrid performs exactly the same matrix query as key generation. -/
+noncomputable def uniformVectorGame (s : Level) (observe : Observable s) : Game := do
   let t ← PMF.uniformOfFintype (Fin s.params.k → Poly)
-  withVector s adv fun _ => t
+  withVector s observe fun _ => t
+
+/-- Given the full challenger instance, sample a fresh seed and plant its matrix as the first
+cache entry. All later oracle and verification operations belong to the same observable. -/
+@[expose] noncomputable def planted (s : Level) (observe : Observable s) (A : PublicMatrix s)
+    (t : Fin s.params.k → Poly) : Game := do
+  let rho ← PMF.uniformOfFintype (FixedBytes 32)
+  observe rho A t [(rho, A)]
+
+private theorem withVector_eq (s : Level) (observe : Observable s)
+    (vector : PublicMatrix s → Fin s.params.k → Poly) :
+    withVector s observe vector = (PMF.uniformOfFintype (PublicMatrix s)).bind fun A =>
+      planted s observe A (vector A) := by
+  simp only [withVector, planted, memoize_of_none _ _ [] rfl, PMF.monad_bind_eq_bind,
+    PMF.monad_pure_eq_pure, PMF.bind_bind, PMF.pure_bind]
+  exact PMF.bind_comm _ _ _
+
+/-- The post-key computation runs in the real Module-LWE experiment whenever the supplied
+program realizes its behavior at a planted seed. The seed and short-vector sampling laws
+and the initial matrix lookup are discharged here for every such program. -/
+theorem keyOnlyGame_eq_realGame_of_planted (s : Level) (observe : Observable s)
+    (D : PublicMatrix s → (Fin s.params.k → Poly) → ProbComp Bool)
+    (h : ∀ A t, planted s observe A t = (D A t).eval) :
+    keyOnlyGame s observe = ModuleLWE.realGame (shortVectorLaw s s.params.ℓ)
+      (shortVectorLaw s s.params.k) D := by
+  simp only [keyOnlyGame, withVector_eq, h, ModuleLWE.realGame, ModuleLWE.eval_realExperiment,
+    PMF.monad_bind_eq_bind]
+  rfl
+
+/-- Run the byte-key forger with its matrix cache and verify its signature using concrete SHAKE. -/
+noncomputable def concreteSHAKE (s : Level) (adv : Forger s) : Observable s := fun rho A t cache =>
+  (ProbOracleComp.runWith (memoize fun _ => PMF.uniformOfFintype (PublicMatrix s))
+    (trial s adv rho A t) cache).map Prod.fst
 
 private def runAtSeed {α : Type} (s : Level) (rho : FixedBytes 32) (A : PublicMatrix s)
     (client : ProbOracleComp (fun _ : FixedBytes 32 => PublicMatrix s) α) : ProbComp α :=
@@ -114,31 +147,27 @@ def distinguisher (s : Level) (adv : Forger s) (A : PublicMatrix s)
   let rho ← sampleSeed
   runAtSeed s rho A (trial s adv rho A t)
 
-private theorem withVector_eq (s : Level) (adv : Forger s)
-    (vector : PublicMatrix s → Fin s.params.k → Poly) :
-    withVector s adv vector = (PMF.uniformOfFintype (PublicMatrix s)).bind fun A =>
-      (distinguisher s adv A (vector A)).eval := by
-  simp only [withVector, PMF.monad_bind_eq_bind, ProbOracleComp.runWith_bind,
-    ProbOracleComp.runWith_query, memoize_of_none _ _ [] rfl, PMF.monad_pure_eq_pure,
-    PMF.map_bind, PMF.bind_bind, PMF.pure_bind, distinguisher, runAtSeed, ProbComp.eval_bind,
+private theorem planted_concreteSHAKE (s : Level) (adv : Forger s)
+    (A : PublicMatrix s) (t : Fin s.params.k → Poly) :
+    planted s (concreteSHAKE s adv) A t = (distinguisher s adv A t).eval := by
+  simp only [planted, concreteSHAKE, PMF.monad_bind_eq_bind, distinguisher, runAtSeed,
+    ProbComp.eval_bind,
     sampleSeed, ProbComp.eval_replicateFin, ProbComp.eval_unifFin, PMF.pi_uniformOfFintype,
     ProbComp.eval_map, ProbOracleComp.eval_run_interpret_eq_runWith, ProbComp.eval_memoize,
     eval_sampleMatrix]
-  exact PMF.bind_comm _ _ _
 
 /-- Exact finite advantage of the seeded public-key switch. Both experiments give the forger
 the same matrix oracle used by key generation and check its full digest against the rounded
 public-key bytes. The distinguisher runs the forger once. -/
 theorem advantage_eq_moduleLWE (s : Level) (adv : Forger s) :
-    Game.advantage (keyOnlyGame s adv) (uniformVectorGame s adv) =
+    Game.advantage (keyOnlyGame s (concreteSHAKE s adv))
+      (uniformVectorGame s (concreteSHAKE s adv)) =
       ModuleLWE.advantage (shortVectorLaw s s.params.ℓ) (shortVectorLaw s s.params.k)
         (distinguisher s adv) := by
   unfold ModuleLWE.advantage
   apply congrArg₂ Game.advantage
-  · simp only [keyOnlyGame, withVector_eq, ModuleLWE.realGame, ModuleLWE.eval_realExperiment,
-      PMF.monad_bind_eq_bind]
-    rfl
-  · simp only [uniformVectorGame, withVector_eq, ModuleLWE.randomGame,
+  · exact keyOnlyGame_eq_realGame_of_planted s _ _ (planted_concreteSHAKE s adv)
+  · simp only [uniformVectorGame, withVector_eq, planted_concreteSHAKE, ModuleLWE.randomGame,
       ModuleLWE.eval_randomExperiment, PMF.monad_bind_eq_bind]
     exact PMF.bind_comm _ _ _
 
@@ -178,11 +207,11 @@ private theorem fixed_le (s : Level) (adv : Forger s) (A : PublicMatrix s)
 self-target experiment with independent uniform `A,t`. The target hashes the same message
 representative and commitment with concrete SHAKE. -/
 theorem uniformVectorGame_le_selfTarget (s : Level) (adv : Forger s) :
-    (uniformVectorGame s adv).succProbability ≤
+    (uniformVectorGame s (concreteSHAKE s adv)).succProbability ≤
       (selfTargetGame s.params (uniformKeyLaw s.params) (selfTargetHash s.params (algebraicHash s))
         (compressedSelfTargetRadius s.params 13) (selfTargetSolver s adv)).succProbability := by
   apply Game.succProbability_mono
-  simp only [uniformVectorGame, withVector_eq, selfTargetGame, uniformKeyLaw,
+  simp only [uniformVectorGame, withVector_eq, planted_concreteSHAKE, selfTargetGame, uniformKeyLaw,
     PMF.monad_bind_eq_bind,
     PMF.monad_pure_eq_pure, PMF.bind_bind, PMF.pure_bind]
   rw [PMF.bind_comm (PMF.uniformOfFintype (Fin s.params.k → Poly))]
@@ -193,7 +222,7 @@ theorem uniformVectorGame_le_selfTarget (s : Level) (adv : Forger s) :
 short-law Module-LWE vector plus the success of the constructed solver against the actual
 full uniform challenge. Both terms use the same byte-key forger. -/
 theorem keyOnlyGame_le_moduleLWE_add_selfTarget (s : Level) (adv : Forger s) :
-    (keyOnlyGame s adv).succProbability ≤
+    (keyOnlyGame s (concreteSHAKE s adv)).succProbability ≤
       ModuleLWE.advantage (shortVectorLaw s s.params.ℓ) (shortVectorLaw s s.params.k)
         (distinguisher s adv) +
       (selfTargetGame s.params (uniformKeyLaw s.params) (selfTargetHash s.params (algebraicHash s))
