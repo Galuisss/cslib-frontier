@@ -4968,6 +4968,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Roots
 public import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
 public import CslibFrontier.Crypto.Computational.MLDSA.Hint
 public import CslibFrontier.Crypto.Computational.MLDSA.KeyOnly
+public import CslibFrontier.Crypto.Computational.MLDSA.KeySeedSearch
 public import CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 public import CslibFrontier.Crypto.Computational.MLDSA.MatrixOracle
 public import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskSeedGame
