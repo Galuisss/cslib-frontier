@@ -113,17 +113,6 @@ private theorem sub_mem_mask {v z : Fin P.ℓ → Fin P.n → ZMod P.q}
 noncomputable def signingMaskLaw (hγ : 0 < P.γ₁) : PMF (Fin P.ℓ → Fin P.n → ZMod P.q) :=
   PMF.uniformOfFinset (maskSet P) (mask_nonempty P hγ)
 
-/-- Draw an ideal signing mask using one uniform finite choice. -/
-noncomputable def sampleSigningMask (hγ : 0 < P.γ₁) : ProbComp (Fin P.ℓ → Fin P.n → ZMod P.q) :=
-  letI : Nonempty (maskSet P) := Finset.nonempty_coe_sort.mpr (mask_nonempty P hγ)
-  Subtype.val <$> ProbComp.uniform (maskSet P)
-
-@[simp] theorem eval_sampleSigningMask (hγ : 0 < P.γ₁) :
-    (sampleSigningMask P hγ).eval = signingMaskLaw P hγ := by
-  let : Nonempty (maskSet P) := Finset.nonempty_coe_sort.mpr (mask_nonempty P hγ)
-  simp only [sampleSigningMask, ProbComp.eval_map, ProbComp.eval_uniform, signingMaskLaw,
-    Probability.PMF.uniformOfFintype_finset_map_val]
-
 /-- Every lifted coefficient of a supported signing mask belongs to `(-γ₁,γ₁]`. -/
 theorem signingMaskLaw_support_bounds [NeZero P.q] {hγ : 0 < P.γ₁} (hq : 2 * P.γ₁ < P.q)
     {y : Fin P.ℓ → Fin P.n → ZMod P.q} (hy : y ∈ (signingMaskLaw P hγ).support) (i j) :
@@ -140,14 +129,6 @@ private theorem mask_card [NeZero P.q] (hγ : 0 < P.γ₁) (hq : 2 * P.γ₁ < P
   rw [intervalVectors_card P (by lia) (by lia)]
   congr 1
   lia
-
-/-- A specified mask occurs with probability at most the reciprocal of the box size. -/
-theorem signingMaskLaw_apply_le [NeZero P.q] (hγ : 0 < P.γ₁) (hq : 2 * P.γ₁ < P.q)
-    (y : Fin P.ℓ → Fin P.n → ZMod P.q) :
-    signingMaskLaw P hγ y ≤ (↑((2 * P.γ₁) ^ (P.ℓ * P.n)) : ℝ≥0∞)⁻¹ := by
-  classical
-  simp only [signingMaskLaw, PMF.uniformOfFinset_apply, mask_card P hγ hq]
-  split <;> simp
 
 /-- A bit for each mask coefficient, selecting its nonpositive or positive half-interval. -/
 abbrev MaskSigns := Fin P.ℓ → Fin P.n → Bool
