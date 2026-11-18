@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Crypto.Computational.MLDSA.CommitmentEntropy
+public import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Roots
 public import CslibFrontier.Crypto.Computational.SIS.Polynomial
 import CslibFrontier.Crypto.Game.CloseTo
 import CslibFrontier.Foundations.Data.Finset.Expect
@@ -15,7 +16,6 @@ import CslibFrontier.Probability.HashFamily.MatrixKernel
 import Mathlib.Algebra.Field.ZMod
 import Mathlib.LinearAlgebra.Lagrange
 import Mathlib.Tactic.NormNum.Prime
-import Mathlib.RingTheory.RootsOfUnity.PrimitiveRoots
 
 /-!
 # Evaluation coordinates for the ML-DSA matrix
@@ -37,34 +37,17 @@ private abbrev F := ZMod 8380417
 
 private instance : Fact (Nat.Prime 8380417) := ⟨by norm_num1⟩
 
-private def nodes (i : Fin 256) : F := 1753 ^ (2 * i.val + 1)
-
-private theorem nodes_root (i : Fin 256) : nodes i ^ 256 = -1 := by
-  have h : (1753 : F) ^ 256 = -1 := by decide +kernel
-  rw [nodes, ← pow_mul, Nat.mul_comm, pow_mul, h, pow_add, pow_mul]
-  norm_num
-
-private theorem nodes_injective : Function.Injective nodes := by
-  have h : orderOf (1753 : F) = 2 ^ (8 + 1) :=
-    orderOf_eq_prime_pow (p := 2) (n := 8) (by decide +kernel) (by decide +kernel)
-  intro i j hij
-  have eq := pow_injOn_Iio_orderOf (x := (1753 : F))
-    (show 2 * i.val + 1 < orderOf (1753 : F) by rw [h]; lia)
-    (show 2 * j.val + 1 < orderOf (1753 : F) by rw [h]; lia) hij
-  apply Fin.ext
-  lia
-
 private noncomputable def evalHom :
     AdjoinRoot ((X : F[X]) ^ 256 + 1) →ₐ[F] (Fin 256 → F) :=
-  AlgHom.pi fun i => AdjoinRoot.liftAlgHom _ (AlgHom.id F F) (nodes i) (by
-    simp [nodes_root])
+  AlgHom.pi fun i => AdjoinRoot.liftAlgHom _ (AlgHom.id F F) (nttNode i) (by
+    simp [nttNode_pow])
 
 private theorem evalHom_surjective : Function.Surjective evalHom := by
   intro v
-  refine ⟨AdjoinRoot.mk _ (Lagrange.interpolate Finset.univ nodes v), ?_⟩
+  refine ⟨AdjoinRoot.mk _ (Lagrange.interpolate Finset.univ nttNode v), ?_⟩
   funext i
-  change Polynomial.eval (nodes i) (Lagrange.interpolate Finset.univ nodes v) = v i
-  exact Lagrange.eval_interpolate_at_node v nodes_injective.injOn (Finset.mem_univ i)
+  change Polynomial.eval (nttNode i) (Lagrange.interpolate Finset.univ nttNode v) = v i
+  exact Lagrange.eval_interpolate_at_node v nttNode_injective.injOn (Finset.mem_univ i)
 
 /-- Evaluation at the 256 odd powers of 1753, the primitive 512th root specified by FIPS 204.
 The index orders the roots by exponent. -/
