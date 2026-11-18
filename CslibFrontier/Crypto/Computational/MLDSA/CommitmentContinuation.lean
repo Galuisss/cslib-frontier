@@ -256,44 +256,9 @@ private theorem prob_row_changes (H : Xofs) (s : Level) (A : PublicMatrix s) (m 
     (signingMaskLaw s.params (by cases s <;> decide)).toOuterMeasure
       {y | ∃ v, sign (Function.update D (maskCommitmentAddress s A m y) v) ≠ sign D} ≤
       815 * commitmentGuessProbability s.params (by cases s <;> decide) A := by
-  classical
-  intro sign
-  let run : DigestReads s (Option (List Byte)) := do
-    if q.context.length > 255 then return none
-    match decodePrivate s key with
-    | none => return none
-    | some sk =>
-      match H.expandA s sk.rho with
-      | none => return none
-      | some matrix =>
-        let μ ← representativeQuery H s sk.tr (formatMessage q.message q.context)
-        H.retryDigestQueries s sk matrix μ (maskFromRow s row) 814 0
-  have eq (T) : OracleComp.evalPure T run = sign T := by
-    simp only [run, sign, Xofs.signWithExpansionRow,
-      Xofs.expandA_congr (H := H) (K := H.withDigestRegister s T) rfl]
-    by_cases hc : q.context.length ≤ 255
-    · simp only [hc, not_lt_of_ge hc, guard, ↓reduceIte, Option.pure_def, Option.bind_eq_bind,
-        Option.bind_some]
-      cases dec : decodePrivate s key with
-      | none => rfl
-      | some sk =>
-        simp only [Option.bind_some]
-        cases matrix : H.expandA s sk.rho with
-        | none => rfl
-        | some mat =>
-          simp only [Option.bind_some, OracleComp.evalPure_bind, Xofs.evalPure_retryDigestQueries,
-            eval_rep]
-    · simp [hc, Nat.lt_of_not_ge hc, guard]
-  have cost : run.IsQueryBounded 815 := by
-    dsimp only [run]
-    split
-    · exact .pure _ _
-    split
-    · exact .pure _ _
-    split
-    · exact .pure _ _
-    · exact (rep_bounded ..).bind fun μ => Xofs.retryDigestQueries_bounded ..
-  simpa only [eq, Nat.cast_ofNat] using prob_response_changes s A m D run cost
+  simpa only [Xofs.evalPure_signDigestQueriesWithMask, Xofs.signWithExpansionRow, Nat.cast_ofNat]
+    using prob_response_changes s A m D _
+      (H.signDigestQueriesWithMask_bounded s key q fun _ _ => maskFromRow s row)
 
 /-- Resume the fresh-digest forgery game with a retained device, the successful signing log,
 and fixed remaining rows of Algorithm 34 bytes. Device queries, later signatures and final
