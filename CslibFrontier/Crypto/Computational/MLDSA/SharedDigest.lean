@@ -8,11 +8,13 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Crypto.Computational.MLDSA.MatrixOracle
+public import CslibFrontier.Crypto.Computational.MLDSA.MatrixSampling
 import CslibFrontier.Crypto.Game.Order
 import CslibFrontier.Languages.Probabilistic.Memoize
 import CslibFrontier.Languages.Probabilistic.Norm
 import CslibFrontier.Languages.Probabilistic.RandomOracle.Sum
 import CslibFrontier.Languages.Probabilistic.Vector
+import CslibFrontier.Probability.StatisticalDistance.TotalVariation
 import CslibFrontier.Probability.PMF.Bind
 import CslibFrontier.Tactic.PMFSwap
 
@@ -258,12 +260,14 @@ private theorem eval_sampleBytes (n : ℕ) :
   simp only [sampleBytes, ProbComp.eval_replicateFin, ProbComp.eval_unifFin,
     PMF.pi_uniformOfFintype]
 
-/-- Draw private coins, a fresh matrix seed, and at most `Q` independent matrix responses. -/
-def sampleSaved {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins) :
+/-- Draw private coins, a fresh matrix seed, and `Q` independent responses from the matrix
+sampler. The default samples exactly uniform matrices. -/
+def sampleSaved {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
+    (matrix : ProbComp (PublicMatrix s) := MatrixOracle.sampleMatrix s) :
     ProbComp (Saved s Coins) := do
   let r ← coins
   let rho ← sampleBytes 32
-  let tape ← replicateFin Q (MatrixOracle.sampleMatrix s)
+  let tape ← replicateFin Q matrix
   return ⟨r, rho, List.ofFn tape⟩
 
 private abbrev Cache (s : Level) := List (FixedBytes 32 × PublicMatrix s)
@@ -406,13 +410,18 @@ private def trial {Coins : Type} (s : Level) (adv : Forger s Coins) (r : Saved s
     let f ← runForger s adv r ⟨A, t⟩
     verify s (encodePublic s r.seed.toList t) A f)
 
-/-- The distinguisher on the full Module-LWE challenge. It publishes the rounded bytes, binds
-the challenge matrix to the public seed, and runs the adversary and verifier with one digest
-cache. -/
-def distinguisher {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
+/-- Run the byte forger and verifier on a full Module-LWE challenge with the indicated
+distribution of private coins, a public seed, and saved matrix answers. Their digest cache is
+shared through verification. -/
+def distinguisherFromSaved {Coins : Type} (s : Level) (saved : ProbComp (Saved s Coins))
     (adv : Forger s Coins) (A : PublicMatrix s) (t : Fin s.params.k → Poly) : ProbComp Bool := do
-  let r ← sampleSaved s Q coins
+  let r ← saved
   trial s adv r A t
+
+/-- The Module-LWE distinguisher with independent, exactly uniform auxiliary matrices. -/
+def distinguisher {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
+    (adv : Forger s Coins) :=
+  distinguisherFromSaved s (sampleSaved s Q coins) adv
 
 private theorem fixed_le {Coins : Type} (s : Level) (adv : Forger s Coins) (r : Saved s Coins)
     (A : PublicMatrix s) (t : Fin s.params.k → Poly) :
@@ -505,18 +514,18 @@ theorem keyOnlyGame_eq_moduleLWE_realGame {Coins : Type} (s : Level) (Q : ℕ)
       (MatrixOracle.shortVectorLaw s s.params.k) (distinguisher s Q coins adv) := by
   simp only [keyOnlyGame, matrixDigestOracle, RandomOracle.memoizeSum_inl,
     memoize_of_none _ _ [] rfl, ModuleLWE.realGame, ModuleLWE.eval_realExperiment,
-    distinguisher, sampleSaved, ProbComp.eval_bind, ProbComp.eval_pure, eval_sampleBytes,
-    ProbComp.eval_replicateFin, MatrixOracle.eval_sampleMatrix, ← PMF.iid_eq_pi, pmf_norm,
-    trial_eq_online s Q adv hQ]
+    distinguisher, distinguisherFromSaved, sampleSaved, ProbComp.eval_bind, ProbComp.eval_pure,
+    eval_sampleBytes, ProbComp.eval_replicateFin, MatrixOracle.eval_sampleMatrix, ← PMF.iid_eq_pi,
+    pmf_norm, trial_eq_online s Q adv hQ]
   pmf_swap
 
-private theorem random_le_selfTarget {Coins : Type} (s : Level) (Q : ℕ) (coins : ProbComp Coins)
+private theorem random_le_selfTarget {Coins : Type} (s : Level) (saved : ProbComp (Saved s Coins))
     (adv : Forger s Coins) :
-    ModuleLWE.randomGame (distinguisher s Q coins adv) true ≤
+    ModuleLWE.randomGame (distinguisherFromSaved s saved adv) true ≤
       ((instances s).bind (ModuleSIS.SelfTarget.game (expandDigest s)
-        (compressedSelfTargetRadius s.params 13) (sampleSaved s Q coins).eval
+        (compressedSelfTargetRadius s.params 13) saved.eval
         (solver s adv))) true := by
-  simp only [ModuleLWE.randomGame, ModuleLWE.eval_randomExperiment, distinguisher,
+  simp only [ModuleLWE.randomGame, ModuleLWE.eval_randomExperiment, distinguisherFromSaved,
     ProbComp.eval_bind, instances, ModuleSIS.SelfTarget.game, pmf_norm]
   apply Probability.PMF.bind_apply_mono_on_support
   intro A _
@@ -525,6 +534,30 @@ private theorem random_le_selfTarget {Coins : Type} (s : Level) (Q : ℕ) (coins
   apply Probability.PMF.bind_apply_mono_on_support
   intro r _
   simpa only [ModuleSIS.SelfTarget.game, pmf_norm] using fixed_le s adv r A t
+
+private theorem real_le_moduleLWE_add_fork {Coins : Type} (s : Level) (Q : ℕ)
+    (saved : ProbComp (Saved s Coins)) (adv : Forger s Coins)
+    (hQ : ∀ bytes r, (adv bytes r).IsQueryBounded Q) :
+    let radius := compressedSelfTargetRadius s.params 13
+    let D := distinguisherFromSaved s saved adv
+    ((ModuleLWE.realGame (MatrixOracle.shortVectorLaw s s.params.ℓ)
+      (MatrixOracle.shortVectorLaw s s.params.k) D) true).toReal ≤
+      ModuleLWE.advantage (MatrixOracle.shortVectorLaw s s.params.ℓ)
+        (MatrixOracle.shortVectorLaw s s.params.k) D +
+      ((Q + 1 : ℕ) / ((256 : ℝ) ^ digestBytes s) + Real.sqrt ((Q + 1 : ℕ) *
+        (((instances s).bind fun M => (ModuleSIS.SelfTarget.reduction (expandDigest s) radius Q
+          saved.eval (solver s adv) M).map
+            fun z => decide (ModuleSIS.IsSolution M (2 * radius) z)) true +
+              ModuleSIS.SelfTarget.collisionMass (expandDigest s)).toReal)) := by
+  have hs := selfTarget_digest_fork s Q (instances s) saved.eval (solver s adv) (solver_bounded hQ)
+  have hr := (ENNReal.toReal_mono (PMF.apply_ne_top _ _)
+    (random_le_selfTarget s saved adv)).trans hs
+  have hl := Game.coe_succProbability_le_add_of_advantage_le
+    (g₀ := ModuleLWE.realGame (MatrixOracle.shortVectorLaw s s.params.ℓ)
+      (MatrixOracle.shortVectorLaw s s.params.k) (distinguisherFromSaved s saved adv))
+    (g₁ := ModuleLWE.randomGame (distinguisherFromSaved s saved adv)) (le_refl _)
+  rw [Game.coe_succProbability, Game.coe_succProbability] at hl
+  exact hl.trans (by rw [add_comm]; exact add_le_add le_rfl hr)
 
 /-- Concrete key-only reduction for the shared classical matrix and digest oracles. It uses one
 short-law Module-LWE distinguisher and the explicit two-run systematic Module-SIS solver at
@@ -541,16 +574,45 @@ theorem keyOnly_le_moduleLWE_add_fork {Coins : Type} (s : Level) (Q : ℕ) (coin
           (sampleSaved s Q coins).eval (solver s adv) M).map
             fun z => decide (ModuleSIS.IsSolution M (2 * radius) z)) true +
               ModuleSIS.SelfTarget.collisionMass (expandDigest s)).toReal)) := by
-  have hs := selfTarget_digest_fork s Q (instances s) (sampleSaved s Q coins).eval
-    (solver s adv) (solver_bounded hQ)
-  have hr := (ENNReal.toReal_mono (PMF.apply_ne_top _ _)
-    (random_le_selfTarget s Q coins adv)).trans hs
-  have hl := Game.coe_succProbability_le_add_of_advantage_le
-    (g₀ := keyOnlyGame s coins adv) (g₁ := ModuleLWE.randomGame (distinguisher s Q coins adv))
-    (le_refl _)
-  rw [Game.coe_succProbability, Game.coe_succProbability,
-    keyOnlyGame_eq_moduleLWE_realGame s Q coins adv hQ] at hl
   rw [keyOnlyGame_eq_moduleLWE_realGame s Q coins adv hQ]
-  exact hl.trans (by rw [add_comm]; exact add_le_add le_rfl hr)
+  exact real_le_moduleLWE_add_fork s Q (sampleSaved s Q coins) adv hQ
+
+/-- Classical key-only reduction with bounded fair-bit sampling of every auxiliary matrix.
+The `Q`-entry matrix tape is drawn once and replayed across the fork. The challenger supplies
+the matrix at the public seed. Only the change from the real online oracle to the bounded
+distinguisher incurs a statistical loss. -/
+theorem keyOnly_le_moduleLWE_add_fork_fairMatrices {Coins : Type} (s : Level) (Q attempts : ℕ)
+    (coins : ProbComp Coins) (adv : Forger s Coins)
+    (hQ : ∀ bytes r, (adv bytes r).IsQueryBounded Q) :
+    let radius := compressedSelfTargetRadius s.params 13
+    let saved := sampleSaved s Q coins (MatrixOracle.sampleMatrixFair s attempts)
+    ((keyOnlyGame s coins adv) true).toReal ≤
+      (Q * s.params.k * s.params.ℓ * 256 : ℕ) * (8191 / 8388608 : ℝ) ^ attempts +
+      (ModuleLWE.advantage (MatrixOracle.shortVectorLaw s s.params.ℓ)
+        (MatrixOracle.shortVectorLaw s s.params.k) (distinguisherFromSaved s saved adv) +
+      ((Q + 1 : ℕ) / ((256 : ℝ) ^ digestBytes s) + Real.sqrt ((Q + 1 : ℕ) *
+        (((instances s).bind fun M => (ModuleSIS.SelfTarget.reduction (expandDigest s) radius Q
+          saved.eval (solver s adv) M).map
+            fun z => decide (ModuleSIS.IsSolution M (2 * radius) z)) true +
+              ModuleSIS.SelfTarget.collisionMass (expandDigest s)).toReal))) := by
+  let saved := sampleSaved s Q coins (MatrixOracle.sampleMatrixFair s attempts)
+  let δ : ℝ := (Q * s.params.k * s.params.ℓ * 256 : ℕ) * (8191 / 8388608 : ℝ) ^ attempts
+  have ht := (closeTo_of_dist_le_ofReal (MatrixOracle.dist_matrixTapeFair_le s Q attempts)).symm
+  have hreal : CloseTo (keyOnlyGame s coins adv)
+      (ModuleLWE.realGame (MatrixOracle.shortVectorLaw s s.params.ℓ)
+        (MatrixOracle.shortVectorLaw s s.params.k) (distinguisherFromSaved s saved adv))
+      (ENNReal.ofReal δ) := by
+    rw [keyOnlyGame_eq_moduleLWE_realGame s Q coins adv hQ]
+    simp only [ModuleLWE.realGame, ModuleLWE.eval_realExperiment, distinguisher,
+      distinguisherFromSaved, saved, sampleSaved, ProbComp.eval_bind, ProbComp.eval_pure, pmf_norm]
+    iterate 5
+      apply CloseTo.bind_right
+      intro _ _
+    rw [ProbComp.eval_replicateFin, MatrixOracle.eval_sampleMatrix, PMF.pi_uniformOfFintype]
+    exact ht.bind_left _
+  have hp := hreal.abs_toReal_sub_le (by dsimp [δ]; positivity) {true}
+  simp only [PMF.toOuterMeasure_apply_singleton] at hp
+  have h := real_le_moduleLWE_add_fork s Q saved adv hQ
+  exact (sub_le_iff_le_add.mp (abs_le.mp hp).2).trans (add_le_add_right h δ)
 
 end Cslib.Crypto.MLDSA.FIPS204.SharedDigest
