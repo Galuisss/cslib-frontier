@@ -484,10 +484,21 @@ private theorem decodePrivate_encode {s : Level} (v : PrivateKey s) (hr : v.rho.
       unpackSigned_packSigned (width := 13) (upper := 4096) c []
       (fun i j => by have := h₀ i j; norm_num at *; omega) i j
 
+/-- Raw SHAKE256 input of FIPS 204 Algorithm 6, line 1. The 32-byte seed is followed by
+the one-byte matrix dimensions in row then column order. -/
+@[expose] def keySeedInput (s : Level) (seed : FixedBytes 32) : List Bool :=
+  Keccak.bytesToBitsLE (seed.toList ++ [Fin.ofNat 256 s.params.k, Fin.ofNat 256 s.params.ℓ])
+
+/-- The Algorithm 6 key expansion uses a 272-bit input at each standardized level. -/
+theorem length_keySeedInput (s : Level) (seed : FixedBytes 32) :
+    (keySeedInput s seed).length = 272 := by
+  rw [keySeedInput, bitsLength, List.length_append, FixedBytes.length_toList]
+  rfl
+
 /-- Algorithm 6 reads the public matrix seed, the short-vector seed and the signing key
 in one 128-byte SHAKE256 expansion of the seed and the two dimension bytes. -/
 @[expose] def Xofs.expandKeySeed (H : Xofs) (s : Level) (seed : FixedBytes 32) : List Byte :=
-  H.h256.readBytes (seed.toList ++ [Fin.ofNat 256 s.params.k, Fin.ofNat 256 s.params.ℓ]) 128
+  H.h256.read (keySeedInput s seed) 128
 
 /-- Algorithm 6, from the 32-byte seed to both encoded keys (Algorithms 22, 24).
 Rejection exhaustion during the matrix or short-vector expansion yields an error. -/
@@ -553,8 +564,7 @@ theorem privateKey_of_keyGen {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys
         sk.s₁, sk.s₂, publicKeyLowPart s.params 13 sk.publicKey⟩ ∧
       (∀ i j, |(sk.s₂ i j).valMinAbs| ≤ s.params.η) := by
   unfold Xofs.keyGen Xofs.expandKeySeed at hg
-  generalize hh : H.h256.readBytes
-    (seed.toList ++ [Fin.ofNat 256 s.params.k, Fin.ofNat 256 s.params.ℓ]) 128 = expanded at hg
+  generalize hh : H.h256.read (keySeedInput s seed) 128 = expanded at hg
   have hex : expanded.length = 128 := by rw [← hh]; exact H.h256.length_read ..
   have hr : (expanded.take 32).length = 32 := by simp [hex]
   obtain ⟨rho, hrho⟩ := FixedBytes.exists_toList hr

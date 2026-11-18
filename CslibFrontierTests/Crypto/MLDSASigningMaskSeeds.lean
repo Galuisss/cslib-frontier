@@ -214,14 +214,15 @@ example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ}
 open QuantumSigningForger in
 example (C : QuantumSigningForger) (s : Level) (seed : FixedBytes 32) (tag : Bool)
     (h : 272 ≤ C.addressBits) :
-    let x := keyInput s seed
+    let x := keySeedInput s seed
     queriesKeySeed (C := C) s seed
-      (some (Xofs.queryAddress C.addressBits tag x ((keyInput_length ..).le.trans h))) = tag := by
+      (some (Xofs.queryAddress C.addressBits tag x ((length_keySeedInput ..).le.trans h))) =
+      tag := by
   intro x
   have len : (List.replicate (C.addressBits - x.length) false ++ true :: x).length =
       C.addressBits + 1 := by
     simp only [List.length_append, List.length_replicate, List.length_cons]
-    have := (keyInput_length s seed).le.trans h
+    have := (length_keySeedInput s seed).le.trans h
     dsimp only [x] at *
     lia
   simp only [queriesKeySeed, Xofs.queryAddress, Fin.cons_zero, Fin.cons_succ,

@@ -77,13 +77,17 @@ theorem length_maskSeedInput (key : List Byte) (rnd : FixedBytes 32) (μ : List 
     simp [Keccak.bytesToBitsLE, Keccak.byteBitsLE, Nat.mul_comm]
   rw [maskSeedInput, List.length_append, bits, List.length_append, FixedBytes.length_toList]
 
+private def Xofs.signDecodedWithSeed (H : Xofs) (s : Level) (sk : PrivateKey s)
+    (formatted : List Bool) (derive : List Bool → List Byte) : Option (List Byte) := do
+  let matrix ← H.expandA s sk.rho
+  let μ := H.representativeFromTr sk.tr formatted
+  firstAccepted s.params.ℓ (H.attempt s sk matrix μ (derive μ)) 814 0
+
 private def Xofs.signInternalWithSeed (H : Xofs) (s : Level) (bytes : List Byte)
     (formatted : List Bool) (derive : PrivateKey s → List Bool → List Byte) :
     Option (List Byte) := do
   let sk ← decodePrivate s bytes
-  let matrix ← H.expandA s sk.rho
-  let μ := H.representativeFromTr sk.tr formatted
-  firstAccepted s.params.ℓ (H.attempt s sk matrix μ (derive sk μ)) 814 0
+  H.signDecodedWithSeed s sk formatted (derive sk)
 
 /-- Algorithm 7 on encoded secret keys, formatted bit-string messages and 32 hedging bytes.
 The signer distinguishes a rejected attempt (advance κ by ℓ) from XOF exhaustion (abort).
@@ -177,7 +181,8 @@ theorem verify_of_sign {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys : Key
     by_contra h
     simp [Xofs.sign, guard, h] at hs
   simp only [Xofs.sign, guard, ctx, ↓reduceIte, Option.pure_def, Option.bind_eq_bind,
-    Option.bind_some, Xofs.signInternal, Xofs.signInternalWithSeed, decoded, hA] at hs
+    Option.bind_some, Xofs.signInternal, Xofs.signInternalWithSeed,
+    Xofs.signDecodedWithSeed, decoded, hA] at hs
   obtain ⟨κ, htry⟩ := attempt_of_firstAccepted hs
   rw [pk] at htry ⊢
   exact verified_of_attempt sk rho hA ctx short htry

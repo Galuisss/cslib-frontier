@@ -27,7 +27,9 @@ import CslibFrontier.Languages.Probabilistic.QueryCount.Congr
 two dimension bytes into 128 bytes. The last 32 bytes are the signing seed `K`.
 
 `keySeedDeviceGame_true` identifies the original prediction experiment with one in which
-only the quantum device can access that programmed input. The background device predicts `K`
+only the quantum device can access that programmed input. Signing uses the independent
+mask-seed rows of `signingSeedPredictionGame`, including its fallback after the tape of `n`
+rows is exhausted. The background device predicts `K`
 with probability at most `2 / 2^256` and encounters a changed response at each fixed query
 with probability at most `1 / 2^256`. Before its first coherent query the original device
 also satisfies the prediction bound, with arbitrary prior classical signing requests.
@@ -40,36 +42,30 @@ namespace Cslib.Crypto.MLDSA.FIPS204
 open Cslib.Probability Cslib.Quantum ExtendableOutput
 open scoped ENNReal
 
-private def keyInput (s : Level) (seed : FixedBytes 32) :=
-  Keccak.bytesToBitsLE (seed.toList ++ [Fin.ofNat 256 s.params.k, Fin.ofNat 256 s.params.ℓ])
-
-private theorem keyInput_length (s : Level) (seed : FixedBytes 32) :
-    (keyInput s seed).length = 272 := by simp [keyInput, bitsLength]
-
 private def Xofs.plant (H : Xofs) (s : Level) (seed : FixedBytes 32) (out : FixedBytes 128) :
     Xofs :=
   { H with h256 := H.h256.withPrefixes fun x =>
-      if x = keyInput s seed then some out.toList else none }
+      if x = keySeedInput s seed then some out.toList else none }
 
 private theorem expand_plant (H : Xofs) (s : Level) (seed : FixedBytes 32) (out : FixedBytes 128) :
     (H.plant s seed out).expandKeySeed s seed = out.toList := by
-  change ((H.plant s seed out).h256.read (keyInput s seed) 128) = _
+  change ((H.plant s seed out).h256.read (keySeedInput s seed) 128) = _
   simp [Xofs.plant, ExtendableOutput.withPrefixes, ExtendableOutput.readWithPrefix,
     List.take_of_length_le (FixedBytes.length_toList out).le,
-    List.drop_eq_nil_of_le (H.h256.length_read (keyInput s seed) 128).le]
+    List.drop_eq_nil_of_le (H.h256.length_read (keySeedInput s seed) 128).le]
 
 private theorem plant_off (H : Xofs) (s : Level) (seed : FixedBytes 32) (out : FixedBytes 128)
     {x : List Bool} (h : x.length ≠ 272) (n : ℕ) :
     (H.plant s seed out).h256.read x n = H.h256.read x n := by
-  have ne : x ≠ keyInput s seed := fun eq => h (eq ▸ keyInput_length s seed)
+  have ne : x ≠ keySeedInput s seed := fun eq => h (eq ▸ length_keySeedInput s seed)
   simp [Xofs.plant, ExtendableOutput.withPrefixes, ne]
 
 private theorem uniform_plant (base : Xofs) (s : Level) (seed : FixedBytes 32) {a b : ℕ}
     (ha : 272 ≤ a) (hb : 128 ≤ b) {α : Type} (f : Xofs → PMF α) :
     ((base.uniformPrefixes a b).bind fun H => (PMF.uniformOfFintype (FixedBytes 128)).bind
       fun out => f (H.plant s seed out)) = (base.uniformPrefixes a b).bind f := by
-  let x := keyInput s seed
-  have hx : x.length ≤ a := (keyInput_length ..).le.trans ha
+  let x := keySeedInput s seed
+  have hx : x.length ≤ a := (length_keySeedInput ..).le.trans ha
   let e (i : Fin 128) : RawWord a × Fin b := (word x hx, i.castLE hb)
   have he : Function.Injective e := fun _ _ eq => Fin.ext (congrArg (fun p => p.2.val) eq)
   have install_eq (U T : Table a b) (out : FixedBytes 128) :
@@ -82,7 +78,7 @@ private theorem uniform_plant (base : Xofs) (s : Level) (seed : FixedBytes 32) {
     simp only [byteAt_install]
     by_cases same : y = x
     · subst y
-      simp only [← show x = keyInput s seed from rfl, ↓reduceIte, Option.bind_some,
+      simp only [← show x = keySeedInput s seed from rfl, ↓reduceIte, Option.bind_some,
         FixedBytes.toList, List.getElem?_ofFn]
       by_cases hi : i < 128
       · have small := hi.trans_le hb
@@ -96,7 +92,7 @@ private theorem uniform_plant (base : Xofs) (s : Level) (seed : FixedBytes 32) {
           rintro ⟨j, eq⟩
           exact hi ((congrArg (fun p => p.2.val) eq : j.val = i) ▸ j.isLt)
         next => rfl
-    · have miss : y ≠ keyInput s seed := same
+    · have miss : y ≠ keySeedInput s seed := same
       simp only [miss, ↓reduceIte, Option.bind_none, Option.getD_none]
       split
       next h =>
@@ -189,10 +185,8 @@ private theorem attempt_plant (H : Xofs) (s : Level) (seed : FixedBytes 32) (out
   change G.attempt s _ A μ mask.toList κ = _
   simp only [Xofs.attempt, expand, dig, chal]
 
-private def signDecoded (H : Xofs) (s : Level) (m : List Bool) (r : Row) (v : PrivateKey s) :=
-  let μ := H.representativeFromTr v.tr m
-  (H.expandA s v.rho).bind fun A =>
-    firstAccepted s.params.ℓ (H.attempt s v A μ (r (BitString.ofList 512 μ)).toList) 814 0
+private abbrev signDecoded (H : Xofs) (s : Level) (m : List Bool) (r : Row) (v : PrivateKey s) :=
+  H.signDecodedWithSeed s v m fun μ => (r (BitString.ofList 512 μ)).toList
 
 private theorem signDecoded_plant (H : Xofs) (s : Level) (seed : FixedBytes 32)
     (out : FixedBytes 128) (K : FixedBytes 32) (v : PrivateKey s) (ht : v.tr.length = 64)
@@ -206,7 +200,7 @@ private theorem signDecoded_plant (H : Xofs) (s : Level) (seed : FixedBytes 32)
     lia
   have hμ : μ.length = 512 := by
     simp [μ, Xofs.representativeFromTr, bitsLength, H.h256.length_read]
-  unfold signDecoded
+  unfold signDecoded Xofs.signDecodedWithSeed
   dsimp only
   rw [rep, Xofs.expandA_congr (H := H) (K := H.plant s seed out) rfl]
   apply congrArg (Option.bind (H.expandA s v.rho))
@@ -311,9 +305,8 @@ namespace QuantumSigningForger
 
 private noncomputable def serviceAddress (C : QuantumSigningForger) (device : Xofs) (s : Level)
     (service : Option RowSigner) {n : ℕ} (rows : SigningMaskSeeds n) (j : ℕ) :=
-  let keys := service.map fun sv => (⟨sv.publicKey, []⟩ : KeyPair)
-  C.addressLaw device s keys (fun _ _ => 0) (List.ofFn fun i μ => rows (i, μ))
-    (fun _ r => C.signingCommand device s [] fun q => service.bind fun sv => sv.reply r q) j
+  C.addressLaw device s RowSigner.publicKey service (fun _ _ => 0)
+    (List.ofFn fun i μ => rows (i, μ)) (fun sv r => C.signingCommand device (sv.reply r)) j
 
 private noncomputable def observations (C : QuantumSigningForger) (device : Xofs) (s : Level)
     (service : Option RowSigner) {n : ℕ} (rows : SigningMaskSeeds n) (j : ℕ) :=
@@ -337,7 +330,8 @@ private theorem fixedPrediction_eq (C : QuantumSigningForger) (s : Level) (base 
     cases H.expandA s (k.publicKey.take 32) <;> rfl
 
 /-- Predict the private signing seed in an experiment with an independently drawn expansion.
-Both runs use the same generated public key, its hash, and the same adaptive signing service.
+Both runs use the same generated public key, its hash, and the same independent mask-seed
+rows for adaptive signing requests.
 With `planted` the device sees the 128 expansion bytes at the FIPS key-generation address.
 Otherwise all its coherent queries use the original background table. -/
 noncomputable def keySeedDeviceGame (C : QuantumSigningForger) (s : Level) (base : Xofs)
@@ -450,7 +444,7 @@ private theorem first_serviceAddress (C : QuantumSigningForger) (H : Xofs) (s : 
   cases sv with
   | none => rfl
   | some sv =>
-    simp only [Option.map_some]
+    dsimp only
     cases H.expandA s (sv.publicKey.take 32) with
     | none => rfl
     | some A =>
@@ -467,13 +461,13 @@ private theorem first_serviceAddress (C : QuantumSigningForger) (H : Xofs) (s : 
           funext st
           obtain ⟨st, tape⟩ := st
           simp only [OracleComp.withSampleListWhen, isSigningCall, Sum.elim_inr, Sum.elim_inl,
-            Bool.false_eq_true, ↓reduceIte, signingCommand, commands, OracleComp.sumHandler,
+            Bool.false_eq_true, ↓reduceIte, signingCommand, deviceCommand, OracleComp.sumHandler,
             deviceHandler_gate, deviceHandler_measure, DeviceState.instruction_apply,
             OracleGateCode.toPlacedGate?]
       · rfl
 
 /-- Even with adaptive signing before the first coherent query, the original predictor
-has success at most `2 / 2^256` when the oracle covers the key expansion. -/
+in the independent-row game has success at most `2 / 2^256` when the oracle covers key expansion. -/
 theorem signingSeedPredictionGame_zero_le (C : QuantumSigningForger) (s : Level) (base : Xofs)
     {a b : ℕ} (ha : 272 ≤ a) (hb : 128 ≤ b) (n : ℕ) :
     (Game.succProbability (C.signingSeedPredictionGame s base a b n 0) : ℝ) ≤ 2 / 2 ^ 256 := by
@@ -489,7 +483,7 @@ private def queriesKeySeed {C : QuantumSigningForger} (s : Level) (seed : FixedB
   match addr with
   | none => false
   | some v => v 0 && Xofs.unpad (List.ofFn (fun i : Fin (C.addressBits + 1) => v i.succ)) ==
-      some (keyInput s seed)
+      some (keySeedInput s seed)
 
 private theorem queriesKeySeed_of_change {C : QuantumSigningForger} (s : Level) (H : Xofs)
     (seed : FixedBytes 32) (out : FixedBytes 128) (addr : Option (Address C))
@@ -508,7 +502,7 @@ private theorem queriesKeySeed_of_change {C : QuantumSigningForger} (s : Level) 
       cases tag : v 0 with
       | false => exact (hit (by rw [tag]; rfl)).elim
       | true =>
-        by_cases h : x = keyInput s seed
+        by_cases h : x = keySeedInput s seed
         · simp only [queriesKeySeed, tag, e, h, beq_self_eq_true, Bool.and_self]
         · exact (hit (by simp only [tag, ↓reduceIte, Xofs.plant, ExtendableOutput.withPrefixes,
             ite_eq_right h])).elim
