@@ -335,8 +335,8 @@ theorem keyOnly_le_decision_add_digestSelfTarget (C : Controller) :
   let uniform := PMF.uniformOfFintype (PublicMatrix s × (Fin s.params.k → Poly))
   have h : (uniform.bind (distinguisher s C)) true ≤
       ((SharedDigest.instances s).bind (digestSelfTargetGame s C)) true := by
-    simp only [uniform, ← PMF.uniformOfFintype_prod, SharedDigest.instances, distinguisher,
-      digestSelfTargetGame, Quantum.RandomOracle.sample_eq, pmf_norm,
+    simp only [uniform, ← PMF.uniformOfFintype_prod, SharedDigest.instances_eq_sample,
+      distinguisher, digestSelfTargetGame, Quantum.RandomOracle.sample_eq, pmf_norm,
       SharedDigest.fullKey_systematic]
     iterate 5
       apply PMF.bind_apply_mono_on_support
