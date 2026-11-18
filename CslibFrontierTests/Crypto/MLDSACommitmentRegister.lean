@@ -68,21 +68,34 @@ example (C : QuantumSigningForger) (H : Xofs) (s : Level) {a b : ℕ}
   rw [C.randomPrefixGame_eq_digestRegister H s ha hb]
   simp only [Xofs.winsForgery, Xofs.evalPure_verifyDigestQueries]
 
--- With no further instructions, flip every digest bit at the fresh commitment. The final
--- native verifier still gets its two reads, even when the forger has an earlier signing log.
-open Cslib.Crypto.MLDSA in
+-- A coherent query and a measurement select the message sent to the signer. The program
+-- reuses the reply on a different message, after flipping the sampled commitment digest.
+open Cslib.Crypto.MLDSA
+
 example (C : QuantumSigningForger) (s : Level) (H : Xofs) (A : PublicMatrix s)
     (m : BitString 512) (D : BitString s.commitmentInputBits → BitString (8 * digestBytes s))
-    (keys : KeyPair) (d : C.Device) (log : List Forgery) (f : Forgery) :
+    (keys : KeyPair)
+    (w : Fin C.Width) (d : C.Device) (log : List Forgery)
+    (row : FixedBytes 2 → FixedBytes (maskPolyBytes s)) :
     let μ := signingMaskLaw s.params (by cases s <;> decide)
-    let addr := maskCommitmentAddress s A m
-    let flip y j := !(D (addr y) j)
+    let r y j := !(D (maskCommitmentAddress s A m y) j)
+    let δ := (commitmentGuessProbability s.params (by cases s <;> decide) A).toReal
+    let prog : C.Program Forgery :=
+      .liftBind (.inr (.inl .query)) fun _ =>
+        .liftBind (.inr (.inl (.measure w))) fun bits =>
+          .liftBind (.inr (.inr ⟨[], bits⟩)) fun sig =>
+            .pure ⟨[], [!bits.headD false], sig.getD []⟩
     let win T := Game.succProbability (C.expansionContinuation s (H.withDigestRegister s T)
-      A keys (.pure f) d log [])
-    ∑ y, (μ y).toReal * |(win (Function.update D (addr y) (flip y)) : ℝ) - (win D : ℝ)| ≤
-      2 * (commitmentGuessProbability s.params (by cases s <;> decide) A).toReal := by
+      A keys prog d log [row])
+    ∑ y, (μ y).toReal * |(win (Function.update D (maskCommitmentAddress s A m y) (r y)) : ℝ) -
+        (win D : ℝ)| ≤ 4 * √δ + 817 * δ := by
   classical
-  intro μ addr flip win
-  simpa only [Nat.cast_zero, mul_zero, zero_mul, zero_add] using
-    C.mean_expansionContinuation_gap_le s H A m D flip keys (.pure f) d log []
-      (qH := 0) (qS := 0) (.pure f 0) (.pure f 0)
+  intro μ r δ prog win
+  have hH : OracleComp.IsCostBounded (fun x => (QuantumSigningForger.isXofQuery x).toNat)
+      prog 1 :=
+    .liftBind _ _ 0 fun _ => .liftBind _ _ 0 fun _ => .liftBind _ _ 0 fun _ => .pure _ _
+  have hS : OracleComp.IsCostBounded (fun x => (QuantumSigningForger.isSigningCall x).toNat)
+      prog 1 :=
+    .liftBind _ _ 1 fun _ => .liftBind _ _ 1 fun _ => .liftBind _ _ 0 fun _ => .pure _ _
+  simpa [μ, δ, win, show (815 : ℝ) + 2 = 817 by norm_num] using
+    C.mean_expansionContinuation_gap_le s H A m D r keys prog d log [row] hH hS

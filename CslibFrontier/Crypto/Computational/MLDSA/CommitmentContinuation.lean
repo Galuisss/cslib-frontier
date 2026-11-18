@@ -65,31 +65,6 @@ private theorem query_change_event (H : Xofs) (s : Level) (A : PublicMatrix s)
   dsimp only
   rw [Function.update_of_ne ne]
 
-open Classical in
-private theorem query_change_probability (H : Xofs) (s : Level) (A : PublicMatrix s)
-    (m : BitString 512) (D) (a b : ℕ) (p : PMF (BitString (a + 2)))
-    (replacement : (Fin s.params.ℓ → Poly) → BitString (8 * digestBytes s)) :
-    ((signingMaskLaw s.params (by cases s <;> decide)).bind fun y =>
-      p.map fun x => decide
-        ((H.withDigestRegister s (Function.update D (maskCommitmentAddress s A m y)
-          (replacement y))).queryTable a b x ≠ (H.withDigestRegister s D).queryTable a b x)) true ≤
-      commitmentGuessProbability s.params (by cases s <;> decide) A := by
-  classical
-  simp only [← PMF.bind_pure_comp]
-  rw [PMF.bind_comm]
-  apply PMF.bind_apply_le_on_support
-  intro x _
-  let response y (j : BitString (a + 2)) :=
-    (H.withDigestRegister s (Function.update D (maskCommitmentAddress s A m y)
-      (replacement y))).queryTable a b j
-  let flag y := decide (response y x ≠ (H.withDigestRegister s D).queryTable a b x)
-  change ((signingMaskLaw s.params _).bind (PMF.pure ∘ flag)) true ≤ _
-  rw [PMF.bind_pure_comp, ← PMF.toOuterMeasure_apply_singleton, PMF.toOuterMeasure_map_apply]
-  refine le_trans ((signingMaskLaw s.params (by cases s <;> decide)).toOuterMeasure.mono ?_)
-    (query_change_event H s A m D a b x)
-  intro y hy
-  exact ⟨replacement y, of_decide_eq_true hy⟩
-
 /-- Mean squared change of the square root of an observable probability after one coherent
 SHAKE query when a fresh ML-DSA mask selects the digest to change. The final measurement may
 depend on the mask and the input device may carry an arbitrary entangled reference. -/
@@ -109,27 +84,15 @@ theorem Xofs.sq_sqrt_readout_after_maskCommitment_le
       4 * (commitmentGuessProbability s.params (by cases s <;> decide) A).toReal := by
   classical
   intro μ base write p
-  let wires := Fin.castLEEmb (Nat.le_add_right (a + 2 + 8 * b) w)
-  let address := fun z : (Fin (a + 2 + 8 * b + w) → Bool) × κ =>
-    (queryRegisters (a := a + 2) (b := 8 * b) wires z.1).1
-  let basis := POVM.basis.measureDensity st.density st.isDensityMatrix
-  let hit y := (basis.map fun z => decide (write y (address z) ≠ base (address z))) true
-  have point (y) : (√(p y (write y)) - √(p y base)) ^ 2 ≤ 4 * (hit y).toReal :=
-    (st.sq_sqrt_query_readout_sub_le (M y) outcome (write y) base).trans
-      (xorQueryDisturbance_le (write y) base wires st.isDensityMatrix)
-  have guess := query_change_probability H s A m D a b (basis.map address) replacement
-  simp only [PMF.map_comp, Function.comp_def] at guess
+  apply (st.mean_sq_sqrt_query_readout_sub_le μ M outcome write base).trans
+  apply mean_xorQueryDisturbance_le μ write base _ st.isDensityMatrix
+  intro x
   have finite : commitmentGuessProbability s.params (by cases s <;> decide) A ≠ ⊤ :=
     ne_top_of_le_ne_top ENNReal.one_ne_top (iSup_le fun _ => PMF.coe_le_one _ _)
-  have mean := ENNReal.toReal_mono finite guess
-  rw [PMF.bind_apply_toReal] at mean
-  calc
-    _ ≤ ∑ y, (μ y).toReal * (4 * (hit y).toReal) :=
-      Finset.sum_le_sum fun y _ => mul_le_mul_of_nonneg_left (point y) ENNReal.toReal_nonneg
-    _ = 4 * ∑ y, (μ y).toReal * (hit y).toReal := by
-      rw [Finset.mul_sum]
-      exact Finset.sum_congr rfl fun y _ => by ring
-    _ ≤ _ := mul_le_mul_of_nonneg_left mean (by norm_num)
+  apply ENNReal.toReal_mono finite
+  rw [← PMF.toOuterMeasure_apply_singleton, PMF.toOuterMeasure_map_apply]
+  apply le_trans (μ.toOuterMeasure.mono ?_) (query_change_event H s A m D a b x)
+  exact fun y hy => ⟨replacement y, of_decide_eq_true hy⟩
 
 namespace QuantumSigningForger
 
