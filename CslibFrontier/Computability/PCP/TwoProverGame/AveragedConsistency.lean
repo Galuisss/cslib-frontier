@@ -107,11 +107,7 @@ private theorem expect_localDistance_le :
   let B (c : ι → Bool) :=
     let r := PauliConsistencyQuestion.ofChecked basis a c
     ((S.bob r).map r.checkedBit).observable
-  change S.state.norm (A - (𝔼 c, B c)) ^ 2 ≤ 𝔼 c, S.state.norm (A - B c) ^ 2
-  have h : (𝔼 c, (A - B c)) = A - (𝔼 c, B c) := by
-    rw [expect_sub_distrib, Fintype.expect_const]
-  rw [← h]
-  exact S.state.norm_expect_sq_le univ _
+  exact S.state.norm_sub_expect_sq_le univ univ_nonempty A B
 
 /-- The mean squared distance between the two averaged observables is at most four times the
 same-basis game's rejection probability. -/
@@ -125,11 +121,7 @@ theorem expect_norm_sub_sq_le_of_pauliSameBasisTest :
     let q := PauliConsistencyQuestion.ofChecked basis a b
     ((S.alice q).map q.checkedBit).observable
   let B := PauliConsistencyQuestion.averagedObservable S.bob basis a
-  change S.state.norm ((𝔼 b, A b) - B) ^ 2 ≤ 𝔼 b, S.state.norm (A b - B) ^ 2
-  have h : (𝔼 b, (A b - B)) = (𝔼 b, A b) - B := by
-    rw [expect_sub_distrib, Fintype.expect_const]
-  rw [← h]
-  exact S.state.norm_expect_sq_le univ _
+  exact S.state.norm_expect_sub_sq_le univ univ_nonempty A B
 
 omit [TopologicalSpace 𝒜] [ContinuousFunctionalCalculus ℝ 𝒜 IsSelfAdjoint]
   [NonnegSpectrumClass ℝ 𝒜] [Module ℚ≥0 𝒜] in

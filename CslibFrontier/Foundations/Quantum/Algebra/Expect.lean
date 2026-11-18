@@ -61,6 +61,22 @@ theorem norm_expect_sq_le (a : ι → A) :
   (pow_le_pow_left₀ (φ.norm_nonneg _) (φ.norm_expect_le s a) 2).trans
     (s.sq_expect_le_expect_sq _)
 
+/-- Squared distance to a fixed operator is convex under a nonempty finite average. -/
+theorem norm_sub_expect_sq_le (hs : s.Nonempty) (a : A) (b : ι → A) :
+    φ.norm (a - (𝔼 i ∈ s, b i)) ^ 2 ≤ 𝔼 i ∈ s, φ.norm (a - b i) ^ 2 := by
+  have h : (𝔼 i ∈ s, (a - b i)) = a - (𝔼 i ∈ s, b i) := by
+    rw [expect_sub_distrib, Finset.expect_const hs]
+  rw [← h]
+  exact φ.norm_expect_sq_le s _
+
+/-- Squared distance from a finite average to a fixed operator. -/
+theorem norm_expect_sub_sq_le (hs : s.Nonempty) (a : ι → A) (b : A) :
+    φ.norm ((𝔼 i ∈ s, a i) - b) ^ 2 ≤ 𝔼 i ∈ s, φ.norm (a i - b) ^ 2 := by
+  have h : (𝔼 i ∈ s, (a i - b)) = (𝔼 i ∈ s, a i) - b := by
+    rw [expect_sub_distrib, Finset.expect_const hs]
+  rw [← h]
+  exact φ.norm_expect_sq_le s _
+
 /-- **Jensen with contractions**: `‖𝔼_i u_i d_i‖²_φ ≤ 𝔼_i ‖d_i‖²_φ` when every `u_i` is a
 contraction. -/
 theorem norm_expect_mul_sq_le {u d : ι → A} (hu : ∀ i ∈ s, star (u i) * u i ≤ 1) :
