@@ -511,14 +511,15 @@ theorem publicSeed_of_keyGen {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys
 /-- FIPS 202 specialization of `Xofs.keyGen`. -/
 abbrev keyGen := Xofs.keyGen Xofs.shake
 
-/-- A generated private key decodes to the same matrix seed, short vectors, public-key hash,
-and rounded low part that generated its public key. -/
+/-- A generated private key decodes to the same matrix seed, last 32 key-expansion bytes,
+short vectors, public-key hash and rounded low part used by Algorithm 6. -/
 theorem privateKey_of_keyGen {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys : KeyPair}
     (hg : H.keyGen s seed = some keys) :
-    ∃ (rho : FixedBytes 32) (sk : MLDSA.SecretKey s.params) (key : List Byte),
+    ∃ (rho : FixedBytes 32) (sk : MLDSA.SecretKey s.params),
       H.expandA s rho.toList = some sk.A ∧
       keys.publicKey = encodePublic s rho.toList sk.publicKey.t ∧
-      decodePrivate s keys.secretKey = some ⟨rho.toList, key, H.h256.readBytes keys.publicKey 64,
+      decodePrivate s keys.secretKey = some ⟨rho.toList, (H.expandKeySeed s seed).drop 96,
+        H.h256.readBytes keys.publicKey 64,
         sk.s₁, sk.s₂, publicKeyLowPart s.params 13 sk.publicKey⟩ ∧
       (∀ i j, |(sk.s₂ i j).valMinAbs| ≤ s.params.η) := by
   unfold Xofs.keyGen Xofs.expandKeySeed at hg
@@ -553,9 +554,10 @@ theorem privateKey_of_keyGen {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys
         simp only [ha, h₁, h₂, Option.bind_eq_bind, Option.bind_some, Option.pure_def,
           materialized, Option.some.injEq, ht] at hg
         subst keys
-        refine ⟨rho, sk, expanded.drop 96, hrho ▸ ha, ?_, ?_, sb⟩
+        refine ⟨rho, sk, hrho ▸ ha, ?_, ?_, sb⟩
         · rw [hrho]
         · rw [hrho]
+          simp only [Xofs.expandKeySeed, hh]
           apply decodePrivate_encode
           · exact hr
           · simp [hex]

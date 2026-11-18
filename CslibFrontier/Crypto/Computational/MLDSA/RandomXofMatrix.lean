@@ -244,7 +244,7 @@ private theorem forgery_from_setup (C : QuantumSigningForger) (s : Level) (H : X
   cases hg : H.keyGen s seed with
   | none => simp [readSetup, hg, runAtSetup]
   | some keys =>
-    obtain ⟨rho, sk, _, hm, pk, _, _⟩ := privateKey_of_keyGen hg
+    obtain ⟨rho, sk, hm, pk, _, _⟩ := privateKey_of_keyGen hg
     have mat : H.expandA s (keys.publicKey.take 32) = some sk.A := by
       rwa [pk, take_encodePublic]
     simp [readSetup, hg, mat, runAtSetup, PMF.map_comp, SignedMatrixTrial.wins, Function.comp_def]

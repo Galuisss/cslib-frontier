@@ -66,6 +66,17 @@ private def firstAccepted (stride : ℕ) (tryAt : ℕ → Option (Option (List B
     | some sig => return sig
     | none => firstAccepted stride tryAt fuel (κ + stride)
 
+/-- Raw SHAKE256 input for the private mask seed in Algorithm 7, line 7. -/
+@[expose] def maskSeedInput (key : List Byte) (rnd : FixedBytes 32) (μ : List Bool) : List Bool :=
+  Keccak.bytesToBitsLE (key ++ rnd.toList) ++ μ
+
+/-- The 32-byte hedge contributes 256 bits between the key and representative. -/
+theorem length_maskSeedInput (key : List Byte) (rnd : FixedBytes 32) (μ : List Bool) :
+    (maskSeedInput key rnd μ).length = 8 * (key.length + 32) + μ.length := by
+  have bits (v : List Byte) : (Keccak.bytesToBitsLE v).length = 8 * v.length := by
+    simp [Keccak.bytesToBitsLE, Keccak.byteBitsLE, Nat.mul_comm]
+  rw [maskSeedInput, List.length_append, bits, List.length_append, FixedBytes.length_toList]
+
 /-- Algorithm 7 on encoded secret keys, formatted bit-string messages and 32 hedging bytes.
 The signer distinguishes a rejected attempt (advance κ by ℓ) from XOF exhaustion (abort).
 After 814 rejected attempts it returns the single error of Appendix C. -/
@@ -74,8 +85,7 @@ def Xofs.signInternal (H : Xofs) (s : Level) (bytes : List Byte) (formatted : Li
   let sk ← decodePrivate s bytes
   let matrix ← H.expandA s sk.rho
   let μ := H.representativeFromTr sk.tr formatted
-  let maskSeed := H.h256.read
-    (Keccak.bytesToBitsLE (sk.key ++ rnd.toList) ++ μ) 64
+  let maskSeed := H.h256.read (maskSeedInput sk.key rnd μ) 64
   firstAccepted s.params.ℓ (H.attempt s sk matrix μ maskSeed) 814 0
 
 /-- FIPS 202 specialization of `Xofs.signInternal`. -/
@@ -158,7 +168,7 @@ theorem verify_of_sign {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys : Key
     {rnd : FixedBytes 32} (hg : H.keyGen s seed = some keys)
     (hs : H.sign s keys.secretKey f.message f.context rnd = some f.signature) :
     H.verify s keys.publicKey f.message f.context f.signature = some true := by
-  obtain ⟨rho, sk, key, hA, pk, decoded, short⟩ := privateKey_of_keyGen hg
+  obtain ⟨rho, sk, hA, pk, decoded, short⟩ := privateKey_of_keyGen hg
   have ctx : f.context.length ≤ 255 := by
     by_contra h
     simp [Xofs.sign, guard, h] at hs
@@ -305,7 +315,7 @@ theorem extractLoggedDigest_of_signingTranscript {H : Xofs} {s : Level} {seed : 
     (valid : H.verify s keys.publicKey out.message out.context out.signature = some true) :
     ∃ A w, H.expandA s (keys.publicKey.take 32) = some A ∧
       H.extractLoggedDigest s keys.publicKey A out log = some w ∧ w.Valid H A := by
-  obtain ⟨rho, sk, _, hA, hpk, _, _⟩ := privateKey_of_keyGen hg
+  obtain ⟨rho, sk, hA, hpk, _, _⟩ := privateKey_of_keyGen hg
   have matrix : H.expandA s (keys.publicKey.take 32) = some sk.A := by
     rwa [hpk, take_encodePublic]
   obtain ⟨w, he, good⟩ := extractLoggedDigest_of_verifiedLog matrix
