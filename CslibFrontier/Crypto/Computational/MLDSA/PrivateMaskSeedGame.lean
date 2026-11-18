@@ -48,41 +48,42 @@ private def Xofs.signWithRow (H : Xofs) (s : Level) (key : List Byte) (q : Signi
   H.runSigning s (H.startSigningWithSeed s key (formatMessage q.message q.context) fun _ μ =>
     (row (BitString.ofList 512 μ)).toList)
 
-private abbrev Unchanged (H G : Xofs) :=
-  ∀ x : List Bool, x.length ≠ 1024 → ∀ k, H.h256.read x k = G.h256.read x k
+private abbrev Unchanged (H G : Xofs) (bits : ℕ) :=
+  ∀ x : List Bool, x.length ≠ bits → ∀ k, H.h256.read x k = G.h256.read x k
 
-private theorem commitment_unchanged {H G : Xofs} (raw : Unchanged H G) (s : Level)
+private theorem commitmentInput_length_ne_maskSeed (s : Level)
     (w : Fin s.params.k → Fin 256 → ℤ) {μ : List Bool} (hμ : μ.length = 512) :
-    H.commitmentDigest s w μ = G.commitmentDigest s w μ := by
-  apply raw
+    (commitmentInput s w μ).length ≠ 1024 := by
   simp only [commitmentInput, List.length_append, hμ, Keccak.length_bytesToBitsLE]
   rw [length_packCoeffs]
   cases s <;> decide
 
-private theorem challenge_unchanged {H G : Xofs} (raw : Unchanged H G) (s : Level)
-    {d : List Byte} (hd : d.length ≤ digestBytes s) :
-    H.sampleInBall s d = G.sampleInBall s d := by
-  have len : digestBytes s ≤ 64 := by cases s <;> decide
-  have eq : H.h256.readBytes d 221 = G.h256.readBytes d 221 := by
-    apply raw
-    rw [Keccak.length_bytesToBitsLE]
-    lia
+private theorem challenge_unchanged {H G : Xofs} {bits : ℕ} (raw : Unchanged H G bits) (s : Level)
+    {d : List Byte} (hd : 8 * d.length ≠ bits) : H.sampleInBall s d = G.sampleInBall s d := by
+  have eq : H.h256.readBytes d 221 = G.h256.readBytes d 221 :=
+    raw _ (by rwa [Keccak.length_bytesToBitsLE]) _
   simp only [Xofs.sampleInBall, eq]
 
-private theorem attempt_unchanged {H G : Xofs} (raw : Unchanged H G) (s : Level)
-    (sk : PrivateKey s) (A : PublicMatrix s) {μ : List Bool} (hμ : μ.length = 512)
-    (r : FixedBytes 64) (κ : ℕ) :
+/-- A signing attempt is insensitive to changes at a single input length disjoint from
+its mask-expansion, commitment-hash and sparse-challenge inputs. -/
+private theorem attempt_congr_of_read {H G : Xofs} {bits : ℕ} {s : Level} {sk : PrivateKey s}
+    {A : PublicMatrix s} {μ : List Bool} {r : FixedBytes 64} {κ : ℕ} (raw : Unchanged H G bits)
+    (hn : 528 ≠ bits) (hw : ∀ w, (commitmentInput s w μ).length ≠ bits)
+    (hc : 8 * digestBytes s ≠ bits) :
     H.attempt s sk A μ r.toList κ = G.attempt s sk A μ r.toList κ := by
   have nonce (i k : ℕ) : H.h256.readBytes (nonceInput r.toList i) k =
       G.h256.readBytes (nonceInput r.toList i) k := by
     apply raw
     simp only [Keccak.length_bytesToBitsLE, nonceInput, List.length_append, FixedBytes.toList,
       List.length_ofFn, List.length_cons, List.length_nil]
-    decide
+    exact hn
   have mask : H.expandMask s r.toList κ = G.expandMask s r.toList κ := by
     simp only [Xofs.expandMask, nonce]
-  simp only [Xofs.attempt, Xofs.prepareAttempt, mask, commitment_unchanged raw s _ hμ,
-    challenge_unchanged raw s (length_commitmentDigest ..).le]
+  have digest w : H.commitmentDigest s w μ = G.commitmentDigest s w μ := raw _ (hw w) _
+  have challenge w : H.sampleInBall s (G.commitmentDigest s w μ) =
+      G.sampleInBall s (G.commitmentDigest s w μ) :=
+    challenge_unchanged raw s (by rwa [length_commitmentDigest])
+  simp only [Xofs.attempt, Xofs.prepareAttempt, mask, digest, challenge]
 
 section Coupled
 
@@ -119,7 +120,8 @@ private theorem sign_eq_row {keys : KeyPair} (hg : p.background.keyGen s seed = 
       ← show m = formatMessage q.message q.context from rfl, rep, rep', seedRead,
       mat, bgMat]
     exact congrArg (fun f => firstAccepted s.params.ℓ f 814 0) (funext fun κ =>
-      attempt_unchanged (read_ne_maskSeed_length hp) s _ sk.A len row κ)
+      attempt_congr_of_read (r := row) (κ := κ) (read_ne_maskSeed_length hp) (by decide)
+        (fun w => commitmentInput_length_ne_maskSeed s w len) (by cases s <;> decide))
   · simp [Xofs.sign, Xofs.signWithRow, guard, ctx]
 
 private theorem verify_eq_background {keys : KeyPair}
@@ -138,9 +140,15 @@ private theorem verify_eq_background {keys : KeyPair}
       | none => rfl
       | some σ =>
         have dig : σ.digest.length ≤ digestBytes s := by rw [← digest_of_sigDecode hd]; simp
+        have short : 8 * σ.digest.length ≠ 1024 := by
+          have : digestBytes s ≤ 64 := by cases s <;> decide
+          lia
+        have hash w {μ : List Bool} (len : μ.length = 512) :
+            p.shared.commitmentDigest s w μ = p.background.commitmentDigest s w μ :=
+          raw _ (commitmentInput_length_ne_maskSeed s w len) _
         simp only [Xofs.expandA_congr (agree_off_sampleSigningMaskSeeds hp).1,
-          challenge_unchanged raw s dig, good, Xofs.check,
-          commitment_unchanged raw s _ (length_messageRepresentative ..)]
+          challenge_unchanged raw s short, good, Xofs.check,
+          hash _ (length_messageRepresentative ..)]
     · simp [hk]
   · simp [Xofs.verify, Xofs.verifyWithExpansion, guard, hc]
 

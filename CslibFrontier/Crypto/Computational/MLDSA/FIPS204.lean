@@ -403,6 +403,14 @@ private def PrivateKey.encode {s : Level} (v : PrivateKey s) : List Byte :=
   v.rho ++ (v.key ++ (v.tr ++ (packSigned width s.params.η v.s₁ ++
     (packSigned width s.params.η v.s₂ ++ packSigned 13 4096 v.t₀))))
 
+private theorem PrivateKey.length_encode {s : Level} (w : PrivateKey s)
+    (hr : w.rho.length = 32) (hk : w.key.length = 32) (ht : w.tr.length = 64) :
+    w.encode.length = 128 +
+      32 * ((2 * s.params.η).log2 + 1) * s.params.ℓ +
+      32 * ((2 * s.params.η).log2 + 1) * s.params.k + 32 * 13 * s.params.k := by
+  simp only [PrivateKey.encode, List.length_append, hr, hk, ht, packSigned, length_packCoeffs]
+  lia
+
 /-- Algorithm 25 decodes the stored private-key fields from their fixed-width encodings. -/
 def decodePrivate (s : Level) (bytes : List Byte) : Option (PrivateKey s) := do
   let width := (2 * s.params.η).log2 + 1
@@ -433,17 +441,12 @@ private theorem decodePrivate_encode {s : Level} (v : PrivateKey s) (hr : v.rho.
     have small : 2 * s.params.η < 2 ^ w := by cases s <;> decide
     obtain ⟨_, _⟩ := abs_le.mp hz
     omega
-  have len : v.encode.length = 128 + 32 * w * s.params.ℓ + 32 * w * s.params.k +
-      32 * 13 * s.params.k := by
-    simp only [PrivateKey.encode, List.length_append, hr, hk, ht, fieldLen]
-    change 32 + (32 + (64 + (32 * w * _ + (32 * w * _ + _)))) = _
-    omega
   have first := List.drop_left' (l₂ := packSigned w s.params.η v.s₂ ++ packSigned 13 4096 v.t₀)
     (fieldLen w s.params.η v.s₁)
   have second := List.drop_left' (l₂ := packSigned 13 4096 v.t₀) (fieldLen w s.params.η v.s₂)
   unfold decodePrivate
   dsimp only
-  rw [len]
+  rw [v.length_encode hr hk ht]
   dsimp only [w] at first second ⊢
   simp only [guard, ↓reduceIte, Option.pure_def, Option.bind_eq_bind,
     Option.bind_some, PrivateKey.encode, List.take_left' hr, List.drop_left' hr, List.take_left' hk,
