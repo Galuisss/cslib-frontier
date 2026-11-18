@@ -258,7 +258,7 @@ private theorem prob_row_changes (H : Xofs) (s : Level) (A : PublicMatrix s) (m 
       815 * commitmentGuessProbability s.params (by cases s <;> decide) A := by
   simpa only [Xofs.evalPure_signDigestQueriesWithMask, Xofs.signWithExpansionRow, Nat.cast_ofNat]
     using prob_response_changes s A m D _
-      (H.signDigestQueriesWithMask_bounded s key q fun _ _ => maskFromRow s row)
+      (H.signDigestQueriesWithMask_bounded s key q (fun _ _ => row) (maskFromRow s))
 
 /-- Resume the fresh-digest forgery game with a retained device, the successful signing log,
 and fixed remaining rows of Algorithm 34 bytes. Device queries, later signatures and final
