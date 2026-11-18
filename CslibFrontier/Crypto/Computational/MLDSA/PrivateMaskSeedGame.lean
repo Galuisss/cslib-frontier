@@ -156,19 +156,27 @@ private noncomputable def rowTranscript (C : QuantumSigningForger) (H : Xofs) (s
     (C.rowCommand H s keys)) (C.program keys.publicKey)).run (C.initial, tape)).map
     fun (f, st, _) => (f, st.2)
 
-private theorem transcript_eq_rows (C : QuantumSigningForger) {base : Xofs} {s : Level}
+private theorem run_eq_rows (C : QuantumSigningForger) {base : Xofs} {s : Level}
     {seed : FixedBytes 32} {a b n : ℕ} {t : Fin n ↪ FixedBytes 32} {ha : 1024 ≤ a}
     {hb : 64 ≤ b} {rows : SigningMaskSeeds n} {p : SigningMaskSeedOracles}
     (hp : p ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
     {keys : KeyPair} (hg : p.background.keyGen s seed = some keys)
     (good : ∀ m, p.shared.messageRepresentative keys.publicKey m =
-      p.background.messageRepresentative keys.publicKey m) (hn : C.SigningCallsLe n) :
-    C.transcriptWithHedges p.background p.shared s keys (List.ofFn t) =
-      C.rowTranscript p.background s keys (List.ofFn fun i μ => rows (i, μ)) := by
+      p.background.messageRepresentative keys.publicKey m)
+    {α : Type} {program : ProbOracleComp (OracleSpec.sum
+      (fun _ : DeviceRequest (Width C) Empty => List Bool)
+      (fun _ : SigningQuery => Option (List Byte))) α}
+    (hn : OracleComp.IsCostBounded (fun q => (isSigningCall q).toNat) program n) :
+    ((OracleComp.interpret (OracleComp.withSampleListWhen isSigningCall (fun _ => 0)
+      (C.hedgeCommand p.background p.shared s keys.secretKey)) program).run
+      (C.initial, List.ofFn t)).map (fun (a, st, _) => (a, st)) =
+    ((OracleComp.interpret (OracleComp.withSampleListWhen isSigningCall (fun _ _ => 0)
+      (C.rowCommand p.background s keys)) program).run
+      (C.initial, List.ofFn fun i μ => rows (i, μ))).map (fun (a, st, _) => (a, st)) := by
   let f := C.hedgeCommand p.background p.shared s keys.secretKey
   let g := C.rowCommand p.background s keys
-  have joint := OracleComp.IsCostBounded.run_interpret_sampleListWhen_congr isSigningCall
-    (hn keys.publicKey) (fun _ => 0) (fun _ _ => 0) f g (by
+  exact OracleComp.IsCostBounded.run_interpret_sampleListWhen_congr isSigningCall
+    hn (fun _ => 0) (fun _ _ => 0) f g (by
       rintro (k | cmd | sign) h
       · simp only [f, g, hedgeCommand, rowCommand, signingCommand, OracleComp.sumHandler]
       · simp only [f, g, hedgeCommand, rowCommand, signingCommand, OracleComp.sumHandler]
@@ -182,9 +190,20 @@ private theorem transcript_eq_rows (C : QuantumSigningForger) {base : Xofs} {s :
       · contradiction
       · simp only [f, g, hedgeCommand, rowCommand, signingCommand, OracleComp.sumHandler,
           sign_eq_row hp hg good]) C.initial
+
+private theorem transcript_eq_rows (C : QuantumSigningForger) {base : Xofs} {s : Level}
+    {seed : FixedBytes 32} {a b n : ℕ} {t : Fin n ↪ FixedBytes 32} {ha : 1024 ≤ a}
+    {hb : 64 ≤ b} {rows : SigningMaskSeeds n} {p : SigningMaskSeedOracles}
+    (hp : p ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
+    {keys : KeyPair} (hg : p.background.keyGen s seed = some keys)
+    (good : ∀ m, p.shared.messageRepresentative keys.publicKey m =
+      p.background.messageRepresentative keys.publicKey m) (hn : C.SigningCallsLe n) :
+    C.transcriptWithHedges p.background p.shared s keys (List.ofFn t) =
+      C.rowTranscript p.background s keys (List.ofFn fun i μ => rows (i, μ)) := by
   simpa only [transcriptWithHedges, rowTranscript, PMF.map_comp, Function.comp_def, probOracleSpec,
-    unifSpec, Width, Row, f, g]
-    using congrArg (PMF.map fun (out, st) => (out, st.2)) joint
+    unifSpec, Width, Row]
+    using congrArg (PMF.map fun (out, st) => (out, st.2))
+      (run_eq_rows C hp hg good (hn keys.publicKey))
 
 private noncomputable def privateTranscript (C : QuantumSigningForger) (H : Xofs) (s : Level)
     (keys : KeyPair) : PMF (Forgery × List Forgery) :=

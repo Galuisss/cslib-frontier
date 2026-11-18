@@ -180,17 +180,16 @@ theorem dist_matrixTrial_distinctHedges (C : QuantumSigningForger) (s : Level)
   simpa only [distinctHedgeGame, PMF.bind_map, Function.comp_def, Fintype.card_fin, card_hedge,
     Nat.cast_pow, Nat.cast_ofNat, ← pow_succ'] using h
 
-/-- At distinct tape positions the actual Algorithm 7 mask-seed addresses differ, even for
-representatives chosen adaptively or of different lengths. -/
-theorem maskSeedAddress_ne {n : ℕ} (t : Fin n ↪ FixedBytes 32) {i j : Fin n} (hij : i ≠ j)
-    (key : List Byte) (μ ν : List Bool) :
-    maskSeedInput key (t i) μ ≠ maskSeedInput key (t j) ν := by
-  unfold maskSeedInput
-  intro h
-  have hbytes := (List.append_inj h (by simp [bitsLength, FixedBytes.toList])).1
-  apply hij
-  apply t.injective
-  apply List.ofFn_inj.mp
-  exact List.append_cancel_left (bytes_eq_of_bits_eq hbytes)
-
 end Cslib.Crypto.MLDSA.FIPS204.QuantumSigningForger
+
+namespace Cslib.Crypto.MLDSA.FIPS204
+
+/-- At a fixed signing key the raw Algorithm 7 input determines the hedge, whatever
+message representative follows it. -/
+theorem hedge_eq_of_maskSeedInput_eq {key : List Byte} {r r' : FixedBytes 32} {μ ν : List Bool}
+    (h : maskSeedInput key r μ = maskSeedInput key r' ν) : r = r' := by
+  unfold maskSeedInput at h
+  have hbytes := (List.append_inj h (by simp [bitsLength, FixedBytes.toList])).1
+  exact List.ofFn_inj.mp (List.append_cancel_left (bytes_eq_of_bits_eq hbytes))
+
+end Cslib.Crypto.MLDSA.FIPS204

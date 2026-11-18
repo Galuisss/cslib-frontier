@@ -59,7 +59,7 @@ private theorem seedInput_injective {n : ℕ} (key : List Byte) (t : Fin n ↪ F
   by_cases hij : i = j
   · subst j
     exact Prod.ext rfl (List.ofFn_inj.mp (List.append_cancel_left h))
-  · exact (QuantumSigningForger.maskSeedAddress_ne t hij key _ _ h).elim
+  · exact (hij (t.injective (hedge_eq_of_maskSeedInput_eq h))).elim
 
 private abbrev SeedCell (n : ℕ) := (Fin n × BitString 512) × Fin 64
 
