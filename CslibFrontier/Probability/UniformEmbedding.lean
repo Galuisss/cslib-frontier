@@ -203,20 +203,15 @@ theorem prob_uniformOfFintype_embedding_mem_range {ι α : Type*} [Fintype ι] [
     simp only [mem_bipartiteBelow, mem_univ, true_and, r, Set.mem_range]
     change (∃ i, e i = y) ↔ ∃ i, (Equiv.swap y x) (e i) = x
     simp only [← Equiv.eq_symm_apply, Equiv.symm_swap, Equiv.swap_apply_right]
-  have count := sum_card_bipartiteAbove_eq_sum_card_bipartiteBelow r (s := univ) (t := univ)
-  simp only [above, card_map, card_univ, sum_const, smul_eq_mul] at count
-  have eqsum : ∑ y, (univ.bipartiteBelow r y).card =
-      Fintype.card α * (univ.bipartiteBelow r x).card := by
-    rw [Finset.sum_congr rfl (fun y _ => below y)]
-    simp
-  rw [eqsum] at count
+  have count := card_mul_eq_card_mul r (s := univ) (t := univ) (m := Fintype.card ι)
+    (fun e _ => by rw [above, card_map, card_univ]) (fun y _ => below y)
   let _ : Nonempty α := ⟨x⟩
   rw [PMF.toOuterMeasure_uniformOfFintype_toReal,
     div_eq_div_iff (Nat.cast_ne_zero.mpr Fintype.card_ne_zero)
       (Nat.cast_ne_zero.mpr Fintype.card_ne_zero)]
   change ((univ.bipartiteBelow r x).card : ℝ) * _ = _
   exact_mod_cast (show (univ.bipartiteBelow r x).card * Fintype.card α =
-    Fintype.card ι * Fintype.card (ι ↪ α) by simpa only [mul_comm] using count.symm)
+    Fintype.card ι * Fintype.card (ι ↪ α) by simpa only [card_univ, mul_comm] using count.symm)
 
 /-- **Without-replacement multiplicative upper bound**
 ([BenderFarachColtonKuszmaulKuszmaulLiu2022], `arXiv:2111.00602v2`, Section 5.3, PDF p. 36 /
