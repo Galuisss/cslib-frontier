@@ -422,7 +422,7 @@ def verify (s : Level) := verifyWithExpansion s (expandA s)
 
 /-- Expand the concrete FIPS commitment digest to a sparse challenge. The zero value on
 exhaustion is outside the challenge ball for every standard set. -/
-def algebraicHash (s : Level) : Hash s.params :=
+private def algebraicHash (s : Level) : Hash s.params :=
   fun ⟨w, μ⟩ => (sampleInBall s (commitmentDigest s w μ)).getD 0
 
 private theorem compressedVerify_of_check {s : Level} {bytes : List Byte} {matrix}
