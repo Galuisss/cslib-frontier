@@ -87,3 +87,22 @@ private def digest44 : List Byte := (List.finRange 32).map (fun i => Fin.ofNat 2
     match i.val with
     | 0 => 4096 | 1 => 4097 | 2 => -1 | 3 => 16384 | _ => 0).drop 32).take 5 ==
   [0, 4, 240, 191, 0]
+
+-- If the ExpandS and ExpandMask seeds and counters coincide, their requests share the
+-- first 481 SHAKE256 bytes at every FIPS level, including nonstandard XOF instances.
+example (H : Xofs) (s : Level) (seed : FixedBytes 64) (nonce : ℕ) :
+    let addr := seed.toList ++ [Fin.ofNat 256 nonce, Fin.ofNat 256 (nonce / 256)]
+    (H.h256.readBytes addr (32 * (s.params.γ₁.log2 + 1))).take 481 =
+      H.h256.readBytes addr 481 := by
+  apply H.h256.take_read
+  cases s <;> decide
+
+-- An XOF returning 0xff on every stream makes the matrix and the Algorithm 29 sampler
+-- exhaust their bounded reads. Both failures must propagate through the FIPS code.
+private def allOnesXof : ExtendableOutput where
+  read _ n := List.replicate n 255
+  length_read _ _ := List.length_replicate
+  take_read _ _ _ h := by simp [Nat.min_eq_left h]
+
+#guard ((Xofs.mk allOnesXof allOnesXof).keyGen .mlDSA44 (fun _ => 0)).isNone
+#guard ((Xofs.mk allOnesXof allOnesXof).sampleInBall .mlDSA87 []).isNone
