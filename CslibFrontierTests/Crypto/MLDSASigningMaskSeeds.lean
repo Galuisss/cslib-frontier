@@ -9,7 +9,6 @@ module
 
 import all CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 import all CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
-import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 import CslibFrontier.Probability.PMF.ToReal
 import CslibFrontier.Probability.PMF.Uniform
@@ -193,6 +192,6 @@ example (C : QuantumSigningForger) (x : List Bool) (hx : x.length ≤ C.addressB
 open QuantumSigningForger in
 example (C : QuantumSigningForger) (H : Xofs) (s : Level) (seed : FixedBytes 32) (keys : KeyPair)
     (hg : H.keyGen s seed = some keys) :
-    guessed (C := C) H s seed none =
-      ((H.h256.readBytes keys.publicKey 64).take 32 == (H.expandKeySeed s seed).drop 96) := by
-  simp [guessed, setupHash, hg, queryKeyPrefix, signingKeyBytes]
+    keyCandidates (C := C) (publicHash H ((H.keyGen s seed).map KeyPair.publicKey)) none =
+      [Keccak.bytesToBitsLE ((H.h256.readBytes keys.publicKey 64).take 32)] := by
+  simp [keyCandidates, publicHash, hg, queryKeyPrefix]

@@ -92,8 +92,8 @@ private noncomputable def actualAddress (C : QuantumSigningForger) (s : Level)
     (fun k => C.hedgeCommand p.background p.shared s k.secretKey)
 
 private noncomputable def rowAddress (C : QuantumSigningForger) (s : Level)
-    (seed : FixedBytes 32) {n : ℕ} (rows : SigningMaskSeeds n) (H : Xofs) :=
-  C.addressLaw H s (H.keyGen s seed) (fun _ _ => 0) (List.ofFn fun i μ => rows (i, μ))
+    (keys : Option KeyPair) {n : ℕ} (rows : SigningMaskSeeds n) (H : Xofs) :=
+  C.addressLaw H s keys (fun _ _ => 0) (List.ofFn fun i μ => rows (i, μ))
     (C.rowCommand H s)
 
 private theorem actualAddress_eq {C : QuantumSigningForger} {base : Xofs} {s : Level}
@@ -101,7 +101,8 @@ private theorem actualAddress_eq {C : QuantumSigningForger} {base : Xofs} {s : L
     {hb : 64 ≤ b} {rows : SigningMaskSeeds n} {p : SigningMaskSeedOracles}
     (hp : p ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
     (good : ¬representativeBad s seed p) (hn : C.SigningCallsLe n) (j : ℕ) :
-    C.actualAddress s seed t p j = C.rowAddress s seed rows p.background j := by
+    C.actualAddress s seed t p j =
+      C.rowAddress s (p.background.keyGen s seed) rows p.background j := by
   simp only [actualAddress, rowAddress, addressLaw, withTrialSetup,
     Xofs.expandA_congr (agree_off_sampleSigningMaskSeeds hp).1]
   cases hg : p.background.keyGen s seed with
@@ -208,23 +209,27 @@ noncomputable def maskSeedQueryHit (C : QuantumSigningForger) (s : Level) (base 
     (C.actualAddress s seed t p j).map (differs C p)
 
 
-private def setupHash (H : Xofs) (s : Level) (seed : FixedBytes 32) : Option (List Byte) :=
-  (H.keyGen s seed).map fun keys => H.h256.readBytes keys.publicKey 64
+private def publicHash (H : Xofs) (pk : Option (List Byte)) : Option (List Byte) :=
+  pk.map fun bytes => H.h256.readBytes bytes 64
 
-private def guessed {C : QuantumSigningForger} (H : Xofs) (s : Level) (seed : FixedBytes 32)
-    (addr : Option (Address C)) : Bool :=
-  let key := signingKeyBytes H s seed
-  (setupHash H s seed).map (List.take 32) == some key ||
-    queryKeyPrefix (C := C) addr == some (Keccak.bytesToBitsLE key)
+private def keyCandidates {C : QuantumSigningForger} (hash : Option (List Byte))
+    (addr : Option (Address C)) : List (List Bool) :=
+  (hash.map (fun tr => Keccak.bytesToBitsLE (tr.take 32))).toList ++
+    (queryKeyPrefix (C := C) addr).toList
 
 private noncomputable def fixedPrediction (C : QuantumSigningForger) (s : Level) (base : Xofs)
     (seed : FixedBytes 32) (a b : ℕ) {n : ℕ} (rows : SigningMaskSeeds n) (j : ℕ) : Game :=
   (base.uniformPrefixes a b).bind fun H =>
-    (C.rowAddress s seed rows H j).map (guessed (C := C) H s seed)
+    let keys := H.keyGen s seed
+    let hash := publicHash H (keys.map KeyPair.publicKey)
+    (C.rowAddress s keys rows H j).map fun addr =>
+      (keyCandidates (C := C) hash addr).contains (Keccak.bytesToBitsLE (signingKeyBytes H s seed))
 
 /-- Two candidates for the FIPS signing key, in the background experiment with independent
 mask-seed rows. Compare the first 32 bytes of the public-key hash and the first 256 input bits
-at the selected SHAKE256 query with the actual signing key. Missing candidates cannot win. -/
+at the selected SHAKE256 query with the actual signing key. The experiment makes one extra
+64-byte SHAKE256 read at the published key on successful key generation, independently of the
+forger's register widths. Missing candidates cannot win. -/
 noncomputable def maskSeedKeyPrediction (C : QuantumSigningForger) (s : Level) (base : Xofs)
     (a b n j : ℕ) : Game := do
   let seed ← PMF.uniformOfFintype (FixedBytes 32)
@@ -236,12 +241,12 @@ private theorem representative_collision {base : Xofs} {s : Level} {seed : Fixed
     {rows : SigningMaskSeeds n} {p : SigningMaskSeedOracles}
     (hp : p ∈ (base.sampleSigningMaskSeeds s seed t ha hb rows).support)
     (bad : representativeBad s seed p) :
-    ∃ i, setupHash p.background s seed =
+    ∃ i, publicHash p.background ((p.background.keyGen s seed).map KeyPair.publicKey) =
       some (signingKeyBytes p.background s seed ++ (t i).toList) := by
   obtain ⟨keys, hg, m, ne⟩ := bad
   rw [Xofs.messageRepresentative, publicKeyHash_eq_of_mem_sampleSigningMaskSeeds hp hg] at ne
   obtain ⟨i, h⟩ := key_hedge_of_representative_ne hp _ (p.background.h256.length_read ..) _ ne
-  exact ⟨i, by simpa only [setupHash, hg, Option.map_some, Option.some.injEq,
+  exact ⟨i, by simpa only [publicHash, hg, Option.map_some, Option.some.injEq,
     signingKeyBytes, ExtendableOutput.readBytes] using h⟩
 
 private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base : Xofs)
@@ -254,12 +259,13 @@ private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base :
   let tapes := PMF.uniformOfFintype (Fin n ↪ FixedBytes 32)
   let draw := fun t => base.sampleSigningMaskSeeds s seed t ha hb rows
   let key (H : Xofs) := signingKeyBytes H s seed
+  let hash (H : Xofs) := publicHash H ((H.keyGen s seed).map KeyPair.publicKey)
   let covers (H : Xofs) (t : Fin n ↪ FixedBytes 32) :=
-    ∃ i, setupHash H s seed = some (key H ++ (t i).toList)
+    ∃ i, hash H = some (key H ++ (t i).toList)
   let atQuery (H : Xofs) (addr : Option (Address C)) (t : Fin n ↪ FixedBytes 32) :=
     queryKeyPrefix (C := C) addr = some (Keccak.bytesToBitsLE (key H)) ∧
       targetHedge (C := C) (key H) addr ∈ Set.range t
-  let report H t := (C.rowAddress s seed rows H j).map fun addr =>
+  let report H t := (C.rowAddress s (H.keyGen s seed) rows H j).map fun addr =>
     decide (covers H t ∨ atQuery H addr t)
   have compare t p (hp : p ∈ (draw t).support) :
       ((C.actualAddress s seed t p j).map (differs C p)) true ≤ report p.background t true := by
@@ -267,7 +273,8 @@ private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base :
     · have h : covers p.background t := representative_collision hp bad
       exact (PMF.coe_le_one _ _).trans (by
         simp only [report, h, true_or, decide_true]
-        change 1 ≤ ((C.rowAddress s seed rows p.background j).bind fun _ => PMF.pure true) true
+        change 1 ≤ ((C.rowAddress s (p.background.keyGen s seed) rows p.background j).bind
+          fun _ => PMF.pure true) true
         rw [PMF.bind_const, PMF.pure_apply_self])
     · rw [actualAddress_eq hp bad hn j]
       apply PMF.map_true_mono
@@ -282,7 +289,7 @@ private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base :
   rw [PMF.bind_comm]
   apply PMF.bind_apply_le_mul_bind_apply
   intro H
-  change (tapes.bind fun t => (C.rowAddress s seed rows H j).bind fun addr =>
+  change (tapes.bind fun t => (C.rowAddress s (H.keyGen s seed) rows H j).bind fun addr =>
     PMF.pure (decide (covers H t ∨ atQuery H addr t))) true ≤ _
   rw [PMF.bind_comm]
   apply PMF.bind_apply_le_mul_bind_apply
@@ -295,10 +302,10 @@ private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base :
       (PMF.toOuterMeasure_ne_top _ _) (by positivity), prob_uniformOfFintype_embedding_mem_range]
     simp only [Fintype.card_fin, card_hedge, Nat.cast_pow, Nat.cast_ofNat, le_refl]
   simp only [Function.comp_apply]
-  by_cases guess : guessed (C := C) H s seed addr = true
+  by_cases guess : (keyCandidates (C := C) (hash H) addr).contains (Keccak.bytesToBitsLE (key H))
   · rw [guess, PMF.pure_apply_self, mul_one]
     have publicBound : (tapes.map (fun t => decide (covers H t))) true ≤ R := by
-      by_cases existsTarget : ∃ r : FixedBytes 32, setupHash H s seed = some (key H ++ r.toList)
+      by_cases existsTarget : ∃ r : FixedBytes 32, hash H = some (key H ++ r.toList)
       · obtain ⟨r, eq⟩ := existsTarget
         apply le_trans _ (single r)
         apply PMF.map_true_mono
@@ -325,14 +332,16 @@ private theorem fixedQueryGame_le (C : QuantumSigningForger) (s : Level) (base :
   · have no t : ¬ (covers H t ∨ atQuery H addr t) := by
       intro hit
       apply guess
-      simp only [guessed, Bool.or_eq_true, beq_iff_eq]
+      rw [List.contains_iff_mem, keyCandidates, List.mem_append]
       rcases hit with ⟨i, eq⟩ | ⟨eq, _⟩
       · left
-        rw [eq, Option.map_some]
-        apply congrArg some
+        rw [eq]
+        simp only [Option.map_some, Option.toList_some, List.mem_singleton]
+        apply congrArg Keccak.bytesToBitsLE
         simpa only [key, signingKeyBytes_length] using
-          (List.take_left (l₁ := signingKeyBytes H s seed) (l₂ := (t i).toList))
-      · exact Or.inr eq
+          (List.take_left (l₁ := signingKeyBytes H s seed) (l₂ := (t i).toList)).symm
+      · right
+        simp [eq]
     simp only [no, decide_false, PMF.bind_const]
     simp
 
