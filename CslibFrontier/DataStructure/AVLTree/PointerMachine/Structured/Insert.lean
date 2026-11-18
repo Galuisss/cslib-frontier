@@ -91,8 +91,8 @@ open SearchTree.PointerMachine.Structured renaming reconnect → relink, seek �
   ⟪rebalanceAncestors zero maxSucc heavy le field⟫ ]
 
 open Register in
-/-- On an unsuccessful search, create a leaf and repair its ancestors. A successful search
-changes nothing. -/
+/-- On an unsuccessful search, create a leaf and repair its ancestors. After a successful
+search the heap is unchanged; pointer register five is cleared in both cases. -/
 @[expose] def insertAfterSeek (zero maxSucc : M.Op) (lt heavy le : M.Test)
     (field : Fin (extra + 1)) (source : Fin (extra + 1) → Fin (regs + 3)) :
     Code M (layout extra (regs + 1)) := pm[

@@ -40,7 +40,8 @@ variable {M : Model} {extra regs : ℕ}
 
 open Register in
 /-- Read the child caches of `base` into data registers one and two. Pointer register two is
-scratch; a null child keeps the supplied scalar zero. -/
+scratch, so `base` must not be register two: the first load would overwrite it.
+A null child keeps the supplied scalar zero. -/
 @[expose] def readHeights (zero : M.Op) (field : Fin (extra + 1)) (base : Fin 7) :
     Code M (layout extra (regs + 1)) := pm[
   lh := zero lh lh;
