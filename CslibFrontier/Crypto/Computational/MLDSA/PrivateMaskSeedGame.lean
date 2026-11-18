@@ -15,6 +15,7 @@ import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
 import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 import all CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
 import CslibFrontier.Crypto.Game.CloseTo.UntilBad
+import CslibFrontier.Crypto.Game.Order
 import CslibFrontier.Crypto.Game.Statistical
 import CslibFrontier.Languages.Probabilistic.Presample
 import CslibFrontier.Probability.StatisticalDistance.ClosedForm
@@ -326,8 +327,7 @@ private theorem avg_score_rows (C : QuantumSigningForger) (H : Xofs) (s : Level)
 private theorem fixed_rows_bound (C : QuantumSigningForger) (s : Level) (base : Xofs)
     (seed : FixedBytes 32) {a b n : ℕ} (ha : 1024 ≤ a) (hb : 64 ≤ b)
     (hn : C.SigningCallsLe n) (hsize : n ≤ 2 ^ 256) (rows : SigningMaskSeeds n) :
-    let _ : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-      (by simpa only [Fintype.card_fin, card_hedge] using hsize)
+    let _ : Nonempty (Fin n ↪ FixedBytes 32) := hedgeEmbedding_nonempty hsize
     (Game.advantage
       ((PMF.uniformOfFintype (Fin n ↪ FixedBytes 32)).bind fun t =>
         (base.sampleSigningMaskSeeds s seed t ha hb rows).bind fun p =>
@@ -338,8 +338,7 @@ private theorem fixed_rows_bound (C : QuantumSigningForger) (s : Level) (base : 
           (fun k => C.rowTranscript H s k (List.ofFn fun i μ => rows (i, μ)))) : ℝ) ≤
       n / 2 ^ 256 := by
   classical
-  let _ : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-    (by simpa only [Fintype.card_fin, card_hedge] using hsize)
+  let _ : Nonempty (Fin n ↪ FixedBytes 32) := hedgeEmbedding_nonempty hsize
   let tapes := PMF.uniformOfFintype (Fin n ↪ FixedBytes 32)
   let draw := fun t => base.sampleSigningMaskSeeds s seed t ha hb rows
   let joint := tapes.bind fun t => (draw t).map (t, ·)
@@ -383,8 +382,7 @@ theorem dist_maskSeedGame_privateMaskSeedGame (C : QuantumSigningForger) (s : Le
     (hsize : n ≤ 2 ^ 256) :
     dist (C.maskSeedGame s base ha hb hn hsize false SignedMatrixTrial.newDigestWin)
       (C.privateMaskSeedGame s base a b) ≤ (n : ℝ) / 2 ^ 256 := by
-  let _ : Nonempty (Fin n ↪ FixedBytes 32) := Function.Embedding.nonempty_of_card_le
-    (by simpa only [Fintype.card_fin, card_hedge] using hsize)
+  let _ : Nonempty (Fin n ↪ FixedBytes 32) := hedgeEmbedding_nonempty hsize
   let R := base.uniformPrefixes a b
   let seeds := PMF.uniformOfFintype (FixedBytes 32)
   let tables := PMF.uniformOfFintype (SigningMaskSeeds n)
@@ -454,12 +452,13 @@ theorem randomPrefixGame_forgery_le_privateMaskSeedGame (C : QuantumSigningForge
         add_le_add (dist_triangle ..) privateSeed
       _ ≤ _ := add_le_add (add_le_add birthday le_rfl) le_rfl
   change (Game.succProbability _ : ℝ) ≤ Game.succProbability priv + _ + _ + _ + _ + _
-  simp only [NNReal.coe_add, Game.coe_succProbability] at branch ⊢
-  rw [PMF.dist_bool] at loss
-  change _ ≤ (fresh true).toReal + _ at branch
-  have finish {w f p d b r c m : ℝ} (h : w ≤ f + (c + m)) (h' : f - p ≤ b + d + r) :
-      w ≤ p + d + b + r + c + m := by linarith only [h, h']
-  exact finish branch ((le_abs_self _).trans loss)
+  simp only [NNReal.coe_add] at branch
+  change _ ≤ (Game.succProbability fresh : ℝ) + _ at branch
+  rw [← coe_nndist, ← Game.advantage_eq_nndist] at loss
+  apply branch.trans
+  apply (add_le_add (Game.coe_succProbability_le_add_of_advantage_le loss) le_rfl).trans_eq
+  abel
+
 
 end QuantumSigningForger
 
