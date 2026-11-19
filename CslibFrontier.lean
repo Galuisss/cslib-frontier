@@ -4362,6 +4362,7 @@ public import CslibFrontier.Computability.PropertyTesting.Distribution.Uniformit
 public import CslibFrontier.Computability.PropertyTesting.Distribution.UniformityLowerBound
 public import CslibFrontier.Computability.PropertyTesting.Linearity
 public import CslibFrontier.Computability.PropertyTesting.LinearityLowerBound
+public import CslibFrontier.Computability.PropertyTesting.Majority
 public import CslibFrontier.Computability.PropertyTesting.Monotonicity.Basic
 public import CslibFrontier.Computability.PropertyTesting.Monotonicity.EdgeTester
 public import CslibFrontier.Computability.QueryComplexity.AdjacentPair
@@ -6488,6 +6489,7 @@ public import CslibFrontier.Foundations.Data.BitString.Support
 public import CslibFrontier.Foundations.Data.BitString.Support.Weight
 public import CslibFrontier.Foundations.Data.BitString.Threshold
 public import CslibFrontier.Foundations.Data.BitString.Weight
+public import CslibFrontier.Foundations.Data.BitString.Weight.ZeroExtend
 public import CslibFrontier.Foundations.Data.BitString.WeightInterval
 public import CslibFrontier.Foundations.Data.BitString.WeightedEnumeration
 public import CslibFrontier.Foundations.Data.BitString.WordCount
