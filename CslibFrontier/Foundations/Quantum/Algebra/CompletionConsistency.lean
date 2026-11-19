@@ -119,11 +119,44 @@ theorem abs_successfulMass_sub_le (φ : AlgState A) (P Q : Measurement (Option �
     |(φ P.successfulEffect).re - (φ Q.successfulEffect).re| ≤
       φ.norm (Q.effect none - P.effect none) := by
   have h := (Complex.abs_re_le_norm (φ (Q.effect none - P.effect none))).trans
-    (by simpa only [star_one, one_mul, AlgState.norm_one] using
-      φ.norm_apply_star_mul_le 1 (Q.effect none - P.effect none))
+    (φ.norm_apply_le_norm (Q.effect none - P.effect none))
   rw [Q.effect_none_eq_one_sub_successfulEffect, P.effect_none_eq_one_sub_successfulEffect,
     sub_sub_sub_cancel_left, map_sub, Complex.sub_re] at h
   simpa only [Q.effect_none_eq_one_sub_successfulEffect, P.effect_none_eq_one_sub_successfulEffect,
     sub_sub_sub_cancel_left] using h
+
+/-- For two close measurements on one side, a measurement on the other side
+that agrees with the original controls the distance after relabeling. The
+bound is independent of the number of outcomes merged into each fiber. -/
+theorem sum_norm_sub_sq_map_le_of_agreement {β : Type*} [Fintype β] [DecidableEq β]
+    (φ : AlgState A) (L R P : Measurement α A) (f : α → β)
+    (hLR : ∀ a b, Commute (L.effect a) (R.effect b))
+    (hLP : ∀ a b, Commute (L.effect a) (P.effect b))
+    {δ ρ : ℝ} (hag : 1 - δ ≤ agreement φ L R)
+    (happrox : (∑ a, φ.norm (R.effect a - P.effect a) ^ 2) ≤ ρ) :
+    ∑ b, φ.norm ((R.map f).effect b - (P.map f).effect b) ^ 2 ≤ 8 * δ + 4 * √ρ := by
+  have hcross : 1 - (δ + √ρ) ≤ agreement φ L P := by
+    have h := (abs_agreement_sub_right_le φ L R P).trans (Real.sqrt_le_sqrt happrox)
+    linarith only [(abs_le.mp h).2, hag]
+  have hR := sum_norm_sub_sq_le_of_agreement φ (L.map f) (R.map f)
+    (fun b => commute_map_map L R hLR f f b b)
+    (hag.trans (agreement_le_agreement_map φ L R f hLR))
+  have hP := sum_norm_sub_sq_le_of_agreement φ (L.map f) (P.map f)
+    (fun b => commute_map_map L P hLP f f b b)
+    (hcross.trans (agreement_le_agreement_map φ L P f hLP))
+  have hpoint (b : β) : φ.norm ((R.map f).effect b - (P.map f).effect b) ^ 2 ≤
+      2 * (φ.norm ((L.map f).effect b - (R.map f).effect b) ^ 2 +
+        φ.norm ((L.map f).effect b - (P.map f).effect b) ^ 2) := by
+    let l := (L.map f).effect b
+    let r := (R.map f).effect b
+    let p := (P.map f).effect b
+    change φ.norm (r - p) ^ 2 ≤ 2 * (φ.norm (l - r) ^ 2 + φ.norm (l - p) ^ 2)
+    rw [show r - p = (r - l) + (l - p) by abel]
+    refine (pow_le_pow_left₀ (φ.norm_nonneg _) (φ.norm_add_le (r - l) (l - p)) 2).trans ?_
+    rw [φ.norm_sub_comm r l]
+    nlinarith only [sq_nonneg (φ.norm (l - r) - φ.norm (l - p))]
+  refine (sum_le_sum fun b _ => hpoint b).trans ?_
+  rw [← mul_sum, sum_add_distrib]
+  linarith only [hR, hP]
 
 end Cslib.Quantum.Measurement

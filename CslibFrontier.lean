@@ -4130,6 +4130,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialEvaluationCollision
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialMeasurement
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialPointEffect
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.ProjectiveSelfImprovement
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SelfImprovementCollision
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SelfImprovementConsistency
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SelfImprovementSDP
@@ -7151,6 +7152,7 @@ public import CslibFrontier.Foundations.Quantum.Algebra.SequentialCopy
 public import CslibFrontier.Foundations.Quantum.Algebra.SequentialDisturbance
 public import CslibFrontier.Foundations.Quantum.Algebra.SequentialMeasurement
 public import CslibFrontier.Foundations.Quantum.Algebra.SuccessfulAgreement
+public import CslibFrontier.Foundations.Quantum.Algebra.TensorState
 public import CslibFrontier.Foundations.Quantum.Algebra.TracialGNS
 public import CslibFrontier.Foundations.Quantum.Algebra.Tsirelson
 public import CslibFrontier.Foundations.Quantum.Bell
