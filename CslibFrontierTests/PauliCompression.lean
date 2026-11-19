@@ -63,4 +63,49 @@ example : ∃ (J : Type) (_ : Fintype J) (_ : DecidableEq J)
   have h1 := (Fintype.expect_eq_zero_iff_of_nonneg (fun b => sq_nonneg _)).mp (congrFun h0 a)
   exact pow_eq_zero_iff two_ne_zero |>.mp (congrFun h1 b)
 
+/-- The identity families on a one-dimensional input have exact Z intertwining and
+nonzero X intertwining error. The odd pair of the one-bit strings contributes error four. -/
+example : ∃ (J : Type) (_ : Fintype J) (_ : DecidableEq J)
+    (W : Matrix ((Fin 1 → Bool) × J) (Fin 1) ℂ), Wᴴ * W = 1 ∧
+    (∀ z, W = (pauliZPow z ⊗ₖ (1 : Matrix J J ℂ)) * W) ∧
+    ∀ φ : AlgState (Matrix (Fin 1) (Fin 1) ℂ),
+      (𝔼 x, let D := W - (pauliXPow x ⊗ₖ (1 : Matrix J J ℂ)) * W
+        (φ (Dᴴ * D)).re) = 1 := by
+  let O (_ : Fin 1 → Bool) : Matrix (Fin 1) (Fin 1) ℂ := 1
+  obtain ⟨J, _, _, W, hW, hZ, h⟩ := exists_isometry_compress_intertwine_pauliFamily O O
+    (fun _ => by simp [O]) (fun _ => by simp [O]) rfl rfl
+    (fun _ _ => one_mul 1) (fun _ _ => one_mul 1)
+  refine ⟨J, inferInstance, inferInstance, W, hW, ?_, fun φ => ?_⟩
+  · simpa only [O, Matrix.mul_one] using hZ
+  have hX := (h φ).2
+  simp only [O, Matrix.mul_one] at hX
+  rw [hX]
+  have hvalue (x z : Fin 1 → Bool) :
+      φ.norm (1 - (signVal (x ⬝ᵥ z) : ℂ) • 1) ^ 2 =
+        if x 0 && z 0 then (4 : ℝ) else 0 := by
+    have hd : x ⬝ᵥ z = (x 0 && z 0) := by
+      rw [dotProduct, Fin.sum_univ_one, Bool.mul_eq_and]
+    rw [hd]
+    cases hbit : x 0 && z 0
+    · simp [signVal]
+    · have htwo : (1 : Matrix (Fin 1) (Fin 1) ℂ) - (signVal true : ℂ) • 1 =
+          (2 : ℂ) • 1 := by
+        simp only [signVal_true, Complex.ofReal_neg, Complex.ofReal_one, neg_one_smul,
+          sub_neg_eq_add, two_smul]
+      rw [htwo, φ.norm_smul, φ.norm_one]
+      norm_num
+  simp only [hvalue]
+  let e := Equiv.funUnique (Fin 1) Bool
+  have he (a : Fin 1 → Bool) : e a = a 0 := congrArg a (Subsingleton.elim _ _)
+  rw [Fintype.expect_equiv e
+    (fun a => 𝔼 z : Fin 1 → Bool, if a 0 && z 0 then (4 : ℝ) else 0)
+    (fun a => 𝔼 z : Fin 1 → Bool, if a && z 0 then 4 else 0) (fun a => by rw [he])]
+  have hinner (a : Bool) :
+      (𝔼 z : Fin 1 → Bool, if a && z 0 then (4 : ℝ) else 0) =
+      𝔼 b : Bool, if a && b then 4 else 0 :=
+    Fintype.expect_equiv e _ _ (fun z => by rw [he])
+  simp_rw [hinner]
+  norm_num [Finset.expect, Fintype.sum_bool, NNRat.smul_def]
+
+
 end CslibFrontierTests.PauliCompression
