@@ -122,6 +122,65 @@ theorem sum_prob (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) :
   simp only [S.sum_prob_bob, ← Complex.re_sum, ← map_sum, (S.alice x).sum_effect,
     AlgState.map_one, Complex.one_re]
 
+variable [IsOrderedAddMonoid 𝒜]
+
+/-- Restrict the questions and postprocess the answers of both players, keeping the same
+state. Each answer effect is a sum of mutually cross-player commuting effects. -/
+def map {X' Y' A' B' : Type*} [Fintype A'] [Fintype B'] [DecidableEq A'] [DecidableEq B']
+    (S : CommutingStrategy X Y A B 𝒜) (questionAlice : X' → X) (questionBob : Y' → Y)
+    (answerAlice : X' → A → A') (answerBob : Y' → B → B') :
+    CommutingStrategy X' Y' A' B' 𝒜 where
+  state := S.state
+  alice x := (S.alice (questionAlice x)).map (answerAlice x)
+  bob y := (S.bob (questionBob y)).map (answerBob y)
+  commute x y a b := by
+    simp only [Measurement.map_effect]
+    exact Commute.sum_left _ _ _ fun a' _ =>
+      Commute.sum_right _ _ _ fun b' _ => S.commute _ _ a' b'
+
+/-- Postprocessed answer probabilities sum the original probabilities over the two
+decoder fibers. -/
+theorem prob_map {X' Y' A' B' : Type*} [Fintype A'] [Fintype B']
+    [DecidableEq A'] [DecidableEq B'] (S : CommutingStrategy X Y A B 𝒜)
+    (questionAlice : X' → X) (questionBob : Y' → Y)
+    (answerAlice : X' → A → A') (answerBob : Y' → B → B') (x : X') (y : Y')
+    (a : A') (b : B') :
+    (S.map questionAlice questionBob answerAlice answerBob).prob x y a b =
+      ∑ a' with answerAlice x a' = a, ∑ b' with answerBob y b' = b,
+        S.prob (questionAlice x) (questionBob y) a' b' := by
+  simp only [prob, map, Measurement.map_effect, sum_mul, mul_sum, map_sum, Complex.re_sum]
+  exact sum_comm
+
+/-- Checking decoded answers in the postprocessed strategy gives the same score as
+checking them directly in the original joint distribution. -/
+theorem sum_ite_prob_map {X' Y' A' B' : Type*} [Fintype A'] [Fintype B']
+    [DecidableEq A'] [DecidableEq B'] (S : CommutingStrategy X Y A B 𝒜)
+    (questionAlice : X' → X) (questionBob : Y' → Y)
+    (answerAlice : X' → A → A') (answerBob : Y' → B → B') (x : X') (y : Y')
+    (accepts : A' → B' → Prop) [∀ a b, Decidable (accepts a b)] :
+    (∑ a, ∑ b, if accepts a b then
+      (S.map questionAlice questionBob answerAlice answerBob).prob x y a b else 0) =
+    ∑ a, ∑ b, if accepts (answerAlice x a) (answerBob y b) then
+      S.prob (questionAlice x) (questionBob y) a b else 0 := by
+  conv_rhs => rw [← sum_fiberwise univ (answerAlice x)]
+  refine sum_congr rfl fun a _ => ?_
+  have hrow (a' : A) :
+      (∑ b', if accepts (answerAlice x a') (answerBob y b') then
+        S.prob (questionAlice x) (questionBob y) a' b' else 0) =
+      ∑ b, ∑ b' with answerBob y b' = b,
+        if accepts (answerAlice x a') (answerBob y b') then
+          S.prob (questionAlice x) (questionBob y) a' b' else 0 :=
+    (sum_fiberwise univ (answerBob y) _).symm
+  simp_rw [hrow]
+  rw [sum_comm]
+  refine sum_congr rfl fun b _ => ?_
+  rw [prob_map]
+  trans ∑ a' with answerAlice x a' = a, ∑ b' with answerBob y b' = b,
+    if accepts a b then S.prob (questionAlice x) (questionBob y) a' b' else 0
+  · split_ifs <;> simp
+  refine sum_congr rfl fun a' ha => sum_congr rfl fun b' hb => ?_
+  rw [(mem_filter.mp ha).2, (mem_filter.mp hb).2]
+
 end Ring
 
 section CFC
