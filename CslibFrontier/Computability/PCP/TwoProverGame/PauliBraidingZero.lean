@@ -17,7 +17,9 @@ import CslibFrontier.Foundations.Data.Finset.Expect
 Conditioning the linearity branch on equal strings in the original pair, a fixed
 basis and a fixed role assignment retains a fraction `1 / (4 * 2^n)` of the seeds.
 The remaining choices are the common string, the other player's dummy, and the check.
-This isolates the probability cost of using these rounds to analyze the zero string.
+The first two checks on these seeds bound disagreement between the two bits
+on a duplicated question. The parity check bounds the missing zero-string term
+in the consistency estimate.
 
 ## Main definitions
 
@@ -26,6 +28,7 @@ This isolates the probability cost of using these rounds to analyze the zero str
 ## Main results
 
 * `Cslib.PCP.rejection_pauliBraidingDiagonalGame_le`: transfer of the rejection budget.
+* `Cslib.PCP.expect_prob_mismatch_pauliBraidingDiagonal_le`: weighted pair-bit mismatch.
 * `Cslib.PCP.expect_norm_pauliBraidingBasisObservable_sub_sq_le`: full uniform consistency
   from the consistency and linearity branches.
 -/
@@ -113,46 +116,6 @@ theorem rejection_pauliBraidingDiagonalGame_le
 is first after sorting, including when the dummy is also zero. -/
 @[expose] def pauliBraidingZeroBit : (Bool × Bool) ⊕ A → Bool :=
   Sum.elim Prod.fst (fun _ => false)
-
-omit [Nonempty (Fin n)] in
-open BitString in
-/-- The linearity and consistency decoders at zero agree away from the duplicated
-zero query. They also agree at the tie in the X basis. -/
-theorem pauliBraidingZero_decoding (basis : Bool) (dummy : Fin n → Bool)
-    (h : dummy ≠ 0 ∨ basis = false) :
-    let q := PauliConsistencyQuestion.ofChecked basis 0 dummy
-    q.toBraidingQuestion = (pauliBraidingZeroQuestion basis dummy : PauliBraidingQuestion n Q) ∧
-      (Sum.elim q.braidingCheckedBit (fun _ : A => false)) = pauliBraidingZeroBit := by
-  intro q
-  cases basis
-  · change (.basis false (cond (lexSwap (0 : Fin n → Bool) dummy) Prod.swap id (0, dummy)) :
-      PauliBraidingQuestion n Q) = .basis false (0, dummy) ∧ _
-    refine ⟨by rw [lexSwap_zero_left]; rfl, ?_⟩
-    funext answer
-    cases answer with
-    | inr malformed => rfl
-    | inl bits =>
-      change (cond (lexSwap (0 : Fin n → Bool) dummy) Prod.swap id bits).1 = bits.1
-      rw [lexSwap_zero_left]
-      rfl
-  have hn : dummy ≠ 0 := h.resolve_right Bool.noConfusion
-  have hswap : lexSwap dummy 0 = true := by
-    rw [lexSwap_reverse (Ne.symm hn), lexSwap_zero_left]
-    rfl
-  change PauliConsistencyQuestion.toBraidingQuestion ⟨dummy, 0, true⟩ =
-      (pauliBraidingZeroQuestion true dummy : PauliBraidingQuestion n Q) ∧
-    Sum.elim (PauliConsistencyQuestion.braidingCheckedBit ⟨dummy, 0, true⟩)
-      (fun _ : A => false) = pauliBraidingZeroBit
-  constructor
-  · rw [PauliConsistencyQuestion.toBraidingQuestion, hswap]
-    rfl
-  · funext answer
-    cases answer with
-    | inr malformed => rfl
-    | inl bits =>
-      change (cond (lexSwap dummy (0 : Fin n → Bool)) Prod.swap id bits).2 = bits.1
-      rw [hswap]
-      rfl
 
 open BitString Finset Quantum in
 /-- For either role assignment, the three checks of a diagonal round bound the point
@@ -310,6 +273,85 @@ theorem expect_prob_true_pauliBraidingZero_le {𝒜 : Type*} [Fintype A] [Ring �
   simpa only [Fintype.expect_const] using h
 
 open BitString Finset Quantum in
+private theorem prob_bad_le_of_diagonal_checks {𝒜 : Type*} [Fintype A] [Ring 𝒜] [StarRing 𝒜]
+    [PartialOrder 𝒜] [StarOrderedRing 𝒜] [Algebra ℂ 𝒜] [TopologicalSpace 𝒜]
+    [ContinuousFunctionalCalculus ℝ 𝒜 IsSelfAdjoint] [NonnegSpectrumClass ℝ 𝒜]
+    (G : TwoProverGame Q Q A A) (special : Bool → Q) (decode : Bool → A → Bool)
+    (roles basis : Bool)
+    (S : CommutingStrategy (PauliBraidingQuestion n Q) (PauliBraidingQuestion n Q)
+      ((Bool × Bool) ⊕ A) ((Bool × Bool) ⊕ A) 𝒜) (a dummy : Fin n → Bool)
+    (k l : Fin 3) (read : Bool × Bool → Bool)
+    (hquery : linearityQuery k a a = linearityQuery l a a)
+    (hcheck : ∀ bits, read bits = true → linearityCheck k bits ≠ linearityCheck l bits) :
+    let game := pauliBraidingDiagonalGame n G special decode roles basis
+    let logical := cond roles S.swap S
+    let question : PauliBraidingQuestion n Q := .basis basis (a, a)
+    let loss (i : Fin 3) := 1 - ({ game with seed := PMF.pure (i, a, dummy) }).commutingWinProb S
+    ((logical.alice question).map (Sum.elim read (fun _ => false))).prob logical.state true ≤
+      loss k + loss l := by
+  classical
+  intro game logical question loss
+  let c := linearityQuery k a a
+  let pointQuestion : PauliBraidingQuestion n Q :=
+    .basis basis (cond (lexSwap c dummy) Prod.swap id (c, dummy))
+  let accepted (i : Fin 3) (p q : (Bool × Bool) ⊕ A) :=
+    game.accepts (i, a, dummy) (cond roles q p) (cond roles p q)
+  let bad := Sum.elim read (fun _ : A => false)
+  have htie : lexSwap a a = false := by simp [lexSwap]
+  have hquestions (i : Fin 3) (hi : linearityQuery i a a = c) :
+      game.query (i, a, dummy) = cond roles Prod.swap id (question, pointQuestion) := by
+    cases roles <;>
+      simp only [game, pauliBraidingDiagonalGame, SeededGame.pullbackSeed, Function.comp_apply,
+        pauliBraidingGame, pauliBraidingBranchGame, SymmetricLinearitySeed.diagonal,
+        Function.Embedding.coeFn_mk, symmetricLinearityGame, hi, htie, Bool.cond_false,
+        Bool.cond_true, id_eq, Prod.swap_prod_mk, question, pointQuestion]
+  have hloss (i : Fin 3) (hi : linearityQuery i a a = c) :
+      loss i = ∑ p, ∑ q, if accepted i p q then 0 else logical.prob question pointQuestion p q := by
+    rw [show loss i = _ from game.one_sub_commutingWinProb_pure_seed (i, a, dummy) S,
+      hquestions i hi]
+    cases roles
+    · rfl
+    · simp only [accepted, logical, Bool.cond_true, Prod.swap_prod_mk, S.prob_swap]
+      exact sum_comm
+  have hmarginal :
+      ((logical.alice question).map bad).prob logical.state true =
+        ∑ p, ∑ q, if bad p = true then logical.prob question pointQuestion p q else 0 := by
+    rw [Measurement.prob_map, sum_filter]
+    refine sum_congr rfl fun p _ => ?_
+    split_ifs
+    · exact (logical.sum_prob_bob question pointQuestion p).symm
+    · simp
+  have hchecks (p q : (Bool × Bool) ⊕ A) (hp : bad p = true) :
+      ¬ (accepted k p q ∧ accepted l p q) := by
+    rintro ⟨hk, hl⟩
+    rcases p with bits | malformed
+    · rcases q with point | malformed
+      · have hdecoded (i : Fin 3) (hi : linearityQuery i a a = c) :
+            accepted i (.inl bits) (.inl point) ↔
+              (cond (lexSwap c dummy) Prod.swap id point).1 = linearityCheck i bits := by
+          cases roles <;>
+            simp only [accepted, game, pauliBraidingDiagonalGame, SeededGame.pullbackSeed,
+              pauliBraidingGame, pauliBraidingBranchGame, SymmetricLinearitySeed.diagonal,
+              Function.Embedding.coeFn_mk, symmetricLinearityGame, hi, htie, Bool.cond_false,
+              Bool.cond_true, id_eq, Prod.swap_prod_mk]
+        exact hcheck bits hp ((hdecoded k rfl |>.mp hk).symm.trans
+          (hdecoded l hquery.symm |>.mp hl))
+      · cases roles <;> exact hk
+    · exact Bool.noConfusion hp
+  change ((logical.alice question).map bad).prob logical.state true ≤ _
+  rw [hmarginal, hloss k rfl, hloss l hquery.symm]
+  simp only [← sum_add_distrib]
+  refine sum_le_sum fun p _ => sum_le_sum fun q _ => ?_
+  have hn := logical.prob_nonneg question pointQuestion p q
+  by_cases hp : bad p = true
+  · have h := hchecks p q hp
+    by_cases hk : accepted k p q <;> by_cases hl : accepted l p q <;>
+      simp only [hp, hk, hl, ite_true, ite_false] at *
+    all_goals first | contradiction | linarith
+  · simp only [hp]
+    positivity
+
+open Quantum in
 /-- When the pair player receives the duplicated zero string, their second bit can be
 true only if at least one of the first-coordinate and parity checks rejects. Both checks
 query zero with the same dummy. -/
@@ -326,72 +368,11 @@ theorem prob_true_second_le_pauliBraidingZero_tie {𝒜 : Type*} [Fintype A] [Ri
     let loss (k : Fin 3) := 1 - ({ game with seed := PMF.pure (k, 0, dummy) }).commutingWinProb S
     ((logical.alice question).map (Sum.elim Prod.snd (fun _ => false))).prob logical.state true ≤
       loss 0 + loss 2 := by
-  classical
-  intro game logical question loss
-  let pointQuestion : PauliBraidingQuestion n Q := pauliBraidingZeroQuestion basis dummy
-  let accepted (k : Fin 3) (p q : (Bool × Bool) ⊕ A) :=
-    game.accepts (k, 0, dummy) (cond roles q p) (cond roles p q)
-  let read (p : (Bool × Bool) ⊕ A) := Sum.elim Prod.snd (fun _ => false) p
-  have htie : lexSwap (0 : Fin n → Bool) 0 = false := by simp [lexSwap]
-  have hpoint (k : Fin 3) : linearityQuery k (0 : Fin n → Bool) 0 = 0 := by
-    simp [linearityQuery]
-  have hquery (k : Fin 3) : game.query (k, 0, dummy) =
-      cond roles Prod.swap id (question, pointQuestion) := by
-    cases roles <;>
-      simp only [game, pauliBraidingDiagonalGame, SeededGame.pullbackSeed, Function.comp_apply,
-        pauliBraidingGame, pauliBraidingBranchGame, SymmetricLinearitySeed.diagonal,
-        Function.Embedding.coeFn_mk, symmetricLinearityGame, hpoint, htie, Bool.cond_false,
-        Bool.cond_true, id_eq, Prod.swap_prod_mk, question, pointQuestion,
-        pauliBraidingZeroQuestion, lexSwap_zero_left]
-  have hloss (k : Fin 3) :
-      loss k = ∑ p, ∑ q, if accepted k p q then 0 else logical.prob question pointQuestion p q := by
-    rw [show loss k = _ from game.one_sub_commutingWinProb_pure_seed (k, 0, dummy) S, hquery]
-    cases roles
-    · rfl
-    · simp only [accepted, logical, Bool.cond_true, Prod.swap_prod_mk, S.prob_swap]
-      exact sum_comm
-  have hmarginal :
-      ((logical.alice question).map read).prob logical.state true =
-        ∑ p, ∑ q, if read p = true then logical.prob question pointQuestion p q else 0 := by
-    rw [Measurement.prob_map, sum_filter]
-    refine sum_congr rfl fun p _ => ?_
-    split_ifs
-    · exact (logical.sum_prob_bob question pointQuestion p).symm
-    · simp
-  have hchecks (p q : (Bool × Bool) ⊕ A) (hp : read p = true) :
-      ¬ (accepted 0 p q ∧ accepted 2 p q) := by
-    intro h
-    rcases p with bits | malformed
-    · rcases q with point | malformed
-      · let bit := pauliBraidingZeroBit (A := A) (.inl point)
-        have hdecoded (k : Fin 3) :
-            accepted k (.inl bits) (.inl point) ↔ bit = linearityCheck k bits := by
-          cases roles <;>
-            simp only [accepted, game, pauliBraidingDiagonalGame, SeededGame.pullbackSeed,
-              pauliBraidingGame, pauliBraidingBranchGame, SymmetricLinearitySeed.diagonal,
-              Function.Embedding.coeFn_mk, symmetricLinearityGame, hpoint, htie, Bool.cond_false,
-              Bool.cond_true, id_eq, Prod.swap_prod_mk, bit, lexSwap_zero_left,
-              pauliBraidingZeroBit, Sum.elim_inl]
-        have hone : bits.2 = true := hp
-        have hp₀ := (hdecoded 0).mp h.1
-        have hp₂ := (hdecoded 2).mp h.2
-        simp only [linearityCheck, Fin.reduceEq, ite_true, ite_false, hone,
-          Bool.xor_true] at hp₀ hp₂
-        exact Bool.not_ne_self bits.1 (hp₂.symm.trans hp₀)
-      · cases roles <;> exact h.1
-    · exact Bool.noConfusion hp
-  change ((logical.alice question).map read).prob logical.state true ≤ _
-  rw [hmarginal, hloss 0, hloss 2]
-  simp only [← sum_add_distrib]
-  refine sum_le_sum fun p _ => sum_le_sum fun q _ => ?_
-  have hn := logical.prob_nonneg question pointQuestion p q
-  by_cases hp : read p = true
-  · have h := hchecks p q hp
-    by_cases h₀ : accepted 0 p q <;> by_cases h₂ : accepted 2 p q <;>
-      simp only [hp, h₀, h₂, ite_true, ite_false] at *
-    all_goals first | contradiction | linarith
-  · simp only [hp]
-    positivity
+  apply prob_bad_le_of_diagonal_checks G special decode roles basis S 0 dummy 0 2 Prod.snd
+  · simp [linearityQuery]
+  · intro bits h
+    simpa only [linearityCheck, Fin.reduceEq, ite_true, ite_false, h, Bool.xor_true] using
+      Ne.symm (Bool.not_ne_self bits.1)
 
 open Quantum in
 /-- The second-bit error at the duplicated zero query has the joint uniform weight of
@@ -432,6 +413,36 @@ theorem weighted_prob_true_second_pauliBraidingZero_tie_le {𝒜 : Type*} [Finty
   convert h using 1
   ring
 
+open Quantum in
+/-- If the two bits of the duplicated pair answer differ, at least one of the two
+equality checks rejects. The average mismatch is weighted by the uniform mass of a tie. -/
+theorem expect_prob_mismatch_pauliBraidingDiagonal_le {𝒜 : Type*} [Fintype A] [Ring 𝒜] [StarRing 𝒜]
+    [PartialOrder 𝒜] [StarOrderedRing 𝒜] [Algebra ℂ 𝒜] [TopologicalSpace 𝒜]
+    [ContinuousFunctionalCalculus ℝ 𝒜 IsSelfAdjoint] [NonnegSpectrumClass ℝ 𝒜]
+    (G : TwoProverGame Q Q A A) (special : Bool → Q) (decode : Bool → A → Bool)
+    (roles basis : Bool)
+    (S : CommutingStrategy (PauliBraidingQuestion n Q) (PauliBraidingQuestion n Q)
+      ((Bool × Bool) ⊕ A) ((Bool × Bool) ⊕ A) 𝒜) :
+    let logical := cond roles S.swap S
+    (𝔼 a, ((logical.alice (.basis basis (a, a))).map
+      (Sum.elim (fun bits => bits.1 ^^ bits.2) (fun _ => false))).prob logical.state true) /
+      Fintype.card (Fin n → Bool) ≤
+        12 * (1 - (pauliBraidingBranchGame n G special decode 0).commutingWinProb S) := by
+  intro logical
+  let bad (a : Fin n → Bool) := ((logical.alice (.basis basis (a, a))).map
+    (Sum.elim (fun bits => bits.1 ^^ bits.2) (fun _ => false))).prob logical.state true
+  have h := expect_diagonal_le G special decode roles basis S (fun a _ => bad a) (fun a d => by
+    have h01 := prob_bad_le_of_diagonal_checks G special decode roles basis S a d 0 1
+      (fun bits => bits.1 ^^ bits.2) (by simp [linearityQuery]) (by decide)
+    have h₂ := sub_nonneg.mpr (SeededGame.answersWinProb_le_one
+      ({ pauliBraidingDiagonalGame n G special decode roles basis with
+          seed := PMF.pure (2, a, d) }) S.answers)
+    dsimp only at h01 h₂
+    change bad a ≤ _ at h01
+    simp only [SeededGame.commutingWinProb] at h01 ⊢
+    linarith only [h01, h₂])
+  simpa only [Fintype.expect_const] using h
+
 open BitString Finset Quantum in
 /-- Both bases of the consistency decoder at zero are controlled by linearity rejection,
 including the second coordinate used by the Z-basis decoder on a duplicated query. -/
@@ -463,10 +474,11 @@ theorem expect_prob_true_pauliBraidingConsistencyZero_le {𝒜 : Type*} [Fintype
   have hcompare (dummy : Fin n → Bool) :
       consistency dummy ≤ linearity dummy + if dummy = 0 then secondBit else 0 := by
     by_cases h : dummy ≠ 0 ∨ basis = false
-    · obtain ⟨hq, hread⟩ := pauliBraidingZero_decoding (Q := Q) (A := A) basis dummy h
+    · obtain ⟨hq, hread⟩ :=
+        PauliConsistencyQuestion.ofChecked_braiding (Q := Q) basis 0 dummy h
       unfold consistency linearity
-      dsimp only
-      rw [hq, hread]
+      dsimp only at hq hread ⊢
+      rw [hq, hread, lexSwap_zero_left]
       exact le_add_of_nonneg_right (by split_ifs <;> positivity)
     · push Not at h
       obtain ⟨rfl, hb⟩ := h

@@ -171,10 +171,13 @@ example (φ : AlgState (Matrix (Fin 1) (Fin 1) ℂ)) :
   rw [hobs, zero_mul] at hsquare
   exact zero_ne_one hsquare
 
+private abbrev MatrixPauliStrategy :=
+  CommutingStrategy (PauliBraidingQuestion 1 Bool) (PauliBraidingQuestion 1 Bool)
+    ((Bool × Bool) ⊕ Bool) ((Bool × Bool) ⊕ Bool) (Matrix (Fin 1) (Fin 1) ℂ)
+
 /-- The width-one Pauli bound instantiates in the usual matrix order for either basis and role. -/
 example
-    (S : CommutingStrategy (PauliBraidingQuestion 1 Bool) (PauliBraidingQuestion 1 Bool)
-      ((Bool × Bool) ⊕ Bool) ((Bool × Bool) ⊕ Bool) (Matrix (Fin 1) (Fin 1) ℂ))
+    (S : MatrixPauliStrategy)
     (hA : ∀ basis q, (S.alice (.basis basis q)).IsProjective)
     (hB : ∀ basis q, (S.bob (.basis basis q)).IsProjective)
     (basis roles : Bool) {ε : ℝ}
@@ -187,5 +190,21 @@ example
         (T.alice (a + b)).observable)).re :=
   one_sub_le_expect_re_apply_mul_mul_of_pauliBraidingLinearity
     TwoProverGame.chsh id (fun _ => id) S hA hB hwin basis roles
+
+/-- The decoder estimate applies to each width-one matrix player with only its
+duplicated-question measurements assumed projective. -/
+example (S : MatrixPauliStrategy) (basis roles : Bool)
+    (hproj : ∀ c, ((cond roles S.alice S.bob) (.basis basis (c, c))).IsProjective) :
+    let R := pauliBraidingLinearityStrategy basis S
+    let T := (cond roles R R.swap).asymmetricLinearity
+    let M := cond roles S.alice S.bob
+    (𝔼 c, S.state.norm ((T.alice c).observable -
+      (𝔼 d, pauliBraidingBasisObservable M basis c d)) ^ 2) ≤
+      if basis then
+        48 * (1 - (pauliBraidingBranchGame 1 TwoProverGame.chsh id
+          (fun _ => id) 0).commutingWinProb S)
+      else 0 :=
+  expect_norm_asymmetricLinearity_sub_basis_sq_le TwoProverGame.chsh id (fun _ => id)
+    S basis roles hproj
 
 end CslibFrontierTests.LinearityGame

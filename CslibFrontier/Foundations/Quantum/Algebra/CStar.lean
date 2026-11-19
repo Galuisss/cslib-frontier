@@ -132,6 +132,24 @@ theorem IsProjective.observable_map_mul_observable_map
   refine sum_congr rfl fun r _ => ?_
   rw [BitString.signVal_xor, Complex.ofReal_mul]
 
+/-- The squared distance between two bit observables of one projective measurement is
+four times the probability that those bits differ. -/
+theorem IsProjective.norm_observable_map_sub_sq (hM : M.IsProjective)
+    (φ : AlgState A) (f g : α → Bool) :
+    φ.norm ((M.map f).observable - (M.map g).observable) ^ 2 =
+      4 * (M.map (fun a => f a ^^ g a)).prob φ true := by
+  let P := M.map (fun a => f a ^^ g a)
+  have hsum := P.sum_effect
+  rw [Fintype.sum_bool] at hsum
+  rw [φ.norm_sub_sq_eq_of_mul_self (M.map f).isSelfAdjoint_observable
+    (M.map g).isSelfAdjoint_observable (observable_mul_self (hM.map f))
+    (observable_mul_self (hM.map g)), hM.observable_map_mul_observable_map]
+  change 2 - 2 * (φ (P.effect false - P.effect true)).re =
+    4 * (φ (P.effect true)).re
+  rw [eq_sub_of_add_eq hsum, map_sub, map_sub, AlgState.map_one, Complex.sub_re,
+    Complex.sub_re, Complex.one_re]
+  ring
+
 end Measurement
 
 end Cslib.Quantum
