@@ -91,17 +91,13 @@ theorem successfulPairDefect_le_evaluatedSlices (φ : AlgState A)
   have havg := expect_le_expect (s := (univ : Finset F)) fun x _ =>
     expect_le_expect (s := (univ : Finset F)) fun y _ => hpoint x y
   simp only [expect_add_distrib, Fintype.expect_const, ← mul_expect] at havg
-  have hsnoc (g : Point F (m + 1) → ℝ) :
-      (𝔼 w, g w) = 𝔼 x : F, 𝔼 u : Point F m, g (Fin.snoc u x) := by
-    rw [expect_comm univ univ]
-    exact (Fintype.expect_fin_snoc g).symm
   have hmean :
       (𝔼 x : F, 𝔼 y : F, 𝔼 u : Point F m, 𝔼 v : Point F m,
         Measurement.successfulPairDefect φ (E x u) (E y v)) =
         𝔼 u, 𝔼 v, Measurement.successfulPairDefect φ (P u) (P v) := by
-    rw [hsnoc]
-    simp_rw [hsnoc (fun v => Measurement.successfulPairDefect φ (P _) (P v)),
-      P, Fin.snoc_last, Fin.init_snoc]
+    rw [Fintype.expect_eq_expect_snoc]
+    simp_rw [Fintype.expect_eq_expect_snoc
+      (fun v => Measurement.successfulPairDefect φ (P _) (P v)), P, Fin.snoc_last, Fin.init_snoc]
     refine expect_congr rfl fun x _ => ?_
     rw [expect_comm univ univ]
   rw [hmean] at havg
