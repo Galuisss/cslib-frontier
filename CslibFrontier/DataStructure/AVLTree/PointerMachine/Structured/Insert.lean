@@ -37,6 +37,7 @@ public section
 namespace Cslib.DataStructure.AVLTree.PointerMachine.Structured
 
 open Cslib.PointerMachine SearchTree.PointerMachine
+open Cslib.Program (ExecWithin.skip ExecWithin.seq ExecWithin.branch_pos ExecWithin.branch_neg)
 
 variable {M : Model} {extra regs : ℕ}
 
@@ -293,9 +294,10 @@ private theorem rebalance_dataDests (zero maxSucc : M.Op) (heavy le : M.Test)
 
 private theorem rebalance_fieldDests (zero maxSucc : M.Op) (heavy le : M.Test)
     (field : Fin (extra + 1)) :
-    (rebalanceAncestors (regs := regs) zero maxSucc heavy le field).fieldDests =
-      List.replicate 13 field := by
-  simp [rebalanceAncestors, rebalanceLoop, ancestorStep, balance_fieldDests, Op.fieldDest]
+    ∀ f ∈ (rebalanceAncestors (regs := regs) zero maxSucc heavy le field).fieldDests,
+      f = field := by
+  simpa [rebalanceAncestors, rebalanceLoop, ancestorStep, Op.fieldDest] using
+    balance_fieldDests zero maxSucc heavy le field
 
 private theorem rebalance_correct [LinearOrder M.Value]
     (zero maxSucc : M.Op) (heavy le : M.Test) (encode : ℕ → M.Value)
@@ -389,7 +391,7 @@ private theorem rebalance_correct [LinearOrder M.Value]
     fun i h1 h2 => run.data_keep [1, 2] (rebalance_dataDests zero maxSucc heavy le field)
       (by simp [h1, h2]),
     fun a f hf => run.field_keep (rebalance_keepsSize zero maxSucc heavy le field)
-      (by simp [rebalance_fieldDests, hf]) a⟩
+      (fun h => hf (rebalance_fieldDests zero maxSucc heavy le field f h)) a⟩
 
 /-- Creating a leaf and rebalancing its ancestors assigns only data registers one and two. -/
 private theorem missing_dataDests (zero maxSucc : M.Op) (lt heavy le : M.Test)

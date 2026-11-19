@@ -37,6 +37,7 @@ public section
 namespace Cslib.DataStructure.AVLTree.PointerMachine.Structured
 
 open Cslib.PointerMachine SearchTree.PointerMachine
+open Cslib.Program (ExecWithin.seq ExecWithin.branch_pos ExecWithin.branch_neg)
 
 variable {M : Model} {extra regs : ℕ}
 
@@ -265,17 +266,19 @@ private theorem heavy_correct (right : Bool) (zero maxSucc : M.Op) (le : M.Test)
       ho hn hs qcur
     refine ⟨t, nodeAt right x' outer (nodeAt right y' inner sibling),
       (ExecWithin.seq (ExecWithin.op_eq nav) (ExecWithin.seq read
-      (ExecWithin.branch_pos (t := .data le (if right then 1 else 2) (if right then 2 else 1))
-        (test.trans (decide_eq_true hle)) run))).mono (by omega), ?_⟩
+      (ExecWithin.branch_pos
+        (show Test.Holds q (Test.data le (if right then 1 else 2) (if right then 2 else 1)) from
+          test.trans (decide_eq_true hle)) run))).mono (by omega), ?_⟩
     simp only [hle, ↓reduceIte, rotateAt_nodeSide]
     exact built.of_start qheap (qcur.trans cursor.symm) qtop
   · obtain ⟨t, tree, run, built⟩ := double_correct right zero maxSucc encode zero_spec max_spec
       field notKey q label child outer inner sibling O N S parent qrep distinct mo mn ms ho hn hs
       (by rintro rfl; simp at hle) qcur
     refine ⟨t, tree, (ExecWithin.seq (ExecWithin.op_eq nav) (ExecWithin.seq read
-      (ExecWithin.branch_neg (t := .data le (if right then 1 else 2) (if right then 2 else 1))
-        (fun holds => hle (of_decide_eq_true (test.symm.trans holds))) run))).mono (by omega),
-      ?_⟩
+      (ExecWithin.branch_neg
+        (fun holds :
+            Test.Holds q (Test.data le (if right then 1 else 2) (if right then 2 else 1)) =>
+          hle (of_decide_eq_true (test.symm.trans holds))) run))).mono (by omega), ?_⟩
     simp only [hle, ↓reduceIte]
     exact built.of_start qheap (qcur.trans cursor.symm) qtop
 
@@ -318,8 +321,8 @@ theorem balance_dataDests (zero maxSucc : M.Op) (heavy le : M.Test) (field : Fin
 set_option maxRecDepth 8192 in
 /-- `balance` stores only into the height field. -/
 theorem balance_fieldDests (zero maxSucc : M.Op) (heavy le : M.Test) (field : Fin (extra + 1)) :
-    (balance (regs := regs) zero maxSucc heavy le field).fieldDests = List.replicate 13 field :=
-  rfl
+    ∀ f ∈ (balance (regs := regs) zero maxSucc heavy le field).fieldDests, f = field :=
+  fun _ hf => List.eq_of_mem_replicate (n := 13) hf
 
 /-- The balance program implements `AVLTree.balance` in at most 85 instructions, without
 allocation. Children must have consistent encoded caches; the old root cache may be arbitrary.
@@ -381,7 +384,7 @@ theorem balance_correct (zero maxSucc : M.Op) (heavy le : M.Test) (encode : ℕ 
           obtain ⟨t, tree, run, built⟩ := heavy_correct false zero maxSucc le encode zero_spec
             max_spec le_spec field notKey q label child a b r AL AR B parent h qrep distinct ma mb
             mr ha hb hr qcur
-          refine ⟨t, tree, (ExecWithin.branch_pos (t := .data heavy 1 2)
+          refine ⟨t, tree, (ExecWithin.branch_pos (t := Test.data heavy 1 2)
             (testL.trans (decide_eq_true hL)) run).mono (by omega), ?_⟩
           have e : AVLTree.balance (label.data 0) (.node key h AL AR) B = _ :=
             balanceAt_heavy false (label.data 0) key h AL AR B hL
@@ -402,7 +405,8 @@ theorem balance_correct (zero maxSucc : M.Op) (heavy le : M.Test) (encode : ℕ 
               max_spec le_spec field notKey q label child b a l BR BL A parent h qrep distinct mb
               ma ml hb ha hl qcur
             refine ⟨t, tree, (ExecWithin.branch_neg notL (ExecWithin.branch_pos
-              (t := .data heavy 2 1) (testR.trans (decide_eq_true hR)) run)).mono (by omega), ?_⟩
+              (t := Test.data heavy 2 1) (testR.trans (decide_eq_true hR)) run)).mono
+              (by omega), ?_⟩
             have e : AVLTree.balance (label.data 0) A (.node key h BL BR) = _ :=
               balanceAt_heavy true (label.data 0) key h BR BL A hR
             rw [e, ← keyEq]
@@ -429,7 +433,8 @@ theorem balance_correct (zero maxSucc : M.Op) (heavy le : M.Test) (encode : ℕ 
     built.cursor, built.top, built.saved, total.length_eq size,
     fun i h1 h2 => total.data_keep [1, 2] (balance_dataDests zero maxSucc heavy le field)
       (by simp [h1, h2]),
-    built.frame, fun z f hf => total.field_keep size (by simp [balance_fieldDests, hf]) z⟩
+    built.frame, fun z f hf => total.field_keep size
+      (fun h => hf (balance_fieldDests zero maxSucc heavy le field f h)) z⟩
   cases tree with
   | node => simp [root]
   | nil =>

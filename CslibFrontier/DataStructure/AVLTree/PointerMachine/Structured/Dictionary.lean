@@ -33,6 +33,7 @@ public section
 namespace Cslib.DataStructure.AVLTree.PointerMachine.Dictionary.Structured
 
 open Cslib.PointerMachine SearchTree.PointerMachine
+open Cslib.Program (ExecWithin.seq)
 
 variable {M : Model} {regs : ℕ}
 

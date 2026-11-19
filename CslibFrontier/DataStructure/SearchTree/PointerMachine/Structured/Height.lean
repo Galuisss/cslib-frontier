@@ -35,6 +35,7 @@ public section
 namespace Cslib.DataStructure.SearchTree.PointerMachine.Structured
 
 open Cslib.PointerMachine
+open Cslib.Program (ExecWithin.seq)
 
 variable {M : Model} {extra regs : ℕ}
 
