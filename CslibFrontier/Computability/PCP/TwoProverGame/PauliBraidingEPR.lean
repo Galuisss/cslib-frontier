@@ -119,7 +119,7 @@ theorem norm_sub_extractedEprProjection_sq_le
     let E := extractedEprProjection (Q := Fin n → Bool) (J := J) (K := L)
     ‖(WithLp.toLp 2 (((E - 1) * T) *ᵥ ψ.ofLp) :
       EuclideanSpace ℂ (((Fin n → Bool) × J) × (Fin n → Bool) × L))‖ ^ 2 ≤
-      12 * (ξ + η) := by
+      3 * ξ + 2 * η := by
   intro T E
   have hT : Tᴴ * T = 1 := by
     simp only [T, conjTranspose_kronecker, ← mul_kronecker_mul, hA.isometry, hB.isometry,
@@ -142,33 +142,41 @@ theorem norm_sub_extractedEprProjection_sq_le
     (φ (oneKronecker (Dᴴ * D))).re
   have hA0 : (𝔼 x, errorA false x) ≤ ξ := hA.intertwinesX
   have hB0 : (𝔼 x, errorB false x) ≤ ξ := hB.intertwinesX
-  have hA1 : ∀ x, errorA true x = 0 := by
-    intro x
-    simp only [errorA, I₁, ideal, Bool.cond_true, hA.intertwinesZ, sub_self,
-      conjTranspose_zero, Matrix.zero_mul, map_zero, Complex.zero_re]
-  have hB1 : ∀ x, errorB true x = 0 := by
-    intro x
-    simp only [errorB, I₂, ideal, Bool.cond_true, hB.intertwinesZ, sub_self,
-      conjTranspose_zero, Matrix.zero_mul, map_zero, Complex.zero_re]
-  have ht (b : Bool) (x : Fin n → Bool) :
-      σ.norm (kroneckerOne (ideal b x) - oneKronecker (ideal b x)) ^ 2 ≤
-        3 * (errorA b x + φ.norm (kroneckerOne (P b x) - oneKronecker (Q b x)) ^ 2 +
-          errorB b x) := by
+  have ht (x : Fin n → Bool) :
+      σ.norm (kroneckerOne (ideal false x) - oneKronecker (ideal false x)) ^ 2 ≤
+        3 * (errorA false x + φ.norm (kroneckerOne (P false x) - oneKronecker (Q false x)) ^ 2 +
+          errorB false x) := by
     simp only [σ, AlgState.norm_comap, map_sub, e, extractedRegisterEmbedding_left,
       extractedRegisterEmbedding_right, ρ, AlgState.norm_vector]
-    change ‖(WithLp.toLp 2 ((kroneckerOne (I₁ b x) - oneKronecker (I₂ b x)) *ᵥ
+    change ‖(WithLp.toLp 2 ((kroneckerOne (I₁ false x) - oneKronecker (I₂ false x)) *ᵥ
       (T *ᵥ ψ.ofLp)) : EuclideanSpace ℂ (((Fin n → Bool) × J) × (Fin n → Bool) × L))‖ ^ 2 ≤ _
     rw [mulVec_mulVec]
     exact squared_disagreement_after_local_isometries ψ hψ V W hA.isometry hB.isometry
-      (P b x) (Q b x) (I₁ b x) (I₂ b x)
-  have hX := expect_le_expect (s := (univ : Finset (Fin n → Bool))) fun x _ => ht false x
-  have hZ := expect_le_expect (s := (univ : Finset (Fin n → Bool))) fun x _ => ht true x
+      (P false x) (Q false x) (I₁ false x) (I₂ false x)
+  have htZ (x : Fin n → Bool) :
+      σ.norm (kroneckerOne (pauliZPow x) - oneKronecker (pauliZPow x)) ^ 2 =
+      φ.norm (kroneckerOne (P true x) - oneKronecker (Q true x)) ^ 2 := by
+    let C := kroneckerOne (P true x) - oneKronecker (Q true x)
+    let D := kroneckerOne (pauliZPow x ⊗ₖ (1 : Matrix J J ℂ)) -
+      oneKronecker (pauliZPow x ⊗ₖ (1 : Matrix L L ℂ))
+    have hDC : D * T = T * C := by
+      simp only [D, T, C, Matrix.sub_mul, Matrix.mul_sub, kroneckerOne_apply,
+        oneKronecker_apply, ← mul_kronecker_mul, Matrix.mul_one, Matrix.one_mul]
+      rw [← hA.intertwinesZ x, ← hB.intertwinesZ x]
+    simp only [σ, AlgState.norm_comap, map_sub, e, extractedRegisterEmbedding_left,
+      extractedRegisterEmbedding_right, ρ, φ, AlgState.norm_vector]
+    change ‖(WithLp.toLp 2 (D *ᵥ (T *ᵥ ψ.ofLp)) :
+      EuclideanSpace ℂ (((Fin n → Bool) × J) × (Fin n → Bool) × L))‖ ^ 2 = _
+    rw [mulVec_mulVec, hDC, ← mulVec_mulVec]
+    exact congrArg (· ^ 2) (norm_toLp_mulVec_of_conjTranspose_mul_self hT
+      (WithLp.toLp 2 (C *ᵥ ψ.ofLp)))
+  have hX := expect_le_expect (s := (univ : Finset (Fin n → Bool))) fun x _ => ht x
+  have hZ := expect_le_expect (s := (univ : Finset (Fin n → Bool))) fun x _ => (htZ x).le
   rw [← mul_expect, expect_add_distrib, expect_add_distrib] at hX
-  simp only [hA1, hB1, zero_add, add_zero, ← mul_expect] at hZ
   have hE := norm_sub_eprProjector_sq_le σ
-  simp only [ideal, Bool.cond_true, Bool.cond_false] at hX hZ
+  simp only [ideal, Bool.cond_false] at hX
   have hbound : σ.norm (pureState (maxEntangled (Fin n → Bool)) - 1) ^ 2 ≤
-      12 * (ξ + η) := by
+      3 * ξ + 2 * η := by
     linarith only [hE, hX, hZ, hA0, hB0, hcross false, hcross true]
   simp only [σ, AlgState.norm_comap, map_sub, map_one, ρ, AlgState.norm_vector] at hbound
   change ‖(WithLp.toLp 2 ((E - 1) *ᵥ (T *ᵥ ψ.ofLp)) :
@@ -194,8 +202,8 @@ theorem exists_local_eprProjection_of_pauliBraidingGame
       let E := extractedEprProjection (Q := Fin n → Bool) (J := J) (K := L)
       ‖(WithLp.toLp 2 (((E - 1) * (V ⊗ₖ W)) *ᵥ S.state.ofLp) :
         EuclideanSpace ℂ (((Fin n → Bool) × J) × (Fin n → Bool) × L))‖ ^ 2 ≤
-        12 * (pauliBraidingTwistedCommutationError (3 * ε) +
-          pauliBraidingRoundedConsistencyError (3 * ε)) := by
+        3 * pauliBraidingTwistedCommutationError (3 * ε) +
+          2 * pauliBraidingRoundedConsistencyError (3 * ε) := by
   let a₀ : (Bool × Bool) ⊕ Bool := .inl (false, false)
   let T := S.dilate a₀ a₀
   have hscore :

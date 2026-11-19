@@ -9,10 +9,10 @@ module
 
 public import CslibFrontier.Foundations.Quantum.Algebra.MaxEntangled
 public import CslibFrontier.Foundations.Quantum.PauliTwirl
-import CslibFrontier.Foundations.Quantum.Algebra.CharacterFamily
 import CslibFrontier.Foundations.Quantum.Algebra.Expect
 import CslibFrontier.Foundations.Quantum.DensityMatrix.Pure
 import Mathlib.LinearAlgebra.Matrix.Reindex
+import Mathlib.LinearAlgebra.Matrix.Trace
 
 /-!
 # EPR projection from paired Pauli strings
@@ -38,7 +38,7 @@ public section
 namespace Cslib.Quantum
 
 open Matrix Finset BitString
-open scoped BigOperators Kronecker MatrixOrder ComplexOrder
+open scoped BigOperators Kronecker MatrixOrder ComplexOrder Matrix.Norms.L2Operator
 
 variable {ι : Type*} [Fintype ι] [DecidableEq ι]
 
@@ -61,107 +61,143 @@ theorem expect_pauliString_kronecker_self :
     push_cast
     rfl
   ext ⟨x, x'⟩ ⟨y, y'⟩
-  have hentry (a : ι → Bool) :
-      (𝔼 b : ι → Bool, pauliString a b ⊗ₖ pauliString a b) (x, x') (y, y') =
-        if y = y' ∧ y = x + a ∧ y' = x' + a then 1 else 0 := by
-    simp only [Finset.expect, Matrix.smul_apply, Matrix.sum_apply, Matrix.kronecker_apply,
-      pauliString_apply, ← NNRat.cast_smul_eq_nnqsmul ℂ, NNRat.cast_inv, NNRat.cast_natCast,
-      Finset.card_univ, smul_eq_mul]
-    by_cases hx : y = x + a <;> by_cases hx' : y' = x' + a
-    · simp only [ite_eq_left hx, ite_eq_left hx']
-      simp_rw [← Complex.ofReal_mul]
-      rw [sum_signVal_mul_signVal, ← hcard]
-      by_cases h : y = y'
-      · rw [ite_eq_left h, ite_eq_left ⟨h, hx, hx'⟩, inv_mul_cancel₀ hcard_ne]
-      · rw [ite_eq_right h, ite_eq_right (fun h' => h h'.1), mul_zero]
-    · simp [hx, hx']
-    · simp [hx, hx']
-    · simp [hx, hx']
-  simp only [Finset.expect, Matrix.smul_apply, Matrix.sum_apply, ← NNRat.cast_smul_eq_nnqsmul ℂ,
-    NNRat.cast_inv, NNRat.cast_natCast, Finset.card_univ, smul_eq_mul, pureState_apply,
-    maxEntangled_apply] at hentry ⊢
-  simp only [hentry]
+  have hentry (a b : ι → Bool) :
+      (pauliString a b * single y y' (1 : ℂ) * (pauliString a b)ᴴ :
+        Matrix (ι → Bool) (ι → Bool) ℂ) x x' =
+        pauliString a b x y * pauliString a b x' y' := by
+    classical
+    rw [Matrix.mul_apply, sum_eq_single y']
+    · rw [mul_single_apply_same, mul_one, conjTranspose_apply]
+      by_cases hy : y' = x' + a <;> simp [pauliString_apply, hy]
+    · intro j _ hj
+      rw [mul_single_apply_of_ne _ _ _ _ _ hj, zero_mul]
+    · simp
+  have he := congrArg (fun M : Matrix (ι → Bool) (ι → Bool) ℂ => M x x')
+    (sum_pauliTwirl (single y y' 1))
+  simp only [Matrix.sum_apply, hentry, Matrix.smul_apply, smul_eq_mul, ← hcard] at he
+  simp only [Finset.expect, Matrix.smul_apply, Matrix.sum_apply, Matrix.kronecker_apply,
+    ← NNRat.cast_smul_eq_nnqsmul ℂ, NNRat.cast_inv, NNRat.cast_natCast, Finset.card_univ,
+    smul_eq_mul, ← mul_sum, ← mul_assoc, pureState_apply, maxEntangled_apply]
+  rw [mul_assoc, he]
   by_cases hy : y = y'
   · subst y'
+    rw [trace_single_eq_same, mul_one, Matrix.one_apply]
     by_cases hx : x = x'
-    · subst x'
-      have hshift (a : ι → Bool) : y = x + a ↔ a = x + y := by
-        constructor
-        · intro h
-          rw [h, BitString.add_cancel_left]
-        · rintro rfl
-          rw [BitString.add_cancel_left]
-      simp only [true_and, and_self, hshift, sum_ite_eq', mem_univ, ite_true, mul_one,
+    · simp only [hx, ite_true, inv_mul_cancel₀ hcard_ne, mul_one,
         Complex.star_def, Complex.conj_ofReal, hscale]
-    · have hfalse (a : ι → Bool) : ¬(y = x + a ∧ y = x' + a) := by
-        rintro ⟨h, h'⟩
-        exact hx (add_right_cancel (h.symm.trans h'))
-      simp [hx, hfalse]
-  · simp [hy]
+    · simp [hx]
+  · rw [trace_single_eq_of_ne y y' (1 : ℂ) hy]
+    simp [hy]
 
-private theorem norm_mul_sq_eq_of_star_mul_self
-    (φ : AlgState (Matrix ((ι → Bool) × (ι → Bool)) ((ι → Bool) × (ι → Bool)) ℂ))
-    {U : Matrix ((ι → Bool) × (ι → Bool)) ((ι → Bool) × (ι → Bool)) ℂ}
-    (hU : star U * U = 1) (M : Matrix ((ι → Bool) × (ι → Bool)) ((ι → Bool) × (ι → Bool)) ℂ) :
-    φ.norm (U * M) ^ 2 = φ.norm M ^ 2 := by
-  rw [φ.norm_sq, φ.norm_sq, star_mul, ← mul_assoc (star M * star U),
-    mul_assoc (star M), hU, mul_one]
+private theorem one_sub_involution_nonneg
+    {A : Type*} [CStarAlgebra A] [PartialOrder A] [StarOrderedRing A]
+    {U : A} (hU : IsSelfAdjoint U) (hU2 : U * U = 1) : 0 ≤ 1 - U := by
+  have h := nonneg_of_isSelfAdjoint_of_mul_self (isSelfAdjoint_signProj hU true)
+    (signProj_mul_self hU2 true)
+  have hs : (2 : ℂ) • signProj U true = 1 - U := by
+    rw [signProj, smul_smul, show (2 : ℂ) * 2⁻¹ = 1 by norm_num, one_smul]
+    simp [signVal_true, sub_eq_add_neg]
+  rw [← hs]
+  exact smul_nonneg (by norm_num : (0 : ℂ) ≤ 2) h
 
-private theorem norm_kronecker_self_sub_one_sq_eq
+private theorem re_apply_one_sub_kronecker_self
     (φ : AlgState (Matrix ((ι → Bool) × (ι → Bool)) ((ι → Bool) × (ι → Bool)) ℂ))
     (M : Matrix (ι → Bool) (ι → Bool) ℂ) (hM : IsSelfAdjoint M) (hM2 : M * M = 1) :
-    φ.norm (M ⊗ₖ M - 1) ^ 2 =
-      φ.norm (kroneckerOne (κ := ι → Bool) M - oneKronecker M) ^ 2 := by
-  let X := kroneckerOne (κ := ι → Bool) M
-  let Y := oneKronecker (ι := ι → Bool) M
-  have hX : star X * X = 1 := by simp only [X, ← map_star, ← map_mul, hM.star_eq, hM2, map_one]
-  have h : X * (X - Y) = 1 - M ⊗ₖ M := by
-    have hx : X * X = 1 := by simp only [X, ← map_mul, hM2, map_one]
-    rw [mul_sub, hx]
-    simp only [X, Y, kroneckerOne_apply, oneKronecker_apply, ← mul_kronecker_mul,
-      Matrix.mul_one, Matrix.one_mul]
-  rw [φ.norm_sub_comm (M ⊗ₖ M), ← h, norm_mul_sq_eq_of_star_mul_self φ hX]
+    (φ (1 - M ⊗ₖ M)).re =
+      (φ.norm (kroneckerOne (κ := ι → Bool) M - oneKronecker M) ^ 2) / 2 := by
+  have h := φ.norm_sub_sq_eq_of_mul_self
+    (hM.map (kroneckerOne (κ := ι → Bool))) (hM.map (oneKronecker (ι := ι → Bool)))
+    (by rw [← map_mul, hM2, map_one]) (by rw [← map_mul, hM2, map_one])
+  simp only [kroneckerOne_apply, oneKronecker_apply, ← mul_kronecker_mul,
+    Matrix.mul_one, Matrix.one_mul] at h
+  rw [map_sub, AlgState.map_one, Complex.sub_re, Complex.one_re, kroneckerOne_apply,
+    oneKronecker_apply, h]
+  ring
+
+private theorem one_sub_mul_le_of_involutions
+    {A : Type*} [CStarAlgebra A] [PartialOrder A] [StarOrderedRing A]
+    {U V : A} (hsU : IsSelfAdjoint U) (hsV : IsSelfAdjoint V)
+    (hU2 : U * U = 1) (hV2 : V * V = 1) (hc : Commute U V) :
+    1 - U * V ≤ (1 - U) + (1 - V) := by
+  have hcomm : Commute (1 - U) (1 - V) :=
+    (Commute.one_right (1 - U)).sub_right ((Commute.one_left V).sub_left hc)
+  have hpos : 0 ≤ (1 - U) * (1 - V) :=
+    Commute.mul_nonneg (one_sub_involution_nonneg hsU hU2)
+      (one_sub_involution_nonneg hsV hV2) hcomm
+  rw [← sub_nonneg]
+  have he : (1 - U) + (1 - V) - (1 - U * V) = (1 - U) * (1 - V) := by
+    simp only [sub_mul, mul_sub, mul_one, one_mul]
+    abel
+  rwa [he]
+
+private theorem re_apply_one_sub_pairedPauli_le
+    (φ : AlgState (Matrix ((ι → Bool) × (ι → Bool)) ((ι → Bool) × (ι → Bool)) ℂ))
+    (a b : ι → Bool) :
+      (φ (1 - pauliString a b ⊗ₖ pauliString a b)).re ≤
+        (φ (1 - pauliXPow a ⊗ₖ pauliXPow a)).re +
+        (φ (1 - pauliZPow b ⊗ₖ pauliZPow b)).re := by
+  let U := pauliXPow a ⊗ₖ pauliXPow a
+  let V := pauliZPow b ⊗ₖ pauliZPow b
+  have hsU : IsSelfAdjoint U := by
+    change Uᴴ = U
+    simp only [U, conjTranspose_kronecker, (pauliXPow_isHermitian a).eq]
+  have hsV : IsSelfAdjoint V := by
+    change Vᴴ = V
+    simp only [V, conjTranspose_kronecker, (pauliZPow_isHermitian b).eq]
+  have hU2 : U * U = 1 := by
+    simp only [U, ← mul_kronecker_mul, pauliXPow_mul_self, one_kronecker_one]
+  have hV2 : V * V = 1 := by
+    simp only [V, ← mul_kronecker_mul, pauliZPow_mul_self, one_kronecker_one]
+  have hc : Commute U V := by
+    change U * V = V * U
+    simp only [U, V, ← mul_kronecker_mul, pauliZPow_mul_pauliXPow,
+      smul_kronecker, kronecker_smul, smul_smul, ← Complex.ofReal_mul, signVal_mul_self,
+      Complex.ofReal_one, one_smul]
+  have hp := φ.re_apply_mono (one_sub_mul_le_of_involutions hsU hsV hU2 hV2 hc)
+  rw [map_add, Complex.add_re] at hp
+  change _ ≤ (φ (1 - U)).re + (φ (1 - V)).re
+  rw [show pauliString a b ⊗ₖ pauliString a b = U * V by
+    simp only [U, V, ← mul_kronecker_mul, pauliString]]
+  exact hp
+
+/-- Squared leakage is the state's weight on the complementary EPR projection. -/
+theorem norm_sub_eprProjector_sq_eq
+    (φ : AlgState (Matrix ((ι → Bool) × (ι → Bool)) ((ι → Bool) × (ι → Bool)) ℂ)) :
+    let E := pureState (maxEntangled (ι → Bool))
+    φ.norm (E - 1) ^ 2 = (φ (1 - E)).re := by
+  intro E
+  have hE : IsSelfAdjoint E := (posSemidef_pureState _).isHermitian.isSelfAdjoint
+  have hE2 : E * E = E := pureState_mul_self_of_norm_eq_one _ norm_maxEntangled
+  rw [φ.norm_sq, star_sub, hE.star_eq, star_one, sub_mul, mul_sub, mul_sub,
+    hE2, mul_one, one_mul, one_mul]
+  congr 2
+  abel
 
 /-- Agreement of the two ideal X and Z families controls the part of a state outside
 the EPR projection. The state may be the restriction of a state with extra registers. -/
 theorem norm_sub_eprProjector_sq_le
     (φ : AlgState (Matrix ((ι → Bool) × (ι → Bool)) ((ι → Bool) × (ι → Bool)) ℂ)) :
     φ.norm (pureState (maxEntangled (ι → Bool)) - 1) ^ 2 ≤
-      2 * ((𝔼 a, φ.norm (kroneckerOne (pauliXPow a) - oneKronecker (pauliXPow a)) ^ 2) +
+      (1 / 2) * ((𝔼 a, φ.norm (kroneckerOne (pauliXPow a) - oneKronecker (pauliXPow a)) ^ 2) +
         (𝔼 b, φ.norm (kroneckerOne (pauliZPow b) - oneKronecker (pauliZPow b)) ^ 2)) := by
-  rw [← expect_pauliString_kronecker_self]
-  refine (φ.norm_expect_sub_sq_le univ univ_nonempty _ _).trans ?_
-  have hJ (a : ι → Bool) := φ.norm_expect_sub_sq_le univ univ_nonempty
-    (fun b => pauliString a b ⊗ₖ pauliString a b) 1
-  refine (expect_le_expect fun a _ => hJ a).trans ?_
-  have hpt (a b : ι → Bool) :
-      φ.norm (pauliString a b ⊗ₖ pauliString a b - 1) ^ 2 ≤
-        2 * φ.norm (kroneckerOne (pauliXPow a) - oneKronecker (pauliXPow a)) ^ 2 +
-        2 * φ.norm (kroneckerOne (pauliZPow b) - oneKronecker (pauliZPow b)) ^ 2 := by
-    let U := pauliXPow a ⊗ₖ pauliXPow a
-    let V := pauliZPow b ⊗ₖ pauliZPow b
-    have hU : star U * U = 1 := by
-      simp only [U, Matrix.star_eq_conjTranspose, conjTranspose_kronecker,
-        (pauliXPow_isHermitian a).eq, ← mul_kronecker_mul, pauliXPow_mul_self, one_kronecker_one]
-    have hUV : pauliString a b ⊗ₖ pauliString a b = U * V := by
-      rw [← mul_kronecker_mul]
-      rw [pauliString]
-    have hdiff : U * V - U = U * (V - 1) := by rw [mul_sub, mul_one]
-    have h := φ.norm_sub_sq_le_through (U * V) U 1
-    rw [hdiff, norm_mul_sq_eq_of_star_mul_self φ hU] at h
-    rw [hUV]
-    change _ ≤ _ at h
-    rw [show V = pauliZPow b ⊗ₖ pauliZPow b from rfl,
-      show U = pauliXPow a ⊗ₖ pauliXPow a from rfl,
-      norm_kronecker_self_sub_one_sq_eq φ _ (pauliZPow_isHermitian b).isSelfAdjoint
-        (pauliZPow_mul_self b),
-      norm_kronecker_self_sub_one_sq_eq φ _ (pauliXPow_isHermitian a).isSelfAdjoint
-        (pauliXPow_mul_self a), add_comm] at h
-    exact h
-  have h := expect_le_expect (s := (univ : Finset (ι → Bool))) fun a _ =>
-    expect_le_expect (s := (univ : Finset (ι → Bool))) fun b _ => hpt a b
-  simp only [expect_add_distrib, Fintype.expect_const, ← mul_expect] at h
-  linarith only [h]
+  let E := pureState (maxEntangled (ι → Bool))
+  have havg := expect_le_expect (s := (univ : Finset (ι → Bool))) fun a _ =>
+    expect_le_expect (s := (univ : Finset (ι → Bool))) fun b _ =>
+      re_apply_one_sub_pairedPauli_le φ a b
+  have hL : (𝔼 a : ι → Bool, 𝔼 b : ι → Bool,
+      (φ (1 - pauliString a b ⊗ₖ pauliString a b)).re) = (φ (1 - E)).re := by
+    simp_rw [← φ.re_apply_expect, expect_sub_distrib, Fintype.expect_const]
+    rw [expect_pauliString_kronecker_self]
+  have hx (a : ι → Bool) := re_apply_one_sub_kronecker_self φ (pauliXPow a)
+    (pauliXPow_isHermitian a).isSelfAdjoint (pauliXPow_mul_self a)
+  have hz (b : ι → Bool) := re_apply_one_sub_kronecker_self φ (pauliZPow b)
+    (pauliZPow_isHermitian b).isSelfAdjoint (pauliZPow_mul_self b)
+  rw [hL] at havg
+  simp only [expect_add_distrib, Fintype.expect_const, hx, hz, div_eq_inv_mul,
+    ← mul_expect] at havg
+  change φ.norm (E - 1) ^ 2 ≤ _
+  rw [norm_sub_eprProjector_sq_eq φ]
+  linarith only [havg]
 
 
 section Projection

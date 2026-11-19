@@ -214,13 +214,57 @@ example (S : QuantumStrategy (PauliBraidingQuestion 1 Bool) (PauliBraidingQuesti
     sub_eq_zero.mp (by
       simpa only [WithLp.ofLp_toLp, WithLp.ofLp_zero] using (congrArg WithLp.ofLp hz))⟩
 
-/-- For two physical qubits the EPR projector rejects the unequal computational string. -/
+
+/-- On the width-one computational state `|00⟩`, the leakage is one half and
+the paired X and Z disagreements are one and zero, respectively. -/
 example :
-    let e := Equiv.prodProdProdComm Bool Unit Bool Unit
-    let E := extractedEprProjection (Q := Bool) (J := Unit) (K := Unit)
-    (reindex e e E) ((false, true), (), ()) ((false, true), (), ()) = 0 := by
-  intro e E
-  rw [show reindex e e E = _ from reindex_extractedEprProjection]
-  simp [pureState_apply, maxEntangled_apply_of_ne Bool.false_ne_true]
+    let p : (Fin 1 → Bool) × (Fin 1 → Bool) := (0, 0)
+    let φ := AlgState.vector (ket p) (norm_ket p)
+    (φ.norm (pureState (maxEntangled (Fin 1 → Bool)) - 1) ^ 2 = 1 / 2) ∧
+    ((𝔼 x, φ.norm (kroneckerOne (pauliXPow x) - oneKronecker (pauliXPow x)) ^ 2) = 1) ∧
+    ((𝔼 z, φ.norm (kroneckerOne (pauliZPow z) - oneKronecker (pauliZPow z)) ^ 2) = 0) := by
+  intro p φ
+  have hentry (M : Matrix ((Fin 1 → Bool) × (Fin 1 → Bool))
+      ((Fin 1 → Bool) × (Fin 1 → Bool)) ℂ) : φ M = M p p := by
+    have hk : (ket p).ofLp = Pi.single p (1 : ℂ) := by
+      ext q
+      simp [Pi.single_apply]
+    change AlgState.vector (ket p) (norm_ket p) M = M p p
+    rw [AlgState.vector_apply, hk, Pi.star_single, star_one, single_dotProduct,
+      one_mul, mulVec_single_one]
+    rfl
+  have hpair (M : Matrix (Fin 1 → Bool) (Fin 1 → Bool) ℂ) (hM : IsSelfAdjoint M)
+      (hM2 : M * M = 1) :
+      φ.norm (kroneckerOne M - oneKronecker M) ^ 2 = 2 - 2 * (M 0 0 * M 0 0).re := by
+    rw [φ.norm_sub_sq_eq_of_mul_self
+      (hM.map kroneckerOne) (hM.map oneKronecker)
+      (by rw [← map_mul, hM2, map_one]) (by rw [← map_mul, hM2, map_one]),
+      kroneckerOne_apply, oneKronecker_apply, ← mul_kronecker_mul,
+      Matrix.mul_one, Matrix.one_mul, hentry]
+    rfl
+  refine ⟨?_, ?_, ?_⟩
+  · rw [norm_sub_eprProjector_sq_eq, map_sub, φ.map_one, Complex.sub_re, Complex.one_re, hentry]
+    change 1 - (pureState (maxEntangled (Fin 1 → Bool)) ((0, 0)) ((0, 0))).re = _
+    simp only [pureState_apply, maxEntangled_apply, Fintype.card_fun, Fintype.card_bool,
+      Fintype.card_fin, pow_one, Nat.cast_ofNat, ite_true, Complex.star_def, Complex.conj_ofReal]
+    rw [← Complex.ofReal_mul, ← mul_inv, Real.mul_self_sqrt (by norm_num), Complex.ofReal_re]
+    norm_num
+  · have hx (x : Fin 1 → Bool) :
+        φ.norm (kroneckerOne (pauliXPow x) - oneKronecker (pauliXPow x)) ^ 2 =
+          if x = 0 then 0 else (2 : ℝ) := by
+      rw [hpair _ (pauliXPow_isHermitian x).isSelfAdjoint (pauliXPow_mul_self x),
+        pauliXPow_apply, zero_add]
+      by_cases h : x = 0 <;> simp [h, eq_comm]
+    simp only [hx]
+    erw [Fintype.expect_unique_bool (fun x : Fin 1 → Bool => if x = 0 then 0 else (2 : ℝ))]
+    have hz : (fun _ : Fin 1 => false) = 0 := rfl
+    have ho : (fun _ : Fin 1 => true) ≠ 0 := fun h => Bool.false_ne_true (congrFun h 0).symm
+    norm_num [hz, ho]
+  · have hz (z : Fin 1 → Bool) :
+        φ.norm (kroneckerOne (pauliZPow z) - oneKronecker (pauliZPow z)) ^ 2 = 0 := by
+      rw [hpair _ (pauliZPow_isHermitian z).isSelfAdjoint (pauliZPow_mul_self z)]
+      norm_num [pauliZPow_apply, dotProduct_zero, BitString.signVal,
+        show (0 : Bool) = false from rfl]
+    simp only [hz, Fintype.expect_const]
 
 end CslibFrontierTests.LinearityRounding
