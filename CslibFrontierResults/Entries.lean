@@ -10846,10 +10846,10 @@ register_result "bvy-anchored-conditioning-bounds" where
     Cslib.PCP.AnchoredDependency.sum_sq_dist_freeTrials_given_wins_le,
     Cslib.PCP.AnchoredDependency.sum_dist_questions_given_wins_le
   ]
-  scope := "Finite alphabets and local tensor POVMs, with checked answers from the same strategy that \
+  scope := "Finite alphabets and tensor POVMs, with checked answers from the strategy that \
     supplies the positive-probability checked-win event. The first bound sums squared distances \
     and the second sums transcript and question-resampling distances. Distances are half-L1. \
-    The constants use natural logarithms with Pinsker’s factor 1/2 and count the full checked-answer \
+    The constants use natural logs with Pinsker’s factor 1/2 and the full checked-answer \
     alphabet. Any checked set is allowed, including when no free coordinate remains."
 
 register_result "synchronous-correlations-tracial-representation" where
