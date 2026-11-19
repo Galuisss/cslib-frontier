@@ -43,22 +43,15 @@ def Xofs.withExpandSStream (H secret : Xofs) : Xofs :=
 
 private theorem seed_keep (H G : Xofs) (s : Level) (seed : FixedBytes 32) :
     (H.withExpandSStream G).expandKeySeed s seed = H.expandKeySeed s seed := by
-  have size : (Keccak.bytesToBitsLE (seed.toList ++
-      [Fin.ofNat 256 s.params.k, Fin.ofNat 256 s.params.ℓ])).length ≠ 528 := by
-    rw [Keccak.length_bytesToBitsLE, List.length_append, FixedBytes.length_toList seed]
-    change 8 * (32 + 2) ≠ 528
-    decide
-  simp only [Xofs.expandKeySeed, ExtendableOutput.readBytes, Xofs.withExpandSStream, size,
-    ↓reduceIte]
+  simp [Xofs.expandKeySeed, Xofs.withExpandSStream, length_keySeedInput]
 
 private theorem separate_secret (H G : Xofs) (s : Level) (rho : List Byte) (hr : rho.length = 64) :
     (H.withExpandSStream G).expandS s rho = G.expandS s rho := by
-  have agree (i : ℕ) : (H.withExpandSStream G).secretPoly s rho i = G.secretPoly s rho i := by
-    have size : (Keccak.bytesToBitsLE (nonceInput rho i)).length = 528 := by
-      rw [Keccak.length_bytesToBitsLE, nonceInput, List.length_append, hr]
-      rfl
-    simp only [Xofs.secretPoly, ExtendableOutput.readBytes, Xofs.withExpandSStream, size,
-      ↓reduceIte]
+  obtain ⟨r, rfl⟩ := FixedBytes.exists_toList hr
+  have agree (i : ℕ) :
+      (H.withExpandSStream G).secretPoly s r.toList i = G.secretPoly s r.toList i := by
+    simp only [Xofs.secretPoly, ExtendableOutput.readBytes, Xofs.withExpandSStream,
+      length_nonceInput_bits, ↓reduceIte]
   simp only [Xofs.expandS, agree]
 
 private abbrev PostKey (s : Level) := Xofs → FixedBytes 32 → MLDSA.PublicKey s.params → Game
@@ -67,14 +60,14 @@ private noncomputable def observePair {s : Level} (matrix : Option (PublicMatrix
     (vectors : Option ((Fin s.params.ℓ → Poly) × (Fin s.params.k → Poly)))
     (run : MLDSA.PublicKey s.params → Game) : Game :=
   ((do let A ← matrix
-       let (x,e) ← vectors
+       let (x, e) ← vectors
        return run ⟨A, ModuleLWE.sample A x e⟩) : Option Game).getD (PMF.pure false)
 
 private noncomputable def idealShortPair {s : Level} (matrix : Option (PublicMatrix s))
     (run : MLDSA.PublicKey s.params → Game) : Game :=
   (MatrixOracle.shortVectorLaw s s.params.ℓ).bind fun x =>
     (MatrixOracle.shortVectorLaw s s.params.k).bind fun e =>
-      observePair matrix (some (x,e)) run
+      observePair matrix (some (x, e)) run
 
 private theorem expandS_observe_le (s : Level) (base : Xofs) (rho : List Byte)
     (hr : rho.length = 64) {a b : ℕ} (ha : 528 ≤ a) (hb : 481 ≤ b) (matrix : Option (PublicMatrix s))
@@ -163,7 +156,7 @@ private theorem planted_real {s : Level} (H : Xofs) (seed : FixedBytes 32) (run 
     (programMatrixPrefixes s t A)
   let mat (t : MatrixPrefixes s) := (H.withMatrixPrefixes s rho t).expandA s rho
   change (U.bind fun t => M.bind fun A => S.bind fun x => E.bind fun e =>
-    observePair ((mat t).map fun _ => A) (some (x,e)) (run (g A t) (fun j => rho[j.val]!))) =
+    observePair ((mat t).map fun _ => A) (some (x, e)) (run (g A t) (fun j => rho[j.val]!))) =
     M.bind fun A => S.bind fun x => E.bind fun e => U.bind fun t =>
       if (mat t).isSome then run (g A t) (fun j => rho[j.val]!) (v A x e) else PMF.pure false
   rw [PMF.bind_comm U M]

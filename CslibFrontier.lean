@@ -61,6 +61,7 @@ public import CslibFrontier.Algorithms.Lean.Dijkstra.Native.Fibonacci.Cost
 public import CslibFrontier.Algorithms.Lean.Dijkstra.Native.Fibonacci.Memory
 public import CslibFrontier.Algorithms.Lean.Dijkstra.Native.Source
 public import CslibFrontier.Algorithms.Lean.Dijkstra.Native.Word
+public import CslibFrontier.Algorithms.Lean.DyadicRecovery
 public import CslibFrontier.Algorithms.Lean.EdgeCSP.Blossom.Arms
 public import CslibFrontier.Algorithms.Lean.EdgeCSP.Blossom.Attachment
 public import CslibFrontier.Algorithms.Lean.EdgeCSP.Blossom.Contraction
@@ -1332,6 +1333,7 @@ public import CslibFrontier.Computability.Circuit.Boolean.NativeEvaluation
 public import CslibFrontier.Computability.Circuit.Boolean.NaturalProof
 public import CslibFrontier.Computability.Circuit.Boolean.NaturalProof.ConstDepth
 public import CslibFrontier.Computability.Circuit.Boolean.NaturalProof.Generator
+public import CslibFrontier.Computability.Circuit.Boolean.NaturalProof.Restriction
 public import CslibFrontier.Computability.Circuit.Boolean.Nechiporuk
 public import CslibFrontier.Computability.Circuit.Boolean.NegationNormalForm
 public import CslibFrontier.Computability.Circuit.Boolean.NonconstantCost
@@ -4994,6 +4996,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
 public import CslibFrontier.Crypto.Computational.MLDSA.FullPairMLWE
 public import CslibFrontier.Crypto.Computational.MLDSA.Hint
 public import CslibFrontier.Crypto.Computational.MLDSA.KeyOnly
+public import CslibFrontier.Crypto.Computational.MLDSA.KeySeedSearch
 public import CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 public import CslibFrontier.Crypto.Computational.MLDSA.MatrixOracle
 public import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskSeedGame

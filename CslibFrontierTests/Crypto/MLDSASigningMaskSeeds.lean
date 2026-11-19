@@ -7,6 +7,7 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (test driver)
 
+import all CslibFrontier.Crypto.Computational.MLDSA.KeySeedSearch
 import all CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 import all CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
@@ -195,3 +196,34 @@ example (C : QuantumSigningForger) (H : Xofs) (s : Level) (seed : FixedBytes 32)
     signingSeedCandidates (C := C) (publicHash H ((H.keyGen s seed).map KeyPair.publicKey)) none =
       [Keccak.bytesToBitsLE ((H.h256.readBytes keys.publicKey 64).take 32)] := by
   simp [signingSeedCandidates, publicHash, hg, queryKeyPrefix]
+
+-- At the first query, even after signing, the original response-change bound gains 255 bits.
+example (C : QuantumSigningForger) (s : Level) (base : Xofs) {a b : ℕ}
+    (ha : 1024 ≤ a) (hb : 128 ≤ b) (hn : C.SigningCallsLe (2 ^ 64)) :
+    (Game.succProbability (C.maskSeedQueryHit s base ha ((by decide : 64 ≤ 128).trans hb)
+      (n := 2 ^ 64) (by decide) 0) : ℝ) ≤ 1 / 2 ^ 446 := by
+  have hit := C.maskSeedQueryHit_le_signingSeedPrediction s base ha
+    ((by decide : 64 ≤ 128).trans hb) hn (by decide) 0
+  have pred := C.signingSeedPredictionGame_zero_le s base ((by decide : 272 ≤ 1024).trans ha)
+    hb (2 ^ 64)
+  apply hit.trans (le_trans (mul_le_mul_of_nonneg_left pred (by positivity)) _)
+  rw [show (446 : ℕ) = 223 + 223 by decide, pow_add]
+  norm_num
+
+-- Both SHAKE variants parse the same raw word. Only SHAKE256 owns the key-generation row.
+open QuantumSigningForger in
+example (C : QuantumSigningForger) (s : Level) (seed : FixedBytes 32) (tag : Bool)
+    (h : 272 ≤ C.addressBits) :
+    let x := keySeedInput s seed
+    queriesKeySeed (C := C) s seed
+      (some (Xofs.queryAddress C.addressBits tag x ((length_keySeedInput ..).le.trans h))) =
+      tag := by
+  intro x
+  have len : (List.replicate (C.addressBits - x.length) false ++ true :: x).length =
+      C.addressBits + 1 := by
+    simp only [List.length_append, List.length_replicate, List.length_cons]
+    have := (length_keySeedInput s seed).le.trans h
+    dsimp only [x] at *
+    lia
+  simp only [queriesKeySeed, Xofs.queryAddress, Fin.cons_zero, Fin.cons_succ,
+    BitString.ofFn_ofList len, Xofs.unpad_word, x, beq_self_eq_true, Bool.and_true]

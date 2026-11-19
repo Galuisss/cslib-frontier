@@ -162,7 +162,6 @@ noncomputable def Xofs.fullPairExperiment (H : Xofs) (s : Level)
       let pair : MLDSA.SecretKey s.params := ⟨A, sk.s₁, sk.s₂⟩
       return run (fun j => sk.rho[j.val]!) pair.publicKey) : Option Game).getD (pure false)
 
-
 /-- Draw the FIPS seed and form the unrounded pair directly from the two expansions of Algorithm
 6. This is the same experiment as generating and decoding the private and public key bytes. -/
 theorem Xofs.fullPairExperiment_eq_expand (H : Xofs) (s : Level)
@@ -388,7 +387,7 @@ private noncomputable def runProgrammed (C : QuantumSigningForger) (s : Level) (
   let commands := OracleComp.sumHandler (m := StateT (Device C × History s H tr) PMF)
     (spec₁ := fun _ : DeviceRequest (Width C) Empty => List Bool)
     (spec₂ := fun _ : SigningQuery => Option (List Byte))
-    (fun cmd st => (C.deviceCommand st.2.xofs cmd st.1).map fun (r, dev) => (r, dev, st.2))
+    (fun cmd st => C.deviceCommand st.2.xofs cmd st)
     (fun q st => (signingCall s tr draw q st.2).map fun (r, history) => (r, st.1, history))
   let (f, dev, state) ← ProbOracleComp.runWith commands (C.program pk)
     (C.initial.1, ⟨H, [], [], .initial, by simp, by simp⟩)

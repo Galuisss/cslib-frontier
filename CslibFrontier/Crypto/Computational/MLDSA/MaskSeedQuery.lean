@@ -76,24 +76,25 @@ private noncomputable def addressRead (C : QuantumSigningForger) (result : Bool 
   else PMF.pure none
 
 private noncomputable def addressLaw (C : QuantumSigningForger) (matrixXof : Xofs) (s : Level)
-    (keys : Option KeyPair) {V : Type} (fallback : V) (tape : List V)
-    (command : KeyPair → V → (q : Request C) → StateT (State C) PMF
+    {κ : Type} (publicKey : κ → List Byte) (keys : Option κ) {V : Type}
+    (fallback : V) (tape : List V)
+    (command : κ → V → (q : Request C) → StateT (State C) PMF
       (probOracleSpec (OracleSpec.sum (fun _ : DeviceRequest (Width C) Empty => List Bool)
         (fun _ : SigningQuery => Option (List Byte))) q)) (j : ℕ) : PMF (Option (Address C)) :=
-  withTrialSetup matrixXof s keys none fun keys _ =>
-    let p := queryPrefix (C := C) (C.program keys.publicKey) j
+  withTrialSetup matrixXof s publicKey keys none fun keys _ =>
+    let p := queryPrefix (C := C) (C.program (publicKey keys)) j
     let outcomes := (OracleComp.interpret (OracleComp.withSampleListWhen isSigningCall fallback
       (command keys)) p).run (C.initial, tape)
     (outcomes.map (fun (found, st, _) => (found, st))).bind (addressRead C)
 
 private noncomputable def actualAddress (C : QuantumSigningForger) (s : Level)
     (seed : FixedBytes 32) {n : ℕ} (t : Fin n ↪ FixedBytes 32) (p : SigningMaskSeedOracles) :=
-  C.addressLaw p.shared s (p.background.keyGen s seed) (fun _ => 0) (List.ofFn t)
+  C.addressLaw p.shared s KeyPair.publicKey (p.background.keyGen s seed) (fun _ => 0) (List.ofFn t)
     (fun k => C.hedgeCommand p.background p.shared s k.secretKey)
 
 private noncomputable def rowAddress (C : QuantumSigningForger) (s : Level)
     (keys : Option KeyPair) {n : ℕ} (rows : SigningMaskSeeds n) (H : Xofs) :=
-  C.addressLaw H s keys (fun _ _ => 0) (List.ofFn fun i μ => rows (i, μ))
+  C.addressLaw H s KeyPair.publicKey keys (fun _ _ => 0) (List.ofFn fun i μ => rows (i, μ))
     (C.rowCommand H s)
 
 private theorem actualAddress_eq {C : QuantumSigningForger} {base : Xofs} {s : Level}
