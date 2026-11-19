@@ -24,6 +24,27 @@ This proves the tagged, coordinate-summed alignment step of
 [Bavarian, Vidick and Yuen, Lemma 5.12][BavarianVidickYuen2022]
 (arXiv:1509.07466v2, §5.2, printed pp. 22 and 27–28).
 
+## Using the alignment bounds
+
+Use `exists_bob_taggedLocalUnitary_le` for a left message set by the sampled Alice
+question. The comparison takes Bob's sampled-question branch to his anchored branch and
+allows the unitary to depend on both questions. The exchanged result uses the right tag.
+For a message fixed at its anchor, use `exists_bob_anchorLocalUnitary_le` or
+`exists_alice_anchorLocalUnitary_le`. These start from the doubly anchored branch
+and use only the moving player's question and the remaining transcript. The Alice
+construction uses the Bob-first ordering, so her local action is on the second factor.
+
+The error uses `NormedSpace.normalize`: a nonzero vector becomes a unit vector and zero
+stays zero. The support term accounts for using the identity when either endpoint is
+missing. At strictly positive anchor rate `α`, divide by `anchoredAlignmentScale α`
+in the sampled-tag bound and by `(α : ℝ) * anchoredAlignmentScale α` in the fixed-tag
+bound. The unequal-dimension anchoring test checks
+the latter division at `α = 1/2`.
+
+The bounds sum squared errors over coordinates. Good-coordinate probabilities and
+asymptotic rates require further steps, as do the normalization-weight comparison and
+the strategy for the repetition theorem.
+
 ## Main definitions
 
 * `localUnitaryErrorSq`: squared alignment error of two normalized noisy branches.
