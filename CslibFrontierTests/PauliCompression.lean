@@ -9,6 +9,7 @@ module
 
 import CslibFrontier.Foundations.Quantum.PauliGroup
 import CslibFrontier.Foundations.Quantum.PauliCompression
+import CslibFrontier.Foundations.Quantum.Algebra.Expect
 
 /-! # Compression of the Pauli family
 
@@ -72,14 +73,13 @@ example : ∃ (J : Type) (_ : Fintype J) (_ : DecidableEq J)
       (𝔼 x, let D := W - (pauliXPow x ⊗ₖ (1 : Matrix J J ℂ)) * W
         (φ (Dᴴ * D)).re) = 1 := by
   let O (_ : Fin 1 → Bool) : Matrix (Fin 1) (Fin 1) ℂ := 1
-  obtain ⟨J, _, _, W, hW, hZ, h⟩ := exists_isometry_compress_intertwine_pauliFamily O O
-    (fun _ => by simp [O]) (fun _ => by simp [O]) rfl rfl
+  obtain ⟨J, _, _, W, hW, hZ, _, h⟩ := exists_isometry_compress_intertwine_pauliFamily O O
+    (fun _ => by simp [O]) (fun _ => by simp [O])
     (fun _ _ => one_mul 1) (fun _ _ => one_mul 1)
   refine ⟨J, inferInstance, inferInstance, W, hW, ?_, fun φ => ?_⟩
   · simpa only [O, Matrix.mul_one] using hZ
-  have hX := (h φ).2
-  simp only [O, Matrix.mul_one] at hX
-  rw [hX]
+  simp only [O, Matrix.mul_one] at h
+  simp_rw [h, φ.re_apply_expect, ← Matrix.star_eq_conjTranspose, ← AlgState.norm_sq]
   have hvalue (x z : Fin 1 → Bool) :
       φ.norm (1 - (signVal (x ⬝ᵥ z) : ℂ) • 1) ^ 2 =
         if x 0 && z 0 then (4 : ℝ) else 0 := by
@@ -95,17 +95,13 @@ example : ∃ (J : Type) (_ : Fintype J) (_ : DecidableEq J)
       rw [htwo, φ.norm_smul, φ.norm_one]
       norm_num
   simp only [hvalue]
-  let e := Equiv.funUnique (Fin 1) Bool
-  have he (a : Fin 1 → Bool) : e a = a 0 := congrArg a (Subsingleton.elim _ _)
-  rw [Fintype.expect_equiv e
-    (fun a => 𝔼 z : Fin 1 → Bool, if a 0 && z 0 then (4 : ℝ) else 0)
-    (fun a => 𝔼 z : Fin 1 → Bool, if a && z 0 then 4 else 0) (fun a => by rw [he])]
-  have hinner (a : Bool) :
-      (𝔼 z : Fin 1 → Bool, if a && z 0 then (4 : ℝ) else 0) =
-      𝔼 b : Bool, if a && b then 4 else 0 :=
-    Fintype.expect_equiv e _ _ (fun z => by rw [he])
-  simp_rw [hinner]
-  norm_num [Finset.expect, Fintype.sum_bool, NNRat.smul_def]
+  let f (a : Fin 1 → Bool) := 𝔼 b : Fin 1 → Bool, if a 0 && b 0 then (4 : ℝ) else 0
+  change (𝔼 a, f a) = 1
+  erw [Fintype.expect_unique_bool f]
+  dsimp only [f]
+  erw [Fintype.expect_unique_bool (fun b : Fin 1 → Bool => if false && b 0 then (4 : ℝ) else 0),
+    Fintype.expect_unique_bool (fun b : Fin 1 → Bool => if true && b 0 then (4 : ℝ) else 0)]
+  norm_num
 
 
 end CslibFrontierTests.PauliCompression

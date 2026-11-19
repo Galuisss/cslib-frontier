@@ -332,24 +332,30 @@ theorem exists_isometry_compress_pauliFamily (X Z : (ι → Bool) → Matrix κ 
     expect_norm_sub_pauliFamily_compression_le X Z W (conjTranspose_pauliFamily_mul X Z hX hZ)
       hcompress⟩
 
-/-- An isometry that compresses the rounded Pauli products also exactly intertwines the
-Z family. Its mean squared X intertwining error in any state equals the mean squared
-twisted commutation error. The two rounded families satisfy exact linearity and normalization. -/
+/-- The same isometry compresses the rounded Pauli products and exactly intertwines Z.
+For each X string separately, the Gram matrix of its intertwining error equals the
+average Gram matrix of the twisted commutators with the Z strings. -/
 theorem exists_isometry_compress_intertwine_pauliFamily
     (X Z : (ι → Bool) → Matrix κ κ ℂ)
     (hX : ∀ a, (X a)ᴴ * X a = 1) (hZ : ∀ b, (Z b)ᴴ * Z b = 1)
-    (hX0 : X 0 = 1) (hZ0 : Z 0 = 1)
     (hXmul : ∀ a b, X a * X b = X (a + b)) (hZmul : ∀ a b, Z a * Z b = Z (a + b)) :
     ∃ (J : Type (max u v)) (_ : Fintype J) (_ : DecidableEq J)
       (W : Matrix ((ι → Bool) × J) κ ℂ), Wᴴ * W = 1 ∧
       (∀ b, W * Z b = (pauliZPow b ⊗ₖ (1 : Matrix J J ℂ)) * W) ∧
-      ∀ φ : AlgState (Matrix κ κ ℂ),
-        ((𝔼 a, 𝔼 b, φ.norm (X a * Z b -
+      (∀ φ : AlgState (Matrix κ κ ℂ),
+        (𝔼 a, 𝔼 b, φ.norm (X a * Z b -
           Wᴴ * ((pauliXPow a * pauliZPow b) ⊗ₖ (1 : Matrix J J ℂ)) * W) ^ 2) ≤
           𝔼 p, 𝔼 q, φ.norm (pauliFamily X Z p * pauliFamily X Z q - pauliFamily X Z (p * q)) ^ 2) ∧
-        ((𝔼 a, let D := W * X a - (pauliXPow a ⊗ₖ (1 : Matrix J J ℂ)) * W
-          (φ (Dᴴ * D)).re) =
-          𝔼 a, 𝔼 b, φ.norm (Z b * X a - (signVal (a ⬝ᵥ b) : ℂ) • (X a * Z b)) ^ 2) := by
+      (∀ a, let D := W * X a - (pauliXPow a ⊗ₖ (1 : Matrix J J ℂ)) * W
+        Dᴴ * D = 𝔼 b, let B := Z b * X a - (signVal (a ⬝ᵥ b) : ℂ) • (X a * Z b)
+          Bᴴ * B) := by
+  have hzero (U : (ι → Bool) → Matrix κ κ ℂ) (hU : (U 0)ᴴ * U 0 = 1)
+      (hmul : U 0 * U 0 = U 0) : U 0 = 1 := by
+    calc
+      U 0 = (U 0)ᴴ * (U 0 * U 0) := by rw [← Matrix.mul_assoc, hU, Matrix.one_mul]
+      _ = 1 := by rw [hmul, hU]
+  have hX0 := hzero X (hX 0) (by simpa only [add_zero] using hXmul 0 0)
+  have hZ0 := hzero Z (hZ 0) (by simpa only [add_zero] using hZmul 0 0)
   obtain ⟨J, _, _, W, hWW, hcompress, hintertwine⟩ := exists_isometry_pauliFamily X Z hX hZ
   let f := pauliFamily X Z
   have hZexact (b : ι → Bool) : W * Z b = (pauliZPow b ⊗ₖ (1 : Matrix J J ℂ)) * W := by
@@ -365,10 +371,10 @@ theorem exists_isometry_compress_intertwine_pauliFamily
         smul_zero]
     change (f p * f (ofZ b) - f (p * ofZ b))ᴴ * (f p * f (ofZ b) - f (p * ofZ b)) = _
     rw [hz, conjTranspose_zero, Matrix.zero_mul]
-  refine ⟨J, inferInstance, inferInstance, W, hWW, hZexact, fun φ => ⟨?_, ?_⟩⟩
-  · exact expect_norm_sub_pauliFamily_compression_le X Z W
-      (conjTranspose_pauliFamily_mul X Z hX hZ) hcompress φ
-  refine expect_congr rfl fun a _ => ?_
+  refine ⟨J, inferInstance, inferInstance, W, hWW, hZexact,
+    expect_norm_sub_pauliFamily_compression_le X Z W
+      (conjTranspose_pauliFamily_mul X Z hX hZ) hcompress, ?_⟩
+  intro a D
   let B (b : ι → Bool) := Z b * X a - (signVal (a ⬝ᵥ b) : ℂ) • (X a * Z b)
   have hx (p : PauliGroup ι) : f p * f (ofX a) - f (p * ofX a) =
       (signVal p.sign : ℂ) • (X p.x * B p.z) := by
@@ -388,12 +394,9 @@ theorem exists_isometry_compress_intertwine_pauliFamily
     (f p * f (ofX a) - f (p * ofX a)) at h
   simp only [hgram] at h
   rw [pauliFamily_ofX _ _ hZ0, pauliFamily_ofX _ _ pauliZPow_zero] at h
-  dsimp only
-  rw [h, expect_pauliGroup (fun _ b => (B b)ᴴ * B b), Fintype.expect_const]
-  have hcast (q : ℚ≥0) : (q : ℂ) = ((q : ℝ) : ℂ) := by norm_cast
-  simp only [AlgState.norm_sq, Matrix.star_eq_conjTranspose, Finset.expect,
-    ← NNRat.cast_smul_eq_nnqsmul ℂ, ← NNRat.cast_smul_eq_nnqsmul ℝ, map_smul, map_sum,
-    smul_eq_mul, hcast, Complex.re_ofReal_mul, Complex.re_sum, B]
+  change _ = 𝔼 b, (B b)ᴴ * B b
+  rw [show Dᴴ * D = _ from h, expect_pauliGroup (fun _ b => (B b)ᴴ * B b),
+    Fintype.expect_const]
 
 /-- **Compression from consistency, anticommutation and linearity**, a step toward robust Pauli
 rigidity [Natarajan and Vidick, §4.2, Theorem 14][NatarajanVidick2017], for unitary families (see
