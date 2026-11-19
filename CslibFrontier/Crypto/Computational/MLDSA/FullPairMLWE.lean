@@ -77,6 +77,16 @@ noncomputable def withSecretExpansionSuccess (s : Level) (g : Game) : Game :=
     (PMF.uniformOfFintype (Fin s.params.k → FixedBytes 481)).bind fun y =>
       if (vectors s (x, y)).isSome then g else PMF.pure false
 
+/-- Dropping an independent secret-expansion failure can only increase a game's success. -/
+theorem withSecretExpansionSuccess_le (s : Level) (g : Game) :
+    withSecretExpansionSuccess s g true ≤ g true := by
+  unfold withSecretExpansionSuccess
+  apply PMF.bind_apply_le_on_support
+  intro x _
+  apply PMF.bind_apply_le_on_support
+  intro y _
+  split_ifs <;> simp [PMF.pure_apply]
+
 private theorem bind_secretSuccess {α : Type} (p : PMF α) (s : Level) (g : α → Game) :
     (p.bind fun v => withSecretExpansionSuccess s (g v)) =
       withSecretExpansionSuccess s (p.bind g) := by
