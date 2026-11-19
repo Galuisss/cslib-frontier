@@ -91,7 +91,8 @@ registers; the other declared scratch registers may change. -/
 
 /-- A rebuilt subtree, seen from an earlier state with the same records, cursor and root
 register. -/
-theorem Rebuilt.of_start {encode : ℕ → M.Value} {field : Fin (extra + 1)}
+theorem _root_.Cslib.DataStructure.AVLTree.PointerMachine.Rebuilt.of_start
+    {encode : ℕ → M.Value} {field : Fin (extra + 1)}
     {s q t : State M (layout extra (regs + 1))} {parent : Pointer}
     {old tree : BinaryTree (Label M extra)} {target : AVLTree M.Value}
     (h : Rebuilt encode field q t parent old tree target) (heap : q.heap = s.heap)
