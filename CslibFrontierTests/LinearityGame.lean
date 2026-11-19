@@ -191,20 +191,67 @@ example
   one_sub_le_expect_re_apply_mul_mul_of_pauliBraidingLinearity
     TwoProverGame.chsh id (fun _ => id) S hA hB hwin basis roles
 
-/-- The decoder estimate applies to each width-one matrix player with only its
-duplicated-question measurements assumed projective. -/
-example (S : MatrixPauliStrategy) (basis roles : Bool)
-    (hproj : ∀ c, ((cond roles S.alice S.bob) (.basis basis (c, c))).IsProjective) :
-    let R := pauliBraidingLinearityStrategy basis S
-    let T := (cond roles R R.swap).asymmetricLinearity
-    let M := cond roles S.alice S.bob
+private abbrev BraidingAnswer := (Bool × Bool) ⊕ Bool
+
+private noncomputable def mixedTie : Measurement BraidingAnswer (Matrix (Fin 1) (Fin 1) ℂ) :=
+  Measurement.average fun b : Bool => Measurement.const (.inl (false, b))
+
+private noncomputable def mixedTieStrategy (φ : AlgState (Matrix (Fin 1) (Fin 1) ℂ)) :
+    MatrixPauliStrategy where
+  state := φ
+  alice
+    | .basis true q => if q = (0, 0) then mixedTie else Measurement.const (.inl (false, false))
+    | _ => Measurement.const (.inl (false, false))
+  bob _ := Measurement.const (.inl (false, false))
+  commute _ _ _ b := by
+    simp only [Measurement.const]
+    split_ifs <;> simp [Commute, SemiconjBy]
+
+/-- Alice mixes second bits on the duplicated Z question. The decoded-observable
+distance on that question is strictly smaller than four times the mismatch probability. -/
+example (φ : AlgState (Matrix (Fin 1) (Fin 1) ℂ)) :
+    let M := (mixedTieStrategy φ).alice (.basis true (0, 0))
+    let f : BraidingAnswer → Bool := Sum.elim Prod.fst fun _ => false
+    let g : BraidingAnswer → Bool := Sum.elim Prod.snd fun _ => false
+    φ.norm ((M.map f).observable - (M.map g).observable) ^ 2 <
+      4 * (M.map (fun a => f a ^^ g a)).prob φ true := by
+  intro M f g
+  have hM : M = mixedTie := by simp [M, mixedTieStrategy]
+  have ht : ({x ∈ ({true, false} : Finset Bool) | x = true}).card = 1 := by decide
+  have hf : ({x ∈ ({true, false} : Finset Bool) | x = false}).card = 1 := by decide
+  have hfirst : (M.map f).observable = 1 := by
+    rw [hM]
+    simp only [Measurement.observable, Measurement.map_effect, sum_filter]
+    norm_num [mixedTie, Measurement.average, Measurement.const, f, Finset.expect,
+      Fintype.sum_sum_type, Fintype.sum_prod_type, Fintype.sum_bool, ht, hf,
+      ← NNRat.cast_smul_eq_nnqsmul ℂ, Algebra.smul_def]
+    rw [← map_add, show (1 : ℂ) / 2 + 1 / 2 = 1 by norm_num, map_one]
+  have hsecond : (M.map g).observable = 0 := by
+    rw [hM]
+    simp only [Measurement.observable, Measurement.map_effect, sum_filter]
+    norm_num [mixedTie, Measurement.average, Measurement.const, g, Finset.expect,
+      Fintype.sum_sum_type, Fintype.sum_prod_type, Fintype.sum_bool, ht, hf,
+      ← NNRat.cast_smul_eq_nnqsmul ℂ, Algebra.smul_def]
+  have hprob : (M.map (fun a => f a ^^ g a)).prob φ true = 1 / 2 := by
+    rw [hM]
+    simp only [Measurement.prob, Measurement.map_effect, sum_filter]
+    norm_num [mixedTie, Measurement.average, Measurement.const, f, g, Finset.expect,
+      Fintype.sum_sum_type, Fintype.sum_prod_type, Fintype.sum_bool, AlgState.map_one, ht,
+      ← NNRat.cast_smul_eq_nnqsmul ℂ]
+  rw [hfirst, hsecond, hprob, sub_zero, φ.norm_sq]
+  norm_num [φ.map_one]
+
+/-- The game estimate applies to the strategy with the mixed Z tie on Alice's side. -/
+example (φ : AlgState (Matrix (Fin 1) (Fin 1) ℂ)) :
+    let S := mixedTieStrategy φ
+    let T := (pauliBraidingLinearityStrategy true S).asymmetricLinearity
     (𝔼 c, S.state.norm ((T.alice c).observable -
-      (𝔼 d, pauliBraidingBasisObservable M basis c d)) ^ 2) ≤
-      if basis then
-        48 * (1 - (pauliBraidingBranchGame 1 TwoProverGame.chsh id
-          (fun _ => id) 0).commutingWinProb S)
-      else 0 :=
-  expect_norm_asymmetricLinearity_sub_basis_sq_le TwoProverGame.chsh id (fun _ => id)
-    S basis roles hproj
+      (𝔼 d, pauliBraidingBasisObservable S.alice true c d)) ^ 2) ≤
+      24 * (1 - (pauliBraidingBranchGame 1 TwoProverGame.chsh id
+        (fun _ => id) 0).commutingWinProb S) := by
+  simpa only [Bool.cond_true, ite_true, Fintype.card_fun, Fintype.card_bool, Fintype.card_fin,
+    pow_one, Nat.cast_ofNat, show (48 : ℝ) / 2 = 24 by norm_num] using
+    expect_norm_asymmetricLinearity_sub_basis_sq_le TwoProverGame.chsh id (fun _ => id)
+      (mixedTieStrategy φ) true true
 
 end CslibFrontierTests.LinearityGame
