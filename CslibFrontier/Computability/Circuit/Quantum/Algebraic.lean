@@ -40,6 +40,7 @@ structure AlgebraicGateInstruction where
   /-- Wires on which the gate is placed, in its local wire order. -/
   wires : List ℕ
 
+/-- Encode the gate label and the ordered wire indices in unary. -/
 enc_structure encAlgebraicGateInstruction : AlgebraicGateInstruction where
   label : encUnary, wires : (encList encUnary)
 
