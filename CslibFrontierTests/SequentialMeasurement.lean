@@ -8,6 +8,7 @@ module
 -- upstream: local-only (tests)
 
 import CslibFrontier.Foundations.Quantum.Algebra.PrefixCommutator
+import CslibFrontierTests.QubitMeasurementFixture
 
 /-! # An interior coordinate of a sequential projective measurement -/
 
@@ -62,3 +63,80 @@ example :
       (χ := 0) (ζ := 0) (by simp [hp]) (by simp)
     simpa using h
   · exact Finset.expect_nonneg fun _ _ => prefixCommutatorDefect_nonneg _ _ _
+open Cslib.Quantum Finset Matrix CslibFrontierTests.QubitMeasurementFixture
+open scoped MatrixOrder Matrix.Norms.L2Operator Real
+
+section Qubit
+
+private noncomputable def D :=
+  binary diagonalProjection diagonalProjection_star diagonalProjection_sq
+private noncomputable def U := binary uniformProjection uniformProjection_star uniformProjection_sq
+private noncomputable def qubitSequence : Fin 2 → Measurement Bool Mat := ![U, D]
+
+private theorem qubitSequence_projective : ∀ j, (qubitSequence j).IsProjective :=
+  pair_projective U D (binary_projective _ _ _) (binary_projective _ _ _)
+
+private def W (a : Bool) : Mat := if a then 1 else 0
+
+private def boolWord : (Fin 1 → Bool) ≃ Bool where
+  toFun f := f 0
+  invFun b _ := b
+  left_inv f := funext fun i => congrArg f (Subsingleton.elim 0 i)
+  right_inv _ := rfl
+
+private theorem weighted_score :
+    (∑ g : Fin 2 → Bool, (φ ((Measurement.sequentialProjective qubitSequence
+      qubitSequence_projective).effect g * W (g 1))).re) = 1 / 2 := by
+  have hterm (g : Fin 2 → Bool) : (Measurement.sequentialProjective qubitSequence
+      qubitSequence_projective).effect g =
+      U.effect (g 0) * D.effect (g 1) * U.effect (g 0) := by
+    rw [Measurement.sequentialProjective_effect_succ, Measurement.sequentialProjective_effect_one]
+    rfl
+  simp only [hterm]
+  rw [← (Fin.consEquiv (fun _ : Fin 2 => Bool)).sum_comp, Fintype.sum_prod_type]
+  have ht (a : Bool) (g : Fin 1 → Bool) :
+      (Fin.consEquiv (fun _ : Fin 2 => Bool) (a, g)) 1 = g 0 := rfl
+  simp only [ht]
+  simp only [Fin.consEquiv_apply, Fin.cons_zero]
+  simp_rw [← boolWord.symm.sum_comp]
+  simp only [boolWord, Equiv.symm_mk, Equiv.coe_fn_mk, Fintype.sum_bool]
+  norm_num [U, D, W, binary, φ, AlgState.vector_apply, basisVector, EuclideanSpace.single,
+    Matrix.mul_apply, Matrix.mulVec, Matrix.vecMul, dotProduct, Fin.sum_univ_two,
+    uniformProjection, diagonalProjection, Matrix.one_apply]
+
+private theorem isolated_score :
+    (∑ a : Bool, (φ ((qubitSequence 1).effect a * W a)).re) = 0 := by
+  norm_num [qubitSequence, D, W, binary, φ, AlgState.vector_apply, basisVector,
+    EuclideanSpace.single, Matrix.mulVec, Matrix.vecMul, dotProduct,
+    Fin.sum_univ_two, Fintype.sum_bool, diagonalProjection]
+
+private theorem prefix_defect :
+    Measurement.prefixCommutatorDefect φ qubitSequence 1 = 1 := by
+  have h (p : Fin 1 → Bool) :
+      Measurement.transcriptProduct (Measurement.before qubitSequence 1) p =
+        U.effect (p 0) := by
+    rw [Measurement.transcriptProduct_succ, Measurement.transcriptProduct_zero, mul_one]
+    rfl
+  unfold Measurement.prefixCommutatorDefect Measurement.transcriptCommutatorDefect
+  change (∑ a : Bool, ∑ p : Fin 1 → Bool, _) = 1
+  simp only [h]
+  simp_rw [← boolWord.symm.sum_comp]
+  simp only [boolWord, Equiv.symm_mk, Equiv.coe_fn_mk, Fintype.sum_bool]
+  norm_num [qubitSequence, U, D, binary, AlgState.norm_sq, φ, AlgState.vector_apply,
+    basisVector, EuclideanSpace.single, Matrix.star_apply, Matrix.mul_apply, Matrix.mulVec,
+    Matrix.vecMul, dotProduct, Fin.sum_univ_two, uniformProjection, diagonalProjection,
+    Matrix.one_apply]
+
+/-- In the second measurement the selected score increases from zero to one half.
+The theorem applies with a nonzero prefix commutator defect. -/
+example : (1 / 2 : ℝ) ≤ 0 + 2 * √1 := by
+  have h := Measurement.sequentialProjective_weighted_le φ qubitSequence qubitSequence_projective
+    1 W (fun a => by cases a <;> simp [W])
+    (fun _ _ a => by
+      cases a
+      · exact Commute.zero_right _
+      · exact Commute.one_right _)
+  rw [weighted_score, isolated_score, prefix_defect] at h
+  exact h
+
+end Qubit
