@@ -224,10 +224,7 @@ theorem abs_average_evaluated_failure_rightPoint_le {β : Type*} [Fintype β]
   calc
     _ ≤ 𝔼 u : Fin m → F, √(∑ p, φ.norm (Y u p) ^ 2) := by
       refine (abs_expect_le _ _).trans (expect_le_expect fun u _ => ?_)
-      have h := φ.abs_sum_re_star_mul_le L (Y u)
-      exact h.trans (by
-        simpa only [Real.sqrt_one, one_mul] using
-          mul_le_mul_of_nonneg_right (Real.sqrt_le_sqrt hL) (Real.sqrt_nonneg _))
+      exact φ.abs_sum_re_star_mul_le_of_normalized L (Y u) hL
     _ ≤ _ := (Fintype.expect_sqrt_le_sqrt_expect _ (fun u =>
       sum_nonneg fun p _ => sq_nonneg _)).trans (Real.sqrt_le_sqrt hv)
 

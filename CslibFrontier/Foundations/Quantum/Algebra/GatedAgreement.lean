@@ -115,30 +115,6 @@ theorem sum_successful_product_sq_le {β : Type*} [Fintype β]
   simpa only [mul_one, hn (some a)] using
     (N.nonneg (some a)).isSelfAdjoint.conjugate_le_conjugate P.successfulEffect_mem_Icc.2
 
-end Measurement
-
-/-- Cauchy–Schwarz for a state pairing with a normalized left family. -/
-theorem AlgState.abs_sum_re_star_mul_le_of_normalized {ι : Type*} [Fintype ι]
-    (φ : AlgState A) (X Y : ι → A)
-    (hX : (∑ a, φ.norm (X a) ^ 2) ≤ 1) :
-    |∑ a, (φ (star (X a) * Y a)).re| ≤ √(∑ a, φ.norm (Y a) ^ 2) := by
-  refine (φ.abs_sum_re_star_mul_le X Y).trans ?_
-  simpa only [Real.sqrt_one, one_mul] using
-    mul_le_mul_of_nonneg_right (Real.sqrt_le_sqrt hX) (Real.sqrt_nonneg _)
-
-/-- Cauchy–Schwarz for a state pairing with a normalized right family. -/
-theorem AlgState.abs_sum_re_star_mul_le_of_normalized_right {ι : Type*} [Fintype ι]
-    (φ : AlgState A) (X Y : ι → A)
-    (hY : (∑ a, φ.norm (Y a) ^ 2) ≤ 1) :
-    |∑ a, (φ (star (X a) * Y a)).re| ≤ √(∑ a, φ.norm (X a) ^ 2) := by
-  refine (φ.abs_sum_re_star_mul_le X Y).trans ?_
-  simpa only [Real.sqrt_one, mul_one] using
-    mul_le_mul_of_nonneg_left (Real.sqrt_le_sqrt hY) (Real.sqrt_nonneg _)
-
-namespace Measurement
-
-variable {α : Type*} [Fintype α]
-
 /-- Sandwiching by the successful projections does not amplify a replacement on the
 right. The bound uses one squared norm per outcome of the replaced operator family. -/
 theorem abs_sum_successful_sandwich_mul_le {β : Type*} [Fintype β]
@@ -297,11 +273,8 @@ theorem AlgState.abs_sum_failure_mul_le {ι : Type*} [Fintype ι] (φ : AlgState
   have hnorm : (∑ i, φ.norm (X i * H i) ^ 2) ≤ (φ (F * Z)).re :=
     (sum_le_sum fun i _ => hnormX i).trans (by
       simpa only [← Complex.re_sum, ← map_sum] using φ.re_apply_mono hsum)
-  have h := φ.abs_sum_re_star_mul_le K (fun i => X i * H i)
+  have h := φ.abs_sum_re_star_mul_le_of_normalized K (fun i => X i * H i) hnormK
   simp only [X, ← mul_assoc] at h
-  exact h.trans (by
-    simpa only [Real.sqrt_one, one_mul] using
-      mul_le_mul (Real.sqrt_le_sqrt hnormK) (Real.sqrt_le_sqrt hnorm)
-        (Real.sqrt_nonneg _) (by norm_num))
+  exact h.trans (Real.sqrt_le_sqrt hnorm)
 
 end Cslib.Quantum
