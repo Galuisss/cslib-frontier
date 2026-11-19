@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (tests)
 
-import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
 import CslibFrontier.Computability.PCP.TwoProverGame.Tsirelson
 
 /-! # Anchoring the CHSH game -/
@@ -41,3 +41,11 @@ example (n : ℕ) :
         (fun samples => (Prod.fst ∘ Prod.snd ∘ samples, Prod.snd ∘ Prod.snd ∘ samples)) =
           ((chsh.anchored half).pow n).questions :=
   Cslib.PCP.AnchoredDependency.map_questions_pi_law chsh half n
+
+/-- Checking one coordinate of two-copy CHSH leaves the verifier's question law intact. -/
+example (S : Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option Bool)
+    (Fin 2 → Bool) (Fin 2 → Bool) (Fin 2) (Fin 2)) :
+    (Cslib.PCP.AnchoredDependency.transcriptLaw chsh half {0} S).map
+      (fun r => let ((t, _), u) := r; t.combine u) =
+        Cslib.Probability.PMF.pi (fun _ : Fin 2 => (chsh.anchored half).questions) :=
+  Cslib.PCP.AnchoredDependency.map_questionPairs_transcriptLaw chsh half {0} S
