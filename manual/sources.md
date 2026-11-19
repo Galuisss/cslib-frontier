@@ -1198,8 +1198,8 @@ checked this manuscript's §1.1, Theorem 1, p. 2 and §3.3, Theorem 10, p. 29 di
 2026-11-16. Berger's memoir internal locator remains unverified, as recorded under
 [Berger1966](#berger1966). No aperiodicity theorem or co-RE completeness is claimed.
 
-<a id="jinatarajanvidickwrightyuen2020lowindividualdegree"></a>
-## jinatarajanvidickwrightyuen2020lowindividualdegree
+<a id="jnvwy2020lowindividualdegree"></a>
+## jnvwy2020lowindividualdegree
 
 Zhengfeng Ji, Anand Natarajan, Thomas Vidick, John Wright and Henry Yuen.
 *Quantum soundness of the classical low individual degree test*. arXiv:2009.12982v1, 2020.

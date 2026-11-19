@@ -16,7 +16,7 @@ import CslibFrontier.Probability.PMF.EventBind
 # The low individual degree test
 
 The verifier of [Ji, Natarajan, Vidick, Wright and Yuen, Definition 3.2 and Figure 2]
-[JiNatarajanVidickWrightYuen2020LowIndividualDegree] tests assignments on a finite field.
+[JNVWY2020LowIndividualDegree] tests assignments on a finite field.
 It chooses uniformly among an axis-parallel line check, a point self-consistency check,
 and a diagonal line check with a uniformly selected prefix of coordinates. A line question
 carries its set of points. It reveals neither the sampled location on the line nor its
