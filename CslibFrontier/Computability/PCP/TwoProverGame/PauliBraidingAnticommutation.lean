@@ -16,6 +16,13 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.AnticommutationTest
 Restricting the tagged anticommutation questions of a single strategy to one odd
 pair gives a commuting CHSH strategy. Its logical second player's observables
 are exactly those checked in the matched consistency rounds.
+
+## Main results
+
+* `Cslib.PCP.commutingWinProb_pauliBraidingAnticommutation_eq_expect`: the branch score is
+  the mean score over odd pairs and role assignments.
+* `Cslib.PCP.expect_norm_pauliBraidingSpecial_anticomm_sq_le`: the CHSH deficit controls
+  the special observables' averaged squared anticommutation defect.
 -/
 
 public section
@@ -118,5 +125,120 @@ theorem commutingWinProb_pauliBraidingCHSHGame_le [Nonempty (Fin n)]
   · exact False.elim (h₂ (haccept h₁))
   · exact logical.prob_nonneg _ _ _ _
   · exact le_rfl
+
+section Scores
+
+open scoped BigOperators Real
+
+variable [TopologicalSpace 𝒜] [ContinuousFunctionalCalculus ℝ 𝒜 IsSelfAdjoint]
+  [NonnegSpectrumClass ℝ 𝒜] [Nonempty (Fin n)]
+
+omit [IsOrderedAddMonoid 𝒜] in
+/-- The anticommutation branch score is the uniform mean over physical role assignments
+and odd pairs of the original verifier's conditioned CHSH score. -/
+theorem commutingWinProb_pauliBraidingAnticommutation_eq_expect
+    (S : CommutingStrategy (PauliBraidingQuestion n Bool) (PauliBraidingQuestion n Bool)
+      ((Bool × Bool) ⊕ Bool) ((Bool × Bool) ⊕ Bool) 𝒜) :
+    (pauliBraidingBranchGame n TwoProverGame.chsh id (fun _ => id) 1).commutingWinProb S =
+      𝔼 roles : Bool, 𝔼 p : ↥(oddPairs (Fin n)),
+        (pauliBraidingCHSHGame n roles p).commutingWinProb S := by
+  let game := pauliBraidingGame n TwoProverGame.chsh id (fun _ => id)
+  let := oddPairs_nonempty (ι := Fin n)
+  let law (roles : Bool) (p : ↥(oddPairs (Fin n))) :=
+    TwoProverGame.chsh.questions.map fun (x, y) => PauliBraidingSeed.anticommutation roles p x y
+  let odd := Probability.PMF.uniformOfFintype ↥(oddPairs (Fin n))
+  let sampler := (Probability.PMF.uniformOfFintype Bool).bind fun roles => odd.bind (law roles)
+  change ({ game with seed := sampler }).answersWinProb S.answers = _
+  dsimp only [sampler]
+  rw [SeededGame.answersWinProb_bind_uniformSeed]
+  refine Finset.expect_congr rfl fun roles _ => ?_
+  rw [SeededGame.answersWinProb_bind_uniformSeed]
+  refine Finset.expect_congr rfl fun p _ => ?_
+  exact (game.answersWinProb_pullbackSeed TwoProverGame.chsh.questions
+    (fun (x, y) => .anticommutation roles p x y) S.answers).symm
+
+variable [StarModule ℂ 𝒜] [SelfAdjointDecompose 𝒜]
+
+/-- At a fixed physical role assignment the mean CHSH deficit of the decoded strategies
+is at most twice the deficit of the full anticommutation branch against the CHSH optimum. -/
+theorem expect_chshDeficit_pauliBraiding_le
+    (S : CommutingStrategy (PauliBraidingQuestion n Bool) (PauliBraidingQuestion n Bool)
+      ((Bool × Bool) ⊕ Bool) ((Bool × Bool) ⊕ Bool) 𝒜) (roles : Bool) :
+    (𝔼 p : ↥(oddPairs (Fin n)),
+      (Real.cos (π / 8) ^ 2 -
+        TwoProverGame.chsh.commutingWinProb (pauliBraidingCHSHStrategy S roles p))) ≤
+      2 * (Real.cos (π / 8) ^ 2 -
+        (pauliBraidingBranchGame n TwoProverGame.chsh id (fun _ => id) 1).commutingWinProb S) := by
+  let deficit (r : Bool) : ℝ := 𝔼 p : ↥(oddPairs (Fin n)),
+    (Real.cos (π / 8) ^ 2 - (pauliBraidingCHSHGame n r p).commutingWinProb S)
+  have hnonneg (r : Bool) : 0 ≤ deficit r :=
+    Finset.expect_nonneg fun p _ => sub_nonneg.mpr <|
+      (commutingWinProb_pauliBraidingCHSHGame_le S r p).trans
+        (TwoProverGame.commutingWinProb_chsh_le _)
+  have hcompare :
+      (𝔼 p : ↥(oddPairs (Fin n)), (Real.cos (π / 8) ^ 2 -
+        TwoProverGame.chsh.commutingWinProb (pauliBraidingCHSHStrategy S roles p))) ≤
+      deficit roles :=
+    Finset.expect_le_expect fun p _ => sub_le_sub_left
+      (commutingWinProb_pauliBraidingCHSHGame_le S roles p) _
+  refine hcompare.trans ?_
+  rw [commutingWinProb_pauliBraidingAnticommutation_eq_expect]
+  have hdef : (𝔼 r : Bool, deficit r) = Real.cos (π / 8) ^ 2 -
+      (𝔼 r : Bool, 𝔼 p : ↥(oddPairs (Fin n)),
+        (pauliBraidingCHSHGame n r p).commutingWinProb S) := by
+    have hrow (r : Bool) : deficit r = Real.cos (π / 8) ^ 2 -
+        (𝔼 p : ↥(oddPairs (Fin n)), (pauliBraidingCHSHGame n r p).commutingWinProb S) := by
+      unfold deficit
+      rw [Finset.expect_sub_distrib]
+      let := oddPairs_nonempty (ι := Fin n)
+      rw [Fintype.expect_const]
+    simp_rw [hrow]
+    rw [Finset.expect_sub_distrib, Fintype.expect_const]
+  rw [← hdef, Fintype.expect_eq_sum_div_card, Fintype.sum_bool, Fintype.card_bool]
+  cases roles <;> push_cast <;> linarith [hnonneg false, hnonneg true]
+
+omit [IsOrderedAddMonoid 𝒜] [StarModule ℂ 𝒜] [SelfAdjointDecompose 𝒜] in
+private theorem chsh_swap_score (S : CommutingStrategy Bool Bool Bool Bool 𝒜) :
+    TwoProverGame.chsh.commutingWinProb S.swap = TwoProverGame.chsh.commutingWinProb S := by
+  simp only [TwoProverGame.commutingWinProb_chsh, CommutingStrategy.correlation_eq,
+    CommutingStrategy.prob_swap]
+  ring
+
+/-- Averaged over the odd pairs, the logical second player's special observables
+nearly anticommute when the combined verifier's CHSH branch scores near the CHSH optimum. -/
+theorem expect_norm_pauliBraidingSpecial_anticomm_sq_le
+    (S : CommutingStrategy (PauliBraidingQuestion n Bool) (PauliBraidingQuestion n Bool)
+      ((Bool × Bool) ⊕ Bool) ((Bool × Bool) ⊕ Bool) 𝒜) (roles : Bool) :
+    let special := pauliBraidingSpecialObservable (cond roles S.alice S.bob)
+    (𝔼 p : ↥(oddPairs (Fin n)),
+      S.state.norm (special false id p * special true id p +
+        special true id p * special false id p) ^ 2) ≤
+      (2 * chshAnticommConst) * (Real.cos (π / 8) ^ 2 -
+        (pauliBraidingBranchGame n TwoProverGame.chsh id (fun _ => id) 1).commutingWinProb S) := by
+  intro special
+  let deficit (p : ↥(oddPairs (Fin n))) :=
+    Real.cos (π / 8) ^ 2 - TwoProverGame.chsh.commutingWinProb (pauliBraidingCHSHStrategy S roles p)
+  have hlocal (p : ↥(oddPairs (Fin n))) :
+      S.state.norm (special false id p * special true id p +
+        special true id p * special false id p) ^ 2 ≤ chshAnticommConst * deficit p := by
+    let G := pauliBraidingCHSHStrategy S roles p
+    have hwin : Real.cos (π / 8) ^ 2 - deficit p ≤ TwoProverGame.chsh.commutingWinProb G.swap := by
+      rw [chsh_swap_score]
+      change Real.cos (π / 8) ^ 2 - (Real.cos (π / 8) ^ 2 - _) ≤ _
+      rw [sub_sub_cancel]
+    have h := norm_anticomm_sq_le_of_chsh G.swap hwin
+    change G.state.norm ((G.bob false).observable * (G.bob true).observable +
+      (G.bob true).observable * (G.bob false).observable) ^ 2 ≤ _ at h
+    simpa only [G, pauliBraidingCHSHStrategy_state, pauliBraidingCHSHStrategy_bob_observable]
+      using h
+  have havg := Finset.expect_le_expect
+    (s := (Finset.univ : Finset ↥(oddPairs (Fin n)))) fun p _ => hlocal p
+  rw [← Finset.mul_expect] at havg
+  exact havg.trans <| by
+    rw [mul_comm (2 : ℝ), mul_assoc]
+    exact mul_le_mul_of_nonneg_left (expect_chshDeficit_pauliBraiding_le S roles)
+      chshAnticommConst_nonneg
+
+end Scores
 
 end Cslib.PCP
