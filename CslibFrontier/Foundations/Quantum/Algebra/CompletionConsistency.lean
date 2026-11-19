@@ -111,7 +111,7 @@ theorem abs_agreement_sub_right_le (φ : AlgState A) (P Q R : Measurement α A) 
 
 /-- Changing the right measurement increases the mean disagreement by at most
 the square root of the mean squared state distance. -/
-theorem expect_one_sub_agreement_le_of_distance {X : Type*} [Fintype X] [Nonempty X]
+theorem expect_one_sub_agreement_le_of_distance {X : Type*} [Fintype X]
     (φ : AlgState A) (P Q R : X → Measurement α A) {σ ρ : ℝ}
     (hσ : (𝔼 x, (1 - agreement φ (P x) (Q x))) ≤ σ)
     (hρ : (𝔼 x, ∑ a, φ.norm ((Q x).effect a - (R x).effect a) ^ 2) ≤ ρ) :
