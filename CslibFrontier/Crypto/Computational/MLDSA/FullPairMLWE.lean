@@ -9,7 +9,8 @@ module
 
 public import CslibFrontier.Crypto.Computational.MLDSA.SecretExpansionLaw
 public import CslibFrontier.Crypto.Computational.MLDSA.PublicPairSigning
-import all CslibFrontier.Crypto.Computational.MLDSA.RandomXofMatrix
+import all CslibFrontier.Crypto.Computational.MLDSA.SecretExpansionLaw
+import CslibFrontier.Crypto.Computational.MLDSA.RandomXofMatrix
 import all CslibFrontier.Crypto.Computational.MLDSA.ExpandAProgramming
 import all CslibFrontier.Crypto.Computational.MLDSA.RandomXof
 import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204
@@ -69,46 +70,80 @@ private noncomputable def idealShortPair {s : Level} (matrix : Option (PublicMat
     (MatrixOracle.shortVectorLaw s s.params.k).bind fun e =>
       observePair matrix (some (x, e)) run
 
-private theorem expandS_observe_le (s : Level) (base : Xofs) (rho : List Byte)
+/-- Run the given game when Algorithm 33 succeeds on fresh 481-byte rows for both short
+vectors. This reproduces secret expansion's finite rejection cap in the pair test. -/
+noncomputable def withSecretExpansionSuccess (s : Level) (g : Game) : Game :=
+  (PMF.uniformOfFintype (Fin s.params.ℓ → FixedBytes 481)).bind fun x =>
+    (PMF.uniformOfFintype (Fin s.params.k → FixedBytes 481)).bind fun y =>
+      if (vectors s (x, y)).isSome then g else PMF.pure false
+
+private theorem bind_secretSuccess {α : Type} (p : PMF α) (s : Level) (g : α → Game) :
+    (p.bind fun v => withSecretExpansionSuccess s (g v)) =
+      withSecretExpansionSuccess s (p.bind g) := by
+  unfold withSecretExpansionSuccess
+  let X := PMF.uniformOfFintype (Fin s.params.ℓ → FixedBytes 481)
+  let Y := PMF.uniformOfFintype (Fin s.params.k → FixedBytes 481)
+  rw [PMF.bind_comm p X]
+  apply congrArg (PMF.bind X ·)
+  funext x
+  rw [PMF.bind_comm p Y]
+  apply congrArg (PMF.bind Y ·)
+  funext y
+  split_ifs <;> simp
+
+private theorem expandS_observe_eq (s : Level) (base : Xofs) (rho : List Byte)
     (hr : rho.length = 64) {a b : ℕ} (ha : 528 ≤ a) (hb : 481 ≤ b)
     (matrix : Option (PublicMatrix s)) (run : MLDSA.PublicKey s.params → Game) :
-    let R := base.uniformPrefixes a b
-    ((R.bind fun G => observePair matrix (G.expandS s rho) run) true) ≤
-      idealShortPair matrix run true := by
-  intro R
+    ((base.uniformPrefixes a b).bind fun G => observePair matrix (G.expandS s rho) run) =
+      withSecretExpansionSuccess s (idealShortPair matrix run) := by
   obtain ⟨r, rfl⟩ := FixedBytes.exists_toList hr
   let use v := observePair matrix v run
-  have eq := congrArg (PMF.bind · use) (uniformPrefixes_expandS base s r ha hb)
+  have rows := (uniformPrefixes_secretRows base s r ha hb).trans (uniform_vector_pair s)
+  have eq := congrArg (PMF.bind · use) rows
   simp only [PMF.bind_map, Function.comp_def, PMF.bind_bind] at eq
-  rw [eq]
-  rw [← PMF.bind_const (p := R) (q := idealShortPair matrix run)]
-  apply PMF.bind_apply_mono_on_support
-  intro G _
+  apply eq.trans
+  unfold withSecretExpansionSuccess
+  congr 1
+  funext x
+  congr 1
+  funext y
+  let ok := (vectors s (x, y)).isSome
+  change ((if ok then (MatrixOracle.shortVectorLaw s s.params.ℓ).bind fun x =>
+    (MatrixOracle.shortVectorLaw s s.params.k).map fun e => some (x, e)
+    else PMF.pure none).bind use) = if ok then idealShortPair matrix run else PMF.pure false
   split_ifs
-  · simp only [PMF.bind_bind, PMF.bind_map, Function.comp_def, idealShortPair, use, le_refl]
-  · cases matrix <;> simp [use, observePair, PMF.pure_apply]
+  · simp only [PMF.bind_bind, PMF.bind_map, Function.comp_def, idealShortPair, use]
+  · rw [PMF.pure_bind]
+    cases matrix <;> rfl
 
-private noncomputable def sourceGame {s : Level} (base : Xofs) (a b : ℕ)
-    (run : PostKey s) : Game :=
-  let R := base.uniformPrefixes a b
-  R.bind fun H => R.bind fun G => (H.withExpandSStream G).fullPairExperiment s (run H)
+/-- Fresh-digest success with native key generation using an independent secret-expansion stream.
+The public-pair signer and the quantum forger share the ambient XOFs. -/
+@[expose] noncomputable def QuantumSigningForger.independentExpandSGame (C : QuantumSigningForger)
+    (s : Level) (base : Xofs) (a b : ℕ) : Game :=
+  (base.uniformPrefixes a b).bind fun H => (base.uniformPrefixes a b).bind fun G =>
+    (H.withExpandSStream G).fullPairExperiment s fun rho pk =>
+      (C.publicPairSigning s H rho pk).map (·.trial.newDigestWin)
 
 private noncomputable def matrixGame {s : Level} (H : Xofs) (seed : FixedBytes 32)
     (run : PostKey s) : Game :=
   let rho := (H.expandKeySeed s seed).take 32
   idealShortPair (H.expandA s rho) (run H (fun j => rho[j.val]!))
 
-private theorem source_le_matrixGame {s : Level} (base : Xofs) {a b : ℕ}
-    (ha : 528 ≤ a) (hb : 481 ≤ b) (run : PostKey s) :
-    sourceGame base a b run true ≤ ((base.uniformPrefixes a b).bind fun H =>
-      (PMF.uniformOfFintype (FixedBytes 32)).bind fun seed => matrixGame H seed run) true := by
-  unfold sourceGame
-  apply PMF.bind_apply_mono_on_support
-  intro H _
+private theorem source_eq_matrixGame (C : QuantumSigningForger) {s : Level} (base : Xofs) {a b : ℕ}
+    (ha : 528 ≤ a) (hb : 481 ≤ b) :
+    let run := fun H rho pk => (C.publicPairSigning s H rho pk).map (·.trial.newDigestWin)
+    C.independentExpandSGame s base a b = withSecretExpansionSuccess s
+      ((base.uniformPrefixes a b).bind fun H =>
+        (PMF.uniformOfFintype (FixedBytes 32)).bind fun seed => matrixGame H seed run) := by
+  intro run
+  unfold QuantumSigningForger.independentExpandSGame
+  rw [← bind_secretSuccess]
+  apply congrArg (PMF.bind (base.uniformPrefixes a b) ·)
+  funext H
   simp_rw [Xofs.fullPairExperiment_eq_expand, seed_keep]
-  rw [PMF.bind_comm]
-  apply PMF.bind_apply_mono_on_support
-  intro seed _
+  rw [PMF.bind_comm, ← bind_secretSuccess]
+  apply congrArg (PMF.bind (PMF.uniformOfFintype (FixedBytes 32)) ·)
+  funext seed
   let ex := H.expandKeySeed s seed
   have hlen : ex.length = 128 := H.h256.length_read ..
   let rs := (ex.drop 32).take 64
@@ -116,14 +151,15 @@ private theorem source_le_matrixGame {s : Level} (base : Xofs) {a b : ℕ}
   let A := H.expandA s (ex.take 32)
   let finish := run H (fun j => (ex.take 32)[j.val]!)
   change ((base.uniformPrefixes a b).bind fun G =>
-    observePair A ((H.withExpandSStream G).expandS s rs) finish) true ≤ _
+    observePair A ((H.withExpandSStream G).expandS s rs) finish) = _
   simp_rw [separate_secret H _ s rs hr]
-  exact expandS_observe_le s base rs hr ha hb A finish
+  exact expandS_observe_eq s base rs hr ha hb A finish
 
--- A supplied pair provides both the matrix installed in the SHAKE128 rows and the full
--- vector rounded for the forger. The original row pattern decides matrix exhaustion.
-private noncomputable def atChallenge {s : Level} (H : Xofs) (seed : FixedBytes 32)
-    (run : PostKey s) (pk : MLDSA.PublicKey s.params) : Game :=
+/-- Install a supplied lattice matrix at the public seed for an arbitrary subsequent computation
+on the raw XOFs and the full pair. The original SHAKE128 rows decide matrix exhaustion. -/
+@[expose] noncomputable def Xofs.withProgrammedMLWEPair {s : Level} (H : Xofs)
+    (seed : FixedBytes 32) (run : Xofs → FixedBytes 32 → MLDSA.PublicKey s.params → Game)
+    (pk : MLDSA.PublicKey s.params) : Game :=
   let rho := (H.expandKeySeed s seed).take 32
   (PMF.uniformOfFintype (MatrixPrefixes s)).bind fun rows =>
     if ((H.withMatrixPrefixes s rho rows).expandA s rho).isSome then
@@ -136,7 +172,7 @@ private theorem planted_real {s : Level} (H : Xofs) (seed : FixedBytes 32) (run 
     ((PMF.uniformOfFintype (MatrixPrefixes s)).bind fun t =>
       matrixGame (H.withMatrixPrefixes s rho t) seed run) =
       (MLDSA.keyLaw s.params (MatrixOracle.shortCoefficientLaw s)).bind
-        (atChallenge H seed run) := by
+        (H.withProgrammedMLWEPair seed run) := by
   intro rho
   let U := PMF.uniformOfFintype (MatrixPrefixes s)
   let M := PMF.uniformOfFintype (PublicMatrix s)
@@ -173,79 +209,44 @@ private theorem planted_real {s : Level} (H : Xofs) (seed : FixedBytes 32) (run 
   funext t
   cases mat t <;> rfl
 
-private theorem resample_matrixGame {s : Level} (base : Xofs) {a b : ℕ}
-    (ha : 272 ≤ a) (hb : 894 ≤ b) (run : PostKey s) :
-    let R := base.uniformPrefixes a b
-    let S := PMF.uniformOfFintype (FixedBytes 32)
-    (R.bind fun H => S.bind fun seed =>
-      (PMF.uniformOfFintype (MatrixPrefixes s)).bind fun t =>
-        matrixGame (H.withMatrixPrefixes s ((H.expandKeySeed s seed).take 32) t) seed run) =
-      R.bind fun H => S.bind fun seed => matrixGame H seed run := by
-  intro R S
-  let U := PMF.uniformOfFintype (Table a b)
-  simp only [R, independent_tables, PMF.bind_bind, PMF.bind_map, Function.comp_def]
-  apply congrArg (PMF.bind U ·)
-  funext t
-  rw [PMF.bind_comm U S, PMF.bind_comm U S]
-  apply congrArg (PMF.bind S ·)
-  funext seed
-  let G : Xofs := {base with h256 := install base.h256 t}
-  let rho := (G.expandKeySeed s seed).take 32
-  have len : rho.length ≤ 32 := List.length_take_le ..
-  exact resample_at_seed (s := s) G rho (by lia) hb (fun H => matrixGame H seed run)
-
-private noncomputable def challengeTest {s : Level} (base : Xofs) (a b : ℕ)
-    (run : PostKey s) (pk : MLDSA.PublicKey s.params) : Game :=
-  (base.uniformPrefixes a b).bind fun H =>
-    (PMF.uniformOfFintype (FixedBytes 32)).bind fun seed => atChallenge H seed run pk
-
 private theorem matrixGame_eq_real {s : Level} (base : Xofs) {a b : ℕ}
     (ha : 272 ≤ a) (hb : 894 ≤ b) (run : PostKey s) :
     ((base.uniformPrefixes a b).bind fun H => (PMF.uniformOfFintype (FixedBytes 32)).bind
       fun seed => matrixGame H seed run) =
       (MLDSA.keyLaw s.params (MatrixOracle.shortCoefficientLaw s)).bind
-        (challengeTest base a b run) := by
-  rw [← resample_matrixGame base ha hb run]
+        (fun pk => (base.uniformPrefixes a b).bind fun H =>
+          (PMF.uniformOfFintype (FixedBytes 32)).bind fun seed =>
+            H.withProgrammedMLWEPair seed run pk) := by
+  rw [← uniformPrefixes_resampleMatrix base s ha hb (fun H seed => matrixGame H seed run)]
   simp_rw [planted_real]
   let K := MLDSA.keyLaw s.params (MatrixOracle.shortCoefficientLaw s)
   let R := base.uniformPrefixes a b
   let U := PMF.uniformOfFintype (FixedBytes 32)
-  change (R.bind fun H => U.bind fun seed => K.bind (atChallenge H seed run)) = _
+  change (R.bind fun H => U.bind fun seed => K.bind (H.withProgrammedMLWEPair seed run)) = _
   simp_rw [PMF.bind_comm U K]
   rw [PMF.bind_comm R K]
-  rfl
 
 namespace QuantumSigningForger
 
-private noncomputable def freshDigestTest (C : QuantumSigningForger) (s : Level) : PostKey s :=
-  fun H rho pk => (C.publicPairSigning s H rho pk).map (·.trial.newDigestWin)
-
-/-- Fresh-digest success with native key generation using an independent secret-expansion stream.
-The public-pair signer and the quantum forger share the ambient XOFs. -/
-noncomputable def independentExpandSGame (C : QuantumSigningForger) (s : Level)
-    (base : Xofs) (a b : ℕ) : Game :=
-  sourceGame base a b (freshDigestTest C s)
-
 /-- Test a supplied MLWE pair by installing its matrix in the public-seed SHAKE128 rows
 and running the adaptive public-pair signer with that same pair. -/
-noncomputable def fullPairMLWETest (C : QuantumSigningForger) (s : Level)
+@[expose] noncomputable def fullPairMLWETest (C : QuantumSigningForger) (s : Level)
     (base : Xofs) (a b : ℕ) (pk : MLDSA.PublicKey s.params) : Game :=
-  challengeTest base a b (freshDigestTest C s) pk
+  withSecretExpansionSuccess s <| (base.uniformPrefixes a b).bind fun H =>
+    (PMF.uniformOfFintype (FixedBytes 32)).bind fun seed =>
+      H.withProgrammedMLWEPair seed (fun G rho pair =>
+        (C.publicPairSigning s G rho pair).map (·.trial.newDigestWin)) pk
 
-/-- In the independent secret-expansion game, switching the public pair to uniform costs
-at most the decision-MLWE advantage of the displayed pair test. Failed key expansion cannot
-win. The comparison is a statement about probability laws. -/
-theorem independentExpandSGame_le_uniform_add_mlwe (C : QuantumSigningForger) (s : Level)
-    (base : Xofs) {a b : ℕ} (ha : 528 ≤ a) (hb : 894 ≤ b) :
-    let test := C.fullPairMLWETest s base a b
-    let uniformGame := (MLDSA.uniformKeyLaw s.params).bind test
-    let realGame := (MLDSA.keyLaw s.params (MatrixOracle.shortCoefficientLaw s)).bind test
-    (C.independentExpandSGame s base a b).succProbability ≤
-      Game.succProbability uniformGame + Game.advantage realGame uniformGame := by
-  intro test uniformGame realGame
-  have h := source_le_matrixGame base ha (by lia : 481 ≤ b) (freshDigestTest C s)
-  rw [matrixGame_eq_real base (by lia : 272 ≤ a) hb] at h
-  exact (Game.succProbability_mono h).trans (Game.succProbability_le_add_of_advantage_le le_rfl)
+/-- The independent private-expansion game is the exact real branch of the constructed
+short-secret decision-MLWE test. Both matrix and secret exhaustion are retained. -/
+theorem independentExpandSGame_eq_mlwe (C : QuantumSigningForger) (s : Level) (base : Xofs)
+    {a b : ℕ} (ha : 528 ≤ a) (hb : 894 ≤ b) :
+    C.independentExpandSGame s base a b =
+      (MLDSA.keyLaw s.params (MatrixOracle.shortCoefficientLaw s)).bind
+        (C.fullPairMLWETest s base a b) := by
+  rw [source_eq_matrixGame C base ha (by lia : 481 ≤ b),
+    matrixGame_eq_real base (by lia : 272 ≤ a) hb, ← bind_secretSuccess]
+  rfl
 
 end QuantumSigningForger
 
