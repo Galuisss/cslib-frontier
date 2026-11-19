@@ -4118,10 +4118,12 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredTranscript
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredTranscriptDistance
 public import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
+public import CslibFrontier.Computability.PCP.TwoProverGame.AveragedAnswerStates
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSH
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSHRigidity
 public import CslibFrontier.Computability.PCP.TwoProverGame.Commuting
 public import CslibFrontier.Computability.PCP.TwoProverGame.CommutingValue
+public import CslibFrontier.Computability.PCP.TwoProverGame.EntangledRepetition
 public import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebra
 public import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 public import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
@@ -7153,6 +7155,8 @@ public import CslibFrontier.Foundations.Quantum.NoCloning
 public import CslibFrontier.Foundations.Quantum.POVM
 public import CslibFrontier.Foundations.Quantum.POVM.Density
 public import CslibFrontier.Foundations.Quantum.POVM.Mixture
+public import CslibFrontier.Foundations.Quantum.POVM.OutcomeVector
+public import CslibFrontier.Foundations.Quantum.POVM.Postprocessing
 public import CslibFrontier.Foundations.Quantum.Pauli
 public import CslibFrontier.Foundations.Quantum.PauliTwirl
 public import CslibFrontier.Foundations.Quantum.Register
