@@ -11,6 +11,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.PauliBraidingAnticom
 import CslibFrontier.Computability.PCP.TwoProverGame.Tsirelson
 import CslibFrontier.Foundations.Analysis.SpecialFunctions.Trigonometric.Basic
 import CslibFrontier.Foundations.Quantum.Algebra.FourierMeasurement
+import CslibFrontier.Foundations.Quantum.Algebra.Involution
 import CslibFrontier.Foundations.Quantum.Algebra.CStar
 import CslibFrontier.Foundations.Quantum.Algebra.MaxEntangled
 import CslibFrontier.Foundations.Quantum.PauliTwirl
@@ -144,18 +145,10 @@ private theorem honestCHSHObservable_mul_self
     (secondRole question : Bool) (p : ↥(oddPairs (Fin n))) :
     honestCHSHObservable secondRole question p * honestCHSHObservable secondRole question p =
       1 := by
-  have hc : ((√2 / 2 : ℝ) : ℂ) * ((√2 / 2 : ℝ) : ℂ) = 2⁻¹ := by
-    rw [← Complex.ofReal_mul, div_mul_div_comm, Real.mul_self_sqrt zero_le_two]
-    norm_num
   cases secondRole
-  · cases question
-    · simp only [honestCHSHObservable, Bool.false_eq_true, ite_false, smul_mul_smul_comm, hc,
-        add_mul, mul_add, pauliXPow_mul_self, pauliZPow_mul_self, odd_pauli_anticommute]
-      module
-    · simp only [honestCHSHObservable, Bool.false_eq_true, ite_false, ite_true,
-        smul_mul_smul_comm, hc, sub_mul, mul_sub, pauliXPow_mul_self, pauliZPow_mul_self,
-        odd_pauli_anticommute]
-      module
+  · have h := normalized_add_sub_mul_self_of_anticommute (pauliXPow_mul_self p.val.1)
+      (pauliZPow_mul_self p.val.2) (odd_pauli_anticommute p) question
+    cases question <;> exact h
   · exact honestPauli_mul_self _ _
 
 private noncomputable def honestCHSHMeasurement
