@@ -84,8 +84,10 @@ collisions. Instead, construction `(13.2)` of [BonehShoup2023], Section 13.2.1 (
      `KeyedHashFamily` (`OneWayPermutation.exists_targetCollisionResistant_keyedHashFamily`) proves
      that **every one-way permutation implies the existence of a stateless many-time EUF-CMA secure
      digital signature scheme (`OneWayPermutation.exists_eufCMA`)**, with no separate hash-family
-     assumption. Many-time extension to unrestricted `List Bool` messages (`WordSignatureScheme`)
-     and instantiation from general `OneWay` functions ([Rompel1990]) are proved in
+     assumption. Both results are steps toward [NaorYung1989], not the cited result: no inspection
+     of the primary source is recorded (#5293). Many-time extension to unrestricted `List Bool`
+     messages (`WordSignatureScheme`) and instantiation from general `OneWay` functions
+     ([Rompel1990]) are proved in
      `CslibFrontier.Crypto.Computational.TCRSignature.ManyTime` and
      `CslibFrontier.Crypto.Computational.Rompel`.
 
@@ -124,7 +126,7 @@ collisions. Instead, construction `(13.2)` of [BonehShoup2023], Section 13.2.1 (
 * `Cslib.Crypto.OneWay.exists_indexedEUFCMA_of_targetCollisionResistant`,
   `Cslib.Crypto.OneWay.exists_eufCMA_of_targetCollisionResistant`: capacity-`2` indexed and
   stateless many-time `EUFCMA` signatures from a one-way function and a target collision-resistant
-  `KeyedHashFamily`.
+  `KeyedHashFamily` (the second a step toward [NaorYung1989], Section 4).
 * `Cslib.Crypto.OneWayPermutation.exists_eufCMA`: stateless many-time `EUFCMA` signatures from a
   one-way permutation alone.
 
@@ -1670,9 +1672,12 @@ theorem OneWay.exists_indexedEUFCMA_of_targetCollisionResistant
     fun _ => rfl,
     (hS₀.indexedEUFCMA_tcrSignature hH).double hcap₁⟩
 
-/-- **Stateless many-time EUF-CMA signatures from one-way functions and target collision-resistant
-hash families** ([NaorYung1989], Section 4; [BonehShoup2023], Sections 13.2.1 and 14.6): any
-one-way function and any unrestricted target collision-resistant `KeyedHashFamily` yield a
+/-- Step toward the signatures of [NaorYung1989], Section 4, not the cited result: no inspection of
+the primary source is recorded (`manual/sources.md` lists the authors' manuscript without a check),
+so this statement has not been checked against it (#5293). [BonehShoup2023], Sections 13.2.1 and
+14.6, give the route but state no theorem of this form.
+
+Any one-way function and any unrestricted target collision-resistant `KeyedHashFamily` yield a
 stateless many-time `SignatureScheme` satisfying `EUFCMA`. -/
 theorem OneWay.exists_eufCMA_of_targetCollisionResistant
     {f : List Bool → List Bool} (hf : OneWay f)
@@ -1681,9 +1686,12 @@ theorem OneWay.exists_eufCMA_of_targetCollisionResistant
   obtain ⟨S, hcapS, hS⟩ := hf.exists_indexedEUFCMA_of_targetCollisionResistant hH
   exact hS.exists_eufCMA_of_oneWay (fun n => by rw [hcapS n]) hf
 
-/-- **Naor–Yung signature theorem** ([NaorYung1989], Theorem 2 / Section 4): every one-way
-permutation implies the existence of a stateless many-time `EUFCMA`-secure digital signature
-scheme, with no separate hash-family assumption. -/
+/-- Step toward the Naor–Yung signature theorem ([NaorYung1989], Theorem 2 / Section 4), not the
+cited result: no inspection of the primary source is recorded (`manual/sources.md` lists the
+authors' manuscript without a check), so this statement has not been checked against it (#5293).
+
+Every one-way permutation implies the existence of a stateless many-time `EUFCMA`-secure digital
+signature scheme, with no separate hash-family assumption. -/
 theorem OneWayPermutation.exists_eufCMA
     {f : List Bool → List Bool} (hf : OneWayPermutation f) :
     ∃ M : SignatureScheme, M.EUFCMA := by
