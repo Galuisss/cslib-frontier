@@ -47,8 +47,8 @@ variable {n : ℕ} [Nonempty (Fin n)] {ι : Type u} {κ : Type v}
 at most `ε`. The coefficients are independent of the string width. -/
 noncomputable def pauliBraidingRoundedDefectError (ε : ℝ) : ℝ :=
   let r := pauliBraidingRoundingError ε
-  let c := 1280 * ε
-  let a := 9 * (4096 * ε + 2 * chshAnticommConst * ε)
+  let c := 832 * ε
+  let a := (9 / 2) * (4096 * ε + 2 * chshAnticommConst * ε)
   5 * (72 * (6 * r + 4 * c) + 33 * (9 * (2 * r + 2 * c + a)))
 
 @[simp]
@@ -121,7 +121,7 @@ private theorem basis_anticomm_oddExpect_le
     let M := cond roles S.bob S.alice
     let B (b : Bool) (x : Fin n → Bool) := 𝔼 d, pauliBraidingBasisObservable M b x d
     oddExpect (fun x z => S.state.norm (B false x * B true z + B true z * B false x) ^ 2) ≤
-      9 * (4096 * ε + 2 * chshAnticommConst * ε) := by
+      (9 / 2) * (4096 * ε + 2 * chshAnticommConst * ε) := by
   intro M B
   let F (x z : Fin n → Bool) := S.state.norm (B false x * B true z + B true z * B false x) ^ 2
   have h := expect_norm_pauliBraidingBasis_anticomm_sq_le S roles
@@ -130,8 +130,8 @@ private theorem basis_anticomm_oddExpect_le
   rw [oddExpect_eq_dens_mul_expect]
   have hnonneg : 0 ≤ 𝔼 p : ↥(oddPairs (Fin n)), F p.val.1 p.val.2 :=
     expect_nonneg fun p _ => sq_nonneg _
-  have hd : ((oddPairs (Fin n)).dens : ℝ) ≤ 1 := by exact_mod_cast Finset.dens_le_one
-  refine (mul_le_of_le_one_left hnonneg hd).trans (h.trans ?_)
+  refine (mul_le_mul_of_nonneg_right dens_oddPairs_le_half hnonneg).trans
+    ((mul_le_mul_of_nonneg_left h (by norm_num : 0 ≤ (1 / 2 : ℝ))).trans ?_)
   have hconst := mul_le_mul_of_nonneg_left hac (show 0 ≤ 2 * chshAnticommConst by
     exact mul_nonneg (by norm_num) chshAnticommConst_nonneg)
   linarith only [hcons, hconst]
@@ -216,28 +216,16 @@ private theorem basis_cross_distance_le
       (fun _ => id) 2).commutingWinProb T ≤ ε) :
     let A (x : Fin n → Bool) := 𝔼 d, pauliBraidingBasisObservable T.alice b x d
     let B (x : Fin n → Bool) := 𝔼 d, pauliBraidingBasisObservable T.bob b x d
-    (𝔼 x, T.state.norm (A x - B x) ^ 2) ≤ 1280 * ε := by
+    (𝔼 x, T.state.norm (A x - B x) ^ 2) ≤ 832 * ε := by
   intro A B
   have h := expect_norm_pauliBraidingBasisObservable_sub_sq_le
     TwoProverGame.chsh id (fun _ => id) b T
   change (𝔼 x, T.state.norm (A x - B x) ^ 2) ≤ _ at h
-  have hd : ((oddPairs (Fin n)).dens : ℝ) ≤ 1 := by exact_mod_cast Finset.dens_le_one
   have hd0 : 0 ≤ ((oddPairs (Fin n)).dens : ℝ) := by positivity
   have hmul := mul_le_mul_of_nonneg_left hcons (mul_nonneg (by norm_num : 0 ≤ (896 : ℝ)) hd0)
-  have hcap := mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right hd hε)
-    (by norm_num : 0 ≤ (896 : ℝ))
+  have hhalf := mul_le_mul_of_nonneg_right (dens_oddPairs_le_half (ι := Fin n)) hε
+  have hcap := mul_le_mul_of_nonneg_left hhalf (by norm_num : 0 ≤ (896 : ℝ))
   linarith only [h, hmul, hlin, hcap]
-
-omit [Nonempty (Fin n)] in
-private theorem basisObservable_average_contraction
-    (M : PauliBraidingQuestion n Bool → Measurement ((Bool × Bool) ⊕ Bool)
-      (Matrix (ι × κ) (ι × κ) ℂ)) (b : Bool) (x : Fin n → Bool) :
-    star (𝔼 d, pauliBraidingBasisObservable M b x d) *
-      (𝔼 d, pauliBraidingBasisObservable M b x d) ≤ 1 := by
-  change star (𝔼 d, (pauliBraidingBasisBitMeasurement M b x d).observable) *
-    (𝔼 d, (pauliBraidingBasisBitMeasurement M b x d).observable) ≤ 1
-  rw [← Measurement.observable_average]
-  exact (Measurement.average _).star_observable_mul_self_le_one
 
 /-- The three branch scores of a single projective-basis tensor strategy bound the
 Pauli-group multiplication defects of exactly linear character families on both original
@@ -272,34 +260,15 @@ theorem exists_local_pauliFamily_of_pauliBraidingBranchScores
          pauliBraidingRoundedDefectError ε) := by
   intro T
   let branch := pauliBraidingBranchGame n TwoProverGame.chsh id (fun _ => id)
-  obtain ⟨PX, QX, hPX, hQX, hPXclose, hQXclose⟩ := exists_local_charObs_of_pauliBraidingLinearity
-    TwoProverGame.chsh id (fun _ => id) S hA hB false hlin
-  obtain ⟨PZ, QZ, hPZ, hQZ, hPZclose, hQZclose⟩ := exists_local_charObs_of_pauliBraidingLinearity
-    TwoProverGame.chsh id (fun _ => id) S hA hB true hlin
-  let P := fun b => cond b PZ PX
-  let Q := fun b => cond b QZ QX
-  have hP (b : Bool) : (P b).IsProjective := by
-    cases b
-    · exact hPX
-    · exact hPZ
-  have hQ (b : Bool) : (Q b).IsProjective := by
-    cases b
-    · exact hQX
-    · exact hQZ
+  choose P Q hP hQ hUclose hVclose using fun b =>
+    exists_local_charObs_of_pauliBraidingLinearity
+      TwoProverGame.chsh id (fun _ => id) S hA hB b hlin
   let U (b : Bool) (x : Fin n → Bool) := kroneckerOne (κ := κ) ((P b).charObs x)
   let V (b : Bool) (x : Fin n → Bool) := oneKronecker (ι := ι) ((Q b).charObs x)
   let A (b : Bool) (x : Fin n → Bool) := 𝔼 d, pauliBraidingBasisObservable T.alice b x d
   let B (b : Bool) (x : Fin n → Bool) := 𝔼 d, pauliBraidingBasisObservable T.bob b x d
   let r := pauliBraidingRoundingError ε
-  let c := 1280 * ε
-  have hUclose (b : Bool) : 𝔼 x, T.state.norm (A b x - U b x) ^ 2 ≤ r := by
-    cases b
-    · exact hPXclose
-    · exact hPZclose
-  have hVclose (b : Bool) : 𝔼 x, T.state.norm (B b x - V b x) ^ 2 ≤ r := by
-    cases b
-    · exact hQXclose
-    · exact hQZclose
+  let c := 832 * ε
   have hε : 0 ≤ ε := by
     have hm := SeededGame.answersWinProb_le_one (branch 0) S.answers
     change (branch 0).quantumWinProb S ≤ 1 at hm
@@ -334,11 +303,11 @@ theorem exists_local_pauliFamily_of_pauliBraidingBranchScores
     (expect_sq_distance_comm T.state (B b) (A b)).le.trans (hAB b)
   exact ⟨P, Q, fun b => ⟨hP b, hQ b⟩, fun b => ⟨hUclose b, hVclose b⟩,
     rounded_character_defect_le T.state kroneckerOne P hP V A B hV
-      (basisObservable_average_contraction T.bob) hUV hUB hUclose hVclose hAB
+      (star_pauliBraidingBasisObservable_average_mul_self_le_one T.bob) hUV hUB hUclose hVclose hAB
       (basis_anticomm_oddExpect_le T true hcons' hac'),
     rounded_character_defect_le T.state oneKronecker Q hQ U B A hU
-      (basisObservable_average_contraction T.alice) (fun b b' x y => (hUV b' b y x).symm)
-      hVA hVclose hUclose hBA
+      (star_pauliBraidingBasisObservable_average_mul_self_le_one T.alice)
+      (fun b b' x y => (hUV b' b y x).symm) hVA hVclose hUclose hBA
       (basis_anticomm_oddExpect_le T false hcons' hac')⟩
 
 omit [Nonempty (Fin n)] in

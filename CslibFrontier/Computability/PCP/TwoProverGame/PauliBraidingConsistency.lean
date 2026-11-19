@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.PauliBraidingGame
 public import CslibFrontier.Foundations.Quantum.Algebra.Expect
+import CslibFrontier.Foundations.Quantum.Algebra.MeasurementAverage
 
 /-!
 # Consistency rounds of the Pauli braiding verifier
@@ -226,6 +227,17 @@ abbrev pauliBraidingBasisBitMeasurement
     (measure : PauliBraidingQuestion n Q → Measurement ((Bool × Bool) ⊕ A) 𝒜)
     (basis : Bool) (checked dummy : Fin n → Bool) : 𝒜 :=
   (pauliBraidingBasisBitMeasurement measure basis checked dummy).observable
+
+omit [Nonempty (Fin n)] [StarModule ℂ 𝒜] [SelfAdjointDecompose 𝒜] in
+/-- Averaging the binary consistency observable over the dummy gives a contraction. -/
+theorem star_pauliBraidingBasisObservable_average_mul_self_le_one
+    [Module ℚ≥0 𝒜] [PosSMulMono ℚ≥0 𝒜]
+    (M : PauliBraidingQuestion n Q → Measurement ((Bool × Bool) ⊕ A) 𝒜)
+    (b : Bool) (x : Fin n → Bool) :
+    star (𝔼 d, pauliBraidingBasisObservable M b x d) *
+      (𝔼 d, pauliBraidingBasisObservable M b x d) ≤ 1 := by
+  simp only [pauliBraidingBasisObservable, ← Measurement.observable_average]
+  exact (Measurement.average _).star_observable_mul_self_le_one
 
 omit [Nonempty (Fin n)] in
 private theorem oddExpect_expect_eq_dens_mul (f : (Fin n → Bool) → (Fin n → Bool) →

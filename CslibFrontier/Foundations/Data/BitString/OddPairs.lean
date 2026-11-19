@@ -140,6 +140,12 @@ theorem oddExpect_nonneg (h : ∀ a b, a ⬝ᵥ b = true → 0 ≤ f a b) : 0 �
   rwa [oddExpect_def (fun _ _ => 0), show (𝔼 a : ι → Bool, 𝔼 b : ι → Bool,
     if a ⬝ᵥ b = true then (0 : ℝ) else 0) = 0 by simp] at h0
 
+/-- At most half of all pairs have odd inner product. -/
+theorem dens_oddPairs_le_half : ((oddPairs ι).dens : ℝ) ≤ 1 / 2 := by
+  rw [dens_oddPairs]
+  have h : 0 ≤ ((2 : ℝ) ^ Fintype.card ι)⁻¹ := by positivity
+  linarith
+
 /-- The masked average is the density of the odd pairs times the conditional average over them. -/
 theorem oddExpect_eq_dens_smul (f : (ι → Bool) → (ι → Bool) → ℝ) :
     oddExpect f = ((oddPairs ι).dens : ℝ) * 𝔼 p ∈ oddPairs ι, f p.1 p.2 := by
