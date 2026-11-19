@@ -1708,6 +1708,7 @@ public import CslibFrontier.Computability.Circuit.Pi
 public import CslibFrontier.Computability.Circuit.Pointwise
 public import CslibFrontier.Computability.Circuit.Program
 public import CslibFrontier.Computability.Circuit.Quantum.AcceptOperator
+public import CslibFrontier.Computability.Circuit.Quantum.Algebraic
 public import CslibFrontier.Computability.Circuit.Quantum.Approximation
 public import CslibFrontier.Computability.Circuit.Quantum.Basic
 public import CslibFrontier.Computability.Circuit.Quantum.Classical
@@ -1718,6 +1719,7 @@ public import CslibFrontier.Computability.Circuit.Quantum.EncodingSize
 public import CslibFrontier.Computability.Circuit.Quantum.GateMatrix
 public import CslibFrontier.Computability.Circuit.Quantum.HadamardLayer
 public import CslibFrontier.Computability.Circuit.Quantum.Input
+public import CslibFrontier.Computability.Circuit.Quantum.Layered
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Basic
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Code
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.Boundary
@@ -1980,17 +1982,21 @@ public import CslibFrontier.Computability.Complexity.Classes.BPP.Reduction
 public import CslibFrontier.Computability.Complexity.Classes.BPP.WorstCaseHardness
 public import CslibFrontier.Computability.Complexity.Classes.BPPpath
 public import CslibFrontier.Computability.Complexity.Classes.BQP
+public import CslibFrontier.Computability.Complexity.Classes.BQP.Advice
 public import CslibFrontier.Computability.Complexity.Classes.BQP.Amplification
 public import CslibFrontier.Computability.Complexity.Classes.BQP.Classical
 public import CslibFrontier.Computability.Complexity.Classes.BQP.ConstantGap
 public import CslibFrontier.Computability.Complexity.Classes.BQP.Counting
 public import CslibFrontier.Computability.Complexity.Classes.BQP.OutputGap
 public import CslibFrontier.Computability.Complexity.Classes.BQP.PhaseGates
+public import CslibFrontier.Computability.Complexity.Classes.BQP.SBQP
 public import CslibFrontier.Computability.Complexity.Classes.BQP.Sampling
 public import CslibFrontier.Computability.Complexity.Classes.BQP.Sampling.Resources
 public import CslibFrontier.Computability.Complexity.Classes.BQP.Sampling.Seeded
+public import CslibFrontier.Computability.Complexity.Classes.BQP.Search
 public import CslibFrontier.Computability.Complexity.Classes.BQP.TensorContraction
 public import CslibFrontier.Computability.Complexity.Classes.BQP.Time
+public import CslibFrontier.Computability.Complexity.Classes.BQP.ZQP
 public import CslibFrontier.Computability.Complexity.Classes.BooleanHierarchy
 public import CslibFrontier.Computability.Complexity.Classes.BooleanHierarchy.Closure
 public import CslibFrontier.Computability.Complexity.Classes.BooleanHierarchy.Kadin
@@ -2279,6 +2285,9 @@ public import CslibFrontier.Computability.Complexity.Classes.QMA.Amplification
 public import CslibFrontier.Computability.Complexity.Classes.QMA.Counting
 public import CslibFrontier.Computability.Complexity.Classes.QMA.MA
 public import CslibFrontier.Computability.Complexity.Classes.QMA.NP
+public import CslibFrontier.Computability.Complexity.Classes.QMA.Oracle
+public import CslibFrontier.Computability.Complexity.Classes.QMA.QCMA
+public import CslibFrontier.Computability.Complexity.Classes.QNC
 public import CslibFrontier.Computability.Complexity.Classes.RP
 public import CslibFrontier.Computability.Complexity.Classes.RP.Closure
 public import CslibFrontier.Computability.Complexity.Classes.RP.Reduction
