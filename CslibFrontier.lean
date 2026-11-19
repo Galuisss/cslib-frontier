@@ -4120,6 +4120,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.AveragedAnswerMargin
 public import CslibFrontier.Computability.PCP.TwoProverGame.AveragedAnswerStates
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSH
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSHRigidity
+public import CslibFrontier.Computability.PCP.TwoProverGame.CheckedAnswerInformation
 public import CslibFrontier.Computability.PCP.TwoProverGame.CheckedAnswerRegister
 public import CslibFrontier.Computability.PCP.TwoProverGame.Commuting
 public import CslibFrontier.Computability.PCP.TwoProverGame.CommutingValue

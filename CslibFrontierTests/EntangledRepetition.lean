@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (tests)
 
-import CslibFrontier.Computability.PCP.TwoProverGame.CheckedAnswerRegister
+import CslibFrontier.Computability.PCP.TwoProverGame.CheckedAnswerInformation
 import CslibFrontier.Computability.PCP.TwoProverGame.EntangledRepetition
 import CslibFrontier.Computability.PCP.TwoProverGame.Tsirelson
 
@@ -113,6 +113,46 @@ example (η : I) (hη : 0 < (η : ℝ)) :
   have h := echoStrategy.relativeEntropy_normalize_checkedAnswerRegister_le C
     p (coin η) PMF.pure w (hw.symm ▸ hη)
   simpa only [hw, hc, Nat.cast_ofNat] using h
+
+open Cslib.Probability.PMF (conditionalSnd pi)
+open Cslib.Quantum (classicalQuantumMarginal mutualInformation)
+
+/-- The echo experiment with a retained one-bit question tuple has the four-answer
+information budget when every checked outcome is kept. -/
+example (μ : PMF Bool) :
+    let C : Finset (Fin 2) := {0}
+    let p (_ : Unit) := PMF.pure true
+    let r := PMF.pure ()
+    let s (_ : Unit) (_ : Fin 1) := μ
+    let q (_ : Unit) (y : Fin 1 → Bool) := PMF.pure (y 0)
+    let W (_ : Unit) : Set ((C → Bool) × (C → Bool)) := Set.univ
+    let P := echoStrategy.checkedWinTranscriptLaw C (fun _ : Fin 1 => Bool) p r s q W (by
+      simp only [W, Set.mem_univ, Set.ofPred_true]
+      rw [(PMF.toOuterMeasure_apply_eq_one_iff _ _).mpr (Set.subset_univ _)]
+      norm_num)
+    ∃ ρ : (Unit × ((C → Bool) × (C → Bool))) × (Fin 1 → Bool) → Matrix (Fin 1) (Fin 1) ℂ,
+      (∑ t, (((P.map Prod.fst) t).toReal : WithTop ℝ) *
+        mutualInformation (classicalQuantumMarginal (conditionalSnd P t)
+          (fun y => ρ (t, y)) (fun y => y 0))) ≤ (Real.log 4 : WithTop ℝ) := by
+  dsimp only
+  let C : Finset (Fin 2) := {0}
+  let p (_ : Unit) := PMF.pure true
+  let r := PMF.pure ()
+  let s (_ : Unit) (_ : Fin 1) := μ
+  let q (_ : Unit) (y : Fin 1 → Bool) := PMF.pure (y 0)
+  let W (_ : Unit) : Set ((C → Bool) × (C → Bool)) := Set.univ
+  obtain ⟨ρ, _, _, h⟩ := echoStrategy.exists_checkedWin_coordinateInformation_le C
+    (fun _ : Fin 1 => Bool) p r s q W (by
+      simp only [W, Set.mem_univ, Set.ofPred_true]
+      rw [(PMF.toOuterMeasure_apply_eq_one_iff _ _).mpr (Set.subset_univ _)]
+      norm_num)
+  have hc : Fintype.card ((C → Bool) × (C → Bool)) = 4 := by simp [Fintype.card_prod, C]
+  refine ⟨ρ, ?_⟩
+  have hb := h.trans (show _ ≤ (Real.log 4 : WithTop ℝ) by
+    simp only [W, Set.mem_univ, Set.ofPred_true]
+    rw [(PMF.toOuterMeasure_apply_eq_one_iff _ _).mpr (Set.subset_univ _),
+      hc, Nat.cast_ofNat, ENNReal.toReal_one, Real.log_one, sub_zero])
+  simpa only [Fin.sum_univ_one] using hb
 
 /-- Independent play gives the lower end of the interval for repeated CHSH. -/
 example (n : ℕ) : (Real.cos (π / 8) ^ 2) ^ n ≤ (chsh.pow n).quantumValue := by
