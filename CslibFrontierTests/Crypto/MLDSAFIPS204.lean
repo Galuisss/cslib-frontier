@@ -32,15 +32,18 @@ set_option linter.hashCommand false
 
 open Cslib.Crypto Cslib.Crypto.MLDSA.FIPS204
 
--- Algorithm 31 reads the low nibble first and accepts the 256th coefficient at the final byte.
-example (s : Level) :
-    ((rejBoundedPoly s (16 :: List.replicate 127 0)).map fun p => (p 0, p 1, p 255)) =
-      some (s.params.η, (s.params.η : ZMod 8380417) - 1, s.params.η) := by
-  cases s <;> decide +kernel
+-- Check low-before-high nibble order, the last accepted coefficient, and exhaustion with
+-- 255 accepted coefficients after the final high nibble is rejected.
+private def secretPrefixChecks (s : Level) : Bool :=
+  let sample : Option (ZMod 8380417 × ZMod 8380417 × ZMod 8380417) :=
+    (rejBoundedPoly s (16 :: List.replicate 127 0)).map fun p => (p 0, p 1, p 255)
+  let eta : ZMod 8380417 := s.params.η
+  sample == some (eta, eta - 1, eta) &&
+    (rejBoundedPoly s (List.replicate 127 0 ++ [240])).isNone
 
--- Discarding the high nibble of the last byte leaves only 255 accepted coefficients.
-example (s : Level) : rejBoundedPoly s (List.replicate 127 0 ++ [240]) = none := by
-  cases s <;> decide +kernel
+#guard secretPrefixChecks .mlDSA44
+#guard secretPrefixChecks .mlDSA65
+#guard secretPrefixChecks .mlDSA87
 
 -- Start with q itself (rejected), then accept a high-bit-set zero. The byte after the
 -- last swapped triple is a sentinel. The shorter prefix contains only 255 accepted triples.
