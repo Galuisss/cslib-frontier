@@ -282,23 +282,6 @@ private theorem heavy_correct (right : Bool) (zero maxSucc : M.Op) (le : M.Test)
     simp only [hle, ↓reduceIte]
     exact built.of_start qheap (qcur.trans cursor.symm) qtop
 
-private theorem balance_nonempty (key : M.Value) (l r : AVLTree M.Value) :
-    AVLTree.balance key l r ≠ .nil := by
-  have right (key : M.Value) (l r : AVLTree M.Value) : AVLTree.rotateRight key l r ≠ .nil := by
-    cases l <;> simp [AVLTree.rotateRight, mkNode]
-  have left (key : M.Value) (l r : AVLTree M.Value) : AVLTree.rotateLeft key l r ≠ .nil := by
-    cases r <;> simp [AVLTree.rotateLeft, mkNode]
-  unfold AVLTree.balance
-  split
-  · split
-    · simp [mkNode]
-    · split <;> apply right
-  · split
-    · split
-      · simp [mkNode]
-      · split <;> apply left
-    · simp [mkNode]
-
 /-! Frames of `balance`, read off its text. Each is evaluated in a declaration of its own: the
 program has 230 instructions, which exceeds the default recursion depth. Larger programs get
 their frames from these by `simp`. -/
@@ -440,7 +423,7 @@ theorem balance_correct (zero maxSucc : M.Op) (heavy le : M.Test) (encode : ℕ 
   | nil =>
     have matched := built.matched
     cases eq : AVLTree.balance (label.data 0) A B with
-    | nil => exact (balance_nonempty _ _ _ eq).elim
+    | nil => exact (balance_ne_nil _ _ _ eq).elim
     | node => simp [eq, Matches] at matched
 
 end Cslib.DataStructure.AVLTree.PointerMachine.Structured

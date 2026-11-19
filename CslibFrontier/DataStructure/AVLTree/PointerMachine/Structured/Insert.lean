@@ -400,33 +400,6 @@ private theorem missing_dataDests (zero maxSucc : M.Op) (lt heavy le : M.Test)
   simpa [missing] using And.intro (createLeaf_dataDests zero maxSucc lt field source)
     (rebalance_dataDests zero maxSucc heavy le field)
 
-private theorem InsertResult.before [LinearOrder M.Value]
-    {encode : ℕ → M.Value} {field : Fin (extra + 1)}
-    {source : Fin (extra + 1) → Fin (regs + 3)} {s x t : State M (layout extra (regs + 1))}
-    {before after : BinaryTree (Label M extra)} {original : AVLTree M.Value}
-    (h : InsertResult encode field source x t before after original)
-    (heap : x.heap = s.heap)
-    (data : ∀ i, i ≠ 1 → i ≠ 2 → x.data i = s.data i)
-    (safe : ∀ f, f ≠ field → f ≠ 0 → source f ≠ 1 ∧ source f ≠ 2) :
-    InsertResult encode field source s t before after original := by
-  have h01 : (0 : Fin ((regs + 1) + 2)) ≠ 1 := by simp
-  have h02 : (0 : Fin ((regs + 1) + 2)) ≠ 2 := by
-    simp [Fin.ext_iff, Nat.mod_eq_of_lt (by omega : 2 < (regs + 1) + 2)]
-  have query := data 0 h01 h02
-  refine ⟨h.rep, ?_, h.distinct, h.root, ?_, ?_, ?_, ?_, ?_⟩
-  · simpa only [query] using h.matched
-  · simpa only [heap] using h.space
-  · simpa only [heap] using h.footprint
-  · intro i h1 h2; exact (h.data i h1 h2).trans (data i h1 h2)
-  · intro z f hz hf
-    simpa only [heap] using h.payload z f (by simpa only [heap] using hz) hf
-  · intro grows f hf
-    have fresh := h.freshPayload (by simpa only [heap] using grows) f hf
-    by_cases key : f = 0
-    · simpa only [heap, key, ↓reduceIte, query] using fresh
-    · simpa only [heap, key, ↓reduceIte, data (source f) (safe f hf key).1 (safe f hf key).2]
-        using fresh
-
 private theorem missing_correct [LinearOrder M.Value]
     (zero maxSucc : M.Op) (lt heavy le : M.Test) (encode : ℕ → M.Value)
     (zero_spec : ∀ a b, M.evalOp zero a b = encode 0)

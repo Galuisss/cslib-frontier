@@ -564,23 +564,6 @@ are client registers; the other declared scratch registers may change. -/
         (branch heavy 2 1 (Balance.heavyCase false zero maxSucc le field)
           (recomputeHeight zero maxSucc field))))
 
-private theorem balance_nonempty (key : M.Value) (l r : AVLTree M.Value) :
-    AVLTree.balance key l r ≠ .nil := by
-  have right (key : M.Value) (l r : AVLTree M.Value) : AVLTree.rotateRight key l r ≠ .nil := by
-    cases l <;> simp [AVLTree.rotateRight, mkNode]
-  have left (key : M.Value) (l r : AVLTree M.Value) : AVLTree.rotateLeft key l r ≠ .nil := by
-    cases r <;> simp [AVLTree.rotateLeft, mkNode]
-  unfold AVLTree.balance
-  split
-  · split
-    · simp [mkNode]
-    · split <;> apply right
-  · split
-    · split
-      · simp [mkNode]
-      · split <;> apply left
-    · simp [mkNode]
-
 /-- The concrete balance program implements `AVLTree.balance` in at most 121 instructions,
 without allocation. Children must have consistent encoded caches; the old root cache may
 be arbitrary. Register six retains the former root for the caller's subsequent reconnection. -/
@@ -702,7 +685,7 @@ theorem balance_correct (zero maxSucc : M.Op) (heavy le : M.Test) (encode : ℕ 
     | nil =>
       have matched := finalEffect.matched
       cases eq : AVLTree.balance (label.data 0) A B with
-      | nil => exact (balance_nonempty _ _ _ eq).elim
+      | nil => exact (balance_ne_nil _ _ _ eq).elim
       | node => simp [eq, Matches] at matched
   · intro z f hf
     obtain ⟨_, steps, _, _⟩ := total
