@@ -11,6 +11,7 @@ import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredTranscriptDistance
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditionalStates
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredNoisyStates
 import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 import CslibFrontier.Computability.PCP.TwoProverGame.Synchronous
@@ -10910,6 +10911,23 @@ register_result "bvy-checked-answer-weight-given-questions" where
     coordinate, the squared branch norm is the actual conditional checked-answer probability. \
     The selected pair and retained question observation must be supported. Local dimensions may \
     differ. The reconstructed kernels are total and the observed-law equality is on support."
+
+register_result "bvy-checked-answer-weight-given-noisy-message" where
+  title := "Checked-answer branch weight given a noisy message and Bob’s question"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Proposition 4.9, equations (21)–(22)",
+      locator := "arXiv:1509.07466v2, §4.4, printed p. 18" }
+  ]
+  theorems := [
+    Cslib.PCP.AnchoredDependency.norm_checkedVectorGivenBob_sq,
+    Cslib.PCP.AnchoredDependency.norm_checkedVectorGivenBob_sq_inl
+  ]
+  scope := "For a finite-dimensional tensor strategy with local POVMs and a selected unchecked \
+    coordinate, the squared branch norm equals the actual conditional checked-answer \
+    probability at supported retained information, tagged message and Bob question. \
+    For a left message, this weight splits into the anchor and ordinary branches at the \
+    additional erasure rate α/2. Local dimensions may differ and the kernels are total."
 
 register_result "synchronous-correlations-tracial-representation" where
   title := "Tracial representation of synchronous commuting correlations"
