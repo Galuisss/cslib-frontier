@@ -9,6 +9,8 @@ module
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.SchmidtReduction
 public import CslibFrontier.Computability.PCP.TwoProverGame.AlmostSynchronous
+import Mathlib.Analysis.Convex.Jensen
+import Mathlib.Analysis.Convex.SpecificFunctions.Pow
 
 /-!
 # Canonical purification and the synchrony deficit
@@ -145,14 +147,9 @@ theorem schmidtAgreement_defect_le_two_mul (S : QuantumStrategy X X A A ι κ)
         sum_le_sum fun x _ => mul_le_mul_of_nonneg_left
           (S.sum_prob_same_le_sqrt_schmidtAgreement d e hd htrace hψ x) ENNReal.toReal_nonneg
       _ ≤ _ := by
-        have h := Real.sum_sqrt_mul_sqrt_le (f := fun x => (ν x).toReal)
-          (g := fun x => (ν x).toReal * p x) univ (fun _ => ENNReal.toReal_nonneg)
-          (fun x => mul_nonneg ENNReal.toReal_nonneg (hp x))
-        have he (x : X) : Real.sqrt ((ν x).toReal) * Real.sqrt ((ν x).toReal * p x) =
-            (ν x).toReal * Real.sqrt (p x) := by
-          rw [Real.sqrt_mul ENNReal.toReal_nonneg, ← mul_assoc,
-            Real.mul_self_sqrt ENNReal.toReal_nonneg]
-        simpa only [he, Cslib.Probability.PMF.sum_toReal ν, Real.sqrt_one, one_mul, pavg] using h
+        simpa only [smul_eq_mul, pavg] using Real.strictConcaveOn_sqrt.concaveOn.le_map_sum
+          (t := univ) (w := fun x => (ν x).toReal) (p := p)
+          (fun _ _ => ENNReal.toReal_nonneg) (Cslib.Probability.PMF.sum_toReal ν) (fun x _ => hp x)
   have hsq := (sq_le_sq₀ hqavg (Real.sqrt_nonneg _)).mpr havg
   rw [Real.sq_sqrt hpavg] at hsq
   change (∑ x, (ν x).toReal * (1 - p x)) ≤ 2 * ∑ x, (ν x).toReal * (1 - q x)
@@ -163,6 +160,12 @@ theorem schmidtAgreement_defect_le_two_mul (S : QuantumStrategy X X A A ι κ)
 /-- The weighted probability of different answers when both players receive the same question. -/
 noncomputable def synchronyDefect (S : QuantumStrategy X X A A ι κ) (ν : PMF X) : ℝ :=
   ∑ x, (ν x).toReal * (1 - ∑ a, S.prob x x a a)
+
+/-- Express the diagonal synchrony defect as an average of conditional defects. -/
+theorem synchronyDefect_eq_sum (S : QuantumStrategy X X A A ι κ) (ν : PMF X) :
+    S.synchronyDefect ν = ∑ x, (ν x).toReal * (1 - ∑ a, S.prob x x a a) := by
+  unfold synchronyDefect
+  rfl
 
 @[simp] theorem synchronyDefect_swap (S : QuantumStrategy X X A A ι κ) (ν : PMF X) :
     S.swap.synchronyDefect ν = S.synchronyDefect ν := by
@@ -182,6 +185,9 @@ theorem exists_alice_projective_spectral_mixture (S : QuantumStrategy X X A A ι
       (∀ s x a, ((T s).alice x).effect a * ((T s).alice x).effect a = ((T s).alice x).effect a) ∧
       (∀ s x a, ((T s).bob x).effect a * ((T s).bob x).effect a = ((T s).bob x).effect a) ∧
       (∀ s x a b, a ≠ b → (T s).prob x x a b = 0) ∧
+      (∀ s x y a b, (T s).prob x y a b =
+        (s.val.card : ℝ)⁻¹ *
+          (Matrix.trace (((T s).alice x).effect a * ((T s).alice y).effect b)).re) ∧
       (∀ s : Cuts, extendCutMatrix s.val (partialTraceRight (pureState (T s).state)) =
         spectralCutDensity s) ∧
       (∀ s : Cuts, 0 ≤ spectralCutWeight d s) ∧
@@ -203,7 +209,7 @@ theorem exists_alice_projective_spectral_mixture (S : QuantumStrategy X X A A ι
     unfold synchronyDefect
     simp only [C, sum_prob_same_ofSchmidt]
     simpa only [Q, prob_changeBasis] using h
-  obtain ⟨T, hTa, hTb, hsync, hcut, hw, hsum, hρ, herr⟩ :=
+  obtain ⟨T, hTa, hTb, hsync, hprob, hcut, hw, hsum, hρ, herr⟩ :=
     exists_projective_spectral_mixture d hd htrace Q.alice ν
   have hUU : U * Uᴴ = 1 := by
     rw [← star_eq_conjTranspose]
@@ -215,7 +221,7 @@ theorem exists_alice_projective_spectral_mixture (S : QuantumStrategy X X A A ι
     calc
       _ = (U * Uᴴ) * P * (U * Uᴴ) := by simp only [Matrix.mul_assoc]
       _ = _ := by rw [hUU, Matrix.one_mul, Matrix.mul_one]
-  refine ⟨T, hTa, hTb, hsync, hcut, hw, hsum, ?_, ?_⟩
+  refine ⟨T, hTa, hTb, hsync, hprob, hcut, hw, hsum, ?_, ?_⟩
   · have hρ' : partialTraceRight (pureState C.state) =
         Uᴴ * partialTraceRight (pureState S.state) * U := by
       rw [← partialTraceRight_pureState_changeBasis S U V hU hV]
@@ -266,6 +272,9 @@ theorem exists_bob_projective_spectral_mixture (S : QuantumStrategy X X A A ι �
       (∀ s x a, ((T s).alice x).effect a * ((T s).alice x).effect a = ((T s).alice x).effect a) ∧
       (∀ s x a, ((T s).bob x).effect a * ((T s).bob x).effect a = ((T s).bob x).effect a) ∧
       (∀ s x a b, a ≠ b → (T s).prob x x a b = 0) ∧
+      (∀ s x y a b, (T s).prob x y a b =
+        (s.val.card : ℝ)⁻¹ *
+          (Matrix.trace (((T s).alice x).effect a * ((T s).alice y).effect b)).re) ∧
       (∀ s : BobCuts, extendCutMatrix s.val (partialTraceRight (pureState (T s).state)) =
         spectralCutDensity s) ∧
       (∀ s : BobCuts, 0 ≤ spectralCutWeight d s) ∧

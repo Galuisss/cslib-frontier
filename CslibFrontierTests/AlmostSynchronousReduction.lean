@@ -33,7 +33,7 @@ example :
           (U * QuantumStrategy.spectralCutDensity s * Uᴴ)) := by
   let ν := PMF.pure ()
   obtain ⟨d₁, U₁, _, h₁⟩ := rectangular.exists_alice_projective_spectral_mixture
-  obtain ⟨_, _, _, _, _, _, _, h₁', _⟩ := h₁ ν
+  obtain ⟨_, _, _, _, _, _, _, _, h₁', _⟩ := h₁ ν
   obtain ⟨d₂, U₂, _, h₂⟩ := rectangular.exists_bob_projective_spectral_mixture
-  obtain ⟨_, _, _, _, _, _, _, h₂', _⟩ := h₂ ν
+  obtain ⟨_, _, _, _, _, _, _, _, h₂', _⟩ := h₂ ν
   exact ⟨⟨d₁, U₁, h₁'⟩, ⟨d₂, U₂, h₂'⟩⟩
