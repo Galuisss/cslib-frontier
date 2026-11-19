@@ -12,7 +12,8 @@ public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.Games.
 /-!
 # Public-coin interactive proofs with polynomially many moves
 
-`PPSPACE` uses public randomness during a polynomial number of interactions.
+`PPSPACE` uses public randomness during a polynomial number of interactions. It shares the
+unbounded-error threshold of `IPP`, with public-coin game values used for acceptance.
 
 ## References
 
@@ -22,9 +23,14 @@ public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.Games.
 
 namespace Cslib.Complexity
 
-/-- The public-coin interactive proof class with a polynomially computable game schedule
-and polynomially many moves. -/
+open Turing.MultiTapeTM AMGame
+
+/-- The public-coin interactive proof class with a polynomial-time schedule and verifier.
+Membership is equivalent to the optimal acceptance probability being strictly above one half. -/
 @[expose] public def PPSPACE {α : Type} (enc : α ↪ List Bool) : Set (Set α) :=
-  {A | ∃ p : Polynomial ℕ, A ∈ AMPolyRounds enc p.eval}
+  {A | ∃ (shape : ℕ → List (AMMove × ℕ)) (V : α × List Bool → Bool),
+    ComputableInPolyTime shape encUnary encAMShape ∧
+      ComputableInPolyTime V (encPair enc encBits) encBool ∧
+      ∀ a, a ∈ A ↔ 1 / 2 < value true (shape (enc a).length) (fun t => (V (a, t)).toNat)}
 
 end Cslib.Complexity
