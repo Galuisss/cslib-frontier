@@ -7,7 +7,8 @@ Authors: Christian Reitwiessner
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.PCP.TwoProverGame.PauliBraidingZero
+public import CslibFrontier.Computability.PCP.TwoProverGame.PauliBraidingConsistency
+import CslibFrontier.Computability.PCP.TwoProverGame.PauliBraidingDiagonal
 public import CslibFrontier.Computability.PCP.TwoProverGame.SymmetricLinearityReduction
 import CslibFrontier.Foundations.Data.Finset.Expect
 
