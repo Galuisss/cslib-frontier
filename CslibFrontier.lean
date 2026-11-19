@@ -6935,6 +6935,7 @@ public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Rigidity
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Rigidity.TotallyRegular
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.SchurComplement
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.SkewDeterminant
+public import CslibFrontier.Foundations.LinearAlgebra.Matrix.SpectralCut
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Stochastic
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.StrictUpperTriangular
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.SubmatrixRobust
