@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Foundations.Quantum.Algebra.Measurement
 public import Mathlib.Algebra.Order.Module.Defs
 public import Mathlib.Algebra.BigOperators.Expect
+public import Cslib.Probability.PMF
 import CslibFrontier.Probability.PMF
 
 /-!
@@ -55,6 +56,14 @@ theorem mixture_effect (p : PMF ι) (M : ι → Measurement α A) (a : α) :
     (mixture p M).effect a = ∑ i, (p i).toReal • (M i).effect a := by
   unfold mixture
   rfl
+
+/-- Mixing uniformly gives the ordinary finite average of each effect. -/
+theorem mixture_uniform_effect [Nonempty ι] (M : ι → Measurement α A) (a : α) :
+    (mixture (Cslib.Probability.PMF.uniformOfFintype ι) M).effect a =
+      (Fintype.card ι : ℝ)⁻¹ • ∑ i, (M i).effect a := by
+  rw [mixture_effect, Finset.smul_sum]
+  simp only [Cslib.Probability.PMF.uniformOfFintype_apply, ENNReal.toReal_inv,
+    ENNReal.toReal_natCast]
 
 /-- Classical mixing commutes with postprocessing measurement outcomes. -/
 theorem map_mixture {β : Type*} [Fintype β] [DecidableEq β]
