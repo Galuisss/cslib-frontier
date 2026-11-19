@@ -4113,6 +4113,7 @@ public import CslibFrontier.Computability.PCP.RegularConstraintGraph
 public import CslibFrontier.Computability.PCP.SelectedComposition
 public import CslibFrontier.Computability.PCP.ThreeSAT
 public import CslibFrontier.Computability.PCP.TwoProverGame
+public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
 public import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSH
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSHRigidity
@@ -8118,6 +8119,7 @@ public import CslibFrontier.Probability.OptimalStopping.ProphetIID
 public import CslibFrontier.Probability.OptimalStopping.Secretary
 public import CslibFrontier.Probability.Option
 public import CslibFrontier.Probability.PMF
+public import CslibFrontier.Probability.PMF.AnchorPair
 public import CslibFrontier.Probability.PMF.Bind
 public import CslibFrontier.Probability.PMF.BindCompare
 public import CslibFrontier.Probability.PMF.BindFailure

@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (tests)
 
-import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
 import CslibFrontier.Computability.PCP.TwoProverGame.Tsirelson
 
 /-! # Anchoring the CHSH game -/
@@ -33,3 +33,11 @@ example : (chsh.anchored half).quantumValue = 1 - (1 - Real.cos (π / 8) ^ 2) / 
   rw [quantumValue_anchored, quantumValue_chsh]
   norm_num [half]
   ring
+
+/-- Drawing the noisy reveal independently at each coordinate recovers repeated anchored CHSH. -/
+example (n : ℕ) :
+    (Cslib.Probability.PMF.pi fun _ : Fin n =>
+      Cslib.PCP.AnchoredDependency.law chsh.questions half).map
+        (fun samples => (Prod.fst ∘ Prod.snd ∘ samples, Prod.snd ∘ Prod.snd ∘ samples)) =
+          ((chsh.anchored half).pow n).questions :=
+  Cslib.PCP.AnchoredDependency.map_questions_pi_law chsh half n
