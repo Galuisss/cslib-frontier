@@ -9,6 +9,8 @@ module
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.PauliBraidingConsistency
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnticommutationTest
+public import CslibFrontier.Foundations.Quantum.Algebra.MeasurementAverage
+import CslibFrontier.Probability.PMF.Uniform
 
 /-!
 # The CHSH strategy on an odd pair in the braiding test
@@ -23,6 +25,8 @@ are exactly those checked in the matched consistency rounds.
   the mean score over odd pairs and role assignments.
 * `Cslib.PCP.expect_norm_pauliBraidingSpecial_anticomm_sq_le`: the CHSH deficit controls
   the special observables' averaged squared anticommutation defect.
+* `Cslib.PCP.expect_norm_pauliBraidingBasis_anticomm_sq_le`: transfer of the
+  anticommutation estimate to the uniformly averaged basis observables.
 -/
 
 public section
@@ -238,6 +242,85 @@ theorem expect_norm_pauliBraidingSpecial_anticomm_sq_le
     rw [mul_comm (2 : ℝ), mul_assoc]
     exact mul_le_mul_of_nonneg_left (expect_chshDeficit_pauliBraiding_le S roles)
       chshAnticommConst_nonneg
+
+variable [Module ℚ≥0 𝒜] [PosSMulMono ℚ≥0 𝒜]
+
+open Finset in
+/-- The uniformly averaged basis observables anticommute on odd pairs up to the
+consistency and anticommutation deficits of the CHSH braiding verifier. -/
+theorem expect_norm_pauliBraidingBasis_anticomm_sq_le
+    (S : CommutingStrategy (PauliBraidingQuestion n Bool) (PauliBraidingQuestion n Bool)
+      ((Bool × Bool) ⊕ Bool) ((Bool × Bool) ⊕ Bool) 𝒜) (roles : Bool) :
+    let measure := cond roles S.bob S.alice
+    let X (x : Fin n → Bool) := 𝔼 d, pauliBraidingBasisObservable measure false x d
+    let Z (z : Fin n → Bool) := 𝔼 d, pauliBraidingBasisObservable measure true z d
+    let branch := pauliBraidingBranchGame n TwoProverGame.chsh id (fun _ => id)
+    (𝔼 p : ↥(oddPairs (Fin n)),
+      S.state.norm (X p.val.1 * Z p.val.2 + Z p.val.2 * X p.val.1) ^ 2) ≤
+      9 * (4096 * (1 - (branch 2).commutingWinProb S) +
+        2 * chshAnticommConst * (Real.cos (π / 8) ^ 2 - (branch 1).commutingWinProb S)) := by
+  intro measure X Z branch
+  let logical := cond roles S.swap S
+  let special := pauliBraidingSpecialObservable (cond roles S.alice S.bob)
+  let P := ↥(oddPairs (Fin n))
+  let basisQuestion (basis : Bool) (r : (Fin n → Bool) × (Fin n → Bool)) :=
+    PauliConsistencyQuestion.ofChecked basis r.1 r.2
+  let decoded (basis : Bool) (p : P) :=
+    logical.map (fun r => (basisQuestion basis r).toBraidingQuestion)
+      (fun q => .anticommutation true q p)
+      (fun r => Sum.elim (basisQuestion basis r).braidingCheckedBit fun _ => false)
+      (fun _ => Sum.elim (fun _ : Bool × Bool => false) id)
+  let M (basis : Bool) (x d : Fin n → Bool) :=
+    let q := PauliConsistencyQuestion.ofChecked basis x d
+    (measure q.toBraidingQuestion).map (Sum.elim q.braidingCheckedBit fun _ => false)
+  have hcontract (basis : Bool) (x : Fin n → Bool) :
+      star (𝔼 d, (M basis x d).observable) * (𝔼 d, (M basis x d).observable) ≤ 1 := by
+    rw [← Measurement.observable_average]
+    exact (Measurement.average (M basis x)).star_observable_mul_self_le_one
+  have hspecial (q : Bool) (p : P) : star (special q id p) * special q id p ≤ 1 := by
+    have heq : ((pauliBraidingCHSHStrategy S roles p).bob q).observable = special q id p :=
+      pauliBraidingCHSHStrategy_bob_observable S roles p q
+    rw [← heq]
+    exact ((pauliBraidingCHSHStrategy S roles p).bob q).star_observable_mul_self_le_one
+  have hcomm (basis q : Bool) (x : Fin n → Bool) (p : P) :
+      Commute (𝔼 d, (M basis x d).observable) (special q id p) := by
+    rw [← Measurement.observable_average]
+    refine Measurement.commute_observable_average _ _ fun d => ?_
+    have h := (decoded basis p).commute_observable (x, d) q
+    cases roles <;> exact h
+  have hmass (q : Bool) : ((TwoProverGame.chsh.questions.map Prod.snd) q).toReal = 1 / 2 := by
+    change (((Probability.PMF.uniformOfFintype (Bool × Bool)).map Prod.snd) q).toReal = _
+    rw [Probability.PMF.uniformOfFintype_prod_map_snd, Probability.PMF.uniformOfFintype_apply,
+      ENNReal.toReal_inv]
+    norm_num
+  let density : ℝ := (oddPairs (Fin n)).dens
+  have hdensity : 0 < density := by
+    obtain ⟨p⟩ := oddPairs_nonempty (ι := Fin n)
+    have hpos : 0 < (oddPairs (Fin n)).dens := Finset.dens_pos.mpr ⟨p.val, p.property⟩
+    change 0 < ((oddPairs (Fin n)).dens : ℝ)
+    exact_mod_cast hpos
+  have hclose (basis : Bool) :
+      (𝔼 p : P, S.state.norm ((𝔼 d, (M basis (if basis then p.val.2 else p.val.1) d).observable) -
+        special basis id p) ^ 2) ≤ 2048 * (1 - (branch 2).commutingWinProb S) := by
+    have h := weighted_expect_norm_pauliBraidingAverage_sub_special_sq_le
+      TwoProverGame.chsh id (fun _ => id) roles basis S
+    dsimp only at h
+    rw [hmass] at h
+    apply (mul_le_mul_iff_right₀ (show 0 < (1 / 2 : ℝ) * density by positivity)).mp
+    convert h using 1 <;> first | rfl | ring
+  have h := expect_norm_mul_sub_smul_mul_sq_le_of_consistent S.state
+    (fun p : P => X p.val.1) (fun p => Z p.val.2)
+    (special false id) (special true id) (fun _ => -1)
+    (fun p => hcontract false p.val.1) (fun p => hcontract true p.val.2)
+    (hspecial false) (hspecial true)
+    (fun p => hcomm false true p.val.1 p) (fun p => hcomm true false p.val.2 p) (by simp)
+  simp only [neg_one_smul, sub_neg_eq_add, add_comm (Z _ * X _)] at h
+  have hx := hclose false
+  have hz := hclose true
+  have hac := expect_norm_pauliBraidingSpecial_anticomm_sq_le S roles
+  change (𝔼 p : P, S.state.norm (X p.val.1 - special false id p) ^ 2) ≤ _ at hx
+  change (𝔼 p : P, S.state.norm (Z p.val.2 - special true id p) ^ 2) ≤ _ at hz
+  linarith only [h, hx, hz, hac]
 
 end Scores
 

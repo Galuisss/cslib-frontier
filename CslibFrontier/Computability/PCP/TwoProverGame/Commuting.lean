@@ -229,6 +229,13 @@ theorem correlation_eq (S : CommutingStrategy X Y Bool Bool 𝒜) (x : X) (y : Y
     Complex.sub_re]
   ring
 
+omit [StarRing 𝒜] in
+/-- The observables of a binary commuting strategy commute across players. -/
+theorem commute_observable (S : CommutingStrategy X Y Bool Bool 𝒜) (x : X) (y : Y) :
+    Commute (S.alice x).observable (S.bob y).observable := by
+  exact ((S.commute x y false false).sub_right (S.commute x y false true)).sub_left
+    ((S.commute x y true false).sub_right (S.commute x y true true))
+
 variable [StarOrderedRing 𝒜] {B : Type*} [Fintype B] in
 /-- The first player's observable commutes with every post-processed observable of the second. -/
 theorem commute_observable_map (S : CommutingStrategy X Y Bool B 𝒜) (g : B → Bool) (x : X)
