@@ -4120,6 +4120,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.AveragedAnswerMargin
 public import CslibFrontier.Computability.PCP.TwoProverGame.AveragedAnswerStates
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSH
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSHRigidity
+public import CslibFrontier.Computability.PCP.TwoProverGame.CheckedAnswerRegister
 public import CslibFrontier.Computability.PCP.TwoProverGame.Commuting
 public import CslibFrontier.Computability.PCP.TwoProverGame.CommutingValue
 public import CslibFrontier.Computability.PCP.TwoProverGame.EntangledRepetition
@@ -6938,6 +6939,7 @@ public import CslibFrontier.Foundations.LinearAlgebra.KernelVector
 public import CslibFrontier.Foundations.LinearAlgebra.LinearSolve
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Bareiss
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.BasicSolution
+public import CslibFrontier.Foundations.LinearAlgebra.Matrix.BlockDiagonalOrder
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.BlockEmbedding
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.BranchingProgramDeterminant
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.CauchyBinet
