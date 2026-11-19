@@ -59,7 +59,7 @@ variable {ι κ : Type*}
   exact MvPolynomial.sum_monomial_eq (by simp)
 
 /-- A constant polynomial has the norm of its coefficient. -/
-@[simp] theorem coeffNorm1_C (a : ℤ) :
+theorem coeffNorm1_C (a : ℤ) :
     coeffNorm1 (MvPolynomial.C a : MvPolynomial ι ℤ) = a.natAbs :=
   coeffNorm1_monomial 0 a
 
