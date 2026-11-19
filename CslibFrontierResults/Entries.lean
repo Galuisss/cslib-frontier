@@ -12,6 +12,8 @@ import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredTranscriptDistance
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditionalStates
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredCoordinateInformation
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredCoordinateTraceDistance
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredPriorTraceDeviation
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredNoisyStates
 import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
@@ -10945,6 +10947,85 @@ register_result "bvy-alice-information-after-anchored-wins" where
     positive probability, and the state identification is on support. The sum also permits \
     zero unchecked coordinates. Source check by codex-f4a705f4 at \
     https://github.com/cslib-community/cslib-frontier/pull/6669#issuecomment-7021806259."
+
+register_result "bvy-bob-information-after-anchored-wins" where
+  title := "Bob’s coordinate information after checked wins in an anchored game"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Claim 5.13, equation (36)",
+      locator := "arXiv:1509.07466v2, §5.2, printed pp. 23–24" }
+  ]
+  theorems := [Cslib.PCP.AnchoredDependency.exists_bob_anchored_coordinateInformation_le_after_wins]
+  scope := "For finite tensor-product strategies with local POVMs, sum over the unchecked \
+    coordinates and average over the actual winning transcript. The information between Alice’s \
+    question and Bob’s normalized reduced state is bounded by log of the checked-answer alphabet \
+    size minus log of the checked win probability, in nats. The win event must have positive \
+    probability, and the identity of the reduced state is on support. The sum permits zero \
+    unchecked coordinates. Source check by codex-f4a705f4 at \
+    https://github.com/cslib-community/cslib-frontier/pull/6671#issuecomment-7022481272."
+register_result "bvy-conditional-trace-deviation-after-anchored-wins" where
+  title := "Squared trace deviations of conditional states after anchored wins"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Equation (43) and its player-exchanged form",
+      locator := "arXiv:1509.07466v2, §5.2, printed p. 25" }
+  ]
+  theorems := [
+    Cslib.PCP.AnchoredDependency.exists_alice_sum_conditionalTraceNormSq_le_after_wins,
+    Cslib.PCP.AnchoredDependency.exists_bob_sum_conditionalTraceNormSq_le_after_wins
+  ]
+  scope := "For finite tensor strategies with local POVMs, sum over the unchecked coordinates \
+    and average over the actual winning transcript and the revealed question. The squared full \
+    trace norm between the two conditional marginals is bounded by twice the difference of \
+    the log checked-answer alphabet size and the log checked win probability. Logs are natural. \
+    The win event must have positive probability, and the state identification is on support. \
+    Source check by codex-f4a705f4 at \
+    https://github.com/cslib-community/cslib-frontier/pull/6673#issuecomment-7022597318."
+
+register_result "bvy-independent-prior-trial-after-anchored-wins" where
+  title := "Statistical cost of independently redrawing the selected anchored trial"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Full-trial variant around equation (48)",
+      locator := "arXiv:1509.07466v2, §5.2, printed pp. 25–26" }
+  ]
+  theorems := [Cslib.PCP.AnchoredDependency.sum_dist_trial_rest_independent_given_wins]
+  scope := "The replacement law draws the tagged message and both questions jointly from their \
+    original prior, independently of the winning marginal of the remaining transcript. The \
+    summed statistical distance is weighted by half the squared anchor rate. Source check by \
+    codex-f4a705f4 at \
+    https://github.com/cslib-community/cslib-frontier/pull/6673#issuecomment-7022597318."
+
+register_result "bvy-anchored-trace-deviation-under-prior-redraw" where
+  title := "Transfer of conditional trace deviation under a prior trial redraw"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Prior-draw variant around equation (49)",
+      locator := "arXiv:1509.07466v2, §5.2, printed p. 26" }
+  ]
+  theorems := [Cslib.PCP.AnchoredDependency.priorConditionalTraceNormSq_le]
+  scope := "The selected trial is drawn from its original prior independently of the remaining \
+    winning transcript. Both density states are held fixed under this law change, including \
+    the chosen defaults at null labels. The centered squared full-trace-norm score incurs an \
+    extra four times the summed statistical distance. Source check at \
+    https://github.com/cslib-community/cslib-frontier/pull/6675#issuecomment-7022727335."
+
+register_result "bvy-anchored-tagged-question-trace-comparison" where
+  title := "Transfer of trace deviation to the tagged anchored question pair"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Tagged-question step around equations (50)–(51)",
+      locator := "arXiv:1509.07466v2, §5.2, printed p. 26" }
+  ]
+  theorems := [
+    Cslib.PCP.AnchoredDependency.leftTaggedPairConditionalTraceNormSq_le,
+    Cslib.PCP.AnchoredDependency.rightTaggedPairConditionalTraceNormSq_le
+  ]
+  scope := "For either chosen player, set that message tag to the corresponding question of an \
+    anchored prior pair. The summed squared trace deviation times one quarter of the erasure \
+    rate is at most that under the independent prior trial. The product inequality also allows \
+    zero erasure rate. Source check at \
+    https://github.com/cslib-community/cslib-frontier/pull/6675#issuecomment-7022727335."
 
 register_result "synchronous-correlations-tracial-representation" where
   title := "Tracial representation of synchronous commuting correlations"
