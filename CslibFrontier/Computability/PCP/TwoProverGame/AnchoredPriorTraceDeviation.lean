@@ -143,13 +143,13 @@ theorem priorConditionalTraceNormSq_le [Fintype U] [DecidableEq U] (S : Repeated
     let ε₁ := Real.sqrt (m * Real.log (1 / p) / 2)
     let ε₂ := Real.sqrt (m * Real.log (Fintype.card (C → A × B) / p) / 2)
     w * priorConditionalTraceNormSq C G α Q read e ρ ≤
-      w * sum_conditionalTraceNormSq P ρ + 8 * (w * ε₁ + (1 + w) * (2 * ε₁ + ε₂)) := by
+      w * sumConditionalTraceNormSq P ρ + 8 * (w * ε₁ + (1 + w) * (2 * ε₁ + ε₂)) := by
   classical
   intro T W Q P p w ε₁ ε₂
   have h := priorTrialScore_le C G α Q read e (fun i t u => conditionalTraceNormSq P ρ t i u)
     (fun _ _ _ => sq_nonneg _) (fun i t u => conditionalTraceNormSq_le_four P hρ t i u)
   dsimp only at h
-  rw [← sum_conditionalTraceNormSq_eq_sum_joint P ρ] at h
+  rw [← sumConditionalTraceNormSq_eq_sum_joint P ρ] at h
   have hdist := sum_dist_trial_rest_independent_given_wins G α C S hs
   have hcard : Fintype.card Free = m := (Fintype.card_congr e.symm).trans (Fintype.card_fin m)
   dsimp only at hdist
