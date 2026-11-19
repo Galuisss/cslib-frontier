@@ -64,7 +64,8 @@ noncomputable def decodeCoordinate (d : ℕ) (u : Point F (n + 1)) (i : Fin (n +
     (a : Answer F (n + 1)) : PolynomialFunction F d :=
   decodeAffinePolynomial d (axisOrigin u i) (Pi.single i 1) a
 
-private theorem decodeCoordinate_agrees {d : ℕ} (u : Point F (n + 1)) (i : Fin (n + 1))
+/-- Acceptance of an axis and point answer forces agreement at the point's coordinate. -/
+theorem decodeCoordinate_agrees {d : ℕ} (u : Point F (n + 1)) (i : Fin (n + 1))
     {a b : Answer F (n + 1)}
     (h : accepts d (.axis (coordinateLine u i)) (.point u) a b) :
     (decodeCoordinate d u i a).value (u i) = decodePoint b := by
@@ -73,6 +74,13 @@ private theorem decodeCoordinate_agrees {d : ℕ} (u : Point F (n + 1)) (i : Fin
     (update_eq_axisAffine u i (u i)).symm.trans (update_eq_self i u)
   exact decodeAffinePolynomial_agrees _ _ (u i) (fun _ => u i)
     (by simpa only [he, coordinateLine] using h) rfl
+
+/-- The decoder uses the same line parametrization at every point on the coordinate line. -/
+theorem decodeCoordinate_update (d : ℕ) (u : Point F (n + 1)) (i : Fin (n + 1)) (t : F) :
+    decodeCoordinate d (update u i t) i = decodeCoordinate d u i := by
+  funext a
+  unfold decodeCoordinate axisOrigin
+  rw [update_idem]
 
 /-- The restriction of a bounded polynomial to the line in the selected coordinate. -/
 noncomputable def axisRestriction {d : ℕ} (u : Point F (n + 1)) (i : Fin (n + 1))
@@ -134,11 +142,7 @@ theorem decodedCoordinate_update
     (M : Question F (n + 1) → Measurement (Answer F (n + 1)) A)
     (d : ℕ) (u : Point F (n + 1)) (i : Fin (n + 1)) (t : F) :
     decodedCoordinate M d (update u i t) i = decodedCoordinate M d u i := by
-  have hdecode : decodeCoordinate d (update u i t) i = decodeCoordinate d u i := by
-    funext a
-    unfold decodeCoordinate axisOrigin
-    rw [update_idem]
-  simp only [decodedCoordinate, coordinateLine, axisOrigin, update_idem, hdecode]
+  simp only [decodedCoordinate, coordinateLine, axisOrigin, update_idem, decodeCoordinate_update]
 
 end Measurement
 
