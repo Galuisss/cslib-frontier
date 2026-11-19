@@ -103,39 +103,6 @@ private noncomputable def atSeed {s : Level} (H : Xofs) (seed : FixedBytes 32)
   observePair (H.expandA s rho) (H.expandS s ((ex.drop 32).take 64))
     (run H (fun j => rho[j.val]!))
 
-private noncomputable def playRows {a b : ℕ} (s : Level) (base : Xofs) (seed : FixedBytes 32)
-    (ha : 528 ≤ a) (hb : 481 ≤ b) (T : Table a b) (rows : Nonce s × Fin 481 → Byte)
-    (share : Bool) (run : PostKey s) : Game :=
-  let H := atTable base T
-  let rho := (H.expandKeySeed s seed).take 32
-  let J := atTable base (Function.extend (slots s base seed ha hb T) rows T)
-  observePair (H.expandA s rho) (vectors s (rowPair s rows))
-    (run (if share then J else H) (fun i => rho[i.val]!))
-
-private theorem patched_trial {a b : ℕ} (s : Level) (base : Xofs) (seed : FixedBytes 32)
-    (ha : 528 ≤ a) (hb : 481 ≤ b) (T : Table a b) (rows : Nonce s × Fin 481 → Byte)
-    (run : PostKey s) :
-    atSeed (atTable base (Function.extend (slots s base seed ha hb T) rows T)) seed run =
-      playRows s base seed ha hb T rows true run := by
-  let H := atTable base T
-  let e := slots s base seed ha hb T
-  let J := atTable base (Function.extend e rows T)
-  let r := expansionSeed H s seed
-  have val : J.expandS s r.toList = vectors s (rowPair s rows) := by
-    have read := expandS_install s r ha hb base (Function.extend e rows T)
-    have get (p : Nonce s × Fin 481) :
-        Function.extend e rows T (secretPoint s r ha hb p) = rows p :=
-      e.injective.extend_apply rows T p
-    change (atTable base (Function.extend e rows T)).expandS s r.toList = _
-    unfold atTable
-    simpa only [get] using read
-  unfold atSeed playRows
-  dsimp only
-  rw [fixed_expansion]
-  change observePair _ (J.expandS s (((H.expandKeySeed s seed).drop 32).take 64)) _ = _
-  rw [← expansionSeed_bytes, val]
-  rfl
-
 /-- The coupled FIPS setup before the signing adversary runs. Both games receive the
 same public seed and pair. The distinguishing experiment determines which oracle they read. -/
 structure SecretExpansionViews (s : Level) where
@@ -143,12 +110,28 @@ structure SecretExpansionViews (s : Level) where
   shared : Xofs
   /-- Original raw XOFs, before installing those rows. -/
   background : Xofs
+  /-- Original 32-byte key-generation seed, retained by the challenger. -/
+  keySeed : FixedBytes 32
   /-- Secret 64-byte prefix derived at the actual key-generation input. -/
   secretSeed : FixedBytes 64
   /-- Matrix seed passed to the signer and encoded in the public key. -/
   publicSeed : FixedBytes 32
   /-- Matrix and full vector, absent on either native expansion failure. -/
   pair : Option (MLDSA.PublicKey s.params)
+
+private def generatedPair {s : Level} (matrix : Option (PublicMatrix s))
+    (short : Option ((Fin s.params.ℓ → Poly) × (Fin s.params.k → Poly))) :
+    Option (MLDSA.PublicKey s.params) := do
+  let A ← matrix
+  let (x, e) ← short
+  return ⟨A, ModuleLWE.sample A x e⟩
+
+private theorem observe_generatedPair {s : Level} (matrix : Option (PublicMatrix s))
+    (short : Option ((Fin s.params.ℓ → Poly) × (Fin s.params.k → Poly)))
+    (run : MLDSA.PublicKey s.params → Game) :
+    ((generatedPair matrix short).map run).getD (PMF.pure false) =
+      observePair matrix short run := by
+  cases matrix <;> cases short <;> rfl
 
 private noncomputable def viewsAt {a b : ℕ} (s : Level) (base : Xofs) (seed : FixedBytes 32)
     (ha : 528 ≤ a) (hb : 481 ≤ b) (T : Table a b) (rows : Nonce s × Fin 481 → Byte) :
@@ -157,12 +140,10 @@ private noncomputable def viewsAt {a b : ℕ} (s : Level) (base : Xofs) (seed : 
   let rho := (H.expandKeySeed s seed).take 32
   { shared := atTable base (Function.extend (slots s base seed ha hb T) rows T)
     background := H
+    keySeed := seed
     secretSeed := expansionSeed H s seed
     publicSeed := fun i => rho[i.val]!
-    pair := do
-      let A ← H.expandA s rho
-      let (x, e) ← vectors s (rowPair s rows)
-      return ⟨A, ModuleLWE.sample A x e⟩ }
+    pair := generatedPair (H.expandA s rho) (vectors s (rowPair s rows)) }
 
 /-- Joint distribution of the two online XOFs, derived seeds and the actual (possibly failed)
 key-generation pair. The experiment resamples only the first 481 bytes in each of the secret
@@ -179,28 +160,29 @@ private noncomputable def observeViews {s : Level} (share : Bool) (run : PostKey
     (v : SecretExpansionViews s) : Game :=
   (v.pair.map (run (if share then v.shared else v.background) v.publicSeed)).getD (PMF.pure false)
 
-private theorem viewsAt_run {a b : ℕ} (s : Level) (base : Xofs) (seed : FixedBytes 32)
+private theorem patched_trial {a b : ℕ} (s : Level) (base : Xofs) (seed : FixedBytes 32)
     (ha : 528 ≤ a) (hb : 481 ≤ b) (T : Table a b) (rows : Nonce s × Fin 481 → Byte)
-    (share : Bool) (run : PostKey s) :
-    observeViews share run (viewsAt s base seed ha hb T rows) =
-      playRows s base seed ha hb T rows share run := by
+    (run : PostKey s) :
+    atSeed (atTable base (Function.extend (slots s base seed ha hb T) rows T)) seed run =
+      observeViews true run (viewsAt s base seed ha hb T rows) := by
   let H := atTable base T
-  let rho := (H.expandKeySeed s seed).take 32
-  unfold observeViews viewsAt playRows observePair
+  let e := slots s base seed ha hb T
+  let J := atTable base (Function.extend e rows T)
+  let r := expansionSeed H s seed
+  have val : J.expandS s r.toList = vectors s (rowPair s rows) := by
+    have read := expandS_install s r ha hb base (Function.extend e rows T)
+    have get (p : Nonce s × Fin 481) :
+        Function.extend e rows T (secretPoint s r ha hb p) = rows p :=
+      e.injective.extend_apply rows T p
+    change (atTable base (Function.extend e rows T)).expandS s r.toList = _
+    unfold atTable
+    simpa only [get] using read
+  unfold atSeed observeViews viewsAt
   dsimp only
-  cases mat : H.expandA s rho <;> cases vec : vectors s (rowPair s rows) <;>
-    simp only [H, rho] at mat <;> rfl
-
-private theorem sample_run {s : Level} (base : Xofs) {a b : ℕ}
-    (ha : 528 ≤ a) (hb : 481 ≤ b) (share : Bool) (run : PostKey s) :
-    let U := PMF.uniformOfFintype (Table a b)
-    ((base.sampleSecretExpansionViews s ha hb).bind (observeViews share run)) =
-    U.bind fun T => U.bind fun M =>
-    (PMF.uniformOfFintype (FixedBytes 32)).bind fun seed =>
-      (PMF.uniformOfFintype (Nonce s × Fin 481 → Byte)).bind fun rows =>
-        playRows s {base with h128 := install base.h128 M} seed ha hb T rows share run := by
-  simp only [Xofs.sampleSecretExpansionViews, PMF.bind_bind, PMF.bind_map,
-    Function.comp_def, viewsAt_run]
+  rw [fixed_expansion]
+  change observePair _ (J.expandS s (((H.expandKeySeed s seed).drop 32).take 64)) _ = _
+  rw [← expansionSeed_bytes, val]
+  exact (observe_generatedPair ..).symm
 
 private theorem shared_law {s : Level} (base : Xofs) {a b : ℕ}
     (ha : 528 ≤ a) (hb : 481 ≤ b) (run : PostKey s) :
@@ -211,13 +193,13 @@ private theorem shared_law {s : Level} (base : Xofs) {a b : ℕ}
   have atH (H : Xofs) : H.fullPairExperiment s (run H) = S.bind fun seed => atSeed H seed run :=
     Xofs.fullPairExperiment_eq_expand ..
   simp_rw [atH]
-  rw [independent_tables, sample_run]
-  simp only [PMF.bind_bind, PMF.bind_map, Function.comp_def]
+  rw [independent_tables]
+  simp only [Xofs.sampleSecretExpansionViews, PMF.bind_bind, PMF.bind_map, Function.comp_def]
   let F (M T : Table a b) := atTable {base with h128 := install base.h128 M} T
   change (U.bind fun T => U.bind fun M => S.bind fun seed => atSeed (F M T) seed run) =
     U.bind fun T => U.bind fun M => S.bind fun seed =>
       (PMF.uniformOfFintype (Nonce s × Fin 481 → Byte)).bind fun v =>
-        playRows s {base with h128 := install base.h128 M} seed ha hb T v true run
+        observeViews true run (viewsAt s {base with h128 := install base.h128 M} seed ha hb T v)
   conv_lhs => rw [PMF.bind_comm U U]
   conv_rhs => rw [PMF.bind_comm U U]
   apply congrArg (PMF.bind U ·)
@@ -278,8 +260,8 @@ private theorem detached_law (C : QuantumSigningForger) (s : Level) (base : Xofs
     exact detached_at_seed base ha hb H seed run
   change (R.bind fun H => R.bind fun G => (H.withExpandSStream G).fullPairExperiment s (run H)) = _
   simp_rw [atH]
-  rw [sample_run]
-  simp only [R, independent_tables, PMF.bind_bind, PMF.bind_map, Function.comp_def]
+  simp only [R, independent_tables, Xofs.sampleSecretExpansionViews, PMF.bind_bind, PMF.bind_map,
+    Function.comp_def, observeViews, viewsAt, observe_generatedPair]
   rfl
 
 /-- The native public-pair signing game and the independent private-expansion game share
@@ -294,6 +276,30 @@ theorem QuantumSigningForger.secretExpansionViews_games (C : QuantumSigningForge
     (C.independentExpandSGame s base a b =
       V.bind fun v => (v.pair.map (run v.background v.publicSeed)).getD (PMF.pure false)) :=
   ⟨shared_law base ha hb _, detached_law C s base ha hb⟩
+
+/-- The coupled views expand the same original 32-byte key seed to the same 128 bytes.
+Their published seed and private row prefix are the first 32 and following 64 of these bytes. -/
+theorem SecretExpansionViews.seeds_of_mem {base : Xofs} {s : Level} {a b : ℕ}
+    {ha : 528 ≤ a} {hb : 481 ≤ b} {v : SecretExpansionViews s}
+    (hv : v ∈ (base.sampleSecretExpansionViews s ha hb).support) :
+    let ex := v.background.expandKeySeed s v.keySeed
+    v.shared.expandKeySeed s v.keySeed = ex ∧ v.publicSeed.toList = ex.take 32 ∧
+      v.secretSeed.toList = (ex.drop 32).take 64 := by
+  obtain ⟨T, _, M, _, seed, _, rows, _, rfl⟩ := (by
+    simpa only [Xofs.sampleSecretExpansionViews, PMF.mem_support_bind_iff,
+      PMF.mem_support_map_iff] using hv)
+  let B : Xofs := {base with h128 := install base.h128 M}
+  let H := atTable B T
+  refine ⟨fixed_expansion s B seed ha hb T rows, ?_, expansionSeed_bytes H s seed⟩
+  let rho := (H.expandKeySeed s seed).take 32
+  have len : (H.expandKeySeed s seed).length = 128 := H.h256.length_read ..
+  have hr : rho.length = 32 := by simp [rho, len]
+  obtain ⟨r, eq⟩ := FixedBytes.exists_toList hr
+  change FixedBytes.toList (n := 32) (fun i => rho[i.val]!) = rho
+  rw [← eq]
+  congr 1
+  funext i
+  simp only [FixedBytes.toList, List.length_ofFn, getElem!_pos, i.isLt, List.getElem_ofFn]
 
 /-- The coupled views have identical SHAKE128 streams and identical SHAKE256 bytes except at
 the first 481 positions of an Algorithm 33 row. The nonce range includes both vectors. -/
