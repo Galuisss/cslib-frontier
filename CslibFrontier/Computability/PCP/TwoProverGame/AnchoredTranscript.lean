@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
 import CslibFrontier.Probability.PMF.Filter
 import CslibFrontier.Probability.PMF.Map
+import CslibFrontier.Probability.Product.Resample
 
 /-!
 # The transcript with one noisy message omitted
@@ -77,24 +78,6 @@ noncomputable def restKernel (S : RepeatedStrategy) (j : Free) (q : PairQ) : PMF
       (completeTranscript C S checked (Function.update u j (Sum.inl none, q))).map
         (restTranscript C j)
 
-private theorem map_update_pi {I₀ U : Type*} [Fintype I₀] [DecidableEq I₀] [Finite U]
-    (p : I₀ → PMF U) (j : I₀) (x : U) :
-    (pi p).map (fun u => Function.update u j x) =
-      pi (Function.update p j (PMF.pure x)) := by
-  have hu (u : I₀ → U) (i : I₀) : Function.update u j x i = if i = j then x else u i := by
-    by_cases h : i = j <;> simp [h, Function.update_of_ne]
-  have hp (i : I₀) : (p i).map (fun y => if i = j then x else y) =
-      Function.update p j (PMF.pure x) i := by
-    by_cases h : i = j
-    · subst i
-      simp only [Function.update_self]
-      exact PMF.map_const (p j) x
-    · simp only [h, ite_false, Function.update_of_ne h]
-      exact PMF.map_id _
-  have hupdate : (fun u : I₀ → U => fun i => if i = j then x else u i) =
-      fun u => Function.update u j x := funext fun u => funext fun i => (hu u i).symm
-  simpa only [hupdate, hp] using (pi_map p (fun i y => if i = j then x else y)).symm
-
 omit [Fintype X] [Fintype Y] in
 private theorem map_rest_complete_update (S : RepeatedStrategy) (j : Free)
     (checked : C → PairQ) (u : Free → Trial) (m : Option X ⊕ Option Y) (q : PairQ) :
@@ -151,7 +134,7 @@ theorem map_trial_restTranscriptLaw (S : RepeatedStrategy) (j : Free) :
       simp only [restKernel, PMF.map_bind]
       congr 1 with trial : 1
       congr 1 with t : 1
-      rw [← map_update_pi, PMF.bind_map]
+      rw [pi_update_pure, PMF.bind_map]
       congr 1 with u : 1
       rcases trial with ⟨m, q⟩
       simp only [Function.comp_def, read]
