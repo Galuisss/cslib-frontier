@@ -131,6 +131,17 @@ theorem re_trace_conjTranspose_mul_le_traceNorm (A U : Matrix n n ℂ)
   exact re_trace_mul_le_trace_of_unitary _ _ hW
     (Matrix.nonneg_iff_posSemidef.mp (CFC.sqrt_nonneg (Aᴴ * A)))
 
+/-- The polar witness attains the trace norm as a complex trace with zero imaginary part. -/
+theorem trace_conjTranspose_mul_eq_traceNorm_of_polar (A U : Matrix n n ℂ)
+    (hU : U ∈ unitaryGroup n ℂ) (h : U * CFC.sqrt (Aᴴ * A) = A) :
+    (Uᴴ * A).trace = (A.traceNorm : ℂ) := by
+  have hUU : Uᴴ * U = 1 := (mem_unitaryGroup_iff').mp hU
+  conv_lhs => rw [← h, ← Matrix.mul_assoc, hUU, Matrix.one_mul]
+  unfold traceNorm
+  have hpos := (Matrix.nonneg_iff_posSemidef.mp
+    (CFC.sqrt_nonneg (Aᴴ * A))).trace_nonneg
+  exact Complex.ext rfl (Complex.nonneg_iff.mp hpos).2.symm
+
 /-- The trace norm is the maximum real trace overlap with a unitary, attained by a polar
 factor. -/
 theorem traceNorm_eq_max_re_trace (A : Matrix n n ℂ) :
@@ -139,10 +150,8 @@ theorem traceNorm_eq_max_re_trace (A : Matrix n n ℂ) :
       ∀ V ∈ unitaryGroup n ℂ, (Vᴴ * A).trace.re ≤ (Uᴴ * A).trace.re := by
   obtain ⟨U, hU, h⟩ := A.exists_unitary_polar
   have he : (Uᴴ * A).trace.re = A.traceNorm := by
-    have hUU : Uᴴ * U = 1 := (mem_unitaryGroup_iff').mp hU
-    conv_lhs => rw [← h, ← Matrix.mul_assoc, hUU, Matrix.one_mul]
-    unfold traceNorm
-    rfl
+    simpa only [Complex.ofReal_re] using congrArg Complex.re
+      (trace_conjTranspose_mul_eq_traceNorm_of_polar A U hU h)
   exact ⟨U, hU, he, fun V hV => he ▸ A.re_trace_conjTranspose_mul_le_traceNorm V hV⟩
 
 private theorem traceNorm_adjoint_square (A : Matrix n n ℂ) :
