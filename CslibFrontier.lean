@@ -4116,6 +4116,9 @@ public import CslibFrontier.Computability.PCP.RegularConstraintGraph
 public import CslibFrontier.Computability.PCP.SelectedComposition
 public import CslibFrontier.Computability.PCP.ThreeSAT
 public import CslibFrontier.Computability.PCP.TwoProverGame
+public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
+public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
+public import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
 public import CslibFrontier.Computability.PCP.TwoProverGame.AveragedAnswerMarginals
 public import CslibFrontier.Computability.PCP.TwoProverGame.AveragedAnswerStates
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSH
@@ -8155,6 +8158,7 @@ public import CslibFrontier.Probability.OptimalStopping.ProphetIID
 public import CslibFrontier.Probability.OptimalStopping.Secretary
 public import CslibFrontier.Probability.Option
 public import CslibFrontier.Probability.PMF
+public import CslibFrontier.Probability.PMF.AnchorPair
 public import CslibFrontier.Probability.PMF.Bind
 public import CslibFrontier.Probability.PMF.BindCompare
 public import CslibFrontier.Probability.PMF.BindFailure
@@ -8288,6 +8292,7 @@ public import CslibFrontier.Tactic.FirstOrder.Init
 public import CslibFrontier.Tactic.FirstOrder.Simp
 public import CslibFrontier.Tactic.Fits
 public import CslibFrontier.Tactic.GameHop
+public import CslibFrontier.Tactic.LRATTauto
 public import CslibFrontier.Tactic.LogSpace
 public import CslibFrontier.Tactic.LogSpace.Init
 public import CslibFrontier.Tactic.Negligible

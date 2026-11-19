@@ -6,6 +6,9 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 
 -- upstream: local-only (result registry collection)
 import CslibFrontierResults.Registry
+import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
 import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 import CslibFrontier.Computability.PCP.TwoProverGame.Synchronous
@@ -56,6 +59,7 @@ import CslibFrontier.Crypto.Primitives.IdealCipher.CompressionVariants
 import CslibFrontier.Crypto.Primitives.PRF.RandomOracleModel
 import CslibFrontier.Crypto.Protocols.Cipher.LinearCryptanalysis
 import CslibFrontier.Crypto.Protocols.MAC.GHASH
+import CslibFrontier.Probability.HashFamily.Polynomial
 import CslibFrontier.Computability.QueryComplexity.MajorityThree
 import CslibFrontier.Computability.QueryComplexity.Randomized.Nisan
 import CslibFrontier.Computability.QueryComplexity.YaoExpected
@@ -10560,6 +10564,23 @@ register_result "partial-tag-encrypt-then-mac" where
     pp. 132–133), the same scheme is INDCPA (Attack Game 5.2 and Definition 5.2, \
     pp. 181–182, on n-bit messages) while it lacks one-time ciphertext integrity."
 
+register_result "fixed-length-polynomial-universality" where
+  title := "Collision and difference bounds for fixed-length polynomial hashing"
+  topic := "cryptography"
+  sources := [
+    { paper := BonehShoup2023, theorem := "Exercise 7.16(a)–(b)",
+      locator := "v0.6, printed p. 281; Hfpoly in §7.2.1, equation (7.5), p. 257" }
+  ]
+  theorems := [
+    Cslib.Probability.isUniversalHash_coeffPolyHash,
+    Cslib.Probability.isDeltaUniversalHash_mul_coeffPolyHash
+  ]
+  scope := "For length-n coefficient vectors and an exactly uniform field element, the \
+    collision probability is at most (n − 1)/|F|. Multiplying the evaluation by the key bounds \
+    the probability of any specified difference by n/|F|. Both statements quantify over \
+    distinct vectors, extend from prime fields to all finite fields, and apply pointwise in n \
+    without a growth condition. The zero-length vector has no distinct partner."
+
 register_result "ghash-gcm-length-block-xor-duf" where
   title := "GHASH on the bit-length version of GCM's line (∗) input, zero-padded with its \
     length block, is an ℓ/2^128-XOR-DUF for inputs of at most ℓ blocks, the length block \
@@ -10801,6 +10822,61 @@ register_result "abstract-dpll-learning-correctness" where
     assignments, Forget could remove the tautology b ∨ ¬b from a, b ∨ ¬b and end at the trail a. \
     Backjump and Learn use entailment by total assignments, which the §2.1 entailment implies, \
     so every step of the source is a step here."
+
+register_result "anchoring-classical-and-entangled-values" where
+  title := "Classical and entangled values after anchoring a two-prover game"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Lemma 1.2",
+      locator := "arXiv:1509.07466v2, printed p. 3 (anchoring in Definition 1.1)" }
+  ]
+  theorems := [
+    Cslib.PCP.TwoProverGame.value_anchored,
+    Cslib.PCP.TwoProverGame.quantumValue_anchored
+  ]
+  scope := "Anchoring replaces each player's question independently with probability α and \
+    accepts if either question is replaced. For finite games with nonempty answer alphabets, \
+    the classical and entangled rejection gaps both scale by (1 − α)², including α = 0 and α = 1. \
+    Entangled value is the supremum over finite-dimensional tensor strategies with arbitrary \
+    local POVMs. The strategy maps preserve both local dimensions."
+
+register_result "bvy-anchored-noisy-reveal-laws" where
+  title := "Conditional independence and the anchored marginal of the noisy reveal"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Claims 4.1–4.2",
+      locator := "arXiv:1509.07466v2, §4.1, printed pp. 11–12" }
+  ]
+  theorems := [
+    Cslib.PCP.AnchoredDependency.conditionalSnd_messagePair,
+    Cslib.PCP.AnchoredDependency.leftLaw_apply,
+    Cslib.PCP.AnchoredDependency.rightLaw_apply,
+    Cslib.PCP.AnchoredDependency.map_snd_leftLaw,
+    Cslib.PCP.AnchoredDependency.map_snd_rightLaw,
+    Cslib.PCP.AnchoredDependency.map_snd_law
+  ]
+  scope := "For any original joint question PMF, the weighted point masses factor into the message \
+    mass and two local conditional laws. The factorization expresses independence at supported \
+    messages. For either designated player, forgetting the message recovers the anchored question \
+    law, including anchor rates zero and one. Agreement of the left-message conditional with \
+    the original anchored conditional assumes a supported message and an interior anchor rate."
+
+register_result "bvy-anchored-conditioning-bounds" where
+  title := "Movement of free trials and question resampling after checked wins"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Lemma 4.6(1)–(2)",
+      locator := "arXiv:1509.07466v2, §4.3, printed pp. 14–15" }
+  ]
+  theorems := [
+    Cslib.PCP.AnchoredDependency.sum_sq_dist_freeTrials_given_wins_le,
+    Cslib.PCP.AnchoredDependency.sum_dist_questions_given_wins_le
+  ]
+  scope := "Finite alphabets and tensor POVMs, with checked answers from the strategy that \
+    supplies the positive-probability checked-win event. The first bound sums squared distances \
+    and the second sums transcript and question-resampling distances. Distances are half-L1. \
+    The constants use natural logs with Pinsker’s factor 1/2 and the full checked-answer \
+    alphabet. Any checked set is allowed, including when no free coordinate remains."
 
 register_result "synchronous-correlations-tracial-representation" where
   title := "Tracial representation of synchronous commuting correlations"
