@@ -42,12 +42,12 @@ example {n 𝒜 : Type} [Fintype n] [DecidableEq n] [Ring 𝒜] [StarRing 𝒜] 
 example {n 𝒜 : Type} [Fintype n] [DecidableEq n] [CStarAlgebra 𝒜] [PartialOrder 𝒜]
     [StarOrderedRing 𝒜]
     (S : CommutingStrategy (n → Bool) ((n → Bool) × (n → Bool)) Bool (Bool × Bool) 𝒜)
-    (hA : ∀ c, (S.alice c).IsProjective) (hB : ∀ q, (S.bob q).IsProjective) {ε : ℝ}
+    (hB : ∀ q, (S.bob q).IsProjective) {ε : ℝ}
     (hε : 1 - ε ≤ S.linearityTestProb) :
     1 - 6 * ε - √(12 * ε) - √(12 * ε) ≤
       𝔼 a, 𝔼 b, (S.state ((S.alice a).observable * (S.alice b).observable *
         (S.alice (a + b)).observable)).re :=
-  CommutingStrategy.one_sub_le_expect_re_apply_mul_mul_of_linearityTest S hA hB hε
+  CommutingStrategy.one_sub_le_expect_re_apply_mul_mul_of_linearityTest S hB hε
 
 /-- **Completeness for linear functions** (concrete, two bits): the honest answers of the linear
 function `c ↦ s·c` pass every check. -/
