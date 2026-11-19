@@ -64,13 +64,23 @@ noncomputable def specializeLast (x : R) :
   unfold specializeLast lastVariableEquiv
   simp [finSuccEquivLast_castSucc]
 
+/-- Retain the last variable and evaluate all preceding variables at `u`. -/
+noncomputable def evalPrefix (u : Fin m → R) (p : MvPolynomial (Fin (m + 1)) R) : Polynomial R :=
+  (lastVariableEquiv R m p).map (eval u)
+
+theorem eval_evalPrefix (u : Fin m → R) (p : MvPolynomial (Fin (m + 1)) R) (x : R) :
+    (evalPrefix u p).eval x = eval u (specializeLast x p) := by
+  unfold evalPrefix specializeLast
+  change _ = eval u (Polynomial.eval (C x) (lastVariableEquiv R m p))
+  rw [Polynomial.eval_map, ← Polynomial.eval₂_id, Polynomial.hom_eval₂, RingHom.comp_id, eval_C]
+
 /-- Specialization corresponds to evaluating on the last-coordinate slice. -/
 theorem eval_specializeLast (x : R) (u : Fin m → R) (p : MvPolynomial (Fin (m + 1)) R) :
     eval u (specializeLast x p) = eval (Fin.snoc u x) p := by
-  unfold specializeLast lastVariableEquiv
-  change eval u (Polynomial.eval (C x) (optionEquivLeft R _ (rename finSuccEquivLast p))) = _
-  rw [← Polynomial.eval₂_id, Polynomial.hom_eval₂, RingHom.comp_id, eval_C,
-    ← Polynomial.eval_map, ← optionEquivLeft_elim_eval, eval_rename]
+  rw [← eval_evalPrefix]
+  unfold evalPrefix lastVariableEquiv
+  change (Polynomial.map (eval u) (optionEquivLeft R _ (rename finSuccEquivLast p))).eval x = _
+  rw [← optionEquivLeft_elim_eval, eval_rename]
   congr 1
   apply congrArg (fun v : Fin (m + 1) → R => eval v)
   funext i
@@ -84,6 +94,12 @@ theorem natDegree_lastVariableEquiv (p : MvPolynomial (Fin (m + 1)) R) :
   change (optionEquivLeft R _ (rename finSuccEquivLast p)).natDegree = _
   rw [natDegree_optionEquivLeft, ← finSuccEquivLast_last,
     degreeOf_rename_of_injective finSuccEquivLast.injective]
+
+/-- Evaluating the prefix does not increase the degree in the remaining variable. -/
+theorem natDegree_evalPrefix_le (u : Fin m → R) (p : MvPolynomial (Fin (m + 1)) R) :
+    (evalPrefix u p).natDegree ≤ p.degreeOf (Fin.last m) := by
+  unfold evalPrefix
+  exact Polynomial.natDegree_map_le.trans_eq (natDegree_lastVariableEquiv p)
 
 /-- A prefix variable has degree at most `d` exactly when it has that bound in each
 coefficient of the polynomial in the last variable. -/
