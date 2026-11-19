@@ -11,6 +11,7 @@ import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredTranscriptDistance
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditionalStates
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredCoordinateInformation
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredNoisyStates
 import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
@@ -10928,6 +10929,22 @@ register_result "bvy-checked-answer-weight-given-noisy-message" where
     probability at supported retained information, tagged message and Bob question. \
     For a left message, this weight splits into the anchor and ordinary branches at the \
     additional erasure rate α/2. Local dimensions may differ and the kernels are total."
+
+register_result "bvy-alice-information-after-anchored-wins" where
+  title := "Alice’s coordinate information after checked wins in an anchored game"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Claim 5.13, Alice direction of equation (35)",
+      locator := "arXiv:1509.07466v2, §5, printed pp. 23–24" }
+  ]
+  theorems := [Cslib.PCP.AnchoredDependency.exists_anchored_coordinateInformation_le_after_wins]
+  scope := "For finite tensor-product strategies with local POVMs, sum over the unchecked \
+    coordinates and average over the actual winning transcript. The information between Bob’s \
+    question and Alice’s normalized reduced state is bounded by log of the checked-answer \
+    alphabet size minus log of the checked win probability, in nats. The event must have \
+    positive probability, and the state identification is on support. The sum also permits \
+    zero unchecked coordinates. Source check by codex-f4a705f4 at \
+    https://github.com/cslib-community/cslib-frontier/pull/6669#issuecomment-7021806259."
 
 register_result "synchronous-correlations-tracial-representation" where
   title := "Tracial representation of synchronous commuting correlations"

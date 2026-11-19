@@ -7,6 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (tests)
 
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredCoordinateInformation
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredNoisyStates
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredTranscriptDistance
 import CslibFrontier.Computability.PCP.TwoProverGame.Tsirelson
@@ -133,3 +134,54 @@ example (S : Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option
   rw [← norm_checkedVectorGivenBob_sq chsh half {0} S j t _ _ a b ht hm hy,
     norm_checkedVectorGivenBob_sq_inl, coe_noise]
   norm_num [half]
+
+open Cslib.Quantum (classicalQuantumMarginal mutualInformation)
+
+private noncomputable def acceptingGame : Cslib.PCP.TwoProverGame Bool Bool Bool Bool :=
+  ⟨chsh.questions, fun _ _ _ _ => True⟩
+
+private noncomputable def anchoredEcho :
+    Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option Bool)
+      (Fin 2 → Bool) (Fin 2 → Bool) (Fin 1) (Fin 1) :=
+  Cslib.PCP.QuantumStrategy.ofDeterministic
+    (fun x i => (x i).getD false) (fun y i => (y i).getD false)
+
+private theorem acceptingGame_winsOnChecked :
+    winsOnChecked acceptingGame half ({0} : Finset (Fin 2)) = Set.univ := by
+  rw [Set.eq_univ_iff_forall]
+  rintro ⟨⟨t, a⟩, u⟩
+  change ∀ i : ({0} : Finset (Fin 2)),
+    (acceptingGame.anchored half).accepts (t.questions i).1 (t.questions i).2 (a i).1 (a i).2
+  intro i
+  rw [anchored_accepts]
+  cases (t.questions i).1 <;> cases (t.questions i).2 <;> trivial
+
+/-- A two-copy echo strategy with one checked and one unchecked coordinate has the
+information budget `log 4` when every checked answer is accepted. -/
+example :
+    let C : Finset (Fin 2) := {0}
+    let e : Fin 1 ≃ {i : Fin 2 // i ∉ C} := (Fintype.equivFinOfCardEq (by decide)).symm
+    let T := transcriptLaw acceptingGame half C anchoredEcho
+    let W := winsOnChecked acceptingGame half C
+    ∃ hW : ∃ z ∈ W, z ∈ T.support,
+      let P := (T.filter W hW).map (bobTranscriptProjection C e)
+      ∃ ρ : _ → Matrix (Fin 1) (Fin 1) ℂ,
+        (∑ t, (((P.map Prod.fst) t).toReal : WithTop ℝ) *
+          mutualInformation (classicalQuantumMarginal (conditionalSnd P t)
+            (fun y => ρ (t, y)) (fun y => y 0))) ≤ (Real.log 4 : ℝ) := by
+  dsimp only
+  have hW : ∃ z ∈ winsOnChecked acceptingGame half ({0} : Finset (Fin 2)),
+      z ∈ (transcriptLaw acceptingGame half {0} anchoredEcho).support := by
+    rw [acceptingGame_winsOnChecked]
+    obtain ⟨z, hz⟩ := (transcriptLaw acceptingGame half {0} anchoredEcho).support_nonempty
+    exact ⟨z, Set.mem_univ _, hz⟩
+  obtain ⟨ρ, _, _, h⟩ := exists_anchored_coordinateInformation_le_after_wins acceptingGame half
+    {0} anchoredEcho (Fintype.equivFinOfCardEq (by decide : _ = 1)).symm hW
+  refine ⟨hW, ρ, ?_⟩
+  have hcard : Fintype.card ((({0} : Finset (Fin 2)) → Bool) ×
+      (({0} : Finset (Fin 2)) → Bool)) = 4 := by decide
+  have hmass : (transcriptLaw acceptingGame half {0} anchoredEcho).toOuterMeasure
+      (winsOnChecked acceptingGame half {0}) = 1 := by
+    rw [acceptingGame_winsOnChecked, PMF.toOuterMeasure_apply, Set.indicator_univ, PMF.tsum_coe]
+  simpa only [Fintype.sum_unique, Fin.default_eq_zero, hcard, Nat.cast_ofNat, hmass,
+    ENNReal.toReal_one, Real.log_one, sub_zero] using h
