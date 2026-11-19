@@ -46,4 +46,16 @@ theorem positiveDimensionalInstance (u m : ℕ) : criticalCoefficientValue 101 1
   intro y
   simp
 
+-- Reducing the integer quotient modulo 101 preserves the constant coefficient of `X - 1`.
+example : quotientCharacteristicValue 101 0 2 0 0 (fun _ => 1) (fun _ => 1)
+    (fun _ _ => 0) = 100 := by
+  have h := quotientCharacteristicValue_eq_specialization (p := 101) (n := 0) (B := 0) (m := 0)
+    (Int.castRingHom (ZMod 101)) 1 (by decide) (fun _ => 0) (by simp)
+    (1 : MvPolynomial (Fin 0) ℤ)
+    (by intro k _ _; simp [jacobian, Matrix.det_isEmpty]) (by decide) (by decide)
+    (fun _ => 1) (fun _ => 1) (fun _ _ => 0)
+    (by simp) (by simp [jacobian, Matrix.det_isEmpty]) (by simp)
+  have hdim : Fintype.card (NormalIndex 0 2) = 1 := by simp [NormalIndex]
+  simpa [Matrix.charpoly_one, hdim, ZMod.val_neg_one] using h
+
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
