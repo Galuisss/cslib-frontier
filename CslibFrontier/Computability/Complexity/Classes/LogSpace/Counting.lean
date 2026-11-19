@@ -35,21 +35,6 @@ configuration. The nondeterministic view is used only to bound workspace.
 
 @[expose] public section
 
-namespace Turing.MultiTapeCTM
-
-open MultiTapeMachine
-
-variable {k : ℕ} {State : Type}
-
-/-- Forget the multiplicity of transition occurrences for reasoning about reachable configurations.
-Use the original counting machine when counting branches. -/
-def toNTM (M : MultiTapeCTM k Bool State) : MultiTapeNTM k Bool State where
-  q₀ := M.initial
-  Tr state symbol work action :=
-    Action.emptyOracleEquiv.symm action ∈ M.tr state symbol work Empty.elim
-
-end Turing.MultiTapeCTM
-
 namespace Cslib.Complexity
 
 open _root_.Turing _root_.Turing.MultiTapeTM
