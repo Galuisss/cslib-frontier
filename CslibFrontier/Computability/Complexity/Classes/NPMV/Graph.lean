@@ -8,7 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Complexity.Classes.TFNP
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Nondeterministic
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.NondeterministicOutput
 import CslibFrontier.Computability.Complexity.Classes.NP.Nondeterministic
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Basic
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.HaltedReplay
@@ -203,8 +203,7 @@ successful output relation whose graph is in NP. A successful branch halts with 
 `true :: w`, where `w` is the result. -/
 theorem mem_NPMV_of_runsInPolyTime {t : α → ℕ}
     (ht : PolyBounded (fun a => (enc a).length) t) (hrun : ∀ a, ntm.RunsInTime (enc a) (t a)) :
-    (fun a w => ∃ p : ntm.ComputationPath (enc a), p.last.Halted ∧ p.last.output = true :: w) ∈
-      NPMV enc := by
+    (fun a w => ntm.Produces (enc a) w) ∈ NPMV enc := by
   obtain ⟨c, d, hle⟩ := ht.exists_le
   refine ⟨⟨Polynomial.C c * (Polynomial.X + 1) ^ d, ?_⟩, ?_⟩
   · rintro a w ⟨p, hp, hout⟩
