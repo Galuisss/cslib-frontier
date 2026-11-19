@@ -2201,6 +2201,9 @@ public import CslibFrontier.Computability.Complexity.Classes.NP.SelfReduction
 public import CslibFrontier.Computability.Complexity.Classes.NP.StrictVerifier
 public import CslibFrontier.Computability.Complexity.Classes.NP.TruthTable
 public import CslibFrontier.Computability.Complexity.Classes.NP.Witness
+public import CslibFrontier.Computability.Complexity.Classes.NPMV.Graph
+public import CslibFrontier.Computability.Complexity.Classes.NPMV.Machine
+public import CslibFrontier.Computability.Complexity.Classes.NPMV.Witness
 public import CslibFrontier.Computability.Complexity.Classes.Operators
 public import CslibFrontier.Computability.Complexity.Classes.Oracle
 public import CslibFrontier.Computability.Complexity.Classes.Oracle.BakerGillSolovay
@@ -3598,6 +3601,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.L
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.Savitch
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.Words
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Nondeterministic
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.NondeterministicOutput
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolySpace
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolySpace.Basic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolySpace.Fold

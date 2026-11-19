@@ -190,7 +190,8 @@ def TFNP (enc : α ↪ List Bool) : Set (α → List Bool → Prop) :=
 
 /-- The partial multivalued functions computable in nondeterministic polynomial time.
 The output relation is polynomially balanced, and certification of an output may itself
-use a nondeterministic polynomial-time computation. -/
+use a nondeterministic polynomial-time computation. The equivalence with the tagged-output
+machine formulation is proved in `CslibFrontier.Computability.Complexity.Classes.NPMV.Machine`. -/
 def NPMV (enc : α ↪ List Bool) : Set (α → List Bool → Prop) :=
   {R | (∃ p : Polynomial ℕ, ∀ a w, R a w → w.length ≤ p.eval (enc a).length) ∧
     {aw | R aw.1 aw.2} ∈ NP (encPair enc encBits)}
