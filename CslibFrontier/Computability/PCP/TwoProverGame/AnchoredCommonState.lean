@@ -9,7 +9,7 @@ module
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredNoisyStates
 public import CslibFrontier.Foundations.Quantum.Measurement.LocalAlignment
-public import Mathlib.Analysis.Normed.Module.Normalize
+public import CslibFrontier.Foundations.Analysis.Normed.Normalize
 import CslibFrontier.Foundations.LinearAlgebra.Matrix.Kronecker
 
 /-!
@@ -145,10 +145,6 @@ private theorem norm_sub_normalize_le {E : Type*} [NormedAddCommGroup E] [Normed
     rw [NormedSpace.normalize, map_smul, smul_sub]
   have hscale : c • u = (‖u‖ / ‖v‖) • NormedSpace.normalize u := by
     rw [div_eq_mul_inv, mul_comm, ← smul_smul, NormedSpace.norm_smul_normalize]
-  have hnormal : ‖NormedSpace.normalize u‖ ≤ 1 := by
-    by_cases hu : u = 0
-    · simp [hu]
-    · rw [NormedSpace.norm_normalize hu]
   have hrem : c • u - NormedSpace.normalize u = (‖u‖ / ‖v‖ - 1) • NormedSpace.normalize u := by
     rw [sub_smul, one_smul, hscale]
   have h := norm_sub_le (f (NormedSpace.normalize v) - c • u) (NormedSpace.normalize u - c • u)
@@ -157,7 +153,7 @@ private theorem norm_sub_normalize_le {E : Type*} [NormedAddCommGroup E] [Normed
     norm_sub_rev (NormedSpace.normalize u), hrem, norm_smul, Real.norm_eq_abs] at h
   exact h.trans (by
     rw [div_eq_inv_mul ‖f v - u‖]
-    exact add_le_add le_rfl (mul_le_of_le_one_right (abs_nonneg _) hnormal))
+    exact add_le_add le_rfl (mul_le_of_le_one_right (abs_nonneg _) (NormedSpace.norm_normalize_le_one u)))
 
 /-- The state obtained by applying the two local unitaries to the normalized doubly
 anchored branch is close to the normalized branch at the selected questions.

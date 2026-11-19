@@ -6068,6 +6068,7 @@ public import CslibFrontier.Foundations.Analysis.Lattice.Schwartz
 public import CslibFrontier.Foundations.Analysis.LpNorm
 public import CslibFrontier.Foundations.Analysis.LpNormMeasure
 public import CslibFrontier.Foundations.Analysis.MarkovBrothersInequality
+public import CslibFrontier.Foundations.Analysis.Normed.Normalize
 public import CslibFrontier.Foundations.Analysis.Normed.Ring.PowSub
 public import CslibFrontier.Foundations.Analysis.Normed.UnitSphere
 public import CslibFrontier.Foundations.Analysis.RateExponent
