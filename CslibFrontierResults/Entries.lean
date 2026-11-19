@@ -7,6 +7,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 -- upstream: local-only (result registry collection)
 import CslibFrontierResults.Registry
 import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
 import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 import CslibFrontier.Computability.PCP.TwoProverGame.Synchronous
@@ -10811,6 +10812,27 @@ register_result "anchoring-classical-and-entangled-values" where
     the classical and entangled rejection gaps both scale by (1 − α)², including α = 0 and α = 1. \
     Entangled value is the supremum over finite-dimensional tensor strategies with arbitrary \
     local POVMs. The strategy maps preserve both local dimensions."
+
+register_result "bvy-anchored-noisy-reveal-laws" where
+  title := "Conditional independence and the anchored marginal of the noisy reveal"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Claims 4.1–4.2",
+      locator := "arXiv:1509.07466v2, §4.1, printed pp. 11–12" }
+  ]
+  theorems := [
+    Cslib.PCP.AnchoredDependency.conditionalSnd_messagePair,
+    Cslib.PCP.AnchoredDependency.leftLaw_apply,
+    Cslib.PCP.AnchoredDependency.rightLaw_apply,
+    Cslib.PCP.AnchoredDependency.map_snd_leftLaw,
+    Cslib.PCP.AnchoredDependency.map_snd_rightLaw,
+    Cslib.PCP.AnchoredDependency.map_snd_law
+  ]
+  scope := "For any original joint question PMF, the weighted point masses factor into the message \
+    mass and two local conditional laws. The factorization expresses independence at supported \
+    messages. For either designated player, forgetting the message recovers the anchored question \
+    law, including anchor rates zero and one. Agreement of the left-message conditional with \
+    the original anchored conditional assumes a supported message and an interior anchor rate."
 
 register_result "synchronous-correlations-tracial-representation" where
   title := "Tracial representation of synchronous commuting correlations"
