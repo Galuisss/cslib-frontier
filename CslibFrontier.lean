@@ -2971,7 +2971,12 @@ public import CslibFrontier.Computability.Complexity.Problems.XORSAT.Dense
 public import CslibFrontier.Computability.Complexity.Problems.XSAT
 public import CslibFrontier.Computability.Complexity.ProofSystem
 public import CslibFrontier.Computability.Complexity.ProofSystem.Exhaustive
+public import CslibFrontier.Computability.Complexity.RealAlgebraic.CoefficientEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.Controlled
+public import CslibFrontier.Computability.Complexity.RealAlgebraic.ControlledCoefficients
+public import CslibFrontier.Computability.Complexity.RealAlgebraic.ControlledSigns
+public import CslibFrontier.Computability.Complexity.RealAlgebraic.GridEnumeration
+public import CslibFrontier.Computability.Complexity.RealAlgebraic.MultivariateCoefficients
 public import CslibFrontier.Computability.Complexity.Reduction
 public import CslibFrontier.Computability.Complexity.Reduction.Autoreducibility
 public import CslibFrontier.Computability.Complexity.Reduction.BoundedOracle
@@ -6642,6 +6647,7 @@ public import CslibFrontier.Foundations.Data.MvPolynomial.Catalecticant
 public import CslibFrontier.Foundations.Data.MvPolynomial.CoeffNorm1
 public import CslibFrontier.Foundations.Data.MvPolynomial.CoefficientDegree
 public import CslibFrontier.Foundations.Data.MvPolynomial.DualNumber
+public import CslibFrontier.Foundations.Data.MvPolynomial.FiniteFieldCoefficients
 public import CslibFrontier.Foundations.Data.MvPolynomial.Hessian
 public import CslibFrontier.Foundations.Data.MvPolynomial.HessianChainRule
 public import CslibFrontier.Foundations.Data.MvPolynomial.HessianRank
