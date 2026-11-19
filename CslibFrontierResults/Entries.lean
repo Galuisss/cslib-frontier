@@ -8,6 +8,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 import CslibFrontierResults.Registry
 import CslibFrontier.Computability.PCP.TwoProverGame.AlmostSynchronous
 import CslibFrontier.Computability.PCP.TwoProverGame.AlmostSynchronousReduction
+import CslibFrontier.Computability.PCP.TwoProverGame.SynchronousCorrelation
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 import CslibFrontier.Foundations.Algebra.Group.HomomorphismTesting
 import CslibFrontier.Foundations.Quantum.Orthogonalization
@@ -5442,6 +5443,20 @@ register_result "almost-synchronous-arbitrary-projective-spectral-mixture" where
     A finite mixture of synchronous projective strategies on spectral subspaces recovers that \
     party's reduced state exactly in the original local basis. The average squared state-dependent \
     measurement error is at most 18δ + 20√δ, where δ is the diagonal synchrony defect."
+
+register_result "almost-synchronous-correlation-mixture" where
+  title := "Vidick: approximation by a mixture of synchronous correlations"
+  topic := "nonlocal games"
+  sources := [
+    { paper := Vidick2022, theorem := "Corollary 3.3",
+      locator := "arXiv:2103.02468v3, pp. 12–13, equation (21)" }
+  ]
+  theorems := [Cslib.PCP.QuantumStrategy.exists_synchronous_correlation_mixture]
+  scope := "Finite tensor-product strategies with arbitrary POVMs and possibly unequal local \
+    dimensions. Both marginal question laws coincide. The synchronous projective components \
+    have normalized trace correlations. Their finite convex mixture differs from the original \
+    joint answer probabilities by at most 2√(2δ) + 4√(18δ + 20√δ) in the question-averaged \
+    sum of absolute differences, for diagonal synchrony defect δ under the common marginal."
 
 register_result "binary-linear-constraint-operator-solution-perfect" where
   title := "Cleve–Mittal: finite-dimensional operator solutions of binary linear constraint \

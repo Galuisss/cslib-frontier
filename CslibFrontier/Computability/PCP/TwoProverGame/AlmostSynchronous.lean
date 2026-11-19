@@ -45,7 +45,7 @@ noncomputable def spectralCutWeight (d : ι → ℝ) (s : Cuts) : ℝ :=
   diagonalCutWidth d s * s.val.card
 
 /-- The totally mixed state on the cut, as a density matrix on the original space. -/
-noncomputable def spectralCutDensity [DecidableEq ι] (s : Cuts) : Matrix ι ι ℂ :=
+@[expose] noncomputable def spectralCutDensity [DecidableEq ι] (s : Cuts) : Matrix ι ι ℂ :=
   (s.val.card : ℝ)⁻¹ • diagonal (fun i => if i ∈ s.val then (1 : ℂ) else 0)
 
 theorem spectralCutWeight_nonneg (d : ι → ℝ) (s : Cuts) : 0 ≤ spectralCutWeight d s :=
@@ -97,7 +97,7 @@ theorem spectralCutDensity_isDensityMatrix (s : Cuts) :
     exact mul_inv_cancel₀ hn
 
 /-- Extend a cut matrix by zero in both coordinates. -/
-noncomputable def extendCutMatrix (s : Finset ι)
+@[expose] noncomputable def extendCutMatrix (s : Finset ι)
     (B : Matrix {i : ι // i ∈ s} {i : ι // i ∈ s} ℂ) : Matrix ι ι ℂ :=
   fun i j => if hi : i ∈ s then if hj : j ∈ s then B ⟨i, hi⟩ ⟨j, hj⟩ else 0 else 0
 
