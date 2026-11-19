@@ -263,32 +263,23 @@ private abbrev SecretRows (s : Level) := (Fin s.params.ℓ → FixedBytes 481) �
 private def nonceWord (s : Level) (rho : FixedBytes 64) (j : Nonce s) : List Bool :=
   Keccak.bytesToBitsLE (nonceInput rho.toList (finSumFinEquiv j).val)
 
-private theorem nonceWord_length (s : Level) (rho : FixedBytes 64) (j : Nonce s) :
-    (nonceWord s rho j).length = 528 := by
-  rw [nonceWord, Keccak.length_bytesToBitsLE, nonceInput, List.length_append,
-    FixedBytes.length_toList rho]
-  rfl
-
 private theorem nonceWord_injective (s : Level) (rho : FixedBytes 64) :
     Function.Injective (nonceWord s rho) := by
   intro i j h
-  have e := Keccak.bytesToBitsLE_injective h
-  simp only [nonceInput, List.append_cancel_left_eq, List.cons.injEq, and_true] at e
-  have lo := congrArg Fin.val e.1
-  simp only [nonceSuffix, Matrix.cons_val_zero, Fin.val_ofNat] at lo
-  apply finSumFinEquiv.injective
-  apply Fin.ext
-  have size : s.params.ℓ + s.params.k ≤ 256 := by cases s <;> decide
-  simpa only [Nat.mod_eq_of_lt ((finSumFinEquiv i).isLt.trans_le size),
-    Nat.mod_eq_of_lt ((finSumFinEquiv j).isLt.trans_le size)] using lo
+  have size : s.params.ℓ + s.params.k ≤ 65536 := by cases s <;> decide
+  exact finSumFinEquiv.injective (Fin.ext (eq_of_nonceInput_eq
+    ((finSumFinEquiv i).isLt.trans_le size) ((finSumFinEquiv j).isLt.trans_le size)
+    (Keccak.bytesToBitsLE_injective h)))
 
 private def secretPoint {a b : ℕ} (s : Level) (rho : FixedBytes 64) (ha : 528 ≤ a)
     (hb : 481 ≤ b) : (Nonce s × Fin 481) ↪ (RawWord a × Fin b) where
-  toFun p := (word (nonceWord s rho p.1) ((nonceWord_length ..).le.trans ha), p.2.castLE hb)
+  toFun p := (word (nonceWord s rho p.1) ((length_nonceInput_bits rho _).le.trans ha),
+    p.2.castLE hb)
   inj' := by
     intro p q h
-    have raw := word_inj (hx := (nonceWord_length s rho p.1).le.trans ha)
-      (hy := (nonceWord_length s rho q.1).le.trans ha) (congrArg Prod.fst h)
+    have raw := word_inj (hx := (length_nonceInput_bits rho (finSumFinEquiv p.1).val).le.trans ha)
+      (hy := (length_nonceInput_bits rho (finSumFinEquiv q.1).val).le.trans ha)
+      (congrArg Prod.fst h)
     exact Prod.ext (nonceWord_injective s rho raw) (Fin.castLE_injective hb (congrArg Prod.snd h))
 
 private def rowPair (s : Level) : ((Nonce s × Fin 481) → Byte) ≃ SecretRows s :=
@@ -312,7 +303,7 @@ private theorem expandS_install {a b : ℕ} (s : Level) (rho : FixedBytes 64)
     · intro i hi _
       have h : i < 481 := by simpa only [ExtendableOutput.length_read] using hi
       rw [ExtendableOutput.getElem_read _ _ h, byteAt_install,
-        dite_eq_left ⟨(nonceWord_length ..).le.trans ha, h.trans_le hb⟩, List.getElem_ofFn]
+        dite_eq_left ⟨(length_nonceInput_bits rho _).le.trans ha, h.trans_le hb⟩, List.getElem_ofFn]
       rfl
   have row (j : Nonce s) :
       ({H with h256 := install H.h256 T} : Xofs).secretPoly s rho.toList

@@ -262,6 +262,21 @@ private def nonceSuffix (i : ℕ) : FixedBytes 2 := ![Fin.ofNat 256 i, Fin.ofNat
 def nonceInput (seed : List Byte) (nonce : ℕ) : List Byte :=
   seed ++ [nonceSuffix nonce 0, nonceSuffix nonce 1]
 
+/-- A nonce-tagged 64-byte expansion seed occupies 528 SHAKE input bits. -/
+theorem length_nonceInput_bits (seed : FixedBytes 64) (nonce : ℕ) :
+    (Keccak.bytesToBitsLE (nonceInput seed.toList nonce)).length = 528 := by
+  rw [Keccak.length_bytesToBitsLE, nonceInput, List.length_append, FixedBytes.length_toList seed]
+  rfl
+
+/-- For a fixed seed, the two-byte little-endian suffix recovers any counter below 65536. -/
+theorem eq_of_nonceInput_eq {seed : List Byte} {i j : ℕ} (hi : i < 65536) (hj : j < 65536)
+    (eq : nonceInput seed i = nonceInput seed j) : i = j := by
+  simp only [nonceInput, List.append_cancel_left_eq, List.cons.injEq, and_true] at eq
+  have lo := congrArg Fin.val eq.1
+  have high := congrArg Fin.val eq.2
+  simp only [nonceSuffix, Matrix.cons_val_zero, Matrix.cons_val_one, Fin.val_ofNat] at lo high
+  lia
+
 /-- An Algorithm 34 mask row has a 64-byte seed and two counter bytes. It cannot alias
 the SHAKE input at the 32-, 48-, or 64-byte digest consumed by Algorithm 29. -/
 theorem nonceInput_ne_digestInput {s : Level} (seed : FixedBytes 64) (nonce : ℕ)
