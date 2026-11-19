@@ -231,7 +231,7 @@ example (S : Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option
     let P := (T.filter W (acceptingGame_win_supported S)).map (aliceTranscriptProjection C e)
     ∃ ρ : _ → Matrix (Fin 3) (Fin 3) ℂ,
       (∀ z, Cslib.Quantum.IsDensityMatrix (ρ z)) ∧
-      Cslib.Quantum.sum_conditionalTraceNormSq P ρ ≤ 2 * Real.log 4 := by
+      Cslib.Quantum.sumConditionalTraceNormSq P ρ ≤ 2 * Real.log 4 := by
   dsimp only
   obtain ⟨ρ, hρ, _, h⟩ := exists_bob_sum_conditionalTraceNormSq_le_after_wins
     acceptingGame half {0} S (Fintype.equivFinOfCardEq (by decide : _ = 1)).symm
@@ -253,7 +253,7 @@ example (S : Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option
     let w := (half : ℝ) ^ 2 / 2
     let K := w * (2 * Real.log 4) + 8 * ((1 + w) * Real.sqrt (Real.log 4 / 2))
     ∃ ρ : _ → Matrix (Fin 3) (Fin 3) ℂ,
-      Cslib.Quantum.sum_conditionalTraceNormSq P ρ ≤ 2 * Real.log 4 ∧
+      Cslib.Quantum.sumConditionalTraceNormSq P ρ ≤ 2 * Real.log 4 ∧
       w * ((half : ℝ) / 4 *
         taggedPairConditionalTraceNormSq C acceptingGame half Q Prod.fst (Sum.inr ∘ Prod.snd) e ρ) ≤
           K ∧
@@ -264,7 +264,7 @@ example (S : Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option
   have hw : 0 ≤ w := by dsimp only [w]; positivity
   obtain ⟨ρ, hρ, _, hwin⟩ := exists_bob_sum_conditionalTraceNormSq_le_after_wins
     acceptingGame half C S e (acceptingGame_win_supported S)
-  have hwin' : Cslib.Quantum.sum_conditionalTraceNormSq P ρ ≤ 2 * Real.log 4 := by
+  have hwin' : Cslib.Quantum.sumConditionalTraceNormSq P ρ ≤ 2 * Real.log 4 := by
     simpa only [C, singletonCheckedAnswer_card, Nat.cast_ofNat, acceptingGame_win_mass,
       ENNReal.toReal_one, Real.log_one, sub_zero] using hwin
   have hcard : Fintype.card (({0} : Finset (Fin 2)) → Bool × Bool) = 4 := by decide

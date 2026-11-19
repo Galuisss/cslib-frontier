@@ -185,7 +185,7 @@ private theorem exists_quantitativeTaggedPairLocalUnitary_le [Fintype U] [Decida
         ‖NormedSpace.normalize (v i t u)‖ = 1 ∧
         quantumMarginalGivenMap (conditionalSnd P t) (fun z => ρ (t, z)) (fun z => z i) u =
           partialTraceRight (pureState (NormedSpace.normalize (v i t u)))) →
-    (sum_conditionalTraceNormSq P ρ ≤ 2 * (Real.log (Fintype.card Answer) - Real.log p)) →
+    (sumConditionalTraceNormSq P ρ ≤ 2 * (Real.log (Fintype.card Answer) - Real.log p)) →
     ((α : ℝ) / 4 * taggedPairConditionalTraceNormSq C G α Q read tag e ρ ≤
       priorConditionalTraceNormSq C G α Q read e ρ) →
     ((α : ℝ) * taggedPairAnchorTraceNormSq C G α Q read tag anchor e ρ ≤
