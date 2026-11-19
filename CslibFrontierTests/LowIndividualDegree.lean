@@ -15,7 +15,7 @@ import Mathlib.Algebra.Field.ZMod
 set_option linter.privateModule false
 
 open Cslib.PCP Cslib.PCP.LowIndividualDegree Cslib.Quantum
-open scoped MatrixOrder ComplexOrder BigOperators Matrix.Norms.L2Operator
+open scoped MatrixOrder ComplexOrder BigOperators Matrix.Norms.L2Operator Real
 
 private instance : Fact (Nat.Prime 3) := ⟨by decide⟩
 
@@ -92,3 +92,24 @@ example : let S := honestProductStrategy.toCommuting
     honestProductBranchScore .diagonal
   have h := decodedPoint_pairCommutatorDefect_le (F := ZMod 3) (n := 1) S hPoint hLine 1
   rwa [hscore, sub_self, mul_zero] at h
+
+private def shiftedSuccess (t : ZMod 3) (a : Answer (ZMod 3) 2) : Option (ZMod 3) :=
+  if t = 0 then none else some (decodePoint a + 1)
+
+/-- Compare the actual successful mismatch events when the first decoder may fail. -/
+example : let S := honestProductStrategy.toCommuting
+    (𝔼 u : Point (ZMod 3) 1, 𝔼 t : ZMod 3,
+      ((S.answers (.point (Fin.snoc u t)) (.axis (verticalLine u))).toOuterMeasure
+        {ab | ∃ a, shiftedSuccess t ab.1 = some a ∧
+          a ≠ (decodeVertical 1 u ab.2).value t}).toReal) ≤
+      (𝔼 u : Point (ZMod 3) 1, 𝔼 t : ZMod 3,
+        ((S.answers (.point (Fin.snoc u t)) (.point (Fin.snoc u t))).toOuterMeasure
+          {ab | ∃ a, shiftedSuccess t ab.1 = some a ∧ a ≠ decodePoint ab.2}).toReal) := by
+  intro S
+  classical
+  let P (u : Point (ZMod 3) 1) (t : ZMod 3) :=
+    (S.alice (.point (Fin.snoc u t))).map (shiftedSuccess t)
+  have h := successfulMismatch_vertical_le (F := ZMod 3) (n := 1) S 1 P
+  simp only [P, decodedPoint, decodedVertical, Measurement.map_map, Function.comp_apply,
+    CommutingStrategy.successfulMismatch_map_map_eq_event] at h
+  simpa only [S, honestProductBranchScore, sub_self, mul_zero, add_zero, Real.sqrt_zero] using h
