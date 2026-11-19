@@ -85,7 +85,7 @@ example : (Code.eval (pm[ while p ≠ q do [ p ← p[next] ] ] : Code model L) 1
 example (x : State model L) (h : x.data s < x.data t) :
     ExecWithin pm[ if (()) s t then [ s := t ] else [ t := s ] ] x (x.setData s (x.data t)) 2 :=
   .of_eval (fuel := 0)
-    (by simp [Code.eval, Cslib.Program.Code.eval, Test.Holds, Op.effect, Op.instr, Instr.effect, h])
+    (by simp [Cslib.Program.Code.eval, Test.Holds, Op.effect, Op.instr, Instr.effect, h])
     le_rfl
 
 -- A list walk: the loop rule with an invariant and a measure, here the distance to null.
