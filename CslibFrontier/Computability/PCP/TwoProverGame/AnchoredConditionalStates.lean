@@ -156,14 +156,7 @@ theorem norm_checkedVectorGivenRest_sq_answers (S : RepeatedStrategy) (j : Free)
     (q : PairQ) (a : C → A) (b : C → B) (ht : t ∈ (restQuestionsLaw G α C j).support) :
     ‖checkedVectorGivenRest G α C S j t q a b‖ ^ 2 =
       (answersGivenRest G α C S j t q (fun i => (a i, b i))).toReal := by
-  let pack : (C → A) × (C → B) → C → A × B := fun (a', b') i => (a' i, b' i)
-  have hinj : Function.Injective pack := by
-    intro ab cd h
-    apply Prod.ext
-    · funext i
-      exact congrArg Prod.fst (congrFun h i)
-    · funext i
-      exact congrArg Prod.snd (congrFun h i)
+  let pack := (Equiv.arrowProdEquivProdArrow C (fun _ => A) (fun _ => B)).symm
   have hpack (x : Fin n → Option X) (y : Fin n → Option Y) :
       checkedAnswerLaw C S (fun i => (x i, y i)) = (S.checkedAnswers C x y).map pack := by
     simp only [checkedAnswerLaw, QuantumStrategy.checkedAnswers, PMF.map_comp,
@@ -172,7 +165,8 @@ theorem norm_checkedVectorGivenRest_sq_answers (S : RepeatedStrategy) (j : Free)
   rw [checkedVectorGivenRest, QuantumStrategy.norm_averagedCheckedVector_sq]
   rw [answersGivenRest, questionsGivenRest_eq_bind G α C j t q ht, PMF.bind_bind]
   simp only [PMF.bind_map, Function.comp_def, hpack, ← PMF.map_bind]
-  rw [map_apply_of_injective _ hinj (a, b)]
+  rw [show (fun i => (a i, b i)) = pack (a, b) from rfl,
+    map_apply_of_injective _ pack.injective (a, b)]
 
 /-- The squared norm of the branch is the probability of the checked answers conditional on
 the retained questions and messages in the experiment with the selected pair fixed. -/
