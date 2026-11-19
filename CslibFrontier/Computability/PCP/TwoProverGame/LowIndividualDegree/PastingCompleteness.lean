@@ -243,18 +243,6 @@ theorem average_enoughSlices_le (φ : AlgState A)
   have ht := φ.one_sub_le_re_binomialTail hk hθ₀ hθ₁ hsize hG₀ hG₁ hmass
   linarith [(abs_sub_le_iff.mp h).2]
 
-omit [StarOrderedRing A] in
-private theorem successfulEffect_eq_success_prob {γ : Type*} [Fintype γ]
-    (φ : AlgState A) (M : Measurement (Option γ) A) :
-    (φ M.successfulEffect).re =
-      ((M.distribution φ).toOuterMeasure {q | q.isSome}).toReal := by
-  classical
-  simp only [toOuterMeasure_apply_toReal, Fintype.sum_option, Set.mem_ofPred_eq,
-    Option.isSome_none, Option.isSome_some, Bool.false_eq_true, ite_false, ite_true, zero_add,
-    Measurement.distribution_apply, ENNReal.toReal_ofReal (M.prob_nonneg φ _)]
-  unfold Measurement.successfulEffect Measurement.prob
-  rw [map_sum, Complex.re_sum]
-
 omit [Fintype F] in
 private theorem pasteSlices_success_prob_eq_expect [Finite F] (k : ℕ) [Nonempty (Fin k ↪ F)]
     (φ : AlgState A) (M : F → Measurement (Option (BoundedPolynomial F m d)) A)
@@ -268,7 +256,8 @@ private theorem pasteSlices_success_prob_eq_expect [Finite F] (k : ℕ) [Nonempt
       (φ N.successfulEffect).re = 1 - (φ (N.effect none)).re := by
     rw [N.effect_none_eq_one_sub_successfulEffect, map_sub, Complex.sub_re, φ.map_one,
       Complex.one_re, sub_sub_cancel]
-  simp only [← successfulEffect_eq_success_prob, h, expect_sub_distrib, Fintype.expect_const]
+  simp only [← Measurement.successfulEffect_eq_success_prob, h, expect_sub_distrib,
+    Fintype.expect_const]
   rw [pasteSlices_effect]
   simp only [uniformOfFintype_apply, ENNReal.toReal_inv, ENNReal.toReal_natCast, ← smul_sum,
     φ.re_apply_uniformAverage]

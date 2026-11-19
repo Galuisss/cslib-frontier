@@ -15,7 +15,7 @@ import Mathlib.Algebra.Field.ZMod
 set_option linter.privateModule false
 
 open Cslib.PCP Cslib.PCP.LowIndividualDegree Cslib.Quantum
-open scoped MatrixOrder ComplexOrder BigOperators
+open scoped MatrixOrder ComplexOrder BigOperators Matrix.Norms.L2Operator
 
 private instance : Fact (Nat.Prime 3) := ⟨by decide⟩
 
@@ -70,3 +70,25 @@ example (i : Fin 2) :
         (.point u) (.diagonal (linePoints u (prefixDirection i v))))) ≤ 0 := by
   simpa only [honestProductBranchScore, sub_self, mul_zero] using
     diagonalPointLossAt_le 1 1 honestProductStrategy.toCommuting i
+
+/-- The diagonal commutator estimate gives zero for the honest product-polynomial strategy. -/
+example : let S := honestProductStrategy.toCommuting
+    (𝔼 u : Point (ZMod 3) 2, 𝔼 v : Point (ZMod 3) 2,
+      Measurement.pairCommutatorDefect S.state (decodedPoint S.alice u) (decodedPoint S.alice v))
+      ≤ 0 := by
+  intro S
+  classical
+  have hPoint (u : Point (ZMod 3) 2) : (S.alice (.point u)).IsProjective := by
+    intro a
+    simp only [S, honestProductStrategy, QuantumStrategy.toCommuting,
+      QuantumStrategy.ofDeterministic, QuantumStrategy.leftMeasurement, POVM.const]
+    split_ifs <;> simp
+  have hLine (L : Finset (Point (ZMod 3) 2)) : (S.bob (.diagonal L)).IsProjective := by
+    intro a
+    simp only [S, honestProductStrategy, QuantumStrategy.toCommuting,
+      QuantumStrategy.ofDeterministic, QuantumStrategy.rightMeasurement, POVM.const]
+    split_ifs <;> simp
+  have hscore : (branchGame (F := ZMod 3) 1 1 .diagonal).commutingWinProb S = 1 :=
+    honestProductBranchScore .diagonal
+  have h := decodedPoint_pairCommutatorDefect_le (F := ZMod 3) (n := 1) S hPoint hLine 1
+  rwa [hscore, sub_self, mul_zero] at h

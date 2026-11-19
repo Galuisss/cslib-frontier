@@ -141,6 +141,26 @@ noncomputable def completedPaste (k : ℕ) [Nonempty (Fin k ↪ F)]
   classical
   exact (pasteSlices k M hM).map (fun q => q.getD fallback)
 
+open scoped Classical in
+/-- Completion maps the pasted failure outcome to the fallback. -/
+theorem completedPaste_eq_map (k : ℕ) [Nonempty (Fin k ↪ F)]
+    (M : F → Measurement (Option (BoundedPolynomial F n d)) A)
+    (hM : ∀ t, (M t).IsProjective) (fallback : BoundedPolynomial F (n + 1) d) :
+    completedPaste k M hM fallback = (pasteSlices k M hM).map (fun q => q.getD fallback) := by
+  unfold completedPaste
+  rfl
+
+open scoped Classical in
+/-- The fallback outcome receives the original failure effect in addition to its
+successful pasted effect. -/
+theorem completedPaste_effect (k : ℕ) [Nonempty (Fin k ↪ F)]
+    (M : F → Measurement (Option (BoundedPolynomial F n d)) A)
+    (hM : ∀ t, (M t).IsProjective) (fallback p : BoundedPolynomial F (n + 1) d) :
+    (completedPaste k M hM fallback).effect p =
+      (if fallback = p then (pasteSlices k M hM).effect none else 0) +
+        (pasteSlices k M hM).effect (some p) := by
+  rw [completedPaste_eq_map, Measurement.map_getD_effect]
+
 private theorem completedPaste_disagreement_le (k : ℕ) [Nonempty (Fin k ↪ F)]
     (S : RawStrategy) (M : F → Measurement (Option (BoundedPolynomial F n d)) A)
     (hM : ∀ t, (M t).IsProjective)
@@ -156,7 +176,8 @@ private theorem completedPaste_disagreement_le (k : ℕ) [Nonempty (Fin k ↪ F)
   let z := MvPolynomial.eval w fallback.val
   have he : (completedPaste k M hM fallback).map (fun p => MvPolynomial.eval w p.val) =
       (evaluatePolynomialMeasurement P w).map (fun a => a.getD z) := by
-    unfold completedPaste evaluatePolynomialMeasurement
+    rw [completedPaste_eq_map]
+    unfold evaluatePolynomialMeasurement
     simp only [Measurement.map_map]
     congr 1
     funext q
