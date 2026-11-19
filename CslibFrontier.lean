@@ -6661,6 +6661,7 @@ public import CslibFrontier.Foundations.Data.MvPolynomial.HessianRank
 public import CslibFrontier.Foundations.Data.MvPolynomial.InitialMonomial
 public import CslibFrontier.Foundations.Data.MvPolynomial.InterpolateLast
 public import CslibFrontier.Foundations.Data.MvPolynomial.IteratedPDerivSpan
+public import CslibFrontier.Foundations.Data.MvPolynomial.LastVariable
 public import CslibFrontier.Foundations.Data.MvPolynomial.LinearSubstitution
 public import CslibFrontier.Foundations.Data.MvPolynomial.LowDegreeRoot
 public import CslibFrontier.Foundations.Data.MvPolynomial.LowestComponent
