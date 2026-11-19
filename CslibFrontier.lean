@@ -1952,6 +1952,7 @@ public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.Games.
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.GraphNonIsomorphism
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.Operators
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.PH
+public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.PPSPACE
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.PerfectCompleteness
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.RandomizedReduction
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.RoundCollapse
@@ -2009,6 +2010,7 @@ public import CslibFrontier.Computability.Complexity.Classes.Constructible.Log
 public import CslibFrontier.Computability.Complexity.Classes.Constructible.Space
 public import CslibFrontier.Computability.Complexity.Classes.Constructible.TwoPow
 public import CslibFrontier.Computability.Complexity.Classes.Constructible.UnaryClock
+public import CslibFrontier.Computability.Complexity.Classes.Counting.AC0
 public import CslibFrontier.Computability.Complexity.Classes.Counting.OracleSpace
 public import CslibFrontier.Computability.Complexity.Classes.Counting.Space
 public import CslibFrontier.Computability.Complexity.Classes.CountingHierarchy
@@ -2131,8 +2133,10 @@ public import CslibFrontier.Computability.Complexity.Classes.Ladner.Density
 public import CslibFrontier.Computability.Complexity.Classes.Ladner.PolyTime
 public import CslibFrontier.Computability.Complexity.Classes.Ladner.Stages
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace
+public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Advice
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Closure
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Complement
+public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Counting
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.FirstOrder
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.FirstOrder.ClosureKernel
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.FirstOrder.ConfigurationGraph
@@ -2155,6 +2159,8 @@ public import CslibFrontier.Computability.Complexity.Classes.LogSpace.FirstOrder
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.FirstOrder.TransitiveClosure.Converse
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.FirstOrder.TransitiveClosure.Counting
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.FirstOrder.TransitiveClosure.Loop
+public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Function
+public import CslibFrontier.Computability.Complexity.Classes.LogSpace.NondeterministicOracle
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.PolyTime
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Randomized
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Randomized.Amplification
@@ -2168,7 +2174,9 @@ public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Randomized
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Randomized.PolyTime
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Randomized.TimeLayer
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Savitch
+public import CslibFrontier.Computability.Complexity.Classes.LogSpace.TwoWayRandomness
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.USTCON
+public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Variants
 public import CslibFrontier.Computability.Complexity.Classes.MIP
 public import CslibFrontier.Computability.Complexity.Classes.MIP.Defs
 public import CslibFrontier.Computability.Complexity.Classes.MIP.NEXP
@@ -2186,6 +2194,7 @@ public import CslibFrontier.Computability.Complexity.Classes.NP.Advice
 public import CslibFrontier.Computability.Complexity.Classes.NP.Closure
 public import CslibFrontier.Computability.Complexity.Classes.NP.GuessVerify
 public import CslibFrontier.Computability.Complexity.Classes.NP.Image
+public import CslibFrontier.Computability.Complexity.Classes.NP.Logarithmic
 public import CslibFrontier.Computability.Complexity.Classes.NP.Nondeterministic
 public import CslibFrontier.Computability.Complexity.Classes.NP.Relation
 public import CslibFrontier.Computability.Complexity.Classes.NP.SelfReduction
@@ -2311,6 +2320,7 @@ public import CslibFrontier.Computability.Complexity.Classes.SharpP.ApproximateC
 public import CslibFrontier.Computability.Complexity.Classes.SharpP.Characterization
 public import CslibFrontier.Computability.Complexity.Classes.SharpP.Choose
 public import CslibFrontier.Computability.Complexity.Classes.SharpP.Closure
+public import CslibFrontier.Computability.Complexity.Classes.SharpP.Cluster
 public import CslibFrontier.Computability.Complexity.Classes.SharpP.Combinators
 public import CslibFrontier.Computability.Complexity.Classes.SharpP.Completeness
 public import CslibFrontier.Computability.Complexity.Classes.SharpP.EasySearch
