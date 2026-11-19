@@ -165,7 +165,7 @@ theorem priorConditionalTraceNormSq_le [Fintype U] [DecidableEq U] (S : Repeated
 
 /-- Evaluate a score with independently drawn anchored questions and winning remaining
 transcript, setting the selected message by `tag`. -/
-noncomputable def taggedPairScore (Q : PMF Transcript) (read : PairQ → U)
+@[expose] noncomputable def taggedPairScore (Q : PMF Transcript) (read : PairQ → U)
     (tag : PairQ → Message) (e : Fin m ≃ Free) (score : Fin m → Label → U → ℝ) : ℝ :=
   ∑ i : Fin m, ∑ q, ((G.anchored α).questions q).toReal * ∑ r,
     ((Q.map (restTranscript C (e i))) r).toReal *
