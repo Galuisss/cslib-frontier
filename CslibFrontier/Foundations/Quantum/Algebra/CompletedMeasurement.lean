@@ -84,6 +84,12 @@ private def someEmbedding : α ↪ Option α :=
 omit [Fintype α] in
 private theorem someEmbedding_apply (a : α) : someEmbedding a = some a := rfl
 
+/-- Summing the successful projections does not increase the squared state norm. -/
+theorem sum_norm_some_effect_mul_sq_le (φ : AlgState A) (M : Measurement (Option α) A)
+    (hM : M.IsProjective) (x : A) :
+    (∑ a, φ.norm (M.effect (some a) * x) ^ 2) ≤ φ.norm x ^ 2 :=
+  sum_norm_selected_effect_mul_sq_le φ M hM someEmbedding x
+
 /-- Commuting with each successful projection, together with a commuting copy for those
 projections, controls commutation with the total successful effect. -/
 theorem sum_successfulEffect_commutator_sq_le (φ : AlgState A)

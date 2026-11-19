@@ -31,7 +31,7 @@ variable {A α : Type*} [Fintype α] [Ring A] [PartialOrder A] [Algebra ℂ A]
 
 /-- The mass of disagreements between successful outcomes on the first side and outcomes on
 the second side. Failure on the first side contributes zero. -/
-noncomputable def successfulMismatch (φ : AlgState A) (P : Measurement (Option α) A)
+@[expose] noncomputable def successfulMismatch (φ : AlgState A) (P : Measurement (Option α) A)
     (Q : Measurement α A) : ℝ :=
   ∑ a, (φ (P.effect (some a) * (1 - Q.effect a))).re
 

@@ -32,15 +32,6 @@ open scoped Real
 
 variable {A : Type*} [CStarAlgebra A] [PartialOrder A] [StarOrderedRing A]
 
-private theorem abs_sum_re_star_mul_le {ι : Type*} [Fintype ι] (φ : AlgState A) (X Y : ι → A) :
-    |∑ i, (φ (star (X i) * Y i)).re| ≤
-      √(∑ i, φ.norm (X i) ^ 2) * √(∑ i, φ.norm (Y i) ^ 2) := by
-  calc
-    _ ≤ ∑ i, |(φ (star (X i) * Y i)).re| := Finset.abs_sum_le_sum_abs _ _
-    _ ≤ ∑ i, φ.norm (X i) * φ.norm (Y i) := sum_le_sum fun i _ =>
-      (Complex.abs_re_le_norm _).trans (φ.norm_apply_star_mul_le _ _)
-    _ ≤ _ := Real.sum_mul_le_sqrt_mul_sqrt _ _ _
-
 namespace Measurement
 
 variable {α β B : Type*} [Fintype α] [Fintype β] [Fintype B]
@@ -184,7 +175,7 @@ theorem abs_first_transcript_score_sub_le {k : ℕ} (φ : AlgState A)
   have hbound (U V : α × (Fin k → β) → A) {u v : ℝ}
       (hu : ∑ z, φ.norm (U z) ^ 2 ≤ u) (hv : ∑ z, φ.norm (V z) ^ 2 ≤ v) :
       |∑ z, (φ (star (U z) * V z)).re| ≤ √u * √v :=
-    (abs_sum_re_star_mul_le φ U V).trans
+    (φ.abs_sum_re_star_mul_le U V).trans
       (mul_le_mul (Real.sqrt_le_sqrt hu) (Real.sqrt_le_sqrt hv) (Real.sqrt_nonneg _)
         (Real.sqrt_nonneg _))
   have h₁ := hbound X (fun z => w z * D z) hX.le hwD

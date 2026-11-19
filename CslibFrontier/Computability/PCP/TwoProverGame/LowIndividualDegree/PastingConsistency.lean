@@ -186,6 +186,15 @@ noncomputable def isolatedSliceMismatch
     Measurement (Option F) A :=
   M.map (Option.map fun q => eval u q.val)
 
+omit [Algebra ℂ A] [TopologicalSpace A] [ContinuousFunctionalCalculus ℝ A IsSelfAdjoint]
+  [NonnegSpectrumClass ℝ A] [StarModule ℂ A] [SelfAdjointDecompose A] in
+@[simp] theorem evaluatePolynomialMeasurement_effect_none [Fintype F] [DecidableEq F]
+    (M : Measurement (Option (BoundedPolynomial F m d)) A) (u : Fin m → F) :
+    (evaluatePolynomialMeasurement M u).effect none = M.effect none := by
+  classical
+  rw [evaluatePolynomialMeasurement, Measurement.map_effect, sum_filter, Fintype.sum_option]
+  simp
+
 omit [Field F] [Finite F] [StarModule ℂ A] [SelfAdjointDecompose A] in
 private theorem successfulMismatch_eq_event {X Y γ : Type*} [Fintype γ] [Fintype F] [DecidableEq F]
     (T : CommutingStrategy X Y γ β A) (x : X) (y : Y) (f : γ → Option F) (g : β → F) :

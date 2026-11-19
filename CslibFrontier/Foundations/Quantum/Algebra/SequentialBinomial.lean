@@ -34,11 +34,6 @@ namespace Cslib.Quantum.Measurement
 open Finset
 open scoped BigOperators Real
 
-private theorem expect_sqrt_le_sqrt_expect {ι : Type*} [Fintype ι]
-    (f : ι → ℝ) (hf : ∀ i, 0 ≤ f i) : (𝔼 i, √(f i)) ≤ √(𝔼 i, f i) := by
-  apply Real.le_sqrt_of_sq_le
-  simpa only [Real.sq_sqrt (hf _)] using sq_expect_le_expect_sq univ (fun i => √(f i))
-
 variable {A α Q : Type*} [CStarAlgebra A] [PartialOrder A] [StarOrderedRing A]
   [Fintype α] [Fintype Q] [Nonempty Q]
 
@@ -181,12 +176,12 @@ private theorem abs_hybridSuccessScore_step_le (φ : AlgState A) (M R : Q → Me
   refine (expect_le_expect fun y _ => abs_expect_le _ _).trans ?_
   let δ (y : Q) := copyDefect φ (M y) (R y)
   let ε (y : Q) (x : Fin k → Q) := transcriptCommutatorDefect φ (M y) (fun j => M (x j))
-  have hδ := expect_sqrt_le_sqrt_expect δ (fun y => by
+  have hδ := Fintype.expect_sqrt_le_sqrt_expect δ (fun y => by
     unfold δ copyDefect
     exact sum_nonneg fun a _ => sq_nonneg _)
   have hε : (𝔼 y : Q, 𝔼 x : Fin k → Q, √(ε y x)) ≤ √(𝔼 y : Q, 𝔼 x : Fin k → Q, ε y x) := by
     simpa only [Fintype.expect_prod_type] using
-      expect_sqrt_le_sqrt_expect (fun z : Q × (Fin k → Q) => ε z.1 z.2)
+      Fintype.expect_sqrt_le_sqrt_expect (fun z : Q × (Fin k → Q) => ε z.1 z.2)
         (fun z => by
           unfold ε transcriptCommutatorDefect
           exact sum_nonneg fun a _ => sum_nonneg fun g _ => sq_nonneg _)
