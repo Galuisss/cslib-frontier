@@ -2688,6 +2688,7 @@ public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDra
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.SplitLayout
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.SplitOrder
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Star
+public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.VertexPlacement
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.VertexTransport
 public import CslibFrontier.Computability.Complexity.Problems.Graph.Ports
 public import CslibFrontier.Computability.Complexity.Problems.Graph.ReducedLaplacian
@@ -4115,6 +4116,7 @@ public import CslibFrontier.Computability.PCP.RegularConstraintGraph
 public import CslibFrontier.Computability.PCP.SelectedComposition
 public import CslibFrontier.Computability.PCP.ThreeSAT
 public import CslibFrontier.Computability.PCP.TwoProverGame
+public import CslibFrontier.Computability.PCP.TwoProverGame.AveragedAnswerStates
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSH
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSHRigidity
 public import CslibFrontier.Computability.PCP.TwoProverGame.Commuting
@@ -4133,6 +4135,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.Naimark
 public import CslibFrontier.Computability.PCP.TwoProverGame.Quantum
 public import CslibFrontier.Computability.PCP.TwoProverGame.RotationStrategy
 public import CslibFrontier.Computability.PCP.TwoProverGame.Synchronous
+public import CslibFrontier.Computability.PCP.TwoProverGame.TensorStrategy
 public import CslibFrontier.Computability.PCP.TwoProverGame.Tsirelson
 public import CslibFrontier.Computability.Pebbling.Basic
 public import CslibFrontier.Computability.Pebbling.BinaryTree
@@ -6975,6 +6978,7 @@ public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PolarDecomposition
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PosDef
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PosSemidefTrace
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PowPerturbation
+public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PowersStormer
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Rank
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.RankSupport
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.RectPermanent
@@ -7146,6 +7150,7 @@ public import CslibFrontier.Foundations.Quantum.Algebra.Tsirelson
 public import CslibFrontier.Foundations.Quantum.Bell
 public import CslibFrontier.Foundations.Quantum.Bipartite
 public import CslibFrontier.Foundations.Quantum.DensityMatrix
+public import CslibFrontier.Foundations.Quantum.DensityMatrix.FidelityTraceDistance
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Isometry
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Linear
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Normalize
@@ -7166,6 +7171,7 @@ public import CslibFrontier.Foundations.Quantum.Orthogonalization
 public import CslibFrontier.Foundations.Quantum.POVM
 public import CslibFrontier.Foundations.Quantum.POVM.Density
 public import CslibFrontier.Foundations.Quantum.POVM.Mixture
+public import CslibFrontier.Foundations.Quantum.POVM.OutcomeVector
 public import CslibFrontier.Foundations.Quantum.POVM.Postprocessing
 public import CslibFrontier.Foundations.Quantum.Pauli
 public import CslibFrontier.Foundations.Quantum.PauliTwirl
