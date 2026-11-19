@@ -79,7 +79,7 @@ example (φ : AlgState (Matrix (Fin 1) (Fin 1) ℂ)) (t : ℝ) (h₀ : 0 ≤ t) 
     ∃ P : Measurement (Fin 1 → Bool) (Matrix (Fin 1) (Fin 1) ℂ), P.IsProjective ∧
       (∀ a, P.charObs a ∈ unitary (Matrix (Fin 1) (Fin 1) ℂ)) ∧
       (∀ a b, P.charObs a * P.charObs b = P.charObs (a + b)) ∧
-      𝔼 a, φ.norm (A a - P.charObs a) ^ 2 ≤ 84 * (1 - t ^ 3) := by
+      𝔼 a, φ.norm (A a - P.charObs a) ^ 2 ≤ 48 * (1 - t ^ 3) := by
   intro A
   have hsa : ∀ a, IsSelfAdjoint (A a) := fun _ =>
     (show IsSelfAdjoint (t : ℂ) from Complex.conj_ofReal _).smul (by

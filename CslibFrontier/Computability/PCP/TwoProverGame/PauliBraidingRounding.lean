@@ -33,6 +33,15 @@ namespace Cslib.PCP
 open Quantum BitString Finset
 open scoped BigOperators MatrixOrder Matrix.Norms.L2Operator ComplexOrder Real
 
+/-- The width-independent squared distance budget for the rounded local characters
+and the averaged basis observables. -/
+noncomputable def pauliBraidingRoundingError (ε : ℝ) : ℝ :=
+  96 * (24 * ε + 2 * √(48 * ε)) + 48 * ε
+
+@[simp]
+theorem pauliBraidingRoundingError_zero : pauliBraidingRoundingError 0 = 0 := by
+  simp [pauliBraidingRoundingError]
+
 variable {n : ℕ} [Nonempty (Fin n)] {ι κ η Q A : Type*}
   [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ] [Fintype A]
 
@@ -64,7 +73,7 @@ private theorem roundPauliSide [Fintype η] [DecidableEq η]
     ∃ P : Measurement (Fin n → Bool) (Matrix η η ℂ), P.IsProjective ∧
       (𝔼 c, S.state.norm ((𝔼 d, pauliBraidingBasisObservable
         (cond roles S.alice S.bob) basis c d) - f (P.charObs c)) ^ 2) ≤
-          168 * (24 * ε + 2 * √(48 * ε)) + 96 * ε := by
+          pauliBraidingRoundingError ε := by
   let R := pauliBraidingLinearityStrategy basis S
   let T := (cond roles R R.swap).asymmetricLinearity
   let L (c : Fin n → Bool) := (pauliBraidingPointMeasurement M basis c).observable
@@ -93,21 +102,28 @@ private theorem roundPauliSide [Fintype η] [DecidableEq η]
   obtain ⟨P, hP, _, _, hround⟩ :=
     exists_isProjective_charObs_of_linear_contractions (S.state.comap f hf) L hself hcon hδ
   simp only [AlgState.norm_comap, map_sub, ← hL] at hround
-  have hproj (c : Fin n → Bool) :
-      ((cond roles S.alice S.bob) (.basis basis (c, c))).IsProjective := by
-    cases roles
-    · exact hB basis _
-    · exact hA basis _
-  have hdec := expect_norm_asymmetricLinearity_sub_basis_sq_le
-    G special decode S basis roles hproj
+  have hdec := expect_norm_asymmetricLinearity_sub_basis_sq_le G special decode S basis roles
   change (𝔼 c, S.state.norm ((T.alice c).observable - B c) ^ 2) ≤ _ at hdec
   have hε : 0 ≤ ε := by
     have h := SeededGame.answersWinProb_le_one (pauliBraidingBranchGame n G special decode 0)
       S.answers
     change (pauliBraidingBranchGame n G special decode 0).commutingWinProb S ≤ 1 at h
     linarith only [h, hwin]
-  have hdec' : (𝔼 c, S.state.norm ((T.alice c).observable - B c) ^ 2) ≤ 48 * ε :=
-    hdec.trans (by cases basis <;> simp only [Bool.false_eq_true, ite_false, ite_true] <;> linarith)
+  have hdec' : (𝔼 c, S.state.norm ((T.alice c).observable - B c) ^ 2) ≤ 24 * ε := by
+    refine hdec.trans ?_
+    cases basis
+    · simp only [Bool.false_eq_true, ite_false]
+      positivity
+    · simp only [ite_true]
+      have hsize : (2 : ℝ) ≤ Fintype.card (Fin n → Bool) := by
+        exact_mod_cast Nat.succ_le_of_lt (Fintype.one_lt_card (α := Fin n → Bool))
+      have hreject : 0 ≤ 1 - (pauliBraidingBranchGame n G special decode 0).commutingWinProb S :=
+        sub_nonneg.mpr (SeededGame.answersWinProb_le_one _ S.answers)
+      have hweight : (48 : ℝ) / Fintype.card (Fin n → Bool) ≤ 24 := by
+        apply (div_le_iff₀ (lt_of_lt_of_le (by norm_num) hsize)).mpr
+        linarith only [hsize]
+      exact (mul_le_mul_of_nonneg_right hweight hreject).trans
+        (mul_le_mul_of_nonneg_left (by linarith only [hwin]) (by norm_num))
   refine ⟨P, hP, ?_⟩
   change (𝔼 c, S.state.norm (B c - f (P.charObs c)) ^ 2) ≤ _
   have h := S.state.expect_norm_sub_sq_le_through univ B
@@ -117,6 +133,7 @@ private theorem roundPauliSide [Fintype η] [DecidableEq η]
         S.state.norm ((T.alice c).observable - B c) :=
     S.state.norm_sub_comm _ _
   simp only [hswap] at h
+  unfold pauliBraidingRoundingError
   linarith only [h, hdec', hround]
 
 /-- The linearity branch rounds each player's averaged consistency observables in a fixed basis
@@ -130,14 +147,13 @@ theorem exists_local_charObs_of_pauliBraidingLinearity
     (basis : Bool) {ε : ℝ}
     (hwin : 1 - ε ≤ (pauliBraidingBranchGame n G special decode 0).quantumWinProb S) :
     let T := S.toCommuting
-    let error := 168 * (24 * ε + 2 * √(48 * ε)) + 96 * ε
     ∃ (P : Measurement (Fin n → Bool) (Matrix ι ι ℂ))
       (R : Measurement (Fin n → Bool) (Matrix κ κ ℂ)), P.IsProjective ∧ R.IsProjective ∧
       (𝔼 c, T.state.norm ((𝔼 d, pauliBraidingBasisObservable T.alice basis c d) -
-        kroneckerOne (P.charObs c)) ^ 2) ≤ error ∧
+        kroneckerOne (P.charObs c)) ^ 2) ≤ pauliBraidingRoundingError ε ∧
       (𝔼 c, T.state.norm ((𝔼 d, pauliBraidingBasisObservable T.bob basis c d) -
-        oneKronecker (R.charObs c)) ^ 2) ≤ error := by
-  intro T error
+        oneKronecker (R.charObs c)) ^ 2) ≤ pauliBraidingRoundingError ε := by
+  intro T
   have hplaceA (q : PauliBraidingQuestion n Q) (a : (Bool × Bool) ⊕ A) :
       (T.alice q).effect a = kroneckerOne ((S.alice q).toMeasurement.effect a) := rfl
   have hplaceB (q : PauliBraidingQuestion n Q) (a : (Bool × Bool) ⊕ A) :

@@ -281,7 +281,6 @@ include hA in
 /-- The Walsh sums of the Fourier squares are close to the original self-adjoint contractions
 when their triple correlations are near one. -/
 theorem expect_norm_sub_walshSum_sq_le_of_contractions [SelfAdjointDecompose R]
-    (hcontract : ∀ a, A a * A a ≤ 1)
     (hTotal : ∑ u, fourierCoeff A u * fourierCoeff A u ≤ 1)
     {δ : ℝ} (hδ : 1 - δ ≤ 𝔼 a, 𝔼 b, (φ (A a * A b * A (a + b))).re) :
     𝔼 a, φ.norm (A a - walshSum (fun u => fourierCoeff A u * fourierCoeff A u) a) ^ 2 ≤
@@ -291,13 +290,13 @@ theorem expect_norm_sub_walshSum_sq_le_of_contractions [SelfAdjointDecompose R]
   set χ := walshSum B
   have hBsa : ∀ u, IsSelfAdjoint (B u) := fun u => (fourierCoeff_mul_self_nonneg hA u).isSelfAdjoint
   have hχ : ∀ a, IsSelfAdjoint (χ a) := isSelfAdjoint_walshSum hBsa
-  have hN : ∀ a, φ.norm (A a - χ a) ^ 2 ≤
-      1 - (φ (A a * χ a)).re - (φ (χ a * A a)).re + φ.norm (χ a) ^ 2 := by
+  have hN : ∀ a, φ.norm (A a - χ a) ^ 2 =
+      (φ (A a * A a)).re - (φ (A a * χ a)).re - (φ (χ a * A a)).re + φ.norm (χ a) ^ 2 := by
     intro a
     rw [φ.norm_sq, φ.norm_sq, star_sub, (hA a).star_eq, (hχ a).star_eq,
       sub_mul, mul_sub, mul_sub, map_sub, map_sub, map_sub, Complex.sub_re,
       Complex.sub_re, Complex.sub_re]
-    linarith only [φ.re_apply_le_one (hcontract a)]
+    ring
   have hc : (0 : ℝ) < 2 ^ Fintype.card ι := by positivity
   have hcard : (Fintype.card (ι → Bool) : ℝ) = 2 ^ Fintype.card ι := by
     rw [Fintype.card_fun, Fintype.card_bool]; push_cast; rfl
@@ -319,10 +318,13 @@ theorem expect_norm_sub_walshSum_sq_le_of_contractions [SelfAdjointDecompose R]
         rw [← Complex.re_sum, ← map_sum]
         exact φ.re_apply_le_one hTotal
   have hT := re_apply_sum_fourierCoeff_cube φ (A := A)
+  have hAavg : (∑ a, (φ (A a * A a)).re) ≤ (2 : ℝ) ^ Fintype.card ι := by
+    have h := φ.re_apply_le_one hTotal
+    rw [sum_fourierCoeff_mul_self_eq, re_apply_real_smul, map_sum, Complex.re_sum,
+      ← div_eq_inv_mul, div_le_iff₀ hc, one_mul] at h
+    exact h
   simp only [Fintype.expect_eq_sum_div_card, hcard] at hP hδ hT ⊢
-  refine (div_le_div_of_nonneg_right (sum_le_sum fun a _ => hN a) hc.le).trans ?_
-  simp only [sum_add_distrib, sum_sub_distrib, sum_const, card_univ, hcard, nsmul_eq_mul,
-    mul_one]
+  simp only [hN, sum_add_distrib, sum_sub_distrib]
   rw [hT₁] at hT
   have hT' : ∑ a, (φ (χ a * A a)).re = ∑ a, (φ (A a * χ a)).re := by
     have := hT₁.symm.trans hT₂
@@ -334,15 +336,14 @@ theorem expect_norm_sub_walshSum_sq_le_of_contractions [SelfAdjointDecompose R]
     rw [← hT] at hδ
     field_simp at hδ
     linarith
-  linarith
+  linarith only [hAavg, hP, this]
 
 /-- The characters of the Fourier measurement of involutions are close to the observables
 when their triple correlations are near one. -/
 theorem expect_norm_sub_walshSum_sq_le [SelfAdjointDecompose R] {δ : ℝ}
     (hδ : 1 - δ ≤ 𝔼 a, 𝔼 b, (φ (A a * A b * A (a + b))).re) :
     𝔼 a, φ.norm (A a - walshSum (fourierMeasurement A hA hA2).effect a) ^ 2 ≤ 2 * δ :=
-  expect_norm_sub_walshSum_sq_le_of_contractions hA φ (fun a => (hA2 a).le)
-    (sum_fourierCoeff_mul_self hA2).le hδ
+  expect_norm_sub_walshSum_sq_le_of_contractions hA φ (sum_fourierCoeff_mul_self hA2).le hδ
 
 end State
 

@@ -32,10 +32,9 @@ theorem, at the cost of the constant. So the rounded observables stay on `ℂ^ι
 estimate holds in every state, they stay on one party's factor in a tensor-product strategy
 (`Cslib.Quantum.exists_isProjective_charObs_kroneckerOne_of_linear`).
 
-The same-space construction extends to self-adjoint contractions with error `84δ`.
-Their Fourier squares can have total mass below the identity. The proof keeps
-the remaining effect as an extra outcome while orthogonalizing the measurement,
-then merges it into the zero character.
+The same-space construction extends to self-adjoint contractions with error `48δ`.
+The Fourier squares can have total mass below the identity. Distributing the remaining
+effect equally among the outcomes gives a measurement that is still nearly projective.
 
 ## Main results
 
@@ -94,7 +93,7 @@ theorem exists_isProjective_charObs_of_linear_contractions
     ∃ P : Measurement (n → Bool) (Matrix ι ι ℂ), P.IsProjective ∧
       (∀ a, P.charObs a ∈ unitary (Matrix ι ι ℂ)) ∧
       (∀ a a', P.charObs a * P.charObs a' = P.charObs (a + a')) ∧
-      𝔼 a, φ.norm (A a - P.charObs a) ^ 2 ≤ 84 * δ := by
+      𝔼 a, φ.norm (A a - P.charObs a) ^ 2 ≤ 48 * δ := by
   classical
   let D (u : n → Bool) := fourierCoeff A u * fourierCoeff A u
   have hTotal : ∑ u, D u ≤ 1 := by
@@ -109,76 +108,73 @@ theorem exists_isProjective_charObs_of_linear_contractions
     change (𝔼 a, A a * A a) ≤ 1
     simpa only [Fintype.expect_const] using
       (expect_le_expect (s := (univ : Finset (n → Bool))) fun a _ => hcontract a)
-  let B : Measurement (Option (n → Bool)) (Matrix ι ι ℂ) :=
-    { effect := fun o => o.elim (1 - ∑ u, D u) D
-      nonneg := fun o => by
-        cases o with
-        | none => exact sub_nonneg.mpr hTotal
-        | some u => exact fourierCoeff_mul_self_nonneg hA u
+  let H := ∑ u, D u
+  let R := (1 : Matrix ι ι ℂ) - H
+  let w : ℝ := (Fintype.card (n → Bool) : ℝ)⁻¹
+  have hw0 : 0 ≤ w := by positivity
+  have hw1 : w ≤ 1 := by
+    apply inv_le_one_of_one_le₀
+    exact_mod_cast Fintype.card_pos (α := n → Bool)
+  have hcount : ∑ _ : n → Bool, w = 1 := by
+    simp [w]
+  have hH : 0 ≤ H := sum_nonneg fun u _ => fourierCoeff_mul_self_nonneg hA u
+  have hR : 0 ≤ R := sub_nonneg.mpr hTotal
+  let B : Measurement (n → Bool) (Matrix ι ι ℂ) :=
+    { effect := fun u => D u + w • R
+      nonneg := fun u => add_nonneg (fourierCoeff_mul_self_nonneg hA u) (smul_nonneg hw0 hR)
       sum_effect := by
-        rw [Fintype.sum_option]
-        change 1 - (∑ u, D u) + (∑ u, D u) = 1
-        exact sub_add_cancel _ _ }
+        change ∑ u, (D u + w • R) = 1
+        rw [sum_add_distrib, ← sum_smul, hcount, one_smul]
+        change H + (1 - H) = 1
+        abel }
   obtain ⟨hmass, hfourth⟩ := one_sub_le_fourierCoeff_moments_of_linear hA φ hTotal hδ
-  have hB : 1 - 2 * δ ≤ ∑ o, (φ (B.effect o * B.effect o)).re := by
-    rw [Fintype.sum_option]
-    have hnone : 0 ≤ (φ (B.effect none * B.effect none)).re := by
-      have h := star_mul_self_nonneg (B.effect none)
-      rw [(B.nonneg none).isSelfAdjoint.star_eq] at h
-      exact φ.re_apply_nonneg h
-    change 1 - 2 * δ ≤ (φ (B.effect none * B.effect none)).re + ∑ u, (φ (D u * D u)).re
-    exact hfourth.trans (le_add_of_nonneg_left hnone)
-  obtain ⟨Q, hQ, hBQ⟩ := Measurement.exists_isProjective_sum_norm_sub_sq_le_of_le φ B hB
-  let fill : Option (n → Bool) → (n → Bool) := fun o => o.getD 0
-  let P := Q.map fill
-  have hP : P.IsProjective := hQ.map fill
-  refine ⟨P, hP, hP.charObs_mem_unitary, hP.charObs_mul, ?_⟩
-  have hchar (M : Measurement (Option (n → Bool)) (Matrix ι ι ℂ)) (a : n → Bool) :
-      (M.map fill).charObs a = walshSum (fun u => M.effect (some u)) a + M.effect none := by
-    rw [Measurement.charObs_eq_observable_map, Measurement.map_map, Measurement.observable_map,
-      Fintype.sum_option]
-    simp only [fill, Function.comp_apply, Option.getD_none, Option.getD_some, dotProduct_zero,
-      Bool.zero_eq_false, signVal_false, Complex.ofReal_one, one_smul, walshSum, add_comm]
-  have hnone : φ.norm (B.effect none) ^ 2 ≤ δ := by
-    rw [φ.norm_sq, (B.nonneg none).isSelfAdjoint.star_eq]
-    refine (φ.re_apply_mono (mul_self_le_self_of_nonneg_of_le_one
-      (B.nonneg none) (B.effect_le_one none))).trans ?_
-    change (φ (1 - ∑ u, D u)).re ≤ δ
-    rw [map_sub, AlgState.map_one, Complex.sub_re, Complex.one_re]
-    linarith only [hmass]
-  have hD := expect_norm_sub_walshSum_sq_le_of_contractions hA φ hcontract hTotal hδ
-  have hAclose : 𝔼 a, φ.norm (A a - (B.map fill).charObs a) ^ 2 ≤ 6 * δ := by
-    have h := φ.expect_norm_sub_sq_le_through univ A (walshSum D) (B.map fill).charObs
-    have heq (a : n → Bool) :
-        φ.norm (walshSum D a - (B.map fill).charObs a) = φ.norm (B.effect none) := by
-      rw [hchar]
-      change φ.norm (walshSum D a - (walshSum D a + B.effect none)) = _
-      rw [sub_add_eq_sub_sub, sub_self, zero_sub, AlgState.norm_neg]
-    simp only [heq, Fintype.expect_const] at h
-    linarith only [h, hD, hnone]
-  let E (u : n → Bool) := B.effect (some u) - Q.effect (some u)
-  let remainder := B.effect none - Q.effect none
-  have hPclose : 𝔼 a, φ.norm ((B.map fill).charObs a - P.charObs a) ^ 2 ≤ 36 * δ := by
-    have heq (a : n → Bool) :
-        (B.map fill).charObs a - P.charObs a = walshSum E a + remainder := by
-      rw [hchar, hchar Q]
-      change _ = walshSum ((fun u => B.effect (some u)) - fun u => Q.effect (some u)) a +
-        remainder
-      rw [← walshSum_sub]
-      unfold remainder
+  have hsq : ∑ u, B.effect u * B.effect u = (∑ u, D u * D u) + w • (1 - H * H) := by
+    have he (u : n → Bool) : B.effect u * B.effect u =
+        D u * D u + w • (D u * R) + w • (R * D u) + (w * w) • (R * R) := by
+      simp only [B, add_mul, mul_add, mul_smul_comm, smul_mul_assoc, smul_add,
+        ← mul_smul]
       abel
-    have hp (a : n → Bool) : φ.norm (walshSum E a + remainder) ^ 2 ≤
-        2 * φ.norm (walshSum E a) ^ 2 + 2 * φ.norm remainder ^ 2 := by
-      simpa only [add_sub_cancel_right, sub_zero] using
-        φ.norm_sub_sq_le_through (walshSum E a + remainder) remainder 0
-    simp only [heq]
-    have h := expect_le_expect (s := (univ : Finset (n → Bool))) fun a _ => hp a
-    rw [expect_add_distrib, ← mul_expect, Fintype.expect_const, expect_norm_walshSum_sq] at h
-    rw [Fintype.sum_option] at hBQ
-    change φ.norm remainder ^ 2 + ∑ u, φ.norm (E u) ^ 2 ≤ 9 * (2 * δ) at hBQ
-    linarith only [h, hBQ]
-  linarith only [φ.expect_norm_sub_sq_le_through univ A (B.map fill).charObs P.charObs,
-    hAclose, hPclose]
+    have hlast : (∑ _ : n → Bool, (w * w) • (R * R)) = w • (R * R) := by
+      simp only [mul_smul]
+      rw [← sum_smul, hcount, one_smul]
+    simp only [he, sum_add_distrib, hlast, ← smul_sum, ← sum_mul, ← mul_sum,
+      add_assoc, ← smul_add]
+    have hRem : H * R + (R * H + R * R) = 1 - H * H := by
+      dsimp only [R]
+      noncomm_ring
+    rw [hRem]
+  have hB : 1 - 2 * δ ≤ ∑ u, (φ (B.effect u * B.effect u)).re := by
+    rw [← Complex.re_sum, ← map_sum, hsq]
+    rw [← Complex.re_sum, ← map_sum] at hfourth
+    exact hfourth.trans (φ.re_apply_mono (le_add_of_nonneg_right
+      (smul_nonneg hw0 (sub_nonneg.mpr ((mul_self_le_self_of_nonneg_of_le_one hH hTotal).trans
+        hTotal)))))
+  obtain ⟨P, hP, hU, hmul, hBP⟩ := Measurement.exists_isProjective_charObs φ B hB
+  refine ⟨P, hP, hU, hmul, ?_⟩
+  have hRnorm : φ.norm R ^ 2 ≤ δ := by
+    rw [φ.norm_sq, hR.isSelfAdjoint.star_eq]
+    refine (φ.re_apply_mono (mul_self_le_self_of_nonneg_of_le_one hR ?_)).trans ?_
+    · exact sub_le_self _ hH
+    · change (φ (1 - ∑ u, D u)).re ≤ δ
+      rw [map_sub, AlgState.map_one, Complex.sub_re, Complex.one_re]
+      linarith only [hmass]
+  have hcompletion : 𝔼 a, φ.norm (walshSum D a - B.charObs a) ^ 2 ≤ δ := by
+    have he (a : n → Bool) : walshSum D a - B.charObs a = walshSum (fun _ => -(w • R)) a := by
+      rw [Measurement.charObs_eq_observable_map, Measurement.observable_map]
+      change walshSum D a - walshSum (fun u => D u + w • R) a = _
+      rw [walshSum_sub]
+      congr 1
+      funext u
+      change D u - (D u + w • R) = _
+      abel
+    simp only [he, expect_norm_walshSum_sq, AlgState.norm_neg, ← Complex.coe_smul,
+      AlgState.norm_smul, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg hw0, mul_pow]
+    rw [pow_two w, mul_assoc, ← sum_mul, hcount, one_mul]
+    exact (mul_le_of_le_one_left (sq_nonneg _) hw1).trans hRnorm
+  have hD := expect_norm_sub_walshSum_sq_le_of_contractions hA φ hTotal hδ
+  have hAB : 𝔼 a, φ.norm (A a - B.charObs a) ^ 2 ≤ 6 * δ := by
+    linarith only [φ.expect_norm_sub_sq_le_through univ A (walshSum D) B.charObs, hD, hcompletion]
+  linarith only [φ.expect_norm_sub_sq_le_through univ A B.charObs P.charObs, hAB, hBP]
 
 /-- **Rounding for one party of a tensor-product strategy.** If the first party's `±1` observables
 `A(a)` on `ℂ^ι` satisfy `E_{a,b} Re φ(A(a) A(b) A(a + b) ⊗ 1) ≥ 1 - δ` in the joint state `φ`,
