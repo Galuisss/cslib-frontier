@@ -61,8 +61,8 @@ open Cslib.Logic.PL Turing.MultiTapeTM
 /-- The fixed-template constraint satisfaction languages over a finite relation alphabet.
 A member fixes the finite nonempty domain, relation arities and relation tables before receiving
 an instance [Chen2006CSP]. -/
-def CSP.FixedTemplateLanguages (Rel : Type) [Finite Rel] : Set (Set (CSP Rel ℕ)) :=
-  {L | ∃ (q : ℕ) (arity : Rel → ℕ) (sem : Rel → List (Fin (q + 1)) → Bool),
+def CSP.FixedTemplateLanguages (Rel : Type) : Set (Set (CSP Rel ℕ)) :=
+  {L | Finite Rel ∧ ∃ (q : ℕ) (arity : Rel → ℕ) (sem : Rel → List (Fin (q + 1)) → Bool),
     L = CSP.TemplateSAT arity sem}
 
 namespace CSPSAT
