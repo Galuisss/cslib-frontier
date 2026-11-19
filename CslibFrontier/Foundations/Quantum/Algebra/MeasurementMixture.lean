@@ -41,4 +41,12 @@ theorem mixture_effect (p : PMF ι) (M : ι → Measurement α A) (a : α) :
   unfold mixture
   rfl
 
+/-- Classical mixing commutes with postprocessing measurement outcomes. -/
+theorem map_mixture {β : Type*} [Fintype β] [DecidableEq β]
+    (p : PMF ι) (M : ι → Measurement α A) (f : α → β) :
+    (mixture p M).map f = mixture p (fun i => (M i).map f) := by
+  ext b
+  simp only [map_effect, mixture_effect, Finset.smul_sum]
+  exact sum_comm
+
 end Cslib.Quantum.Measurement

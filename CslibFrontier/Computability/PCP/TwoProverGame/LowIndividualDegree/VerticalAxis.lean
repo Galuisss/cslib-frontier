@@ -84,6 +84,16 @@ noncomputable def decodedVertical (M : Question F (n + 1) → Measurement (Answe
     (d : ℕ) (u : Point F n) : Measurement (PolynomialFunction F d) A :=
   (M (.axis (verticalLine u))).map (decodeVertical d u)
 
+/-- An operator commuting with the raw line effects also commutes with the decoded effects. -/
+theorem commute_decodedVertical
+    (M : Question F (n + 1) → Measurement (Answer F (n + 1)) A)
+    (d : ℕ) (u : Point F n) (e : A)
+    (h : ∀ a, Commute e ((M (.axis (verticalLine u))).effect a)) (b : PolynomialFunction F d) :
+    Commute e ((decodedVertical M d u).effect b) := by
+  classical
+  rw [decodedVertical, Measurement.map_effect]
+  exact (Commute.sum_left _ _ _ fun a _ => (h a).symm).symm
+
 end Measurement
 
 section Score
@@ -236,6 +246,47 @@ theorem bob_vertical_stateDist_le (S : CommutingStrategy Q Q Ans Ans A) (d : ℕ
       dsimp only [point, line]
       linarith
 
+/-- The average successful mismatch changes by at most the square root of the
+same-side state-distance bound when comparing to the decoded vertical line or point.
+This gives the measurement transfers used in Equations (113)–(114). -/
+theorem successfulMismatch_vertical_abs_sub_le (S : CommutingStrategy Q Q Ans Ans A) (d : ℕ)
+    (P : Point F n → F → Measurement (Option F) A) :
+    |(𝔼 u : Point F n, 𝔼 t : F, Measurement.successfulMismatch S.state (P u t)
+        ((decodedVertical S.bob d u).map (fun f => f.value t))) -
+      (𝔼 u : Point F n, 𝔼 t : F, Measurement.successfulMismatch S.state (P u t)
+        (decodedPoint S.bob (Fin.snoc u t)))| ≤
+      √(8 * (n + 1 : ℝ) * (1 - (branchGame (F := F) n d .axis).commutingWinProb S) +
+        4 * (1 - (branchGame (F := F) n d .consistency).commutingWinProb S)) := by
+  let err (u : Point F n) (t : F) :=
+    ∑ a, S.state.norm ((decodedPoint S.bob (Fin.snoc u t)).effect a -
+      ((decodedVertical S.bob d u).map (fun f => f.value t)).effect a) ^ 2
+  have hpos (u : Point F n) (t : F) : 0 ≤ err u t := sum_nonneg fun _ _ => sq_nonneg _
+  have hj : (𝔼 u : Point F n, 𝔼 t : F, √(err u t)) ≤ √(𝔼 u : Point F n, 𝔼 t : F, err u t) := by
+    have h := Real.expect_mul_le_sqrt_mul_sqrt (univ : Finset (Point F n × F))
+      (fun p => √(err p.1 p.2)) (fun _ => 1)
+    simpa only [mul_one, one_pow, Fintype.expect_const, Real.sqrt_one,
+      Real.sq_sqrt (hpos _ _), Fintype.expect_prod_type] using h
+  have transfer {Q₁ Q₂ : Point F n → F → Measurement F A}
+      (h : ∀ u t, (∑ a, S.state.norm ((Q₁ u t).effect a - (Q₂ u t).effect a) ^ 2) = err u t) :
+      (𝔼 u : Point F n, 𝔼 t : F, Measurement.successfulMismatch S.state (P u t) (Q₂ u t)) ≤
+      (𝔼 u : Point F n, 𝔼 t : F, Measurement.successfulMismatch S.state (P u t) (Q₁ u t)) +
+        √(8 * (n + 1 : ℝ) * (1 - (branchGame (F := F) n d .axis).commutingWinProb S) +
+          4 * (1 - (branchGame (F := F) n d .consistency).commutingWinProb S)) := by
+    calc
+      _ ≤ 𝔼 u : Point F n, 𝔼 t : F,
+        (Measurement.successfulMismatch S.state (P u t) (Q₁ u t) + √(err u t)) := by
+        refine expect_le_expect fun u _ => expect_le_expect fun t _ => ?_
+        rw [← h]
+        exact Measurement.successfulMismatch_le _ _ _ _
+      _ ≤ _ := by
+        simp only [expect_add_distrib]
+        exact add_le_add_right (hj.trans (Real.sqrt_le_sqrt (bob_vertical_stateDist_le S d))) _
+  apply abs_sub_le_iff.mpr
+  constructor
+  · exact sub_le_iff_le_add'.mpr (transfer fun _ _ => rfl)
+  · exact sub_le_iff_le_add'.mpr (transfer fun u t => sum_congr rfl fun a _ => by
+      rw [S.state.norm_sub_comm])
+
 /-- Transfer agreement of the successful slice measurements from Bob's point answers
 to his vertical-line answers. The initial mismatch may be any bound supplied by the
 slice construction. This is the comparison of Equation (113). -/
@@ -247,24 +298,8 @@ theorem successfulMismatch_vertical_le (S : CommutingStrategy Q Q Ans Ans A) (d 
       (P u t) (decodedPoint S.bob (Fin.snoc u t))) +
       √(8 * (n + 1 : ℝ) * (1 - (branchGame (F := F) n d .axis).commutingWinProb S) +
         4 * (1 - (branchGame (F := F) n d .consistency).commutingWinProb S)) := by
-  let err (u : Point F n) (t : F) :=
-    ∑ a, S.state.norm ((decodedPoint S.bob (Fin.snoc u t)).effect a -
-      ((decodedVertical S.bob d u).map (fun f => f.value t)).effect a) ^ 2
-  let base (u : Point F n) (t : F) :=
-    Measurement.successfulMismatch S.state (P u t) (decodedPoint S.bob (Fin.snoc u t))
-  have hpos (u : Point F n) (t : F) : 0 ≤ err u t := sum_nonneg fun _ _ => sq_nonneg _
-  have hj : (𝔼 u : Point F n, 𝔼 t : F, √(err u t)) ≤ √(𝔼 u : Point F n, 𝔼 t : F, err u t) := by
-    have h := Real.expect_mul_le_sqrt_mul_sqrt (univ : Finset (Point F n × F))
-      (fun p => √(err p.1 p.2)) (fun _ => 1)
-    simpa only [mul_one, one_pow, Fintype.expect_const, Real.sqrt_one,
-      Real.sq_sqrt (hpos _ _), Fintype.expect_prod_type] using h
-  calc
-    _ ≤ 𝔼 u : Point F n, 𝔼 t : F, (base u t + √(err u t)) :=
-      expect_le_expect fun u _ => expect_le_expect fun t _ =>
-        Measurement.successfulMismatch_le _ _ _ _
-    _ = (𝔼 u : Point F n, 𝔼 t : F, base u t) + (𝔼 u : Point F n, 𝔼 t : F, √(err u t)) := by
-      simp only [expect_add_distrib]
-    _ ≤ _ := add_le_add_right (hj.trans (Real.sqrt_le_sqrt (bob_vertical_stateDist_le S d))) _
+  exact sub_le_iff_le_add'.mp
+    (abs_sub_le_iff.mp (successfulMismatch_vertical_abs_sub_le S d P)).1
 
 end Norm
 

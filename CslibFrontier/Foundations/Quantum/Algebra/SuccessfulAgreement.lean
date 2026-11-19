@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Foundations.Quantum.Algebra.Consistency
+public import CslibFrontier.Foundations.Quantum.Algebra.MeasurementMixture
 public import Mathlib.Data.Fintype.Option
 import Mathlib.Analysis.Real.Sqrt
 
@@ -33,6 +34,48 @@ the second side. Failure on the first side contributes zero. -/
 noncomputable def successfulMismatch (φ : AlgState A) (P : Measurement (Option α) A)
     (Q : Measurement α A) : ℝ :=
   ∑ a, (φ (P.effect (some a) * (1 - Q.effect a))).re
+
+/-- For postprocessed measurements, the mismatch is the sum of the original joint weights
+whose decoded outcomes disagree and whose first outcome decodes successfully. -/
+theorem successfulMismatch_map_map {β γ : Type*} [Fintype β] [Fintype γ]
+    [DecidableEq α] [IsOrderedAddMonoid A] (φ : AlgState A) (P : Measurement β A)
+    (Q : Measurement γ A) (f : β → Option α) (g : γ → α) :
+    successfulMismatch φ (P.map f) (Q.map g) =
+      ∑ b, ∑ c, if ∃ a, f b = some a ∧ a ≠ g c then (φ (P.effect b * Q.effect c)).re else 0 := by
+  classical
+  have hComplement (a : α) : 1 - (Q.map g).effect a = ∑ c with g c ≠ a, Q.effect c := by
+    rw [Measurement.map_effect, sub_eq_iff_eq_add]
+    rw [sum_filter_not_add_sum_filter, Q.sum_effect]
+  calc
+    _ = ∑ a, ∑ b, ∑ c, if f b = some a then
+        if g c ≠ a then (φ (P.effect b * Q.effect c)).re else 0 else 0 := by
+      simp only [successfulMismatch, hComplement]
+      simp only [Measurement.map_effect, sum_mul, mul_sum, map_sum, Complex.re_sum, sum_filter]
+      refine sum_congr rfl fun a _ => ?_
+      rw [sum_comm]
+      refine sum_congr rfl fun b _ => sum_congr rfl fun c _ => ?_
+      split_ifs <;> simp_all
+    _ = _ := by
+      rw [sum_comm]
+      refine sum_congr rfl fun b _ => ?_
+      rw [sum_comm]
+      refine sum_congr rfl fun c _ => ?_
+      cases h : f b with
+      | none => simp
+      | some a =>
+        simp [ne_comm, sum_ite_eq]
+
+/-- The successful mismatch averages over a classical choice of the first measurement. -/
+theorem successfulMismatch_mixture_left {ι : Type*} [Fintype ι] [IsOrderedAddMonoid A]
+    [PosSMulMono ℝ A] (φ : AlgState A) (p : PMF ι) (M : ι → Measurement (Option α) A)
+    (Q : Measurement α A) :
+    successfulMismatch φ (mixture p M) Q = ∑ i, (p i).toReal * successfulMismatch φ (M i) Q := by
+  have h (r : ℝ) (a b : A) : (φ ((r • a) * b)).re = r * (φ (a * b)).re := by
+    rw [← IsScalarTower.algebraMap_smul ℂ r a, smul_mul_assoc, map_smul, Complex.coe_algebraMap,
+      smul_eq_mul, Complex.re_ofReal_mul]
+  simp only [successfulMismatch, mixture_effect, sum_mul, map_sum, Complex.re_sum, h,
+    Finset.mul_sum]
+  exact sum_comm
 
 variable [StarRing A] [StarOrderedRing A] [TopologicalSpace A]
   [ContinuousFunctionalCalculus ℝ A IsSelfAdjoint] [NonnegSpectrumClass ℝ A]

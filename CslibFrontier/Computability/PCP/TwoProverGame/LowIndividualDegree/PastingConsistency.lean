@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Computability.PCP.TwoProverGame.Sequential
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.Pasting
 public import CslibFrontier.Foundations.Quantum.Algebra.CompletedMeasurement
+public import CslibFrontier.Foundations.Quantum.Algebra.SuccessfulAgreement
 public import CslibFrontier.Probability.PMF.Event
 public import Mathlib.Algebra.BigOperators.Expect
 import CslibFrontier.Probability.IID.Distinct
@@ -149,7 +150,7 @@ variable {A : Type*} [Finite F] [Fintype β] [Ring A] [PartialOrder A] [StarRing
   [StarOrderedRing A] [Algebra ℂ A]
 
 /-- The isolated experiment with one slice question and one vertical-line question. -/
-def sliceLineStrategy (φ : AlgState A)
+@[expose] def sliceLineStrategy (φ : AlgState A)
     (M : F → Measurement (Option (BoundedPolynomial F m d)) A)
     (B : (Fin m → F) → Measurement β A)
     (hComm : ∀ t u a b, Commute ((M t).effect a) ((B u).effect b)) :
@@ -179,6 +180,69 @@ noncomputable def isolatedSliceMismatch
     (lineValue : β → F → F) (u : Fin m → F) (t : F) : ℝ :=
   ((S.answers t u).toOuterMeasure
     {ab | ∃ q, ab.1 = some q ∧ eval u q.val ≠ lineValue ab.2 t}).toReal
+
+/-- Evaluate the polynomial outcomes of a measurement at a point, preserving failure. -/
+@[expose] noncomputable def evaluatePolynomialMeasurement [Fintype F] [DecidableEq F]
+    (M : Measurement (Option (BoundedPolynomial F m d)) A) (u : Fin m → F) :
+    Measurement (Option F) A :=
+  M.map (Option.map fun q => eval u q.val)
+
+omit [Field F] [Finite F] [StarModule ℂ A] [SelfAdjointDecompose A] in
+private theorem successfulMismatch_eq_event {X Y γ : Type*} [Fintype γ] [Fintype F] [DecidableEq F]
+    (T : CommutingStrategy X Y γ β A) (x : X) (y : Y) (f : γ → Option F) (g : β → F) :
+    Measurement.successfulMismatch T.state ((T.alice x).map f) ((T.bob y).map g) =
+      ((T.answers x y).toOuterMeasure {ab | ∃ a, f ab.1 = some a ∧ a ≠ g ab.2}).toReal := by
+  classical
+  rw [Cslib.Probability.PMF.toOuterMeasure_apply_toReal,
+    Fintype.sum_prod_type, Measurement.successfulMismatch_map_map]
+  refine sum_congr rfl fun a _ => sum_congr rfl fun b _ => ?_
+  simp only [Set.mem_ofPred_eq, T.answers_apply, ENNReal.toReal_ofReal (T.prob_nonneg x y a b)]
+  unfold CommutingStrategy.prob
+  split_ifs <;> rfl
+
+private theorem exists_successful_ne {α γ : Type*} (f : α → γ) (a : Option α) (z : γ) :
+    (∃ q, a = some q ∧ f q ≠ z) ↔ (∃ v, a.map f = some v ∧ v ≠ z) := by
+  cases a <;> simp
+
+omit [StarModule ℂ A] [SelfAdjointDecompose A] in
+/-- The isolated slice event has exactly the successful mismatch weight of its
+evaluated outcomes. -/
+theorem isolatedSliceMismatch_eq_successfulMismatch [Fintype F] [DecidableEq F]
+    (T : CommutingStrategy F (Fin m → F) (Option (BoundedPolynomial F m d)) β A)
+    (lineValue : β → F → F) (u : Fin m → F) (t : F) :
+    isolatedSliceMismatch T lineValue u t =
+      Measurement.successfulMismatch T.state (evaluatePolynomialMeasurement (T.alice t) u)
+        ((T.bob u).map (fun b => lineValue b t)) := by
+  rw [isolatedSliceMismatch, evaluatePolynomialMeasurement, successfulMismatch_eq_event]
+  congr 2
+  ext ⟨a, b⟩
+  exact exists_successful_ne (fun q : BoundedPolynomial F m d => eval u q.val) a (lineValue b t)
+
+omit [StarModule ℂ A] [SelfAdjointDecompose A] in
+/-- The transcript event computes the successful mismatch of the actual pasted measurement
+at a fixed tuple of distinct slice locations. -/
+theorem pastedLineMismatch_eq_successfulMismatch [Fintype F] [DecidableEq F] {k : ℕ}
+    (T : CommutingStrategy F (Fin m → F) (Option (BoundedPolynomial F m d)) β A)
+    (hM : ∀ t, (T.alice t).IsProjective) (lineValue : β → F → F)
+    (u : Fin m → F) (x : Fin k ↪ F) (t : F) :
+    ((((T.sequential k hM).answers x u).map (Prod.map (pasteOutcome x) id)).toOuterMeasure
+        (pastedLineMismatch (d := d) u t lineValue)).toReal =
+      Measurement.successfulMismatch T.state
+        (evaluatePolynomialMeasurement (pasteProjectiveSlices x T.alice hM) (Fin.snoc u t))
+        ((T.bob u).map (fun b => lineValue b t)) := by
+  classical
+  rw [PMF.toOuterMeasure_map_apply, evaluatePolynomialMeasurement, pasteProjectiveSlices,
+    pasteMeasurement]
+  simp only [Measurement.map_map]
+  have h := successfulMismatch_eq_event (T.sequential k hM) x u
+    (Option.map (fun q => eval (Fin.snoc u t) q.val) ∘ pasteOutcome x) (fun b => lineValue b t)
+  refine Eq.trans ?_ h.symm
+  congr 2
+  ext ⟨a, b⟩
+  change (∃ p, pasteOutcome x a = some p ∧ eval (Fin.snoc u t) p.val ≠ lineValue b t) ↔
+    (∃ z, Option.map (fun p => eval (Fin.snoc u t) p.val) (pasteOutcome x a) = some z ∧
+      z ≠ lineValue b t)
+  exact exists_successful_ne _ _ _
 
 /-- The contribution of a selected transcript coordinate to vertical-line inconsistency
 is at most its isolated mismatch probability plus the disturbance of its prefix. -/
@@ -276,6 +340,27 @@ section Completed
 open Cslib.Quantum
 
 variable {A : Type*} [CStarAlgebra A] [PartialOrder A] [StarOrderedRing A] [Fintype β]
+
+/-- Averaging the pasted measurement over distinct slice tuples averages its successful
+vertical-line mismatch with the same sampling law. -/
+theorem successfulMismatch_pasteSlices_eq_expect [Fintype F] [DecidableEq F] (k : ℕ)
+    [Nonempty (Fin k ↪ F)]
+    (T : CommutingStrategy F (Fin m → F) (Option (BoundedPolynomial F m d)) β A)
+    (hM : ∀ t, (T.alice t).IsProjective) (lineValue : β → F → F)
+    (u : Fin m → F) (t : F) :
+    letI : Fintype (Fin k ↪ F) := Fintype.ofFinite _
+    Measurement.successfulMismatch T.state
+      (evaluatePolynomialMeasurement (pasteSlices k T.alice hM) (Fin.snoc u t))
+      ((T.bob u).map (fun b => lineValue b t)) =
+        𝔼 x : Fin k ↪ F,
+          ((((T.sequential k hM).answers x u).map (Prod.map (pasteOutcome x) id)).toOuterMeasure
+            (pastedLineMismatch (d := d) u t lineValue)).toReal := by
+  classical
+  let _ : Fintype (Fin k ↪ F) := Fintype.ofFinite _
+  simp only [pastedLineMismatch_eq_successfulMismatch, Fintype.expect_eq_sum_div_card,
+    evaluatePolynomialMeasurement, pasteSlices, Measurement.map_mixture,
+    Measurement.successfulMismatch_mixture_left, uniformOfFintype_apply, ENNReal.toReal_inv,
+    ENNReal.toReal_natCast, inv_mul_eq_div, sum_div]
 
 /-- The pasted vertical-line estimate needs commutator and copy bounds only on successful
 slice outcomes. The failure outcome is controlled by projectivity and completion. -/

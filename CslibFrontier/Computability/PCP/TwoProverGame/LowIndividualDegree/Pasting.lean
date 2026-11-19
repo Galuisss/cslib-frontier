@@ -176,7 +176,7 @@ variable {A : Type*} [Ring A] [PartialOrder A] [IsOrderedAddMonoid A] [Finite F]
 
 /-- Coarse-grain the joint slice measurement by the pasting readout. Its `none` effect
 collects outcomes with too few successful slices or incompatible slice polynomials. -/
-noncomputable def pasteMeasurement (x : ι ↪ F)
+@[expose] noncomputable def pasteMeasurement (x : ι ↪ F)
     (M : Measurement (ι → Option (BoundedPolynomial F m d)) A) :
     Measurement (Option (BoundedPolynomial F (m + 1) d)) A := by
   classical
@@ -197,7 +197,7 @@ variable [StarRing A] [StarOrderedRing A]
 
 /-- Perform the completed slice measurements in index order and read out their pasted
 polynomial. The outcome `none` is the complementary effect of the pasted sub-measurement. -/
-noncomputable def pasteProjectiveSlices {k : ℕ} (x : Fin k ↪ F)
+@[expose] noncomputable def pasteProjectiveSlices {k : ℕ} (x : Fin k ↪ F)
     (M : F → Measurement (Option (BoundedPolynomial F m d)) A)
     (hM : ∀ t, (M t).IsProjective) : Measurement (Option (BoundedPolynomial F (m + 1) d)) A :=
   pasteMeasurement x (Measurement.sequentialProjective (fun j => M (x j)) (fun j => hM (x j)))
@@ -218,7 +218,7 @@ variable [Module ℝ A] [PosSMulMono ℝ A]
 
 /-- The pasted measurement with an explicit failure outcome. Sample an ordered tuple of
 distinct slices uniformly, perform their measurements and apply the polynomial readout. -/
-noncomputable def pasteSlices (k : ℕ) [Nonempty (Fin k ↪ F)]
+@[expose] noncomputable def pasteSlices (k : ℕ) [Nonempty (Fin k ↪ F)]
     (M : F → Measurement (Option (BoundedPolynomial F m d)) A)
     (hM : ∀ t, (M t).IsProjective) : Measurement (Option (BoundedPolynomial F (m + 1) d)) A := by
   classical
