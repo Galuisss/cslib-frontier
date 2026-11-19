@@ -56,13 +56,13 @@ theorem exists_alice_sum_conditionalTraceNormSq_le_after_wins [DecidableEq Y] [N
         ρ ((t, a, b), y) = normalizeDensity (partialTraceRight (pureState
           (S.averagedCheckedVector C (aliceQuestionsGivenInfo G α C t)
             (PMF.pure (completeBobQuestions C e t y)) a b)))) ∧
-      sum_conditionalTraceNormSq P ρ ≤
+      sumConditionalTraceNormSq P ρ ≤
         2 * (Real.log (Fintype.card Answer) -
           Real.log ((transcriptLaw G α C S).toOuterMeasure (winsOnChecked G α C)).toReal) := by
   classical
   obtain ⟨ρ, hρ, hbranch, hbound⟩ :=
     exists_anchored_coordinateInformation_le_after_wins G α C S e hs
-  exact ⟨ρ, hρ, hbranch, sum_conditionalTraceNormSq_le_of_information_bound _ hρ hbound⟩
+  exact ⟨ρ, hρ, hbranch, sumConditionalTraceNormSq_le_of_information_bound _ hρ hbound⟩
 
 /-- Bob's squared trace deviation, averaged over the winning transcript and the
 revealed Alice question and summed over the unchecked coordinates. -/
@@ -78,12 +78,12 @@ theorem exists_bob_sum_conditionalTraceNormSq_le_after_wins [DecidableEq X] [Non
         ρ ((t, a, b), x) = normalizeDensity (partialTraceLeft (pureState
           (S.averagedCheckedVector C (PMF.pure (completeAliceQuestions C e t x))
             (bobQuestionsGivenInfo G α C t) a b)))) ∧
-      sum_conditionalTraceNormSq P ρ ≤
+      sumConditionalTraceNormSq P ρ ≤
         2 * (Real.log (Fintype.card Answer) -
           Real.log ((transcriptLaw G α C S).toOuterMeasure (winsOnChecked G α C)).toReal) := by
   classical
   obtain ⟨ρ, hρ, hbranch, hbound⟩ :=
     exists_bob_anchored_coordinateInformation_le_after_wins G α C S e hs
-  exact ⟨ρ, hρ, hbranch, sum_conditionalTraceNormSq_le_of_information_bound _ hρ hbound⟩
+  exact ⟨ρ, hρ, hbranch, sumConditionalTraceNormSq_le_of_information_bound _ hρ hbound⟩
 
 end Cslib.PCP.AnchoredDependency
