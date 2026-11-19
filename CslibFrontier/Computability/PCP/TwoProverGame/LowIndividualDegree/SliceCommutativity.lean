@@ -34,7 +34,7 @@ open scoped BigOperators Real
 variable {F A : Type*} {m d : ℕ} [Fintype F]
   [CStarAlgebra A] [PartialOrder A] [StarOrderedRing A]
 
-private theorem abs_mean_le_sqrt {X : Type*} [Fintype X] [Nonempty X]
+private theorem abs_mean_le_sqrt {X : Type*} [Fintype X]
     (f : X → ℝ) (defect : X → ℝ) (hdefect : ∀ x, 0 ≤ defect x)
     (h : ∀ x, |f x| ≤ √(defect x)) {ε : ℝ} (hε : (𝔼 x, defect x) ≤ ε) :
     |𝔼 x, f x| ≤ √ε :=
@@ -174,7 +174,7 @@ private theorem abs_sum_sandwich_copy_le (φ : AlgState A)
   simpa only [G, q, Measurement.successfulEffect, mul_sum, sum_mul, map_sum,
     Complex.re_sum, mul_assoc] using hh
 
-private theorem mean_successfulPairDefect_eq {X : Type*} [Fintype X] [Nonempty X]
+private theorem mean_successfulPairDefect_eq {X : Type*} [Fintype X]
     (φ : AlgState A) (P : X → Measurement (Option F) A) (hP : ∀ u, (P u).IsProjective) :
     (𝔼 u, 𝔼 v, Measurement.successfulPairDefect φ (P u) (P v)) =
       2 * ((𝔼 u, 𝔼 v, ∑ a : F, ∑ b : F, (φ
