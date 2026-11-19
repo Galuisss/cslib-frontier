@@ -11,6 +11,7 @@ public import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropy
 public import CslibFrontier.Probability.Conditioning
 public import Mathlib.InformationTheory.KullbackLeibler.Basic
 import CslibFrontier.Foundations.LinearAlgebra.Matrix.BlockDiagonal
+import CslibFrontier.Foundations.LinearAlgebra.Matrix.PosSemidefKernel
 import CslibFrontier.Probability.Divergence
 import Mathlib.Algebra.BigOperators.WithTop
 
@@ -272,18 +273,10 @@ theorem supportLE_partialTraceRight_classicalQuantumState (p : PMF X) {ρ : X �
     (hρ : ∀ x, IsDensityMatrix (ρ x)) {x : X} (hx : x ∈ p.support) :
     SupportLE (ρ x) (partialTraceRight (classicalQuantumState p ρ)) := by
   intro v hv
-  let A (y : X) := (p y).toReal • ρ y
-  have hA (y : X) : (A y).PosSemidef := (hρ y).posSemidef.smul ENNReal.toReal_nonneg
-  have hquad (y : X) := Complex.nonneg_iff.mp ((hA y).dotProduct_mulVec_nonneg v)
-  have hsum := congrArg (fun u : ι → ℂ => (star v ⬝ᵥ u).re) hv
-  rw [partialTraceRight_classicalQuantumState, sum_mulVec, dotProduct_sum, Complex.re_sum,
-    dotProduct_zero, Complex.zero_re] at hsum
-  have hzero : (star v ⬝ᵥ (A x *ᵥ v)).re = 0 :=
-    (sum_eq_zero_iff_of_nonneg (fun y _ => (hquad y).1)).mp hsum x (mem_univ _)
-  have hz : star v ⬝ᵥ (A x *ᵥ v) = 0 := Complex.ext hzero (hquad x).2.symm
-  have hxv := (hA x).dotProduct_mulVec_zero_iff.mp hz
-  exact (smul_eq_zero_iff_right (ENNReal.toReal_ne_zero.mpr ⟨hx, p.apply_ne_top x⟩)).mp
-    (by simpa only [A, smul_mulVec] using hxv)
+  rw [partialTraceRight_classicalQuantumState] at hv
+  exact (mulVec_sum_smul_eq_zero_iff univ (fun y => (p y).toReal) ρ
+    (fun _ _ => ENNReal.toReal_nonneg) (fun y _ => (hρ y).posSemidef) v).mp hv x
+    (mem_univ _) (ENNReal.toReal_ne_zero.mpr ⟨hx, p.apply_ne_top x⟩)
 
 omit [DecidableEq ι] in
 private theorem supportLE_partialTraceRight_classicalQuantumState_iff (p : PMF X)
@@ -381,8 +374,8 @@ open Cslib.Probability.PMF
   (conditionalSnd marginal_mul_conditionalSnd mem_support_conditionalSnd_iff)
 
 /-- The quantum marginal after fixing the first of two classical labels. -/
-noncomputable def quantumMarginalGiven (p : PMF (X × Y)) (ρ : X × Y → Matrix ι ι ℂ) (x : X) :
-    Matrix ι ι ℂ :=
+@[expose] noncomputable def quantumMarginalGiven (p : PMF (X × Y))
+    (ρ : X × Y → Matrix ι ι ℂ) (x : X) : Matrix ι ι ℂ :=
   partialTraceRight (classicalQuantumState (conditionalSnd p x) (fun y => ρ (x, y)))
 
 omit [Fintype X] [DecidableEq X] [DecidableEq ι] in
@@ -394,6 +387,16 @@ theorem isDensityMatrix_quantumMarginalGiven (p : PMF (X × Y))
   (isDensityMatrix_classicalQuantumState (conditionalSnd p x) fun y =>
     hρ (x, y)).partialTraceRight
 
+omit [Fintype ι] [DecidableEq ι] [Fintype X] [DecidableEq X] in
+/-- The block obtained by weighting a conditional quantum marginal is the sum of the
+corresponding joint blocks, including at a null first label. -/
+theorem smul_quantumMarginalGiven (p : PMF (X × Y)) (ρ : X × Y → Matrix ι ι ℂ) (x : X) :
+    ((p.map Prod.fst) x).toReal • quantumMarginalGiven p ρ x =
+      ∑ y, (p (x, y)).toReal • ρ (x, y) := by
+  rw [quantumMarginalGiven, partialTraceRight_classicalQuantumState, Finset.smul_sum]
+  refine sum_congr rfl fun y _ => ?_
+  rw [smul_smul, ← ENNReal.toReal_mul, marginal_mul_conditionalSnd]
+
 omit [Fintype ι] [DecidableEq ι] in
 /-- Averaging the conditional quantum marginals recovers the original quantum marginal. -/
 theorem partialTraceRight_classicalQuantumState_map_fst (p : PMF (X × Y))
@@ -402,10 +405,7 @@ theorem partialTraceRight_classicalQuantumState_map_fst (p : PMF (X × Y))
       partialTraceRight (classicalQuantumState p ρ) := by
   rw [partialTraceRight_classicalQuantumState, partialTraceRight_classicalQuantumState,
     Fintype.sum_prod_type]
-  refine sum_congr rfl fun x _ => ?_
-  rw [quantumMarginalGiven, partialTraceRight_classicalQuantumState, Finset.smul_sum]
-  refine sum_congr rfl fun y _ => ?_
-  rw [smul_smul, ← ENNReal.toReal_mul, marginal_mul_conditionalSnd]
+  exact sum_congr rfl fun x _ => smul_quantumMarginalGiven p ρ x
 
 /-- The mutual information of two classical labels with a quantum register splits into the
 information of the first label and the average information of the second label given the first.
