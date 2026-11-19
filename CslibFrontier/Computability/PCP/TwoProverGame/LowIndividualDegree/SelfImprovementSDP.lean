@@ -35,22 +35,27 @@ variable {F ι : Type*} {m d : ℕ} [Field F] [Fintype F] [DecidableEq F]
   [Fintype ι] [DecidableEq ι]
 
 /-- The self-improvement SDP has a complete polynomial measurement and a positive dual
-majorant with complementary slackness and equal primal and dual values. Its value bounds
-the score of every polynomial submeasurement, represented with a failure outcome. -/
+majorant with complementary slackness and equal primal and dual values. The primal
+variables range over polynomial submeasurements, represented with a failure outcome.
+The dual variables range over all common majorants of the averaged point effects. -/
 theorem exists_selfImprovement_trace_certificate
     (B : Point F m → Measurement F (Matrix ι ι ℂ)) :
     ∃ (T : Measurement (BoundedPolynomial F m d) (Matrix ι ι ℂ)) (Z : Matrix ι ι ℂ),
       0 ≤ Z ∧ (∀ g : BoundedPolynomial F m d, averagePolynomialPointEffect B g ≤ Z) ∧
       (∀ g, T.effect g * Z = T.effect g * averagePolynomialPointEffect B g) ∧
       (∑ g, (T.effect g * averagePolynomialPointEffect B g).trace) = Z.trace ∧
-      ∀ G : Measurement (Option (BoundedPolynomial F m d)) (Matrix ι ι ℂ),
-        ∑ g, (G.effect (some g) * averagePolynomialPointEffect B g).trace ≤ Z.trace := by
-  let : Nonempty (BoundedPolynomial F m d) := ⟨⟨0, by simp⟩⟩
+      (∀ G : Measurement (Option (BoundedPolynomial F m d)) (Matrix ι ι ℂ),
+        ∑ g, (G.effect (some g) * averagePolynomialPointEffect B g).trace ≤ Z.trace) ∧
+      (∀ W : Matrix ι ι ℂ,
+        (∀ g : BoundedPolynomial F m d, averagePolynomialPointEffect B g ≤ W) →
+          Z.trace ≤ W.trace) := by
+  let g₀ : BoundedPolynomial F m d := ⟨0, by simp⟩
+  let : Nonempty (BoundedPolynomial F m d) := ⟨g₀⟩
   let H (g : BoundedPolynomial F m d) := averagePolynomialPointEffect B g
   have hH (g : BoundedPolynomial F m d) : (H g).PosSemidef :=
     (averagePolynomialPointEffect_mem_Icc B g).1.posSemidef
   obtain ⟨T, Z, hZ, hle, hcomp, htrace⟩ := POVM.exists_optimal_trace_certificate H hH
-  refine ⟨T.toMeasurement, Z, hZ.nonneg, hle, ?_, ?_, ?_⟩
+  refine ⟨T.toMeasurement, Z, hZ.nonneg, hle, ?_, ?_, ?_, ?_⟩
   · simpa only [POVM.toMeasurement_effect] using hcomp
   · simpa only [POVM.toMeasurement_effect] using htrace
   · intro G
@@ -60,5 +65,10 @@ theorem exists_selfImprovement_trace_certificate
       _ hZ hle
     rw [← hsum]
     exact le_add_of_nonneg_left (G.nonneg none)
+  · intro W hW
+    have hW₀ := ((hH g₀).nonneg.trans (hW g₀)).posSemidef
+    rw [← htrace]
+    exact POVM.sum_trace_mul_le_trace_of_le T.effect H W T.posSemidef
+      (le_of_eq T.sum_effect) hW₀ hW
 
 end Cslib.PCP.LowIndividualDegree

@@ -8,6 +8,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 import CslibFrontierResults.Registry
 import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
+import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SelfImprovementSDP
 import CslibFrontier.Computability.PCP.TwoProverGame.Synchronous
 import CslibFrontier.Foundations.Algebra.Group.HomomorphismTesting
 import CslibFrontier.Probability.MarkovChain.RandomWalk
@@ -10835,3 +10836,17 @@ register_result "synchronous-game-perfect-commuting-equivalence" where
     on the closed algebra of left GNS operators. The reverse construction uses commuting GNS \
     actions and works with any tracial state. The real-valued score formulation requires full \
     support on question pairs for the implication from score one to pointwise perfection."
+
+register_result "low-individual-degree-self-improvement-sdp" where
+  title := "Strong duality for the low-individual-degree self-improvement SDP"
+  topic := "nonlocal games"
+  sources := [
+    { paper := JNVWY2020LowIndividualDegree, theorem := "Lemma 9.2",
+      locator := "arXiv:2009.12982v1, §9.1, pp. 68–70, equations (51)–(54)" }
+  ]
+  theorems := [Cslib.PCP.LowIndividualDegree.exists_selfImprovement_trace_certificate]
+  scope := "The matrix objective of each bounded polynomial is the uniform average of the point \
+    effects for its values. The primal ranges over polynomial submeasurements, with an explicit \
+    failure effect completing them to measurements. The dual ranges over common operator \
+    majorants. The optimum has equal primal and dual traces, no primal failure mass and \
+    complementary slackness for each polynomial."
