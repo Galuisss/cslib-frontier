@@ -4119,6 +4119,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.Quantum
 public import CslibFrontier.Computability.PCP.TwoProverGame.RotationStrategy
 public import CslibFrontier.Computability.PCP.TwoProverGame.Schmidt
 public import CslibFrontier.Computability.PCP.TwoProverGame.SchmidtReduction
+public import CslibFrontier.Computability.PCP.TwoProverGame.SynchronousCorrelation
 public import CslibFrontier.Computability.PCP.TwoProverGame.Tsirelson
 public import CslibFrontier.Computability.Pebbling.Basic
 public import CslibFrontier.Computability.Pebbling.BinaryTree
@@ -7098,6 +7099,7 @@ public import CslibFrontier.Foundations.Quantum.Algebra.Involution
 public import CslibFrontier.Foundations.Quantum.Algebra.JointMeasurement
 public import CslibFrontier.Foundations.Quantum.Algebra.MaxEntangled
 public import CslibFrontier.Foundations.Quantum.Algebra.Measurement
+public import CslibFrontier.Foundations.Quantum.Algebra.MeasurementDistance
 public import CslibFrontier.Foundations.Quantum.Algebra.Orthogonalization
 public import CslibFrontier.Foundations.Quantum.Algebra.SpectralCut
 public import CslibFrontier.Foundations.Quantum.Algebra.SpectralRounding
