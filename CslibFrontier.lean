@@ -7101,6 +7101,7 @@ public import CslibFrontier.Foundations.Quantum.Algebra.JointMeasurement
 public import CslibFrontier.Foundations.Quantum.Algebra.MaxEntangled
 public import CslibFrontier.Foundations.Quantum.Algebra.Measurement
 public import CslibFrontier.Foundations.Quantum.Algebra.MeasurementMixture
+public import CslibFrontier.Foundations.Quantum.Algebra.PrefixCommutator
 public import CslibFrontier.Foundations.Quantum.Algebra.SequentialDisturbance
 public import CslibFrontier.Foundations.Quantum.Algebra.SequentialMeasurement
 public import CslibFrontier.Foundations.Quantum.Algebra.TracialGNS
