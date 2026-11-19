@@ -103,7 +103,7 @@ theorem priorConditionalTraceNormSq_le (S : RepeatedStrategy)
     let ε₁ := Real.sqrt (m * Real.log (1 / p) / 2)
     let ε₂ := Real.sqrt (m * Real.log (Fintype.card (C → A × B) / p) / 2)
     w * priorConditionalTraceNormSq C G α Q read e ρ ≤
-      w * sum_conditionalTraceNormSq P ρ + 8 * (w * ε₁ + (1 + w) * (2 * ε₁ + ε₂)) := by
+      w * sumConditionalTraceNormSq P ρ + 8 * (w * ε₁ + (1 + w) * (2 * ε₁ + ε₂)) := by
   classical
   intro T W Q P p w ε₁ ε₂
   let J (j : Free) := Q.map fun z => (freeTrials C z j, restTranscript C j z)
@@ -146,7 +146,7 @@ theorem priorConditionalTraceNormSq_le (S : RepeatedStrategy)
   have hw : 0 ≤ w := by dsimp only [w]; positivity
   have hsum := mul_le_mul_of_nonneg_left (sum_le_sum fun i (_ : i ∈ univ) => htransport i) hw
   simp only [heval, sum_add_distrib, ← mul_sum,
-    ← sum_conditionalTraceNormSq_eq_sum_joint P ρ] at hsum
+    ← sumConditionalTraceNormSq_eq_sum_joint P ρ] at hsum
   change w * (∑ i : Fin m, ∑ z, (R (e i) z).toReal * score i z) ≤ _
   linarith
 
