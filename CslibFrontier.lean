@@ -4112,8 +4112,12 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 public import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystemConverse
 public import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystemPerfect
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.AxisScore
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.OneCoordinate
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.Pasting
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PastingConsistency
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialAnswer
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerticalAxis
 public import CslibFrontier.Computability.PCP.TwoProverGame.MagicSquare
 public import CslibFrontier.Computability.PCP.TwoProverGame.Naimark
 public import CslibFrontier.Computability.PCP.TwoProverGame.Quantum
@@ -7105,6 +7109,7 @@ public import CslibFrontier.Foundations.Quantum.Algebra.MeasurementMixture
 public import CslibFrontier.Foundations.Quantum.Algebra.PrefixCommutator
 public import CslibFrontier.Foundations.Quantum.Algebra.SequentialDisturbance
 public import CslibFrontier.Foundations.Quantum.Algebra.SequentialMeasurement
+public import CslibFrontier.Foundations.Quantum.Algebra.SuccessfulAgreement
 public import CslibFrontier.Foundations.Quantum.Algebra.TracialGNS
 public import CslibFrontier.Foundations.Quantum.Algebra.Tsirelson
 public import CslibFrontier.Foundations.Quantum.Bell
