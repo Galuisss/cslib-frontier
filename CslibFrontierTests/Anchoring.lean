@@ -352,3 +352,11 @@ example (S : Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option
   rintro ⟨t, a, b⟩ ht u hu
   exact checkedVectorGivenAlice_purifies_winningMarginal acceptingGame half C S e
     (acceptingGame_win_supported S) hρ hbranch t a b 0 u ht hu
+
+/-- The support penalty is one if either endpoint is missing, including when only the
+anchor has zero winning mass. It is zero when both endpoints occur. -/
+example :
+    let P : PMF (Unit × (Fin 1 → Bool)) := PMF.pure ((), fun _ => false)
+    winningAnchorMiss P false 0 () false = 0 ∧
+      winningAnchorMiss P false 0 () true = 1 ∧ winningAnchorMiss P true 0 () false = 1 := by
+  simp [winningAnchorMiss, WinningQuestionSupported, PMF.pure_map]
