@@ -390,26 +390,10 @@ private theorem hit_of_change (C : QuantumSigningForger) {s : Level} {v : Secret
     hitsExpansionInput s v.keySeed v.secretSeed (Xofs.shake256QueryInput o.2) = true := by
   obtain ⟨ws, addr⟩ := o
   have agree := h.replay ws
-  cases addr with
-  | none => contradiction
-  | some a =>
-    change decide (_ ≠ _) = true at diff
-    replace diff := of_decide_eq_true diff
-    simp only [Xofs.queryTable] at diff
-    cases word : Xofs.unpad (List.ofFn fun i : Fin (C.addressBits + 1) => a i.succ) with
-    | none => exact (diff (by rw [word])).elim
-    | some x =>
-      rw [word] at diff
-      cases strength : a 0 with
-      | false => exact (diff (by simp [strength, agree.1])).elim
-      | true =>
-        simp only [Xofs.shake256QueryInput, Option.bind_some, strength, ↓reduceIte, word,
-          hitsExpansionInput, Option.any_some, decide_eq_true_eq]
-        by_contra miss
-        push Not at miss
-        have read := read_eq_of_byteAt_eq (n := C.responseBytes) fun i _ =>
-          agree.2 x miss.1 miss.2 i
-        exact diff (by simp [strength, read])
+  obtain ⟨x, hx, ne⟩ := Xofs.shake256QueryInput_of_queryTable_ne agree.1 diff
+  simp only [hx, hitsExpansionInput, Option.any_some, decide_eq_true_eq]
+  by_contra! miss
+  exact ne (read_eq_of_byteAt_eq fun i _ => agree.2 x miss.1 miss.2 i)
 
 /-- Measure a selected query in the reference public-pair signing experiment and test whether
 replaying the signing writes on the other device changes the XOR response at that address. -/
