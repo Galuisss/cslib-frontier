@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 module
 -- upstream: local-only (tests)
 
-import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PastingConsistency
+import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PastingCompleteness
 import Mathlib.Algebra.Field.ZMod
 
 /-! # Pasting on three slices over the field with three elements -/
@@ -67,7 +67,7 @@ private noncomputable def inconsistentSlices (i : Fin 3) :
   if i = 2 then some linearSlice else some zeroSlice
 
 /-- Once two zero slices force the zero polynomial, an incompatible third slice fails. -/
-example : pasteOutcome nodes inconsistentSlices = none := by
+private theorem inconsistentSlices_fail : pasteOutcome nodes inconsistentSlices = none := by
   cases h : pasteOutcome nodes inconsistentSlices with
   | none => rfl
   | some p =>
@@ -90,6 +90,21 @@ example : pasteOutcome nodes inconsistentSlices = none := by
     rw [hzero, map_zero] at hv'
     exact (X_ne_zero (R := F) (0 : Fin 1)) hv'.symm
 
+
+open scoped Classical in
+/-- The three incompatible slices can agree with a line at at most one prefix. -/
+example :
+    (Finset.univ.filter fun u => LocallyInterpolable nodes inconsistentSlices u).card ≤ 1 := by
+  have hcard : 1 < (successfulSlices inconsistentSlices).card := by
+    have h : successfulSlices inconsistentSlices = Finset.univ := by
+      ext i
+      by_cases hi : i = 2 <;> simp [inconsistentSlices, hi]
+    rw [h, Finset.card_univ]
+    decide
+  have h := card_locallyInterpolable_mul_card_le nodes inconsistentSlices hcard
+    inconsistentSlices_fail
+  simp only [ZMod.card, Nat.pow_one, Nat.one_mul] at h
+  omega
 
 private def twoNodes : Fin 2 ↪ F :=
   (Fin.castSuccEmb (n := 2)).trans nodes
