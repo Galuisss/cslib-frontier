@@ -5012,6 +5012,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.RejNTTExhaustion
 public import CslibFrontier.Crypto.Computational.MLDSA.RejNTTProgramming
 public import CslibFrontier.Crypto.Computational.MLDSA.ResponseBinding
 public import CslibFrontier.Crypto.Computational.MLDSA.SecretExpansionLaw
+public import CslibFrontier.Crypto.Computational.MLDSA.SecretRowPrediction
 public import CslibFrontier.Crypto.Computational.MLDSA.SharedSecretExpansion
 public import CslibFrontier.Crypto.Computational.MLDSA.SignedExtraction
 public import CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix

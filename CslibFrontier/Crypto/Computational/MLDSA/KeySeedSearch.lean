@@ -256,7 +256,7 @@ private theorem rowSigner_plant (H : Xofs) (s : Level) (p : FixedBytes 96)
       (G seed K).h256.readBytes (encodePublic s rho t) 64 =
         H.h256.readBytes (encodePublic s rho t) 64 := by
     apply plant_off
-    rw [Keccak.length_bytesToBitsLE, encodePublic, List.length_append, rh, length_packCoeffs]
+    rw [Keccak.length_bytesToBitsLE, length_encodePublic, rh]
     cases s <;> decide
   change rowSigner (G seed K) s seed = rowSigner (G z z) s z
   have expansion (u v : FixedBytes 32) :
