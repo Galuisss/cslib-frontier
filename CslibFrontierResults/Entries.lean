@@ -5453,9 +5453,10 @@ register_result "almost-synchronous-correlation-mixture" where
   ]
   theorems := [Cslib.PCP.QuantumStrategy.exists_synchronous_correlation_mixture]
   scope := "Finite tensor-product strategies with arbitrary POVMs and possibly unequal local \
-    dimensions. Both marginal question laws coincide. The synchronous projective components \
-    have normalized trace correlations. Their finite convex mixture differs from the original \
-    joint answer probabilities by at most 2√(2δ) + 4√(18δ + 20√δ) in the question-averaged \
+    dimensions. The mixture is chosen for a fixed question marginal before choosing the joint \
+    law with that marginal on both sides. The projective components have normalized trace \
+    correlations. The mixture differs from the original joint answer probabilities by at most \
+    2√(2δ) + 4√(18δ + 20√δ) in the question-averaged \
     sum of absolute differences, for diagonal synchrony defect δ under the common marginal."
 
 register_result "binary-linear-constraint-operator-solution-perfect" where

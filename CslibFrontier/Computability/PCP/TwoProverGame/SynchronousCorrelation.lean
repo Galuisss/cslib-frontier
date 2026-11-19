@@ -406,22 +406,22 @@ private theorem exists_lifted_cut_measurements (s : Cuts) (a₀ : A)
     simp only [← map_sub, ← map_mul, ht]
     exact cutLift_error_trace s a₀ (M x) a P'
 
-private theorem nonempty_answers_of_jointLaw (S : QuantumStrategy X X A A ι κ)
-    (μ : PMF (X × X)) : Nonempty A := by
-  obtain ⟨q, _⟩ := μ.support_nonempty
+private theorem nonempty_answers_of_marginal (S : QuantumStrategy X X A A ι κ)
+    (ν : PMF X) : Nonempty A := by
+  obtain ⟨x, _⟩ := ν.support_nonempty
   by_contra he
   let _ := not_nonempty_iff.mp he
-  simpa using S.sum_prob q.1 q.2
+  simpa using S.sum_prob x x
 
 /-- A projective strategy is close in average joint answer probabilities to a mixture of
 synchronous projective strategies on spectral cuts of the second system. The common question
 marginal determines the synchrony defect, and the bound is independent of the dimensions and
 answer count. -/
 theorem exists_synchronous_cut_correlation_mixture [Fintype X]
-    (S : QuantumStrategy X X A A ι κ) (μ : PMF (X × X)) (hμ : μ.map Prod.snd = μ.map Prod.fst)
+    (S : QuantumStrategy X X A A ι κ) (ν : PMF X)
     (hP : ∀ x, (S.alice x).toMeasurement.IsProjective)
     (hR : ∀ x, (S.bob x).toMeasurement.IsProjective) :
-    let δ := S.synchronyDefect (μ.map Prod.fst)
+    let δ := S.synchronyDefect ν
     ∃ (p : PMF Cuts) (T : (s : Cuts) → QuantumStrategy X X A A s.val s.val),
       (∀ s x, ((T s).alice x).toMeasurement.IsProjective) ∧
       (∀ s x, ((T s).bob x).toMeasurement.IsProjective) ∧
@@ -429,12 +429,12 @@ theorem exists_synchronous_cut_correlation_mixture [Fintype X]
       (∀ s x y a b, (T s).prob x y a b =
         (s.val.card : ℝ)⁻¹ *
           (((T s).alice x).effect a * ((T s).alice y).effect b).trace.re) ∧
+      ∀ μ : PMF (X × X), μ.map Prod.fst = ν → μ.map Prod.snd = ν →
       (∑ q, (μ q).toReal * ∑ a, ∑ b,
         |S.prob q.1 q.2 a b - ∑ s, (p s).toReal * (T s).prob q.1 q.2 a b|) ≤
         2 * √(2 * δ) + 4 * √(18 * δ + 20 * √δ) := by
   classical
   intro δ
-  let ν := μ.map Prod.fst
   obtain ⟨d, U, hU, hexists⟩ := S.exists_bob_projective_spectral_mixture
   obtain ⟨T, hTa, hTb, hsync, hprob, _, hw, hsum, hρ, herr⟩ := hexists ν
   let ρ (s : Cuts) := U * spectralCutDensity s * Uᴴ
@@ -444,7 +444,7 @@ theorem exists_synchronous_cut_correlation_mixture [Fintype X]
     rw [← ENNReal.ofReal_sum_of_nonneg (fun s _ => hw s), hsum, ENNReal.ofReal_one])
   have hp (s : Cuts) : (p s).toReal = spectralCutWeight d s := by
     simp only [p, PMF.ofFintype_apply, ENNReal.toReal_ofReal (hw s)]
-  let a₀ := Classical.choice (nonempty_answers_of_jointLaw S μ)
+  let a₀ := Classical.choice (nonempty_answers_of_marginal S ν)
   choose L hL hLc hLp hLe using fun s =>
     exists_lifted_cut_measurements s a₀ (T s).alice (hTa s) U hU
   have hident (s : Cuts) (x y : X) (a b : A) :
@@ -461,14 +461,17 @@ theorem exists_synchronous_cut_correlation_mixture [Fintype X]
           ρ s).trace.re) ≤ 18 * δ + 20 * √δ := by
     simp_rw [hp, hErrTerm]
     exact herr
-  have hSpectral := sum_abs_sequential_sub_mixture_le S.bob L ρ hρs p μ hμ hR hL hLc
-  simp_rw [hident] at hSpectral
   have hDensity : (∑ s, (p s).toReal • ρ s) = partialTraceLeft (pureState S.state) := by
     simp_rw [hp]
     exact hρ.symm
-  rw [hDensity] at hSpectral
-  have hSwitch := S.sum_abs_prob_sub_bob_sequential_le μ hP
   refine ⟨p, T, hTa, hTb, hsync, hprob, ?_⟩
+  intro μ hfst hsnd
+  have hSpectral := sum_abs_sequential_sub_mixture_le S.bob L ρ hρs p μ
+    (hsnd.trans hfst.symm) hR hL hLc
+  simp_rw [hident] at hSpectral
+  rw [hDensity, hfst] at hSpectral
+  have hSwitch := S.sum_abs_prob_sub_bob_sequential_le μ hP
+  rw [hfst] at hSwitch
   refine le_trans ?_ (add_le_add hSwitch
     (hSpectral.trans (mul_le_mul_of_nonneg_left (Real.sqrt_le_sqrt hErr) (by norm_num))))
   simp only [← sum_add_distrib, ← mul_add]
@@ -484,13 +487,14 @@ open scoped ComplexOrder
 local notation "DilatedCuts" => {s : Finset (κ × A) // Finset.Nonempty s}
 
 /-- Vidick's correlation approximation [Vidick2022, Corollary 3.3, arXiv v3, pp. 12–13].
-For a finite tensor strategy and a joint question law with equal marginals, a finite convex
-mixture of projective synchronous correlations approximates its joint answer probabilities.
+For a finite tensor strategy and a fixed question marginal, one finite convex mixture of
+projective synchronous correlations approximates its joint answer probabilities for every
+coupling of the marginal with itself.
 The approximation is dimension- and answer-independent. Naimark dilation preserves the
 probabilities exactly, so the measurements of the original strategy may be arbitrary POVMs. -/
 theorem exists_synchronous_correlation_mixture [Fintype X] [DecidableEq A]
-    (S : QuantumStrategy X X A A ι κ) (μ : PMF (X × X)) (hμ : μ.map Prod.snd = μ.map Prod.fst) :
-    let δ := S.synchronyDefect (μ.map Prod.fst)
+    (S : QuantumStrategy X X A A ι κ) (ν : PMF X) :
+    let δ := S.synchronyDefect ν
     ∃ (p : PMF DilatedCuts) (T : (s : DilatedCuts) → QuantumStrategy X X A A s.val s.val),
       (∀ s x, ((T s).alice x).toMeasurement.IsProjective) ∧
       (∀ s x, ((T s).bob x).toMeasurement.IsProjective) ∧
@@ -498,12 +502,13 @@ theorem exists_synchronous_correlation_mixture [Fintype X] [DecidableEq A]
       (∀ s x y a b, (T s).prob x y a b =
         (s.val.card : ℝ)⁻¹ *
           (((T s).alice x).effect a * ((T s).alice y).effect b).trace.re) ∧
+      ∀ μ : PMF (X × X), μ.map Prod.fst = ν → μ.map Prod.snd = ν →
       (∑ q, (μ q).toReal * ∑ a, ∑ b,
         |S.prob q.1 q.2 a b - ∑ s, (p s).toReal * (T s).prob q.1 q.2 a b|) ≤
         2 * √(2 * δ) + 4 * √(18 * δ + 20 * √δ) := by
   classical
-  let a₀ := Classical.choice (nonempty_answers_of_jointLaw S μ)
-  have h := (S.dilate a₀ a₀).exists_synchronous_cut_correlation_mixture μ hμ
+  let a₀ := Classical.choice (nonempty_answers_of_marginal S ν)
+  have h := (S.dilate a₀ a₀).exists_synchronous_cut_correlation_mixture ν
     (S.isProjective_alice_dilate a₀ a₀) (S.isProjective_bob_dilate a₀ a₀)
   simpa only [synchronyDefect_eq_sum, prob_dilate] using h
 
