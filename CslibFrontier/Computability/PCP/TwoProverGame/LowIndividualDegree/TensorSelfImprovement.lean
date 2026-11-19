@@ -41,31 +41,22 @@ local notation "Poly" => BoundedPolynomial F (n + 1) d
 local notation "Local" => Matrix ι ι ℂ
 local notation "Joint" => Matrix (ι × κ) (ι × κ) ℂ
 
-private noncomputable def leftLinear : Local →ₗ[ℝ] Joint :=
-  (kroneckerBilinear (R := ℝ)).flip (1 : Matrix κ κ ℂ)
-
-omit [Fintype ι] [Fintype κ] [DecidableEq ι] in
-private theorem leftLinear_apply (x : Local) : (leftLinear x : Joint) = x ⊗ₖ 1 := rfl
-
-omit [Fintype ι] [DecidableEq ι] [Fintype κ] in
-private theorem leftLinear_mono : Monotone (leftLinear : Local →ₗ[ℝ] Joint) := by
-  intro x y h
-  rw [← sub_nonneg, ← map_sub]
-  exact ((sub_nonneg.mpr h).posSemidef.kronecker (PosSemidef.one (n := κ))).nonneg
-
-private theorem leftLinear_decodedPoint (M : Q → POVM Ans ι) (u : Point F (n + 1)) (a : F) :
-    (leftLinear ((decodedPoint (fun q => (M q).toMeasurement) u).effect a) : Joint) =
+private theorem kroneckerOne_decodedPoint (M : Q → POVM Ans ι) (u : Point F (n + 1)) (a : F) :
+    (kroneckerOne ((decodedPoint (fun q => (M q).toMeasurement) u).effect a) : Joint) =
       (decodedPoint (fun q => QuantumStrategy.leftMeasurement (M q)) u).effect a := by
   simp only [decodedPoint, Measurement.map_effect, map_sum]
   rfl
 
-private theorem leftLinear_averagePolynomialPointEffect
+private theorem kroneckerOne_averagePolynomialPointEffect
     (M : Q → POVM Ans ι) (g : Poly) :
-    (leftLinear (averagePolynomialPointEffect
+    (kroneckerOne (averagePolynomialPointEffect
       (decodedPoint (fun q => (M q).toMeasurement)) g) : Joint) =
       averagePolynomialPointEffect (decodedPoint (fun q => QuantumStrategy.leftMeasurement
         (M q))) g := by
-  simp only [averagePolynomialPointEffect_eq, map_smul, map_sum, leftLinear_decodedPoint]
+  rw [averagePolynomialPointEffect_eq, averagePolynomialPointEffect_eq]
+  change ((kroneckerOne (κ := κ)).toAlgHom.restrictScalars ℝ) _ = _
+  simp only [map_smul, map_sum, AlgHom.coe_restrictScalars', StarAlgHom.coe_toAlgHom,
+    kroneckerOne_decodedPoint]
 
 private theorem exists_leftSelfImprovementCertificate (M : Q → POVM Ans ι) :
     ∃ (T : POVM Poly ι) (Z : Local), 0 ≤ Z ∧
@@ -80,10 +71,10 @@ private theorem exists_leftSelfImprovementCertificate (M : Q → POVM Ans ι) :
     (decodedPoint (fun q => (M q).toMeasurement))
   refine ⟨T.toPOVM, Z, hZ, ?_, ?_⟩
   · intro g
-    rw [← leftLinear_averagePolynomialPointEffect, ← leftLinear_apply]
-    exact leftLinear_mono (hle g)
+    rw [← kroneckerOne_averagePolynomialPointEffect]
+    exact OrderHomClass.mono (kroneckerOne (κ := κ)) (hle g)
   · intro g
-    rw [← leftLinear_averagePolynomialPointEffect, ← leftLinear_apply]
+    rw [← kroneckerOne_averagePolynomialPointEffect]
     change kroneckerOne (κ := κ) (T.effect g) * kroneckerOne Z =
       kroneckerOne (T.effect g) * kroneckerOne (averagePolynomialPointEffect
         (decodedPoint (fun q => (M q).toMeasurement)) g)
