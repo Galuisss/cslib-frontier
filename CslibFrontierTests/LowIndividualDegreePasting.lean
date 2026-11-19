@@ -7,6 +7,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 module
 -- upstream: local-only (tests)
 
+import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PastingCompleteness
 import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerifierPasting
 import CslibFrontierTests.QubitMeasurementFixture
 import Mathlib.Algebra.Field.ZMod
