@@ -12,9 +12,10 @@ public import CslibFrontier.Foundations.Quantum.Algebra.Consistency
 /-!
 # Sandwiched measurement effects
 
-After measuring a coarse outcome, a second measurement may be retained only when its
-outcome maps to the coarse outcome. The matching effects are sandwiches of the fine
-effects by the corresponding coarse effects. The unmatched weight is a failure outcome.
+Sandwich each fine effect by the coarse effect indexed by its image. These
+sandwiches form a submeasurement. For projective coarse effects they describe
+measuring the coarse outcome first and retaining a matching fine outcome.
+The remaining weight is a failure outcome.
 
 ## Main results
 

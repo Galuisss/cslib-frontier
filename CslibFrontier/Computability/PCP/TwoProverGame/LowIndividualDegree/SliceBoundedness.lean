@@ -44,12 +44,6 @@ open scoped BigOperators Real
 variable {F A : Type*} {m d : ℕ} [Field F] [Fintype F] [DecidableEq F]
   [CStarAlgebra A] [PartialOrder A] [StarOrderedRing A]
 
-private theorem evaluated_successfulEffect (P : Measurement (Option (BoundedPolynomial F m d)) A)
-    (u : Fin m → F) :
-    (evaluatePolynomialMeasurement P u).successfulEffect = P.successfulEffect := by
-  have hh := congrArg (fun x : A => 1 - x) (evaluatePolynomialMeasurement_effect_none P u)
-  simpa only [Measurement.effect_none_eq_one_sub_successfulEffect, sub_sub_cancel] using hh
-
 /-- Agreement of the successful evaluated slice with the point measurement gives the
 squared state distance from the point measurement multiplied by the slice success effect. -/
 theorem evaluatedSlice_gated_stateDist_eq
@@ -64,16 +58,8 @@ theorem evaluatedSlice_gated_stateDist_eq
   have hc' (a : Option F) (b : F) : Commute ((evaluatePolynomialMeasurement P u).effect a)
       (B.effect b) :=
     (Measurement.commute_map_right P _ _ (fun g => (hc g b).symm) a).symm
-  simpa only [evaluated_successfulEffect] using
+  simpa only [evaluatePolynomialMeasurement_successfulEffect] using
     Measurement.sum_norm_sub_success_mul_sq_eq φ (evaluatePolynomialMeasurement P u) B hP hb hc'
-
-/-- The effect of a successful value sums precisely the polynomials evaluating to it. -/
-theorem evaluatePolynomialMeasurement_effect_some (P : Measurement (Option (BoundedPolynomial F m d)) A)
-    (u : Fin m → F) (b : F) : (evaluatePolynomialMeasurement P u).effect (some b) =
-      ∑ g with eval u g.val = b, P.effect (some g) := by
-  rw [evaluatePolynomialMeasurement, Measurement.map_effect, sum_filter, Fintype.sum_option,
-    sum_filter]
-  simp
 
 /-- A positive common majorant of the averaged point effects controls the failure term
 after sandwiching an evaluated slice by the successful effects of a second measurement.

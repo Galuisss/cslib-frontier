@@ -7,9 +7,14 @@ Authors: Christian Reitwiessner
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SliceBoundedness
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialMeasurement
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialPointEffect
+public import CslibFrontier.Foundations.Quantum.Algebra.SuccessfulAgreement
 public import CslibFrontier.Foundations.Quantum.Algebra.SandwichedMeasurement
 import CslibFrontier.Foundations.Data.Finset.Expect
+import CslibFrontier.Foundations.Quantum.Algebra.MeasurementMixture
+import CslibFrontier.Probability.PMF.Uniform
 
 /-!
 # The sandwiched polynomial submeasurement
@@ -29,6 +34,12 @@ weighted-variance errors. A separate estimate from the verifier bounds the varia
 
 * `Cslib.PCP.LowIndividualDegree.abs_sandwichedPolynomial_score_sub_le`: the
   comparison with sandwiching on the other side at the point in the score.
+* `Cslib.PCP.LowIndividualDegree.successfulMass_sandwichedPolynomial_lower_bound`
+  transfers input agreement to successful mass using the SDP certificate.
+* `Cslib.PCP.LowIndividualDegree.average_successfulMismatch_sandwichedPolynomial_le`
+  bounds disagreement on successful outcomes.
+* `Cslib.PCP.LowIndividualDegree.majorant_sub_sandwichedPolynomial_agreement_le`
+  compares point agreement with the state value of the majorant.
 -/
 
 public section
@@ -68,11 +79,12 @@ noncomputable def weightedPointVariance (φ : AlgState A) (L : Point F m → Mea
     let D := (L v).effect (eval v g.val) - (L u).effect (eval u g.val)
     (φ (star D * T.effect g * D)).re
 
-omit [Field F] in
+omit [Field F] [DecidableEq F] in
 private theorem sum_copy_sandwich_le {β : Type*} [Fintype β]
     (φ : AlgState A) (T : Measurement β A) (M N : Measurement F A) (f : β → F) :
     (∑ g, let D := M.effect (f g) - N.effect (f g)
           (φ (star D * T.effect g * D)).re) ≤ copyDefect φ M N := by
+  classical
   let D a := M.effect a - N.effect a
   change (∑ g, (φ (star (D (f g)) * T.effect g * D (f g))).re) ≤ _
   rw [← sum_fiberwise univ f (fun g => (φ (star (D (f g)) * T.effect g * D (f g))).re)]
@@ -86,6 +98,7 @@ private theorem sum_copy_sandwich_le {β : Type*} [Fintype β]
   simpa only [D, mul_one] using φ.re_apply_mono
     (star_left_conjugate_le_conjugate ((T.map f).effect_le_one a) (D a))
 
+omit [DecidableEq F] in
 /-- A step of the self-improvement argument. In a score against positive contractions
 on the opposite side, the averaged sandwiches can be replaced by pointwise sandwiches
 around those contractions. The cost is the sum of twice the square roots of the
@@ -96,7 +109,8 @@ theorem abs_sandwichedPolynomial_score_sub_le (φ : AlgState A)
     (hCT : ∀ u g, Commute (C u g) (T.effect g))
     (hCR : ∀ u v g b, Commute (C u g) ((R v).effect b))
     (hLT : ∀ u g b, Commute ((L u).effect b) (T.effect g)) :
-    |(𝔼 u : Point F m, ∑ g, (φ (C u g * (sandwichedPolynomialMeasurement R T).effect (some g))).re) -
+    |(𝔼 u : Point F m, ∑ g,
+        (φ (C u g * (sandwichedPolynomialMeasurement R T).effect (some g))).re) -
       (𝔼 u : Point F m, ∑ g, (φ ((L u).effect (eval u g.val) * C u g *
         (L u).effect (eval u g.val) * T.effect g)).re)| ≤
       2 * √(𝔼 u : Point F m, copyDefect φ (R u) (L u)) +
@@ -306,5 +320,37 @@ theorem average_successfulMismatch_sandwichedPolynomial_le (φ : AlgState A)
   change (𝔼 u : Point F m, successfulMismatch φ (evaluatePolynomialMeasurement H u) (L u)) ≤ _
   simp_rw [hgroup]
   exact (le_abs_self _).trans h
+
+/-- A step of the boundedness proof. The dual majorant's state value exceeds the
+sandwiched measurement's point-agreement score by at most the stated copy and variance
+budget. The same majorant dominates the averaged point effects whenever it is dual feasible. -/
+theorem majorant_sub_sandwichedPolynomial_agreement_le (φ : AlgState A)
+    (L R : Point F m → Measurement F A) (T : Measurement (BoundedPolynomial F m d) A)
+    (hL : ∀ u, (L u).IsProjective)
+    (hLR : ∀ u v a b, Commute ((L u).effect a) ((R v).effect b))
+    (hLT : ∀ u g b, Commute ((L u).effect b) (T.effect g)) (Z : A)
+    (hslack : ∀ g, T.effect g * Z = T.effect g * averagePolynomialPointEffect R g) :
+    let H := sandwichedPolynomialMeasurement R T
+    (φ Z).re - (𝔼 u : Point F m, ∑ b,
+      (φ ((evaluatePolynomialMeasurement H u).effect (some b) * (L u).effect b)).re) ≤
+      5 * √(𝔼 u : Point F m, copyDefect φ (R u) (L u)) +
+      2 * √(weightedPointVariance φ L T) := by
+  intro H
+  have hsplit (u : Point F m) :
+      successfulMismatch φ (evaluatePolynomialMeasurement H u) (L u) =
+        (φ H.successfulEffect).re -
+          ∑ b, (φ ((evaluatePolynomialMeasurement H u).effect (some b) * (L u).effect b)).re := by
+    simp only [successfulMismatch, mul_sub, mul_one, map_sub, Complex.sub_re, sum_sub_distrib]
+    congr 1
+    rw [← Complex.re_sum, ← map_sum]
+    change (φ (evaluatePolynomialMeasurement H u).successfulEffect).re = _
+    rw [evaluatePolynomialMeasurement_successfulEffect]
+  have hmis := average_successfulMismatch_sandwichedPolynomial_le φ L R T hL hLR hLT
+  change (𝔼 u : Point F m, successfulMismatch φ (evaluatePolynomialMeasurement H u) (L u)) ≤ _
+    at hmis
+  simp_rw [hsplit, expect_sub_distrib, Fintype.expect_const] at hmis
+  have hm := abs_successfulMass_sandwichedPolynomial_sub_majorant_le φ L R T hL hLT Z hslack
+  change |(φ H.successfulEffect).re - (φ Z).re| ≤ _ at hm
+  linarith only [hmis, (abs_le.mp hm).1]
 
 end Cslib.PCP.LowIndividualDegree
