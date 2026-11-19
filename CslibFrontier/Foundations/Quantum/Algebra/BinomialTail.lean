@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Foundations.Quantum.Algebra.AlgState
 public import Mathlib.Analysis.SpecialFunctions.Exp
 import CslibFrontier.Foundations.Combinatorics.BinomialTail
+import Mathlib.Algebra.BigOperators.Group.Finset.Powerset
 import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Instances
 
 /-!
@@ -51,6 +52,79 @@ theorem binomialTail_eq_sum_powerset {A ι : Type*} [Ring A]
     if d < i then X ^ i * (1 - X) ^ (s.card - i) else 0)]
   refine sum_congr rfl fun i _ => ?_
   split_ifs <;> simp [nsmul_eq_mul, mul_assoc]
+
+/-- The binomial effect for at least `r` successes. A zero threshold accepts every outcome. -/
+@[expose] def binomialAtLeast {A : Type*} [Ring A] (k r : ℕ) (X : A) : A :=
+  if r = 0 then 1 else binomialTail k (r - 1) X
+
+@[simp] theorem binomialAtLeast_zero {A : Type*} [Ring A] (r : ℕ) (X : A) :
+    binomialAtLeast 0 r X = if r = 0 then 1 else 0 := by
+  cases r with
+  | zero => simp [binomialAtLeast]
+  | succ r =>
+    simp only [binomialAtLeast, Nat.succ_ne_zero, ite_false, Nat.add_sub_cancel,
+      binomialTail, zero_add, range_one, filter_singleton, Nat.not_lt_zero]
+    simp
+
+private theorem binomialAtLeast_eq_sum_powerset {A ι : Type*} [Ring A]
+    (s : Finset ι) (r : ℕ) (X : A) :
+    binomialAtLeast s.card r X =
+      ∑ t ∈ s.powerset, if r ≤ t.card then X ^ t.card * (1 - X) ^ (s.card - t.card) else 0 := by
+  classical
+  cases r with
+  | zero =>
+    simp only [binomialAtLeast, Nat.zero_le, ite_true]
+    rw [sum_powerset_apply_card (fun i => X ^ i * (1 - X) ^ (s.card - i))]
+    have h : Commute X (1 - X) := (Commute.one_right X).sub_right (Commute.refl X)
+    have hp := h.add_pow s.card
+    rw [add_sub_cancel, one_pow] at hp
+    refine hp.trans (sum_congr rfl fun i _ => ?_)
+    rw [nsmul_eq_mul, Nat.cast_commute]
+  | succ r =>
+    simp only [binomialAtLeast, Nat.succ_ne_zero, ite_false, Nat.add_sub_cancel,
+      Nat.succ_le_iff]
+    rw [binomialTail_eq_sum_powerset, sum_filter]
+
+/-- Splitting off one trial updates the success threshold on the success branch. -/
+theorem binomialAtLeast_succ {A : Type*} [Ring A] (k r : ℕ) (X : A) :
+    binomialAtLeast (k + 1) r X =
+      binomialAtLeast k r X * (1 - X) + binomialAtLeast k (r - 1) X * X := by
+  have hz : k ∉ range k := by simp
+  have hcard : (insert k (range k)).card = k + 1 := by simp [hz]
+  have hc := binomialAtLeast_eq_sum_powerset (insert k (range k)) r X
+  rw [hcard, sum_powerset_insert hz] at hc
+  rw [hc]
+  have h (l : ℕ) := binomialAtLeast_eq_sum_powerset (range k) l X
+  simp only [card_range] at h
+  rw [h r, h (r - 1), sum_mul, sum_mul]
+  congr 1
+  · refine sum_congr rfl fun t ht => ?_
+    have htk : t.card ≤ k := by
+      simpa only [card_range] using card_le_card (mem_powerset.mp ht)
+    have he : k + 1 - t.card = k - t.card + 1 := by omega
+    simp only [he, pow_succ]
+    split_ifs <;> simp [mul_assoc]
+  · refine sum_congr rfl fun t ht => ?_
+    have hn : k ∉ t := fun h => hz (mem_powerset.mp ht h)
+    rw [card_insert_of_notMem hn]
+    have he : k + 1 - (t.card + 1) = k - t.card := by omega
+    have hs : r ≤ t.card + 1 ↔ r - 1 ≤ t.card := by omega
+    simp only [he, hs]
+    have hcomm : Commute ((1 - X) ^ (k - t.card)) X :=
+      (((Commute.one_right X).sub_right (Commute.refl X)).symm).pow_left _
+    split_ifs
+    · simp only [pow_succ, mul_assoc, ← hcomm.eq]
+    · rw [zero_mul]
+
+/-- An operator commuting with the trial effect commutes with its binomial effects. -/
+theorem commute_binomialAtLeast {A : Type*} [Ring A] (k r : ℕ) {X Y : A}
+    (h : Commute Y X) : Commute Y (binomialAtLeast k r X) := by
+  unfold binomialAtLeast binomialTail
+  split_ifs
+  · exact Commute.one_right Y
+  · exact (Commute.sum_left _ _ _ fun i _ =>
+      (((Nat.cast_commute (k.choose i) Y).mul_left (h.symm.pow_left i)).mul_left
+        (((Commute.one_right Y).sub_right h).symm.pow_left _))).symm
 
 private theorem one_sub_binomialTail_real_le {k d : ℕ} (hk : 0 < k) {θ p : ℝ}
     (hθ₀ : 0 < θ) (hθ₁ : θ < 1) (hsize : 2 * (d : ℝ) ≤ θ * k)
@@ -131,6 +205,13 @@ theorem binomialTail_mem_Icc (k d : ℕ) {X : A} (hX₀ : 0 ≤ X) (hX₁ : X �
     have hp₁ := sub_nonneg.mpr (hs₁ p hp)
     rw [← Cslib.sum_choose_mul_pow_eq_one k p]
     exact sum_le_sum_of_subset_of_nonneg (filter_subset _ _) (fun i _ _ => by positivity)
+
+theorem binomialAtLeast_mem_Icc (k r : ℕ) {X : A} (hX₀ : 0 ≤ X) (hX₁ : X ≤ 1) :
+    binomialAtLeast k r X ∈ Set.Icc (0 : A) 1 := by
+  unfold binomialAtLeast
+  split_ifs
+  · exact ⟨zero_le_one, le_rfl⟩
+  · exact binomialTail_mem_Icc _ _ hX₀ hX₁
 
 /-- If the success effect is a positive contraction, the failure effect of the binomial
 tail is bounded by an affine function of the original failure effect. -/

@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PastingConsistency
+public import CslibFrontier.Foundations.Quantum.Algebra.SequentialBinomial
 import CslibFrontier.Foundations.Data.MvPolynomial.SchwartzZippel
 import CslibFrontier.Foundations.Data.MvPolynomial.Shift
 import CslibFrontier.Probability.PMF.ToReal
@@ -30,6 +31,8 @@ step of [Ji, Natarajan, Vidick, Wright and Yuen, Lemma 12.20]
   prefixes on which an incompatible transcript can agree with a line.
 * `Cslib.PCP.LowIndividualDegree.enoughSlices_prob_le_paste_prob_add` bounds the probability
   lost when discarding incompatible transcripts at distinct slice locations.
+* `Cslib.PCP.LowIndividualDegree.average_enoughSlices_le` bounds the probability of
+  obtaining too few successful slices for independent uniform draws.
 -/
 
 public section
@@ -183,5 +186,49 @@ theorem enoughSlices_prob_le_paste_prob_add [Fintype F] {β : Type*}
     _ ≤ _ := by
       rw [expect_add_distrib, expect_sum_comm]
       exact add_le_add_right hlocal _
+
+section Sequential
+
+open Cslib.Quantum
+open scoped Real
+
+private theorem transcriptSuccessCount_eq_card {k : ℕ}
+    (g : Fin k → Option (BoundedPolynomial F m d)) :
+    Measurement.transcriptSuccessCount Option.isSome g = (successfulSlices g).card := by
+  have h : successfulSlices g = univ.filter (fun i => (g i).isSome) := by
+    ext i
+    simp
+  rw [h, card_filter, Measurement.transcriptSuccessCount]
+
+variable {A : Type*} [Fintype F] [CStarAlgebra A] [PartialOrder A] [StarOrderedRing A]
+
+/-- A lower bound for the average probability of enough successful slice outcomes under
+independent uniform sampling. This combines the sequential comparison of Lemma 12.21
+with the concentration estimate of Lemma 12.22. -/
+theorem average_enoughSlices_le (φ : AlgState A)
+    (M R : F → Measurement (Option (BoundedPolynomial F m d)) A)
+    (hM : ∀ x, (M x).IsProjective) (hR : ∀ x, (R x).IsProjective)
+    (hc : ∀ x y a b, Commute ((M x).effect a) ((R y).effect b))
+    {k : ℕ} (hk : 0 < k) {θ κ χ ζ : ℝ}
+    (hθ₀ : 0 < θ) (hθ₁ : θ < 1) (hsize : 2 * (d : ℝ) ≤ θ * k)
+    (hmass : 1 - κ ≤ (φ (Measurement.averageSuccessEffect R Option.isSome)).re)
+    (hpair : (𝔼 x : F, 𝔼 y : F, Measurement.successfulPairDefect φ (M x) (M y)) ≤ χ)
+    (hcopy : (𝔼 x : F, Measurement.successfulCopyDefect φ (M x) (R x)) ≤ ζ) :
+    1 - κ / (1 - θ) - Real.exp (-(θ ^ 2 * k) / 2) -
+        (1 + √2) * (k * √(2 * ζ) + (k : ℝ) ^ 2 * √(162 * χ + 176 * ζ)) ≤
+      𝔼 x : Fin k → F, ∑ g with d < (successfulSlices g).card,
+        (φ ((Measurement.sequentialProjective (fun j => M (x j)) (fun j => hM (x j))).effect
+          g)).re := by
+  obtain ⟨hp, hs⟩ := Measurement.average_completedDefects_le φ M R hM hR hc hpair hcopy
+  have h := Measurement.abs_sequentialSuccess_sub_binomialAtLeast_le φ M R hM hR hc
+    Option.isSome k (d + 1) hp hs
+  have he : 2 * (81 * χ + 80 * ζ) + 8 * (2 * ζ) = 162 * χ + 176 * ζ := by ring
+  simp only [transcriptSuccessCount_eq_card, Nat.succ_le_iff, binomialAtLeast, Nat.succ_ne_zero,
+    ite_false, Nat.add_sub_cancel, he] at h
+  obtain ⟨hG₀, hG₁⟩ := Measurement.averageSuccessEffect_mem_Icc R Option.isSome
+  have ht := φ.one_sub_le_re_binomialTail hk hθ₀ hθ₁ hsize hG₀ hG₁ hmass
+  linarith [(abs_sub_le_iff.mp h).2]
+
+end Sequential
 
 end Cslib.PCP.LowIndividualDegree
