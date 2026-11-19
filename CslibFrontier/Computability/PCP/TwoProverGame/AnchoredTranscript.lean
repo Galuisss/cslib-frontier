@@ -256,7 +256,7 @@ theorem map_restKernel_eq_bind (S : RepeatedStrategy) (j : Free) (q : PairQ) :
     _ = _ := by
       simp only [restQuestionsLaw, PMF.bind_map, Function.comp_def]
       congr 1 with t : 1
-      rw [answersGivenRest, questionsGivenRest_omit, ← map_update_pi, PMF.bind_map, PMF.bind_map,
+      rw [answersGivenRest, questionsGivenRest_omit, pi_update_pure, PMF.bind_map, PMF.bind_map,
         PMF.map_bind]
       rfl
 

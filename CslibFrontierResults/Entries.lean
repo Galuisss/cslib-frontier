@@ -10,6 +10,7 @@ import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredTranscriptDistance
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditionalStates
 import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 import CslibFrontier.Computability.PCP.TwoProverGame.Synchronous
@@ -10868,6 +10869,21 @@ register_result "bvy-two-anchor-transcript-comparisons" where
     and (1+w)(2ε₁+ε₂), with ε₁ and ε₂ the natural-log bounds from the winning probability \
     and the full checked-answer alphabet. The weighted forms include endpoint anchor rates. \
     A null observation uses the remaining transcript’s marginal fallback."
+
+register_result "bvy-checked-answer-weight-given-questions" where
+  title := "Checked-answer branch weight given the selected question pair"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Proposition 4.9, equation (20)",
+      locator := "arXiv:1509.07466v2, §4.4, printed pp. 17–18" }
+  ]
+  theorems := [
+    Cslib.PCP.AnchoredDependency.norm_checkedVectorGivenRest_sq_observed
+  ]
+  scope := "For a finite-dimensional tensor strategy with local POVMs and a selected unchecked \
+    coordinate, the squared branch norm is the actual conditional checked-answer probability. \
+    The selected pair and retained question observation must be supported. Local dimensions may \
+    differ. The reconstructed kernels are total and the observed-law equality is on support."
 
 register_result "synchronous-correlations-tracial-representation" where
   title := "Tracial representation of synchronous commuting correlations"
