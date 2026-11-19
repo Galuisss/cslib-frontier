@@ -175,20 +175,20 @@ theorem observable_asymmetricLinearity_eq_pointMeasurement
 
 open BitString in
 /-- The averaged point and consistency observables agree in X. In Z, the squared
-state-norm distance is controlled by the linearity rejection probability. Only the
-measurements on duplicated basis questions need to be projective for this estimate. -/
+state-norm distance is controlled by the linearity rejection probability for general
+measurements. -/
 theorem expect_norm_asymmetricLinearity_sub_basis_sq_le
     (G : TwoProverGame Q Q A A) (special : Bool → Q) (decode : Bool → A → Bool)
     (S : CommutingStrategy (PauliBraidingQuestion n Q) (PauliBraidingQuestion n Q)
       ((Bool × Bool) ⊕ A) ((Bool × Bool) ⊕ A) 𝒜)
-    (basis roles : Bool)
-    (hproj : ∀ c, ((cond roles S.alice S.bob) (.basis basis (c, c))).IsProjective) :
+    (basis roles : Bool) :
     let R := pauliBraidingLinearityStrategy basis S
     let T := (cond roles R R.swap).asymmetricLinearity
     let M := cond roles S.alice S.bob
     (𝔼 c, S.state.norm ((T.alice c).observable -
       (𝔼 d, pauliBraidingBasisObservable M basis c d)) ^ 2) ≤
-      if basis then 48 * (1 - (pauliBraidingBranchGame n G special decode 0).commutingWinProb S)
+      if basis then 48 / (Fintype.card (Fin n → Bool) : ℝ) *
+        (1 - (pauliBraidingBranchGame n G special decode 0).commutingWinProb S)
       else 0 := by
   classical
   intro R T M
@@ -240,20 +240,19 @@ theorem expect_norm_asymmetricLinearity_sub_basis_sq_le
         cases a <;> rfl
       simp only [bad, tie, hdecode, size]
       cases roles <;> exact h
-    have hsize : 1 ≤ (size : ℝ) := by
-      exact_mod_cast (Fintype.card_pos (α := Fin n → Bool))
-    have hmass : (size : ℝ)⁻¹ ≤ 1 := inv_le_one_of_one_le₀ hsize
-    have hmass_nonneg : 0 ≤ (size : ℝ)⁻¹ := by positivity
     simp only [ite_true, AlgState.norm_nnqsmul, NNRat.cast_inv, NNRat.cast_natCast, mul_pow]
     calc
-      _ ≤ 𝔼 c, (4 * (size : ℝ)⁻¹) * bad c := by
+      _ ≤ 𝔼 c, (4 * ((size : ℝ)⁻¹) ^ 2) * bad c := by
         refine expect_le_expect fun c _ => ?_
-        have heq : S.state.norm (diff c) ^ 2 = 4 * bad c :=
-          (hproj c).norm_observable_map_sub_sq S.state first second
-        rw [heq]
-        have hbad : 0 ≤ bad c := Measurement.prob_nonneg _ _ _
-        nlinarith [mul_nonneg (mul_nonneg hmass_nonneg hbad) (sub_nonneg.mpr hmass)]
-      _ = 4 * ((𝔼 c, bad c) / size) := by rw [← mul_expect]; ring
-      _ ≤ _ := by linarith only [hweighted]
+        have h := (tie c).norm_observable_map_sub_sq_le S.state first second
+        change S.state.norm (diff c) ^ 2 ≤ 4 * bad c at h
+        simpa only [mul_assoc, mul_left_comm (((size : ℝ)⁻¹) ^ 2) 4] using
+          mul_le_mul_of_nonneg_left h (sq_nonneg ((size : ℝ)⁻¹))
+      _ = (4 / size) * ((𝔼 c, bad c) / size) := by
+        rw [← mul_expect]
+        ring
+      _ ≤ _ := by
+        rw [show (48 : ℝ) / size = (4 / size) * 12 by ring, mul_assoc]
+        exact mul_le_mul_of_nonneg_left hweighted (by positivity)
 
 end Cslib.PCP
