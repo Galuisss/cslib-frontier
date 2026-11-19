@@ -55,6 +55,74 @@ example : (fun _ : List Bool =>
   exact mixed.coefficientSign_mem Decoder.bits (fun _ => exponent)
     (ComputableInPolyTime.const [1, 1]) exponent_code
 
+/-- A one-variable constant family exercises an address-independent admissible prime domain. -/
+noncomputable def constantThree :
+    Controlled (fun _ : List Bool => C 3 : List Bool → MvPolynomial (Fin 1) ℤ) encBits 0 :=
+  Controlled.constant (.const 1) (fun _ => 3) (.const 3)
+
+private theorem zero_code (_w : List Bool) (i : Fin 1) :
+    ([0] : List ℕ)[i.val]?.getD 0 = (0 : Fin 1 →₀ ℕ) i := by
+  fin_cases i
+  simp
+
+private theorem surplus_code (_w : List Bool) (i : Fin 1) :
+    ([0, 9] : List ℕ)[i.val]?.getD 0 = (0 : Fin 1 →₀ ℕ) i := by
+  fin_cases i
+  simp
+
+private theorem missing_code (_w : List Bool) (i : Fin 1) :
+    ([] : List ℕ)[i.val]?.getD 0 = (0 : Fin 1 →₀ ℕ) i := by
+  simp
+
+private theorem above_code (_w : List Bool) (i : Fin 1) :
+    ([1] : List ℕ)[i.val]?.getD 0 = (Finsupp.single 0 1 : Fin 1 →₀ ℕ) i := by
+  fin_cases i
+  simp
+
+-- Every address has the same prime cutoff, including a list with an unused large entry.
+example (w : List Bool) : constantThree.coefficientCutoff w = 1 := rfl
+
+example (w : List Bool) (p : ℕ) :
+    (constantThree.coefficientAccess (fun _ => 0) (fun _ => [0]) zero_code).admissible w p ↔
+      (constantThree.coefficientAccess (fun _ => 0) (fun _ => [0, 9]) surplus_code).admissible
+        w p := Iff.rfl
+
+example (w : List Bool) :
+    (constantThree.coefficientAccess (fun _ => 0) (fun _ => [0]) zero_code).admissible w 5 :=
+  ⟨by decide, by change 1 < 5; decide⟩
+
+example (w : List Bool) :
+    (constantThree.coefficientAccess (fun _ => 0) (fun _ => [0, 9]) surplus_code).admissible
+      w 5 := ⟨by decide, by change 1 < 5; decide⟩
+
+example (w : List Bool) :
+    (constantThree.coefficientAccess (fun _ => 0) (fun _ => [0]) zero_code).residue (w, 5) = 3 := by
+  have h := (constantThree.coefficientAccess (fun _ => 0) (fun _ => [0]) zero_code).residue_eq
+    w 5 ⟨by decide, by change 1 < 5; decide⟩
+  simpa [coeff_C] using h
+
+example (w : List Bool) :
+    (constantThree.coefficientAccess (fun _ => 0) (fun _ => [0, 9]) surplus_code).residue
+      (w, 5) = 3 := by
+  have h :=
+    (constantThree.coefficientAccess (fun _ => 0) (fun _ => [0, 9]) surplus_code).residue_eq
+      w 5 ⟨by decide, by change 1 < 5; decide⟩
+  simpa [coeff_C] using h
+
+-- Padding a missing coordinate with zero still selects the constant term.
+example (w : List Bool) :
+    (constantThree.coefficientAccess (fun _ => 0) (fun _ => []) missing_code).residue
+      (w, 5) = 3 := by
+  have h := (constantThree.coefficientAccess (fun _ => 0) (fun _ => []) missing_code).residue_eq
+    w 5 ⟨by decide, by change 1 < 5; decide⟩
+  simpa [coeff_C] using h
+
+-- An actual exponent above the degree bound takes the total zero branch before any grid sum.
+example (w : List Bool) :
+    (constantThree.coefficientAccess
+      (fun _ => Finsupp.single 0 1) (fun _ => [1]) above_code).residue
+      (w, 5) = 0 := rfl
+
 /-- A zero-variable family uses its source evaluator directly for integer signs. -/
 noncomputable def integerFamily :
     Controlled (fun _ : List Bool => C (-37) : List Bool → MvPolynomial (Fin 0) ℤ) encBits 0 :=
