@@ -6945,6 +6945,7 @@ public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PolarDecomposition
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PosDef
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PosSemidefTrace
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PowPerturbation
+public import CslibFrontier.Foundations.LinearAlgebra.Matrix.PowersStormer
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Rank
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.RankSupport
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.RectPermanent
@@ -7113,6 +7114,7 @@ public import CslibFrontier.Foundations.Quantum.Algebra.Tsirelson
 public import CslibFrontier.Foundations.Quantum.Bell
 public import CslibFrontier.Foundations.Quantum.Bipartite
 public import CslibFrontier.Foundations.Quantum.DensityMatrix
+public import CslibFrontier.Foundations.Quantum.DensityMatrix.FidelityTraceDistance
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Isometry
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Linear
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Normalize
