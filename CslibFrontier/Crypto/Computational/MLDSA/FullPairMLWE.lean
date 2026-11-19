@@ -70,8 +70,8 @@ private noncomputable def idealShortPair {s : Level} (matrix : Option (PublicMat
       observePair matrix (some (x, e)) run
 
 private theorem expandS_observe_le (s : Level) (base : Xofs) (rho : List Byte)
-    (hr : rho.length = 64) {a b : ℕ} (ha : 528 ≤ a) (hb : 481 ≤ b) (matrix : Option (PublicMatrix s))
-    (run : MLDSA.PublicKey s.params → Game) :
+    (hr : rho.length = 64) {a b : ℕ} (ha : 528 ≤ a) (hb : 481 ≤ b)
+    (matrix : Option (PublicMatrix s)) (run : MLDSA.PublicKey s.params → Game) :
     let R := base.uniformPrefixes a b
     ((R.bind fun G => observePair matrix (G.expandS s rho) run) true) ≤
       idealShortPair matrix run true := by
@@ -135,7 +135,8 @@ private theorem planted_real {s : Level} (H : Xofs) (seed : FixedBytes 32) (run 
     let rho := (H.expandKeySeed s seed).take 32
     ((PMF.uniformOfFintype (MatrixPrefixes s)).bind fun t =>
       matrixGame (H.withMatrixPrefixes s rho t) seed run) =
-      (MLDSA.keyLaw s.params (MatrixOracle.shortCoefficientLaw s)).bind (atChallenge H seed run) := by
+      (MLDSA.keyLaw s.params (MatrixOracle.shortCoefficientLaw s)).bind
+        (atChallenge H seed run) := by
   intro rho
   let U := PMF.uniformOfFintype (MatrixPrefixes s)
   let M := PMF.uniformOfFintype (PublicMatrix s)
@@ -202,7 +203,8 @@ private theorem matrixGame_eq_real {s : Level} (base : Xofs) {a b : ℕ}
     (ha : 272 ≤ a) (hb : 894 ≤ b) (run : PostKey s) :
     ((base.uniformPrefixes a b).bind fun H => (PMF.uniformOfFintype (FixedBytes 32)).bind
       fun seed => matrixGame H seed run) =
-      (MLDSA.keyLaw s.params (MatrixOracle.shortCoefficientLaw s)).bind (challengeTest base a b run) := by
+      (MLDSA.keyLaw s.params (MatrixOracle.shortCoefficientLaw s)).bind
+        (challengeTest base a b run) := by
   rw [← resample_matrixGame base ha hb run]
   simp_rw [planted_real]
   let K := MLDSA.keyLaw s.params (MatrixOracle.shortCoefficientLaw s)
