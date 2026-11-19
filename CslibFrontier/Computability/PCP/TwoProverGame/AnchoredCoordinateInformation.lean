@@ -398,22 +398,6 @@ local notation "Raw" => ((Info × (C → A × B)) × (Free → PairQ))
 local notation "SwappedRaw" => ((SwappedInfo × (C → B × A)) ×
   (Free → Option Y × Option X))
 
-private def swapRevealed (t : Info) : SwappedInfo :=
-  ⟨Prod.swap ∘ t.questions, Sum.swap ∘ t.halves⟩
-
-omit [Fintype X] [Fintype Y] in
-private theorem swapRevealed_swapRevealed (t : Info) :
-    swapRevealed C (swapRevealed C t) = t := by
-  cases t with
-  | mk qs ms =>
-    exact congrArg (Revealed.mk qs) (funext fun i => Sum.swap_swap (ms i))
-
-private def swapInfo : Info ≃ SwappedInfo where
-  toFun := swapRevealed C
-  invFun := swapRevealed C
-  left_inv := swapRevealed_swapRevealed C
-  right_inv := swapRevealed_swapRevealed C
-
 private def swapTranscript (z : Raw) : SwappedRaw :=
   let ((t, a), u) := z
   ((swapInfo C t, Prod.swap ∘ a), Prod.swap ∘ u)
@@ -429,7 +413,7 @@ private theorem completeTranscript_swap (S : RepeatedStrategy) (qs : C → PairQ
   have hcombine : (swapInfo C t).combine (Prod.swap ∘ u) = Prod.swap ∘ t.combine u := by
     funext i
     by_cases hi : i ∈ C <;>
-      simp [swapInfo, swapRevealed, Revealed.combine, Equiv.piEquivPiSubtypeProd_symm_apply, hi]
+      simp [swapInfo, Revealed.combine, Equiv.piEquivPiSubtypeProd_symm_apply, hi]
   change (checkedAnswerLaw C S.swap ((swapInfo C t).combine (Prod.swap ∘ u))).map
       (fun v => ((swapInfo C t, v), Prod.swap ∘ u)) =
     ((checkedAnswerLaw C S (t.combine u)).map (fun v => ((t, v), u))).map (swapTranscript C)
@@ -646,8 +630,8 @@ private theorem bobTranscriptBranch_swap (S : RepeatedStrategy) (e : Fin m ≃ F
           (PMF.pure (completeBobQuestions C e ts x)) bs as))) := by
   classical
   intro g ts bs as x hx
-  let t' := (swapInfo (X := X) (Y := Y) C).symm ts
-  have ht' : swapInfo C t' = ts := (swapInfo (X := X) (Y := Y) C).apply_symm_apply ts
+  let t' := (swapInfo (X := Option X) (Y := Option Y) C).symm ts
+  have ht' : swapInfo C t' = ts := (swapInfo C).apply_symm_apply ts
   have hx' : ((t', as, bs), x) ∈ P.support := by
     rw [PMF.mem_support_iff, map_equiv_apply] at hx
     exact (PMF.mem_support_iff _ _).mpr hx
@@ -723,13 +707,6 @@ theorem quantumMarginalGivenMap_aliceTranscriptProjection [DecidableEq X] {U : T
   rw [hr] at he
   exact he
 
-/-- The noisy branch at a selected Alice question, with Bob's system in the first
-tensor factor so that the retained state is its right partial trace. -/
-noncomputable def checkedVectorGivenAlice (S : RepeatedStrategy) (j : Free) (t : Info)
-    (x : Option X) (a : C → A) (b : C → B) : EuclideanSpace ℂ (κ × ι) :=
-  let ts := swapInfo C t
-  checkedVectorGivenBob G.swap α C S.swap j (omitMessage C j ts) (ts.halves j) x b a
-
 /-- On a supported winning observation of Alice's selected question, the normalized
 noisy checked-answer vector purifies Bob's conditional reduced state. -/
 theorem checkedVectorGivenAlice_purifies_winningMarginal [DecidableEq X]
@@ -775,7 +752,7 @@ theorem checkedVectorGivenAlice_purifies_winningMarginal [DecidableEq X]
     funext z
     exact congrArg ρ (g.symm_apply_apply ((t, a, b), z))
   dsimp only at h
-  rw [hcond, hr] at h
+  rw [hcond, hr, ← checkedVectorGivenAlice_eq] at h
   exact h
 
 end Cslib.PCP.AnchoredDependency

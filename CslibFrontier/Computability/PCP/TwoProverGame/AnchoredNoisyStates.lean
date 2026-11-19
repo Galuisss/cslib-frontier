@@ -18,6 +18,11 @@ weight in the original transcript with just those observations. For a left messa
 the noisy-anchor case of [Bavarian, Vidick and Yuen, Proposition 4.9][BavarianVidickYuen2022],
 equation (22).
 
+## Main definitions
+
+* `checkedVectorGivenBob`: average the hidden Alice question and keep Alice's system first.
+* `checkedVectorGivenAlice`: average the hidden Bob question and keep Bob's system first.
+
 ## Main results
 
 * `norm_checkedVectorGivenBob_sq`: the noisy branch weight agrees with the original conditional
@@ -115,6 +120,23 @@ theorem checkedVectorGivenBob_eq (S : RepeatedStrategy) (j : Free) (t : Saved j)
         ((aliceGivenMessage G.questions α m).bind fun x => aliceQuestionsGivenRest G α C j t (x, y))
         (bobQuestionsGivenRest G α C j t (none, y)) a b := by
   unfold checkedVectorGivenBob
+  rfl
+
+/-- The noisy branch at a selected Alice question, with Bob's system in the first
+tensor factor so that the retained state is its right partial trace. -/
+noncomputable def checkedVectorGivenAlice (S : RepeatedStrategy) (j : Free)
+    (t : Revealed (Option X) (Option Y) C) (x : Option X) (a : C → A) (b : C → B) :
+    EuclideanSpace ℂ (κ × ι) :=
+  let ts := swapInfo C t
+  checkedVectorGivenBob G.swap α C S.swap j (omitMessage C j ts) (ts.halves j) x b a
+
+/-- The noisy branch for Alice is the Bob-question construction after exchanging players. -/
+theorem checkedVectorGivenAlice_eq (S : RepeatedStrategy) (j : Free)
+    (t : Revealed (Option X) (Option Y) C) (x : Option X) (a : C → A) (b : C → B) :
+    let ts := swapInfo C t
+    checkedVectorGivenAlice G α C S j t x a b =
+      checkedVectorGivenBob G.swap α C S.swap j (omitMessage C j ts) (ts.halves j) x b a := by
+  unfold checkedVectorGivenAlice
   rfl
 
 /-- The branch has the correct checked-answer probability in the original transcript

@@ -22,6 +22,10 @@ This is the conditional independence used in the proof of
 pp. 14–15. The winning event depends only on the rest of the transcript, so the
 independence survives conditioning on the checked wins.
 
+## Main definitions
+
+* `swapInfo`: exchange the players in the checked questions and noisy messages.
+
 ## Main results
 
 * `map_trial_restTranscriptLaw`: the remaining transcript uses only the selected question pair.
@@ -52,6 +56,14 @@ local notation "Free" => {i : Fin n // i ∉ C}
 local notation "Info" => Revealed (Option X) (Option Y) C
 local notation "Rest" => Shared (Option X) (Option Y) A B C
 local notation "Transcript" => ((Info × (C → A × B)) × (Free → PairQ))
+
+/-- Exchange the players in the checked questions and noisy messages. -/
+@[expose] def swapInfo : Revealed X Y C ≃ Revealed Y X C := by
+  refine ⟨fun t => ⟨Prod.swap ∘ t.questions, Sum.swap ∘ t.halves⟩,
+    fun t => ⟨Prod.swap ∘ t.questions, Sum.swap ∘ t.halves⟩, ?_, ?_⟩
+  all_goals
+    rintro ⟨qs, ms⟩
+    exact congrArg (Revealed.mk qs) (funext fun i => Sum.swap_swap (ms i))
 
 /-- Keep the checked questions and answers and the messages at all other unchecked trials. -/
 @[expose] def restTranscript (j : Free) (r : Transcript) : Rest j :=
