@@ -119,6 +119,18 @@ noncomputable def normalizedCheckedVector (p : PMF X) (q : PMF Y)
   let v := S.averagedCheckedVector C p q a b
   ‖v‖⁻¹ • v
 
+/-- Recover an unnormalized branch from its normalized vector and original norm.
+The identity also holds for a zero-weight branch. -/
+theorem averagedCheckedVector_eq_norm_smul_normalized
+    (p : PMF X) (q : PMF Y) (a : C → A) (b : C → B) :
+    S.averagedCheckedVector C p q a b =
+      ‖S.averagedCheckedVector C p q a b‖ • S.normalizedCheckedVector C p q a b := by
+  let v := S.averagedCheckedVector C p q a b
+  change v = ‖v‖ • (‖v‖⁻¹ • v)
+  by_cases h : ‖v‖ = 0
+  · rw [h, zero_smul, norm_eq_zero.mp h]
+  · rw [smul_smul, mul_inv_cancel₀ h, one_smul]
+
 /-- A possible pair of checked answers gives a normalized conditional state. -/
 theorem norm_normalizedCheckedVector (p : PMF X) (q : PMF Y) (a : C → A) (b : C → B)
     (h : (a, b) ∈ (p.bind fun x => q.bind fun y => S.checkedAnswers C x y).support) :
