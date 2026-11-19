@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PastingConsistency
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PointCommutativity
 import CslibFrontier.Foundations.Data.Finset.Expect
+import CslibFrontier.Foundations.Quantum.Algebra.MeasurementMixture
 public import CslibFrontier.Foundations.Quantum.Algebra.GatedAgreement
 
 /-!
@@ -66,31 +67,32 @@ theorem evaluatedSlice_gated_stateDist_eq
   simpa only [evaluatePolynomialMeasurement_successfulEffect] using
     Measurement.sum_norm_sub_success_mul_sq_eq φ (evaluatePolynomialMeasurement P u) B hP hb hc'
 
-/-- The uniform average of a point measurement's effect for the value of a fixed polynomial. -/
+/-- The true effect of the uniform mixture of tests for the value of a fixed polynomial. -/
 noncomputable def averagePolynomialPointEffect (B : (Fin m → F) → Measurement F A)
     (g : BoundedPolynomial F m d) : A :=
-  (Fintype.card ((Fin m → F)) : ℝ)⁻¹ • ∑ u : (Fin m → F), (B u).effect (eval u g.val)
+  (Measurement.mixture (Cslib.Probability.PMF.uniformOfFintype (Fin m → F))
+    (fun u => (B u).map (fun a => decide (a = eval u g.val)))).effect true
 
-omit [DecidableEq F] in
-private theorem averagePolynomialPointEffect_mem_Icc (B : (Fin m → F) → Measurement F A)
-    (g : BoundedPolynomial F m d) : averagePolynomialPointEffect B g ∈ Set.Icc (0 : A) 1 := by
-  unfold averagePolynomialPointEffect
-  constructor
-  · exact smul_nonneg (by positivity : 0 ≤ (Fintype.card ((Fin m → F)) : ℝ)⁻¹)
-      (sum_nonneg fun u _ => (B u).nonneg _)
-  · calc
-      _ ≤ (Fintype.card ((Fin m → F)) : ℝ)⁻¹ • ∑ _ : (Fin m → F), (1 : A) :=
-        smul_le_smul_of_nonneg_left (sum_le_sum fun u _ => (B u).effect_le_one _) (by positivity)
-      _ = _ := by
-        have h : (Fintype.card ((Fin m → F)) : ℝ) ≠ 0 := by exact_mod_cast Fintype.card_ne_zero
-        rw [sum_const, card_univ, ← Nat.cast_smul_eq_nsmul ℝ, smul_smul,
-          inv_mul_cancel₀ h, one_smul]
+/-- The effect is the uniform average of the corresponding point effects. -/
+theorem averagePolynomialPointEffect_eq (B : (Fin m → F) → Measurement F A)
+    (g : BoundedPolynomial F m d) : averagePolynomialPointEffect B g =
+      (Fintype.card ((Fin m → F)) : ℝ)⁻¹ • ∑ u : (Fin m → F), (B u).effect (eval u g.val) := by
+  rw [averagePolynomialPointEffect, Measurement.mixture_uniform_effect]
+  congr 1
+  refine sum_congr rfl fun u _ => ?_
+  simp [Measurement.map_effect, sum_filter]
 
-omit [DecidableEq F] [StarOrderedRing A] in
-private theorem commute_averagePolynomialPointEffect
+/-- The uniform average is a positive contraction, so the identity is always a majorant. -/
+theorem averagePolynomialPointEffect_mem_Icc (B : (Fin m → F) → Measurement F A)
+    (g : BoundedPolynomial F m d) : averagePolynomialPointEffect B g ∈ Set.Icc (0 : A) 1 :=
+  ⟨Measurement.nonneg _ true, Measurement.effect_le_one _ true⟩
+
+/-- An operator commuting with all the point effects also commutes with their average. -/
+theorem commute_averagePolynomialPointEffect
     (B : (Fin m → F) → Measurement F A) (g : BoundedPolynomial F m d) (C : A)
-    (hc : ∀ u b, Commute C ((B u).effect b)) : Commute C (averagePolynomialPointEffect B g) :=
-  (Commute.sum_left _ _ _ fun u _ => (hc u _).symm).symm.smul_right _
+    (hc : ∀ u b, Commute C ((B u).effect b)) : Commute C (averagePolynomialPointEffect B g) := by
+  rw [averagePolynomialPointEffect_eq]
+  exact (Commute.sum_left _ _ _ fun u _ => (hc u _).symm).symm.smul_right _
 
 private theorem evaluation_some (P : Measurement (Option (BoundedPolynomial F m d)) A)
     (u : Fin m → F) (b : F) : (evaluatePolynomialMeasurement P u).effect (some b) =
@@ -145,7 +147,7 @@ theorem abs_average_evaluated_sandwich_failure_le {β : Type*} [Fintype β]
       (𝔼 u : (Fin m → F), (φ (star (K (a, g)) * K (a, g) * P.effect none *
         (B u).effect (eval u g.val))).re) =
         (φ (star (K (a, g)) * K (a, g) * P.effect none * H (a, g))).re := by
-    unfold H averagePolynomialPointEffect
+    rw [show H (a, g) = _ from averagePolynomialPointEffect_eq B g]
     rw [← φ.re_apply_uniformAverage, ← mul_sum, ← mul_smul_comm]
   simp_rw [hsum, expect_sum_comm, hmean]
   exact h
@@ -210,7 +212,7 @@ theorem abs_average_evaluated_failure_rightPoint_le {β : Type*} [Fintype β]
         (φ (star (K p * P.effect none) * averagePolynomialPointEffect B p.2 *
           (K p * P.effect none))).re := by
     simp only [hY]
-    unfold averagePolynomialPointEffect
+    rw [averagePolynomialPointEffect_eq]
     rw [← φ.re_apply_uniformAverage, ← sum_mul, ← mul_sum, ← smul_mul_assoc, ← mul_smul_comm]
   have hv : (𝔼 u : Fin m → F, ∑ p, φ.norm (Y u p) ^ 2) ≤ (φ (P.effect none * Z)).re := by
     simp only [expect_sum_comm, hmean, ← Complex.re_sum, ← map_sum]
