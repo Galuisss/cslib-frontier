@@ -471,22 +471,13 @@ private theorem queriesKeySeed_of_change {C : QuantumSigningForger} (s : Level) 
     (hit : addr.any (fun v => decide ((H.withKeySeedExpansion s seed out).queryTable C.addressBits
       C.responseBytes v ≠ H.queryTable C.addressBits C.responseBytes v)) = true) :
     Xofs.shake256QueryInput addr = some (keySeedInput s seed) := by
-  cases addr with
-  | none => exact Bool.noConfusion hit
-  | some v =>
-    simp only [Option.any_some, decide_eq_true_eq] at hit
-    simp only [Xofs.queryTable] at hit
-    cases e : Xofs.unpad (List.ofFn fun i : Fin (C.addressBits + 1) => v i.succ) with
-    | none => exact (hit (by rw [e])).elim
-    | some x =>
-      rw [e] at hit
-      cases tag : v 0 with
-      | false => exact (hit (by rw [tag]; rfl)).elim
-      | true =>
-        by_cases h : x = keySeedInput s seed
-        · simp only [Xofs.shake256QueryInput, Option.bind_some, tag, ↓reduceIte, e, h]
-        · exact (hit (by simp only [tag, ↓reduceIte, Xofs.withKeySeedExpansion,
-            ExtendableOutput.withPrefixes, ite_eq_right h])).elim
+  obtain ⟨x, decoded, ne⟩ :=
+    Xofs.shake256QueryInput_of_queryTable_ne (H := H.withKeySeedExpansion s seed out)
+      (G := H) rfl hit
+  rw [decoded, Option.some.injEq]
+  by_contra miss
+  exact ne (by simp only [Xofs.withKeySeedExpansion, ExtendableOutput.withPrefixes,
+    ite_eq_right miss])
 
 private theorem changed_keySeed_le (C : QuantumSigningForger) (s : Level) (H : Xofs)
     (out : FixedBytes 128) (addr : Option (Address C)) :
