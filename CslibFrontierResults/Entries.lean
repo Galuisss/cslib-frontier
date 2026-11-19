@@ -5373,7 +5373,7 @@ register_result "measurement-orthogonalization-full-matrix" where
   scope := "Finite-outcome measurements in full complex matrix algebras, with any normalized \
     positive state. The projective measurement uses the same algebra and outcomes. Its sum of \
     squared state distances is at most nine times the exact defect, giving the source's strict \
-    bound when the defect is strictly below epsilon. Normality is automatic in this specialization. \
+    bound when the defect is strictly below epsilon. Normality is automatic here. \
     Outside source check: \
     https://github.com/cslib-community/cslib-frontier/pull/6198#issuecomment-6994351157."
 
