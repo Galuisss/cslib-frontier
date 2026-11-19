@@ -201,7 +201,7 @@ private theorem eval_run_plantedHandler
     (hbound : ∀ msg, msg.length = n → ∀ σ ∈ (ProbComp.eval (S.sign x.2 msg)).support,
       σ.length ≤ b)
     {α : Type} (program : WordOracleComp Unit α) :
-    ProbOracleComp.runWith (fun q s => ProbComp.eval (S.oneTimeSigningOracle x.2 q s))
+    ProbOracleComp.runWith (fun q s => ProbComp.eval (S.oneTimeSigningOracle n x.2 q s))
       ((OracleComp.interpret
         (OracleComp.sumHandler
           (fun j => StateT.lift (ProbOracleComp.sample (ProbComp.unifFin j)))
@@ -217,7 +217,7 @@ private theorem eval_run_plantedHandler
       ((scheme S H depth hH hlen hcap).indexedSigningOracle n
         (secretKey k (front ++ x :: back)) q signed))
     (oracle' := fun (q : Unit × List Bool) (state : List (ℕ × List Bool) × List (List Bool)) =>
-      (ProbOracleComp.runWith (fun q s => ProbComp.eval (S.oneTimeSigningOracle x.2 q s))
+      (ProbOracleComp.runWith (fun q s => ProbComp.eval (S.oneTimeSigningOracle n x.2 q s))
         ((plantedHandler S H depth n k (front ++ (x.1, []) :: back) front.length b q).run
           state.1) state.2).map (fun result => (result.1.1, result.1.2, result.2)))
     (represent := fun signed => (signed, otsLogOf H front.length k signed))
@@ -230,7 +230,7 @@ private theorem eval_run_plantedHandler
       have hsampleApply : ∀ {β : Type} (p : ProbComp β) (state : List (List Bool)),
           (OracleComp.interpret
             (OracleComp.sumHandler (fun j => StateT.lift (ProbComp.unifOracle j))
-              (fun q s => ProbComp.eval (S.oneTimeSigningOracle x.2 q s)))
+              (fun q s => ProbComp.eval (S.oneTimeSigningOracle n x.2 q s)))
             (ProbOracleComp.sample p)) state = (ProbComp.eval p).map (·, state) :=
         fun p state => ProbOracleComp.run_interpret_sample _ p state
       rintro ⟨⟨⟩, w⟩ signed -
@@ -253,7 +253,8 @@ private theorem eval_run_plantedHandler
           simp only [↓reduceIte, hempty, sign, secretKey, secretKeyDecoder.decode_enc, signWith,
             List.getD_append_cons_length, hkeys, OracleComp.interpret_map,
             ProbOracleComp.interpret_query, SignatureScheme.oneTimeSigningOracle,
-            SignatureScheme.oneTimeSigningOracleOf, List.isEmpty_nil,
+            SignatureScheme.oneTimeSigningOracleOn, hlen, hk, beq_self_eq_true, List.isEmpty_nil,
+            Bool.and_self,
             ProbComp.eval_bind, ProbComp.eval_pure, PMF.map_bind, PMF.bind_bind, PMF.pure_bind,
             PMF.pure_map, hmapApply]
           refine PMF.bind_congr_on_support _ _ _ fun σ hσ => ?_

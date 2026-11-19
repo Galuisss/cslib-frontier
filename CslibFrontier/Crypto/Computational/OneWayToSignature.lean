@@ -559,7 +559,7 @@ Lamport public key and run a one-time forger; otherwise return the empty word. -
     let keys ← lamportSimKeys f n j y
     let out ← (OracleComp.interpret
       (OracleComp.sumHandler (fun k => StateT.lift (ProbComp.unifFin k))
-        ((lamportScheme f hf).oneTimeSigningOracle keys.2)) (adversary n keys.1)).run []
+        ((lamportScheme f hf).oneTimeSigningOracle n keys.2)) (adversary n keys.1)).run []
     let msig := out.1
     return (frames msig.2).getD (j / 2) []
   else
@@ -639,7 +639,7 @@ private noncomputable def lamportRunWith (f : List Bool → List Bool)
     (n : ℕ) (pk sk : List Bool) : PMF ((List Bool × List Bool) × List (List Bool)) :=
   ProbComp.eval ((OracleComp.interpret
     (OracleComp.sumHandler (fun k => StateT.lift (ProbComp.unifFin k))
-      ((lamportScheme f hf).oneTimeSigningOracle sk)) (adversary n pk)).run [])
+      ((lamportScheme f hf).oneTimeSigningOracle n sk)) (adversary n pk)).run [])
 
 private def lamportDummySk (w : List (List Bool)) (j : ℕ) : List Bool :=
   encList encBits (w.take j ++ [] :: w.drop (j + 1))
@@ -670,7 +670,7 @@ private theorem lamport_pointwise_le {f : List Bool → List Bool}
     · have hqlen : out.2.length ≤ 1 := by
         dsimp only [lamportRunWith] at hsupp
         rw [ProbOracleComp.eval_run_interpret] at hsupp
-        exact (lamportScheme f hf).length_le_one_of_mem_support_run_oneTimeSigningOracle
+        exact (lamportScheme f hf).length_le_one_of_mem_support_run_oneTimeSigningOracle n
           (encList encBits w) (adversary n pk) hsupp
       have hwin' := hwin
       dsimp only [win] at hwin'
@@ -685,7 +685,7 @@ private theorem lamport_pointwise_le {f : List Bool → List Bool}
           lamportRunWith f hf adversary n pk (lamportDummySk w jStar) out := by
         dsimp only [lamportRunWith, lamportDummySk]
         rw [ProbOracleComp.eval_run_interpret, ProbOracleComp.eval_run_interpret]
-        exact (lamportScheme f hf).run_oneTimeSigningOracle_apply_eq_of_agree
+        exact (lamportScheme f hf).run_oneTimeSigningOracle_apply_eq_of_agree n
           (encList encBits w) (lamportDummySk w jStar)
           (fun req hreq => lamportSign_eq_of_agreeAt hjStar_lt hw_len hreq)
           (adversary n pk) [] out.1 out.2 hagree
@@ -743,7 +743,7 @@ theorem OneWay.oneTimeEUFCMA_lamport {f : List Bool → List Bool} (hf : OneWay 
       let keys ← lamportSimKeys f n j y
       let out ← (OracleComp.interpret
         (OracleComp.sumHandler (fun k => StateT.lift (ProbComp.unifFin k))
-          (S.oneTimeSigningOracle keys.2)) (adversary n keys.1)).run []
+          (S.oneTimeSigningOracle n keys.2)) (adversary n keys.1)).run []
       return (frames out.1.2).getD (j / 2) []
     else
       return []

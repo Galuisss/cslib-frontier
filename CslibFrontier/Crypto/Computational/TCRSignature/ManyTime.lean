@@ -1453,7 +1453,8 @@ theorem succProbability_wordScheme_eufCmaGame_le_of_machine {k : ℕ} {Control :
       (represent := List.map Prod.fst)
       (step := by
         intro ⟨⟨⟩, msg⟩ pairs
-        simp only [pairSigningOracle, WordSignatureScheme.signingOracle, wordScheme_sign, sign,
+        simp only [pairSigningOracle, WordSignatureScheme.signingOracle,
+          SignatureScheme.signingOracleOf, SignatureScheme.signingOracleOn, wordScheme_sign, sign,
           pkOf, simPkOf, keyDecoder.decode_enc, ↓reduceIte, BitString.eval_sampleList,
           List.map_cons, _root_.PMF.map, pmf_norm])
       (adversary n (pkOf keys.1)) []
@@ -1471,7 +1472,8 @@ theorem succProbability_wordScheme_eufCmaGame_le_of_machine {k : ℕ} {Control :
     have hsim := ProbOracleComp.runWith_map_state
       (oracle := pairSigningOracle S H n keys.2)
       (oracle' := fun q (state : Unit × List (List Bool)) =>
-        (ProbOracleComp.runWith (fun req s => ProbComp.eval (S.signingOracle keys.2 req s))
+        (ProbOracleComp.runWith
+          (fun req s => ProbComp.eval (S.signingOracle (otsParam H n) keys.2 req s))
           (StateT.run (manyTimeHandler H sigBound n q) state.1) state.2).map
             (fun p => (p.1.1, p.1.2, p.2)))
       (represent := fun pairs : List (List Bool × List Bool) =>
@@ -1479,12 +1481,14 @@ theorem succProbability_wordScheme_eufCmaGame_le_of_machine {k : ℕ} {Control :
       (step := by
         intro ⟨⟨⟩, msg⟩ pairs
         change _ = (ProbOracleComp.runWith
-          (fun req s => ProbComp.eval (S.signingOracle keys.2 req s))
+          (fun req s => ProbComp.eval (S.signingOracle (otsParam H n) keys.2 req s))
           (manyTimeHandler H sigBound n ((), msg) ())
           (pairs.map fun p => otsMsg H n p.2 (H.eval n p.2 p.1))).map
             (fun p => (p.1.1, p.1.2, p.2))
-        simp only [manyTimeHandler, SignatureScheme.signingOracle, pairSigningOracle,
-          BitString.eval_sampleList, List.map_cons, _root_.PMF.map, runWith_norm, pmf_norm]
+        simp only [manyTimeHandler, SignatureScheme.signingOracle,
+          SignatureScheme.signingOracleOn, length_otsMsg, beq_self_eq_true, ↓reduceIte,
+          pairSigningOracle, BitString.eval_sampleList, List.map_cons, _root_.PMF.map,
+          runWith_norm, pmf_norm]
         peel_binds hashKey ots
         have htake : ots.take (sigBound n) = ots :=
           List.take_of_length_le

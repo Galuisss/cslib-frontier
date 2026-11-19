@@ -457,7 +457,8 @@ theorem isPPTOn_run_oneTimeSigningOracle (M : MACScheme) {adversary : Forger}
         (OracleComp.interpret
           (OracleComp.sumHandler (fun k => StateT.lift (ProbComp.unifFin k))
             (M.oneTimeSigningOracle caller.2)) (adversary caller.1 [])).run []) :=
-  (SignatureScheme.isPPTOn_run_oneTimeSigningOracleOf M.sign_ppt hadversary).preprocess
+  (SignatureScheme.isPPTOn_run_oneTimeSigningOracleOn (adm := fun _ _ => true) (.const true)
+    M.sign_ppt hadversary).preprocess
     ((ComputableInPolyTime.fst _ _).prod
       ((ComputableInPolyTime.const []).prod (ComputableInPolyTime.snd _ _)))
 
@@ -835,7 +836,7 @@ private theorem run_limitToOneQuery_eq_oneTimeSigningPairOracle (M : MACScheme)
       ((OracleComp.interpret
         (OracleComp.sumHandler
           (fun k => StateT.lift (ProbOracleComp.sample (ProbComp.unifFin k)))
-          (SignatureScheme.oneTimeFilterHandler bound (n, [])))
+          (SignatureScheme.oneTimeFilterHandler (fun _ _ => true) bound (n, [])))
         prog).run false)).run [])) =
     ProbComp.eval ((OracleComp.interpret
       (OracleComp.sumHandler (fun k => StateT.lift (ProbComp.unifFin k))
@@ -843,14 +844,14 @@ private theorem run_limitToOneQuery_eq_oneTimeSigningPairOracle (M : MACScheme)
   rw [ProbComp.eval_map, ProbOracleComp.eval_run_interpret_eq_runWith,
     ProbOracleComp.eval_run_interpret_eq_runWith]
   refine (congrArg (PMF.map _) (ProbOracleComp.runWith_run_interpret_map
-    (SignatureScheme.oneTimeFilterHandler bound (n, []))
+    (SignatureScheme.oneTimeFilterHandler (fun _ _ => true) bound (n, []))
     (fun q s => ProbComp.eval (M.signingPairOracle sk q s))
     (fun q s => ProbComp.eval (M.oneTimeSigningPairOracle sk q s))
     (fun queriedPairs => !queriedPairs.isEmpty) (fun queriedPairs => queriedPairs) (by
       intro ⟨⟨⟩, msg⟩ queriedPairs
       rw [ProbOracleComp.runWith_eq_run_interpret]
       change _ = ((OracleComp.interpret (m := StateT (List (List Bool × List Bool)) PMF) _
-        (SignatureScheme.oneTimeFilterHandler bound (n, []) ((), msg)
+        (SignatureScheme.oneTimeFilterHandler (fun _ _ => true) bound (n, []) ((), msg)
           (!queriedPairs.isEmpty))).run queriedPairs).map _
       cases queriedPairs with
       | nil =>
@@ -877,7 +878,7 @@ private theorem eval_toForgeExperiment_limitToOneQuery (M : MACScheme)
     (adversary : Forger) :
     ProbComp.eval
         (M.toForgeExperiment (Signer.ofSign M.sign) fresh
-          (SignatureScheme.limitToOneQuery bound adversary) n) =
+          (SignatureScheme.limitToOneQuery (fun _ _ => true) bound adversary) n) =
       ProbComp.eval
         (M.toForgeExperiment (Signer.ofSign M.sign).oneTime fresh adversary n) := by
   simp only [toForgeExperiment, forgeExperiment, ProbComp.eval_bind, ProbComp.eval_map,
@@ -885,17 +886,20 @@ private theorem eval_toForgeExperiment_limitToOneQuery (M : MACScheme)
   refine PMF.bind_congr_on_support _ _ _ fun sk hsk => ?_
   dsimp only [Function.comp_apply]
   have hrev :
-      (ProbComp.eval (((SignatureScheme.limitToOneQuery bound adversary).toTyped n []).runLogWith
+      (ProbComp.eval (((SignatureScheme.limitToOneQuery (fun _ _ => true) bound
+          adversary).toTyped n []).runLogWith
           (Signer.ofSign M.sign sk))).map (Prod.map id List.reverse) =
         (ProbComp.eval ((adversary.toTyped n []).runLogWith
           ((Signer.ofSign M.sign).oneTime sk))).map (Prod.map id List.reverse) := by
     change
-      (ProbComp.eval (((SignatureScheme.limitToOneQuery bound adversary).toTyped n []).runLogWith
+      (ProbComp.eval (((SignatureScheme.limitToOneQuery (fun _ _ => true) bound
+          adversary).toTyped n []).runLogWith
           (Signer.ofSign M.sign sk))).map (fun (a, log) => (a, log.reverse)) =
         (ProbComp.eval ((adversary.toTyped n []).runLogWith
           ((Signer.ofSign M.sign).oneTime sk))).map (fun (a, log) => (a, log.reverse))
     rw [Forger.toTyped, Forger.toTyped,
-      Forger.eval_runLogWith_rename_state (SignatureScheme.limitToOneQuery bound adversary n [])
+      Forger.eval_runLogWith_rename_state
+        (SignatureScheme.limitToOneQuery (fun _ _ => true) bound adversary n [])
         (fun w => w) (Signer.ofSign M.sign sk) (M.signingPairOracle sk) List.reverse
         (fun _ _ => by
           simp [ProbOracleComp.logOracle, signingPairOracle, ProbComp.eval_map, PMF.map_comp,
@@ -926,8 +930,9 @@ private theorem oneTime_of_full_forge (M : MACScheme)
     Game.Indistinguishable (fun A n => ProbComp.eval (oneTimeGame A n))
       (fun _ _ => PMF.pure false) (IsOraclePPT (encPair encBits encBits)) := by
   obtain ⟨bound, hbound_poly, htagBound⟩ := M.exists_oneTimeTagBound
-  refine h.of_succProbability_reduction (SignatureScheme.limitToOneQuery bound)
-    (fun _ => SignatureScheme.isOraclePPT_limitToOneQuery hbound_poly) fun adversary _ n => ?_
+  refine h.of_succProbability_reduction (SignatureScheme.limitToOneQuery (fun _ _ => true) bound)
+    (fun _ => SignatureScheme.isOraclePPT_limitToOneQuery (.const true) hbound_poly)
+    fun adversary _ n => ?_
   refine le_of_eq (congrArg Game.succProbability ?_)
   rw [hone, hfull, M.eval_toForgeExperiment_limitToOneQuery bound n (htagBound n) fresh adversary]
 

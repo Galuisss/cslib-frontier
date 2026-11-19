@@ -1487,8 +1487,9 @@ theorem succProbability_indexedEufCmaGame_le_of_machine {k : ℕ} {Control : Typ
     | none =>
       simp only [runWith_norm, pmf_norm]
     | some m₀ =>
-      simp only [SignatureScheme.oneTimeSigningOracle, SignatureScheme.oneTimeSigningOracleOf,
-        List.isEmpty_nil, ↓reduceIte, _root_.PMF.map, runWith_norm, pmf_norm]
+      simp only [SignatureScheme.oneTimeSigningOracle, SignatureScheme.oneTimeSigningOracleOn,
+        length_otsMsg, beq_self_eq_true, List.isEmpty_nil, Bool.and_self, ↓reduceIte,
+        _root_.PMF.map, runWith_norm, pmf_norm]
       peel_binds ots
       have htake : ots.take (sigBound n) = ots :=
         List.take_of_length_le
