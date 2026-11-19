@@ -16,7 +16,7 @@ public import Mathlib.Logic.Function.Iterate
 
 `Cslib.Complexity.Ack` is the class of problems decidable in time bounded by the diagonal
 fast-growing function applied to a primitive-recursive function of the input length
-[Schmitz, Sections 2.2 and 2.3][Schmitz2016FastGrowing].
+[Schmitz, Sections 2.2 and 2.3][Schmitz2016].
 -/
 
 public section

@@ -1924,9 +1924,11 @@ public import CslibFrontier.Computability.Complexity.Classes.AWPP.OracleWeights
 public import CslibFrontier.Computability.Complexity.Classes.AWPP.WPP
 public import CslibFrontier.Computability.Complexity.Classes.Ack
 public import CslibFrontier.Computability.Complexity.Classes.Advice
+public import CslibFrontier.Computability.Complexity.Classes.Advice.Classical
 public import CslibFrontier.Computability.Complexity.Classes.Advice.Hierarchy
 public import CslibFrontier.Computability.Complexity.Classes.Advice.LengthComparison
 public import CslibFrontier.Computability.Complexity.Classes.Advice.OneBit
+public import CslibFrontier.Computability.Complexity.Classes.Advice.Randomized
 public import CslibFrontier.Computability.Complexity.Classes.AlgorithmsToLowerBounds
 public import CslibFrontier.Computability.Complexity.Classes.Alternation
 public import CslibFrontier.Computability.Complexity.Classes.Alternation.DeterministicTime
@@ -2042,7 +2044,10 @@ public import CslibFrontier.Computability.Complexity.Classes.CountingSimulation.
 public import CslibFrontier.Computability.Complexity.Classes.CountingSimulation.TruncatedSum
 public import CslibFrontier.Computability.Complexity.Classes.DP
 public import CslibFrontier.Computability.Complexity.Classes.EXP
+public import CslibFrontier.Computability.Complexity.Classes.EXP.Bounds
+public import CslibFrontier.Computability.Complexity.Classes.EXP.Counting
 public import CslibFrontier.Computability.Complexity.Classes.EXP.Decidable
+public import CslibFrontier.Computability.Complexity.Classes.EXP.Hierarchy
 public import CslibFrontier.Computability.Complexity.Classes.EXP.Padding
 public import CslibFrontier.Computability.Complexity.Classes.EXP.Separation
 public import CslibFrontier.Computability.Complexity.Classes.EXPSPACE
