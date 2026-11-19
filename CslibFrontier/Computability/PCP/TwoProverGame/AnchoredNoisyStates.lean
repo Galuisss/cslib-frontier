@@ -53,30 +53,7 @@ private theorem map_questionsGivenRest_congr {T : Type*} [Finite T] (f : PairQ �
     (j : Free) (t : Saved j) (q q' : PairQ) (h : f q = f q') :
     (questionsGivenRest G α C j t q).map (fun u => f ∘ u) =
       (questionsGivenRest G α C j t q').map (fun u => f ∘ u) := by
-  let full := restoreMessage C j t
-  let p (s : PairQ) := Function.update (fun i => pairGiven G α C i full) j (PMF.pure s)
-  let join (u : Free → T) :=
-    (Equiv.piEquivPiSubtypeProd (· ∈ C) fun _ => T).symm (f ∘ t.questions, u)
-  have hc : (fun u => f ∘ u) ∘ full.combine = join ∘ (fun u : Free → PairQ => f ∘ u) := by
-    funext u i
-    unfold Revealed.combine
-    by_cases hi : i ∈ C <;>
-      simp [Equiv.piEquivPiSubtypeProd_symm_apply, hi, join, full, restoreMessage]
-  have hm (i : Free) : ((p q i).map f) = ((p q' i).map f) := by
-    by_cases hi : i = j
-    · subst i
-      simp only [p, Function.update_self, PMF.pure_map, h]
-    · simp only [p, Function.update_of_ne hi]
-  change ((pi (p q)).map full.combine).map (fun u => f ∘ u) =
-    ((pi (p q')).map full.combine).map (fun u => f ∘ u)
-  simp only [PMF.map_comp, hc]
-  simp only [← PMF.map_comp]
-  have hq := pi_map (p q) (fun _ => f)
-  have hq' := pi_map (p q') (fun _ => f)
-  change pi (fun i => (p q i).map f) = (pi (p q)).map (fun u => f ∘ u) at hq
-  change pi (fun i => (p q' i).map f) = (pi (p q')).map (fun u => f ∘ u) at hq'
-  rw [← hq, ← hq']
-  simp only [hm]
+  simp only [questionsGivenRest, map_pi_update_combine, h]
 
 omit [Fintype A] [Fintype B] in
 /-- Keeping Bob's selected question fixed keeps his entire conditional question law fixed. -/
@@ -128,6 +105,17 @@ noncomputable def checkedVectorGivenBob (S : RepeatedStrategy) (j : Free) (t : S
   S.averagedCheckedVector C
     ((aliceGivenMessage G.questions α m).bind fun x => aliceQuestionsGivenRest G α C j t (x, y))
     (bobQuestionsGivenRest G α C j t (none, y)) a b
+
+/-- The noisy checked branch uses the selected-message mixture for Alice and fixes
+Bob's selected question. -/
+theorem checkedVectorGivenBob_eq (S : RepeatedStrategy) (j : Free) (t : Saved j)
+    (m : Message) (y : Option Y) (a : C → A) (b : C → B) :
+    checkedVectorGivenBob G α C S j t m y a b =
+      S.averagedCheckedVector C
+        ((aliceGivenMessage G.questions α m).bind fun x => aliceQuestionsGivenRest G α C j t (x, y))
+        (bobQuestionsGivenRest G α C j t (none, y)) a b := by
+  unfold checkedVectorGivenBob
+  rfl
 
 /-- The branch has the correct checked-answer probability in the original transcript
 when Alice's question is hidden and the selected message and Bob's question are fixed. -/
