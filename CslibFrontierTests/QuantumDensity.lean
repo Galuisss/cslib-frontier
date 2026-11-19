@@ -197,4 +197,16 @@ example : relativeEntropy (pureState (ket false)) (pureState (ket true)) = ⊤ :
   have he := congrFun (h v hz) false
   simp [v, mulVec, dotProduct, pureState_apply, ket_apply] at he
 
+-- Zero relative entropy of the common rank-one reduction gives exact alignment even
+-- when the original purifying vectors use different coordinates.
+example : ∃ U ∈ unitaryGroup (Fin 3) ℂ,
+    WithLp.toLp 2 (((1 : Matrix Bool Bool ℂ) ⊗ₖ U) *ᵥ
+      (ket (false, (0 : Fin 3))).ofLp) = ket (false, (1 : Fin 3)) := by
+  obtain ⟨U, hU, h⟩ := exists_localUnitary_norm_sub_sq_le_relativeEntropy
+    (ket (false, (0 : Fin 3))) (ket (false, (1 : Fin 3))) (norm_ket _) (norm_ket _)
+  rw [partialTraceRight_ket_pair, partialTraceRight_ket_pair, relativeEntropy_self,
+    ← WithTop.coe_zero, WithTop.coe_le_coe] at h
+  have hz := sq_eq_zero_iff.mp (le_antisymm h (sq_nonneg _))
+  exact ⟨U, hU, sub_eq_zero.mp (norm_eq_zero.mp hz)⟩
+
 end CslibFrontierTests.QuantumDensity
