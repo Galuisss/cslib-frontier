@@ -80,7 +80,8 @@ variable [Ring A] [PartialOrder A] [IsOrderedAddMonoid A]
   (M (.point u)).map decodePoint
 
 /-- Decode the outcomes of the vertical-line measurement to polynomial functions. -/
-noncomputable def decodedVertical (M : Question F (n + 1) → Measurement (Answer F (n + 1)) A)
+@[expose] noncomputable def decodedVertical
+    (M : Question F (n + 1) → Measurement (Answer F (n + 1)) A)
     (d : ℕ) (u : Point F n) : Measurement (PolynomialFunction F d) A :=
   (M (.axis (verticalLine u))).map (decodeVertical d u)
 
