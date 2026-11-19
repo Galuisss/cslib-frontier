@@ -7,9 +7,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 module
 -- upstream: candidate
 
-public import CslibFrontier.Init
-public import Mathlib.Algebra.MvPolynomial.Equiv
-public import Mathlib.Data.Fin.Tuple.Basic
+public import CslibFrontier.Foundations.Data.MvPolynomial.LastVariable
 import Mathlib.LinearAlgebra.Lagrange
 
 /-!
@@ -22,8 +20,6 @@ and preserves common degree bounds in all other variables.
 
 ## Main definitions
 
-* `MvPolynomial.lastVariableEquiv`: view the last variable as the univariate variable.
-* `MvPolynomial.specializeLast`: assign a scalar to the last variable.
 * `MvPolynomial.interpolateLast`: interpolate a family of lower-dimensional polynomials.
 
 ## Main results
@@ -44,92 +40,6 @@ open Finset
 
 variable {R : Type*} {m : ℕ} [CommSemiring R]
 
-/-- Isolate the last variable of a multivariate polynomial. -/
-noncomputable def lastVariableEquiv (R : Type*) [CommSemiring R] (m : ℕ) :
-    MvPolynomial (Fin (m + 1)) R ≃ₐ[R] Polynomial (MvPolynomial (Fin m) R) :=
-  (renameEquiv R finSuccEquivLast).trans (optionEquivLeft R (Fin m))
-
-/-- Substitute a scalar for the last variable, keeping all the preceding variables. -/
-noncomputable def specializeLast (x : R) :
-    MvPolynomial (Fin (m + 1)) R →+* MvPolynomial (Fin m) R :=
-  (Polynomial.evalRingHom (C x)).comp (lastVariableEquiv R m).toRingHom
-
-@[simp] theorem specializeLast_X_last (x : R) :
-    specializeLast x (X (Fin.last m)) = C x := by
-  unfold specializeLast lastVariableEquiv
-  simp [finSuccEquivLast_last]
-
-@[simp] theorem specializeLast_X_castSucc (x : R) (i : Fin m) :
-    specializeLast x (X i.castSucc) = X i := by
-  unfold specializeLast lastVariableEquiv
-  simp [finSuccEquivLast_castSucc]
-
-/-- Retain the last variable and evaluate all preceding variables at `u`. -/
-noncomputable def evalPrefix (u : Fin m → R) (p : MvPolynomial (Fin (m + 1)) R) : Polynomial R :=
-  (lastVariableEquiv R m p).map (eval u)
-
-theorem eval_evalPrefix (u : Fin m → R) (p : MvPolynomial (Fin (m + 1)) R) (x : R) :
-    (evalPrefix u p).eval x = eval u (specializeLast x p) := by
-  unfold evalPrefix specializeLast
-  change _ = eval u (Polynomial.eval (C x) (lastVariableEquiv R m p))
-  rw [Polynomial.eval_map, ← Polynomial.eval₂_id, Polynomial.hom_eval₂, RingHom.comp_id, eval_C]
-
-/-- Specialization corresponds to evaluating on the last-coordinate slice. -/
-theorem eval_specializeLast (x : R) (u : Fin m → R) (p : MvPolynomial (Fin (m + 1)) R) :
-    eval u (specializeLast x p) = eval (Fin.snoc u x) p := by
-  rw [← eval_evalPrefix]
-  unfold evalPrefix lastVariableEquiv
-  change (Polynomial.map (eval u) (optionEquivLeft R _ (rename finSuccEquivLast p))).eval x = _
-  rw [← optionEquivLeft_elim_eval, eval_rename]
-  congr 1
-  apply congrArg (fun v : Fin (m + 1) → R => eval v)
-  funext i
-  refine Fin.lastCases ?_ (fun j => ?_) i
-  · simp [finSuccEquivLast_last]
-  · simp [finSuccEquivLast_castSucc]
-
-theorem natDegree_lastVariableEquiv (p : MvPolynomial (Fin (m + 1)) R) :
-    (lastVariableEquiv R m p).natDegree = p.degreeOf (Fin.last m) := by
-  unfold lastVariableEquiv
-  change (optionEquivLeft R _ (rename finSuccEquivLast p)).natDegree = _
-  rw [natDegree_optionEquivLeft, ← finSuccEquivLast_last,
-    degreeOf_rename_of_injective finSuccEquivLast.injective]
-
-/-- Evaluating the prefix does not increase the degree in the remaining variable. -/
-theorem natDegree_evalPrefix_le (u : Fin m → R) (p : MvPolynomial (Fin (m + 1)) R) :
-    (evalPrefix u p).natDegree ≤ p.degreeOf (Fin.last m) := by
-  unfold evalPrefix
-  exact Polynomial.natDegree_map_le.trans_eq (natDegree_lastVariableEquiv p)
-
-/-- A prefix variable has degree at most `d` exactly when it has that bound in each
-coefficient of the polynomial in the last variable. -/
-theorem degreeOf_castSucc_le_iff (i : Fin m) (p : MvPolynomial (Fin (m + 1)) R)
-    (d : ℕ) :
-    p.degreeOf i.castSucc ≤ d ↔ ∀ k, ((lastVariableEquiv R m p).coeff k).degreeOf i ≤ d := by
-  unfold lastVariableEquiv
-  change p.degreeOf i.castSucc ≤ d ↔
-    ∀ k, ((optionEquivLeft R _ (rename finSuccEquivLast p)).coeff k).degreeOf i ≤ d
-  rw [← degreeOf_rename_of_injective finSuccEquivLast.injective i.castSucc,
-    finSuccEquivLast_castSucc]
-  simp only [degreeOf_le_iff, mem_support_coeff_optionEquivLeft]
-  constructor
-  · intro h k s hs
-    simpa using h (s.optionElim k) hs
-  · intro h s hs
-    exact h (s none) s.some (by simpa using hs)
-
-/-- Specializing the last variable preserves each bound on the prefix variables. -/
-theorem degreeOf_specializeLast_le (x : R) (p : MvPolynomial (Fin (m + 1)) R) (i : Fin m) :
-    (specializeLast x p).degreeOf i ≤ p.degreeOf i.castSucc := by
-  have h := (degreeOf_castSucc_le_iff i p _).mp le_rfl
-  unfold specializeLast
-  change (Polynomial.eval (C x) (lastVariableEquiv R m p)).degreeOf i ≤ _
-  rw [Polynomial.eval_eq_sum_range]
-  refine (degreeOf_sum_le _ _ _).trans (Finset.sup_le fun j _ => ?_)
-  refine (degreeOf_mul_le _ _ _).trans ?_
-  rw [← map_pow (C : R →+* MvPolynomial (Fin m) R) x j, degreeOf_C, add_zero]
-  exact h j
-
 section Field
 
 variable {F ι : Type*} [Field F] [DecidableEq ι]
@@ -144,8 +54,7 @@ noncomputable def interpolateLast (s : Finset ι) (x : ι → F)
 theorem specializeLast_interpolateLast {s : Finset ι} {x : ι → F}
     (hx : Set.InjOn x s) (g : ι → MvPolynomial (Fin m) F) {j : ι} (hj : j ∈ s) :
     specializeLast (x j) (interpolateLast s x g) = g j := by
-  unfold specializeLast interpolateLast
-  change Polynomial.eval (C (x j)) (lastVariableEquiv F m ((lastVariableEquiv F m).symm _)) = _
+  rw [specializeLast_apply, interpolateLast]
   rw [AlgEquiv.apply_symm_apply, Polynomial.eval_finsetSum]
   rw [sum_eq_single_of_mem j hj]
   · rw [Polynomial.eval_mul, Polynomial.eval_C, Polynomial.eval_map, Polynomial.eval₂_at_apply,
@@ -190,7 +99,7 @@ theorem eq_of_specializeLast_eq {s : Finset ι} {x : ι → F} (hx : Set.InjOn x
   apply Polynomial.eq_of_natDegree_lt_card_of_eval_eq (ι := s)
     _ _ (f := fun j => C (x j))
     (fun i j hij => Subtype.ext (hx i.prop j.prop (C_injective (Fin m) F hij)))
-  · exact fun j => h j j.prop
+  · exact fun j => by simpa only [specializeLast_apply] using h j j.prop
   · rw [Fintype.card_coe, natDegree_lastVariableEquiv, natDegree_lastVariableEquiv]
     exact max_lt hp hq
 

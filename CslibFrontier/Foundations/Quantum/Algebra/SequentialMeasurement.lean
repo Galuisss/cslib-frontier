@@ -67,6 +67,12 @@ noncomputable def sequentialProjective :
         simp only [Fin.consEquiv_apply, Fin.cons_zero, Fin.tail_cons, ← sum_mul, ← mul_sum,
           N.sum_effect, mul_one, hidem, (M 0).sum_effect]
 
+/-- The empty transcript has effect one. -/
+@[simp] theorem sequentialProjective_effect_zero (M : Fin 0 → Measurement α A)
+    (hM : ∀ i, (M i).IsProjective) (g : Fin 0 → α) :
+    (sequentialProjective M hM).effect g = 1 := by
+  rw [sequentialProjective.eq_1]
+
 /-- The first projection sandwiches the joint effect of the remaining outcomes. -/
 theorem sequentialProjective_effect_succ {k : ℕ} (M : Fin (k + 1) → Measurement α A)
     (hM : ∀ i, (M i).IsProjective) (g : Fin (k + 1) → α) :
@@ -157,5 +163,10 @@ theorem sequentialProjective_commute {k : ℕ} (M : Fin k → Measurement α A)
     rw [sequentialProjective_effect_succ]
     have ht := ih (fun i => M i.succ) (fun i => hM i.succ) (fun i => h i.succ) (Fin.tail g)
     exact ((h 0 (g 0)).mul_left ht).mul_left (h 0 (g 0))
+/-- A one-step transcript has the effect of its only outcome. -/
+theorem sequentialProjective_effect_one (M : Fin 1 → Measurement α A)
+    (hM : ∀ i, (M i).IsProjective) (g : Fin 1 → α) :
+    (sequentialProjective M hM).effect g = (M 0).effect (g 0) := by
+  rw [sequentialProjective_effect_succ, sequentialProjective_effect_zero, mul_one, hM 0]
 
 end Cslib.Quantum.Measurement
