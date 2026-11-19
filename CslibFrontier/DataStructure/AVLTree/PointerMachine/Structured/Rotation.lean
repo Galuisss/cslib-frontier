@@ -220,6 +220,14 @@ theorem rotate_correct (right : Bool) (zero maxSucc : M.Op) (encode : ℕ → M.
     max_spec field notKey (u.setPtr 0 (some x.address)) x a _ A _ parent ru du ma um ha
     (heightConsistent_mkNodeAt right hb hc) (by simp)
   simp only [State.heap_setPtr] at vh
+  have kept (reg : Fin (layout extra (regs + 1)).ptrRegs)
+      (hreg : reg ∉ [0, 2, 3, 4]) : v.ptr reg = (s.setPtr 6 (s.ptr 0)).ptr reg := by
+    have notCursor : reg ≠ 0 := fun h => hreg (by simp [h])
+    have notScratch : reg ∉ [2] := fun h => hreg (by simp_all)
+    have hnew := new.ptr_keep [2] (by pm_frame) notScratch
+    have hold := old.ptr_keep [2] (by pm_frame) notScratch
+    have hrot := rot.ptr_keep [0, 2, 3, 4] (by pm_frame) hreg
+    simpa [notCursor, hold, hrot] using hnew
   let x' : Label M extra := ⟨x.address, Function.update x.data field
     (encode (mkNodeAt right (x.data 0) A (mkNodeAt right (y.data 0) B C)).cachedHeight)⟩
   let y' : Label M extra := ⟨y.address, Function.update y.data field
@@ -232,14 +240,8 @@ theorem rotate_correct (right : Bool) (zero maxSucc : M.Op) (encode : ℕ → M.
     ⟨vr, vm, vd, ?_, ?_, ?_, ?_, fun z hz => ?_⟩⟩
   · simp [x', y', nodeAt_addresses, Finset.insert_comm, Finset.union_assoc]
   · exact (new.ptr_keep [2] (by pm_frame) (by simp)).trans (by simp [x'])
-  · have k₁ := new.ptr_keep [2] (by pm_frame) (r := 6) (by simp)
-    have k₂ := old.ptr_keep [2] (by pm_frame) (r := 6) (by simp)
-    have k₃ := rot.ptr_keep [0, 2, 3, 4] (by pm_frame) (r := 6) (by simp)
-    simpa [k₂, k₃] using k₁
-  · have k₁ := new.ptr_keep [2] (by pm_frame) (r := 1) (by simp)
-    have k₂ := old.ptr_keep [2] (by pm_frame) (r := 1) (by simp)
-    have k₃ := rot.ptr_keep [0, 2, 3, 4] (by pm_frame) (r := 1) (by simp)
-    simpa [k₂, k₃] using k₁
+  · exact kept 6 (by simp)
+  · simpa using kept 1 (by simp)
   · simp only [nodeAt_addresses, Finset.mem_insert, Finset.mem_union, not_or] at hz
     rw [vh, List.getElem?_modify_ne _ _ (Ne.symm hz.2.1.1), uh,
       List.getElem?_modify_ne _ _ (Ne.symm hz.1)]
