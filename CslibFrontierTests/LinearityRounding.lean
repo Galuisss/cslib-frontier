@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (tests)
 
-import CslibFrontier.Computability.PCP.TwoProverGame.PauliBraidingDefect
+import CslibFrontier.Computability.PCP.TwoProverGame.PauliBraidingEPR
 import CslibFrontier.Foundations.Quantum.PauliTwirl
 
 /-! # Rounding approximately linear observables
@@ -154,7 +154,7 @@ example (S : QuantumStrategy (PauliBraidingQuestion 1 Bool) (PauliBraidingQuesti
       (∀ z, W * (P true).charObs z = (pauliZPow z ⊗ₖ (1 : Matrix J J ℂ)) * W) ∧
       (∀ x, let D := W * (P false).charObs x - (pauliXPow x ⊗ₖ (1 : Matrix J J ℂ)) * W
         (S.toCommuting.state (kroneckerOne (κ := Fin 2) (Dᴴ * D))).re = 0) := by
-  obtain ⟨P, _, _, hclose, ⟨J, _, _, W, h⟩, _⟩ :=
+  obtain ⟨P, _, _, hclose, _, ⟨J, _, _, W, h⟩, _⟩ :=
     exists_local_pauliCompression_of_pauliBraidingGame S hA hB (ε := 0) (by rw [hwin, sub_zero])
   let f (x z : Fin 1 → Bool) := S.toCommuting.state.norm (kroneckerOne (κ := Fin 2)
     ((P false).charObs x * (P true).charObs z -
@@ -187,5 +187,40 @@ example (S : QuantumStrategy (PauliBraidingQuestion 1 Bool) (PauliBraidingQuesti
     have hle : (𝔼 a, g a) ≤ 0 := by simpa [g, D, φ] using h.intertwinesX
     have hm := le_antisymm hle (expect_nonneg fun a _ => hn a)
     exact congrFun ((Fintype.expect_eq_zero_iff_of_nonneg hn).mp hm) x
+
+/-- At the upper score the locally extracted width-one state belongs to the EPR subspace. -/
+example (S : QuantumStrategy (PauliBraidingQuestion 1 Bool) (PauliBraidingQuestion 1 Bool)
+    ((Bool × Bool) ⊕ Bool) ((Bool × Bool) ⊕ Bool) (Fin 2) (Fin 2))
+    (hwin : (pauliBraidingGame 1 TwoProverGame.chsh id (fun _ => id)).quantumWinProb S =
+      (2 + Real.cos (π / 8) ^ 2) / 3) :
+    ∃ (J L : Type) (_ : Fintype J) (_ : DecidableEq J) (_ : Fintype L) (_ : DecidableEq L)
+      (V : Matrix ((Fin 1 → Bool) × J) (Fin 2) ℂ)
+      (W : Matrix ((Fin 1 → Bool) × L) (Fin 2) ℂ),
+      Vᴴ * V = 1 ∧ Wᴴ * W = 1 ∧
+      let ψ := (V ⊗ₖ W) *ᵥ S.state.ofLp
+      extractedEprProjection (Q := Fin 1 → Bool) *ᵥ ψ = ψ := by
+  obtain ⟨J, _, _, L, _, _, V, W, hV, hW, h⟩ :=
+    exists_local_eprProjection_of_pauliBraidingGame S (ε := 0) (by rw [hwin, sub_zero])
+  let E := extractedEprProjection (Q := Fin 1 → Bool) (J := J) (K := L)
+  let ψ := (V ⊗ₖ W) *ᵥ S.state.ofLp
+  have hle : ‖(WithLp.toLp 2 (E *ᵥ ψ - ψ) :
+      EuclideanSpace ℂ (((Fin 1 → Bool) × J) × (Fin 1 → Bool) × L))‖ ^ 2 ≤ 0 := by
+    simpa only [E, ψ, zero_mul, mul_zero, pauliBraidingTwistedCommutationError_zero,
+      pauliBraidingRoundedConsistencyError_zero,
+      ← Matrix.mulVec_mulVec, sub_mulVec, one_mulVec, add_zero] using h
+  have hn := le_antisymm hle (sq_nonneg _)
+  have hz := norm_eq_zero.mp ((pow_eq_zero_iff two_ne_zero).mp hn)
+  exact ⟨J, L, inferInstance, inferInstance, inferInstance, inferInstance, V, W, hV, hW,
+    sub_eq_zero.mp (by
+      simpa only [WithLp.ofLp_toLp, WithLp.ofLp_zero] using (congrArg WithLp.ofLp hz))⟩
+
+/-- For two physical qubits the EPR projector rejects the unequal computational string. -/
+example :
+    let e := Equiv.prodProdProdComm Bool Unit Bool Unit
+    let E := extractedEprProjection (Q := Bool) (J := Unit) (K := Unit)
+    (reindex e e E) ((false, true), (), ()) ((false, true), (), ()) = 0 := by
+  intro e E
+  rw [show reindex e e E = _ from reindex_extractedEprProjection]
+  simp [pureState_apply, maxEntangled_apply_of_ne Bool.false_ne_true]
 
 end CslibFrontierTests.LinearityRounding
