@@ -276,9 +276,7 @@ theorem expect_norm_pauliBraidingBasis_anticomm_sq_le
       (fun q => .anticommutation true q p)
       (fun r => Sum.elim (basisQuestion basis r).braidingCheckedBit fun _ => false)
       (fun _ => Sum.elim (fun _ : Bool × Bool => false) id)
-  let M (basis : Bool) (x d : Fin n → Bool) :=
-    let q := PauliConsistencyQuestion.ofChecked basis x d
-    (measure q.toBraidingQuestion).map (Sum.elim q.braidingCheckedBit fun _ => false)
+  let M := pauliBraidingBasisBitMeasurement measure
   have hcontract (basis : Bool) (x : Fin n → Bool) :
       star (𝔼 d, (M basis x d).observable) * (𝔼 d, (M basis x d).observable) ≤ 1 := by
     rw [← Measurement.observable_average]

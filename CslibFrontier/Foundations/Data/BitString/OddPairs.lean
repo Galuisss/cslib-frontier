@@ -148,6 +148,14 @@ theorem oddExpect_eq_dens_smul (f : (ι → Bool) → (ι → Bool) → ℝ) :
   simp_rw [← mem_oddPairs]
   rw [Fintype.expect_ite_mem, NNRat.smul_def]
 
+/-- The masked average is the density times the uniform average on the subtype of odd pairs. -/
+theorem oddExpect_eq_dens_mul_expect (f : (ι → Bool) → (ι → Bool) → ℝ) :
+    oddExpect f = ((oddPairs ι).dens : ℝ) * (𝔼 p : ↥(oddPairs ι), f p.val.1 p.val.2) := by
+  rw [oddExpect_eq_dens_smul, univ_eq_attach]
+  congr 1
+  rw [Finset.expect, Finset.expect, card_attach,
+    sum_attach (oddPairs ι) (fun p => f p.1 p.2)]
+
 /-- The first marginal of the masked odd-pair average is half the uniform
 average with the zero string removed by a mask. -/
 theorem oddExpect_fst (g : (ι → Bool) → ℝ) :
