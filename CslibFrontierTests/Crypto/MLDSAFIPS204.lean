@@ -8,6 +8,7 @@ module
 -- upstream: local-only (test driver)
 
 import CslibFrontier.Crypto.Computational.MLDSA.SignedExtraction
+import CslibFrontier.Crypto.Computational.MLDSA.SecretExpansionLaw
 import all CslibFrontier.Crypto.Computational.MLDSA.CompressedKeyOnly
 import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 import all CslibFrontier.Crypto.Computational.MLDSA.PublicPairSigning
@@ -30,6 +31,16 @@ set_option linter.privateModule false
 set_option linter.hashCommand false
 
 open Cslib.Crypto Cslib.Crypto.MLDSA.FIPS204
+
+-- Algorithm 31 reads the low nibble first and accepts the 256th coefficient at the final byte.
+example (s : Level) :
+    ((rejBoundedPoly s (16 :: List.replicate 127 0)).map fun p => (p 0, p 1, p 255)) =
+      some (s.params.η, (s.params.η : ZMod 8380417) - 1, s.params.η) := by
+  cases s <;> decide +kernel
+
+-- Discarding the high nibble of the last byte leaves only 255 accepted coefficients.
+example (s : Level) : rejBoundedPoly s (List.replicate 127 0 ++ [240]) = none := by
+  cases s <;> decide +kernel
 
 -- Start with q itself (rejected), then accept a high-bit-set zero. The byte after the
 -- last swapped triple is a sentinel. The shorter prefix contains only 255 accepted triples.

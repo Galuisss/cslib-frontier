@@ -274,10 +274,14 @@ theorem nonceInput_ne_digestInput {s : Level} (seed : FixedBytes 64) (nonce : �
   rw [FixedBytes.length_toList seed] at h
   cases s <;> revert h <;> decide
 
-private def Xofs.secretPoly (H : Xofs) (s : Level) (seed : List Byte) (nonce : ℕ) : Option Poly :=
-  let bytes := H.h256.readBytes (nonceInput seed nonce) 481
+/-- FIPS 204 Algorithm 31 on a finite SHAKE256 output. The low nibble precedes the high nibble
+of each byte. Exhaustion returns `none` when fewer than 256 coefficients were accepted. -/
+def rejBoundedPoly (s : Level) (bytes : List Byte) : Option Poly :=
   asPoly (bytes.flatMap fun b =>
     ([b.val % 16, b.val / 16].filterMap (boundedCoeff s.params.η)))
+
+private def Xofs.secretPoly (H : Xofs) (s : Level) (seed : List Byte) (nonce : ℕ) : Option Poly :=
+  rejBoundedPoly s (H.h256.readBytes (nonceInput seed nonce) 481)
 
 private theorem boundedCoeff_short {s : Level} {u : ℕ} {z : ZMod 8380417}
     (h : boundedCoeff s.params.η u = some z) : |z.valMinAbs| ≤ s.params.η := by
@@ -483,6 +487,14 @@ in one 128-byte SHAKE256 expansion of the seed and the two dimension bytes. -/
 @[expose] def Xofs.expandKeySeed (H : Xofs) (s : Level) (seed : FixedBytes 32) : List Byte :=
   H.h256.readBytes (seed.toList ++ [Fin.ofNat 256 s.params.k, Fin.ofNat 256 s.params.ℓ]) 128
 
+/-- FIPS 204 Algorithm 33 samples both short vectors from SHAKE256. The nonces of the
+error vector start immediately after the last nonce of the secret vector. -/
+def Xofs.expandS (H : Xofs) (s : Level) (rho' : List Byte) :
+    Option ((Fin s.params.ℓ → Poly) × (Fin s.params.k → Poly)) := do
+  let s₁ ← tabulate _ fun i : Fin s.params.ℓ => H.secretPoly s rho' i.val
+  let s₂ ← tabulate _ fun i : Fin s.params.k => H.secretPoly s rho' (s.params.ℓ + i.val)
+  return (s₁, s₂)
+
 /-- Algorithm 6, from the 32-byte seed to both encoded keys (Algorithms 22, 24).
 Rejection exhaustion during the matrix or short-vector expansion yields an error. -/
 def Xofs.keyGen (H : Xofs) (s : Level) (seed : FixedBytes 32) : Option KeyPair := do
@@ -490,8 +502,7 @@ def Xofs.keyGen (H : Xofs) (s : Level) (seed : FixedBytes 32) : Option KeyPair :
   let rho := expanded.take 32
   let rho' := (expanded.drop 32).take 64
   let matrix ← H.expandA s rho
-  let s₁ ← tabulate _ fun i : Fin s.params.ℓ => H.secretPoly s rho' i.val
-  let s₂ ← tabulate _ fun i : Fin s.params.k => H.secretPoly s rho' (s.params.ℓ + i.val)
+  let (s₁, s₂) ← H.expandS s rho'
   let full := Vector.ofFn fun i => Vector.ofFn ((moduleSISMap matrix s₁ + s₂) i)
   let t := fun i => (full.get i).get
   let pk := encodePublic s rho t
@@ -519,15 +530,16 @@ theorem Xofs.keyGen_congr_of_reads {H G : Xofs} (s : Level) (seed : FixedBytes 3
     apply publicRead
     simp only [encodePublic, List.length_append, List.length_take, len, length_packCoeffs]
     rfl
-  simp only [Xofs.keyGen, seedRead, ← show ex = H.expandKeySeed s seed from rfl, matrix, short, pk]
+  simp only [Xofs.keyGen, Xofs.expandS, seedRead, ← show ex = H.expandKeySeed s seed from rfl,
+    matrix, short, pk]
 
 /-- The seed recovered from a successful public key is precisely the prefix used to index
 the SHAKE128 matrix streams during this execution of Algorithm 6. -/
 theorem publicSeed_of_keyGen {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys : KeyPair}
     (h : H.keyGen s seed = some keys) :
     keys.publicKey.take 32 = (H.expandKeySeed s seed).take 32 := by
-  simp only [Xofs.keyGen, Option.bind_eq_bind, Option.pure_def, Option.bind_eq_some_iff,
-    Option.some.injEq] at h
+  simp only [Xofs.keyGen, Xofs.expandS, Option.bind_eq_bind, Option.pure_def,
+    Option.bind_eq_some_iff, Option.some.injEq] at h
   obtain ⟨_, _, _, _, _, _, rfl⟩ := h
   have len : (H.expandKeySeed s seed).length = 128 := H.h256.length_read ..
   rw [encodePublic, List.take_left' (by simp [len])]
@@ -573,7 +585,7 @@ theorem privateKey_of_keyGen {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys
         sk.s₁, sk.s₂, publicKeyLowPart s.params 13 sk.publicKey⟩ ∧
       (∀ i j, |(sk.s₁ i j).valMinAbs| ≤ s.params.η) ∧
       (∀ i j, |(sk.s₂ i j).valMinAbs| ≤ s.params.η) := by
-  unfold Xofs.keyGen Xofs.expandKeySeed at hg
+  unfold Xofs.keyGen Xofs.expandS Xofs.expandKeySeed at hg
   generalize hh : H.h256.readBytes
     (seed.toList ++ [Fin.ofNat 256 s.params.k, Fin.ofNat 256 s.params.ℓ]) 128 = expanded at hg
   have hex : expanded.length = 128 := by rw [← hh]; exact H.h256.length_read ..
