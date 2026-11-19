@@ -59,6 +59,10 @@ def linePoints (u v : Point F m) : Finset (Point F m) :=
 theorem mem_linePoints (u v : Point F m) (t : F) : u + t • v ∈ linePoints u v :=
   mem_image.mpr ⟨t, mem_univ t, rfl⟩
 
+theorem mem_linePoints_iff {u v x : Point F m} :
+    x ∈ linePoints u v ↔ ∃ t : F, u + t • v = x := by
+  simp [linePoints]
+
 /-- Moving the base point along an affine line leaves its set of points unchanged. -/
 theorem linePoints_translate_direction (u v : Point F m) (t : F) :
     linePoints (u + t • v) v = linePoints u v := by
@@ -119,19 +123,43 @@ theorem LineHasDegree.exists_polynomial {u v : Point F m} {f : linePoints u v �
     rw [hqt, ← he]
     exact congrArg f (Subtype.ext ht)
 
+/-- Recover a polynomial in a parametrization of the answer domain. -/
+theorem LineHasDegree.exists_polynomial_of_eq {L : Finset (Point F m)} {f : L → F}
+    {u v : Point F m} {d : ℕ} (h : LineHasDegree f d) (hL : linePoints u v = L) :
+    ∃ p : Polynomial F, p.natDegree ≤ d ∧
+      ∀ t : F, f ⟨u + t • v, hL ▸ mem_linePoints u v t⟩ = p.eval t := by
+  subst L
+  exact h.exists_polynomial
+
 /-- The line answer must have the right domain and degree, and agree with the point answer. -/
-def lineAgrees (d : ℕ) (L : Finset (Point F m)) (u : Point F m)
+@[expose] def lineAgrees (d : ℕ) (L : Finset (Point F m)) (u : Point F m)
     (a : Σ L : Finset (Point F m), L → F) (b : F) : Prop :=
   a.1 = L ∧ LineHasDegree a.2 d ∧ ∃ h : u ∈ a.1, a.2 ⟨u, h⟩ = b
 
-/-- The three branches' common acceptance predicate. -/
-def accepts (d : ℕ) : Question F m → Question F m → Answer F m → Answer F m → Prop
+/-- Acceptance with separate degree cutoffs for axis and diagonal answers.
+A fixed diagonal cutoff can be carried through repeated coordinate restrictions. -/
+@[expose] def acceptsAtDegrees (d D : ℕ) :
+    Question F m → Question F m → Answer F m → Answer F m → Prop
   | .point _, .point _, .inl a, .inl b => a = b
   | .axis L, .point u, .inr a, .inl b | .point u, .axis L, .inl b, .inr a =>
     lineAgrees d L u a b
   | .diagonal L, .point u, .inr a, .inl b | .point u, .diagonal L, .inl b, .inr a =>
-    lineAgrees (m * d) L u a b
+    lineAgrees D L u a b
   | _, _, _, _ => False
+
+/-- The three branches' common acceptance predicate in ambient dimension `m`. -/
+def accepts (d : ℕ) : Question F m → Question F m → Answer F m → Answer F m → Prop :=
+  acceptsAtDegrees d (m * d)
+
+theorem accepts_eq_atDegrees (d : ℕ) :
+    accepts (F := F) (m := m) d = acceptsAtDegrees d (m * d) := by
+  unfold accepts
+  rfl
+
+/-- Exchanging the players preserves the result of the acceptance check. -/
+theorem acceptsAtDegrees_swap (d D : ℕ) (x y : Question F m) (a b : Answer F m) :
+    acceptsAtDegrees d D x y a b ↔ acceptsAtDegrees d D y x b a := by
+  cases x <;> cases y <;> cases a <;> cases b <;> simp only [acceptsAtDegrees, eq_comm]
 
 /-- Acceptance on an axis question and its paired point is determined by the legal line
 answer and its value at the point. -/
@@ -139,25 +167,26 @@ theorem exists_legal_of_accepts_axis_point (d : ℕ) (L : Finset (Point F m)) (u
     (a b : Answer F m) (h : accepts d (.axis L) (.point u) a b) :
     ∃ g z, a = .inr g ∧ b = .inl z ∧
       g.1 = L ∧ LineHasDegree g.2 d ∧ ∃ hu : u ∈ g.1, g.2 ⟨u, hu⟩ = z := by
-  cases a <;> cases b <;> simp only [accepts] at h
+  cases a <;> cases b <;> simp only [accepts, acceptsAtDegrees] at h
   exact ⟨_, _, rfl, rfl, h⟩
 
 /-- Accepted diagonal and point answers agree at the queried point. -/
 theorem exists_agree_of_accepts_point_diagonal (d : ℕ) (L : Finset (Point F m))
     (u : Point F m) (a b : Answer F m) (h : accepts d (.point u) (.diagonal L) a b) :
     ∃ g z, a = .inl z ∧ b = .inr g ∧ ∃ hu : u ∈ g.1, g.2 ⟨u, hu⟩ = z := by
-  cases a <;> cases b <;> simp only [accepts] at h
+  cases a <;> cases b <;> simp only [accepts, acceptsAtDegrees] at h
   exact ⟨_, _, rfl, rfl, h.2.2⟩
 
 theorem accepts_point_axis_iff (d : ℕ) (L : Finset (Point F m)) (u : Point F m)
     (a b : Answer F m) :
     accepts d (.point u) (.axis L) a b ↔ accepts d (.axis L) (.point u) b a := by
-  cases a <;> cases b <;> rfl
+  unfold accepts
+  exact acceptsAtDegrees_swap d _ _ _ _ _
 
 /-- Accepted point answers are equal field elements. -/
 theorem exists_eq_of_accepts_points (d : ℕ) (u v : Point F m) (a b : Answer F m)
     (h : accepts d (.point u) (.point v) a b) : ∃ c, a = .inl c ∧ b = .inl c := by
-  cases a <;> cases b <;> simp only [accepts] at h
+  cases a <;> cases b <;> simp only [accepts, acceptsAtDegrees] at h
   exact ⟨_, rfl, congrArg Sum.inl h.symm⟩
 
 /-- Send the line and point to uniformly random opposite roles. -/
@@ -212,6 +241,16 @@ that prefix. Zero directions occur with the sampling probability specified in Fi
         assignLineRoles (.diagonal (linePoints u (prefixDirection i v))) (.point u)
 
 omit [Fintype F] [DecidableEq F] in
+/-- Extending the whole space by one coordinate leaves an earlier prefix unchanged. -/
+theorem prefixDirection_castSucc (i : Fin m) (v : Fin (i.val + 1) → F) :
+    prefixDirection i.castSucc v = Fin.snoc (prefixDirection i v) 0 := by
+  funext j
+  refine Fin.lastCases ?_ (fun k => ?_) j
+  · have h : ¬ m < i.val + 1 := by omega
+    simp [prefixDirection, h]
+  · simp [prefixDirection]
+
+omit [Fintype F] [DecidableEq F] in
 /-- At the full prefix, extending the direction is the identity. -/
 @[simp] theorem prefixDirection_last {n : ℕ} (v : Point F (n + 1)) :
     prefixDirection (Fin.last n) v = v := by
@@ -246,12 +285,33 @@ noncomputable def branchQuestions (n : ℕ) :
   | .consistency => consistencyQuestions
   | .diagonal => diagonalQuestions n
 
-/-- A verifier with its initial branch choice fixed. -/
-noncomputable def branchGame (n d : ℕ) (b : Branch) :
+/-- A verifier branch with separate degree cutoffs for axis and diagonal answers. -/
+noncomputable def branchGameAtDegrees (n d D : ℕ) (b : Branch) :
     TwoProverGame (Question F (n + 1)) (Question F (n + 1))
       (Answer F (n + 1)) (Answer F (n + 1)) where
   questions := branchQuestions n b
-  accepts := accepts d
+  accepts := acceptsAtDegrees d D
+
+/-- A verifier with its initial branch choice fixed. -/
+noncomputable def branchGame (n d : ℕ) (b : Branch) :
+    TwoProverGame (Question F (n + 1)) (Question F (n + 1))
+      (Answer F (n + 1)) (Answer F (n + 1)) :=
+  branchGameAtDegrees n d ((n + 1) * d) b
+
+theorem branchGame_eq_atDegrees (n d : ℕ) (b : Branch) :
+    branchGame (F := F) n d b = branchGameAtDegrees n d ((n + 1) * d) b := by
+  unfold branchGame
+  rfl
+
+theorem branchGameAtDegrees_questions (n d D : ℕ) (b : Branch) :
+    (branchGameAtDegrees (F := F) n d D b).questions = branchQuestions n b := by
+  unfold branchGameAtDegrees
+  rfl
+
+theorem branchGameAtDegrees_accepts (n d D : ℕ) (b : Branch) :
+    (branchGameAtDegrees (F := F) n d D b).accepts = acceptsAtDegrees d D := by
+  unfold branchGameAtDegrees
+  rfl
 
 theorem branchGame_questions (n d : ℕ) (b : Branch) :
     (branchGame (F := F) n d b).questions = branchQuestions n b := by
@@ -393,8 +453,8 @@ theorem winProb_branch_honest {n d : ℕ} (P : MvPolynomial (Fin (n + 1)) F)
       {q | accepts d q.1 q.2 (honest P q.1) (honest P q.2)} = 1 := by
     rw [PMF.toOuterMeasure_apply_eq_one_iff]
     exact fun _ hq => accepts_honest_of_mem_branch P hP b hq
-  unfold TwoProverGame.winProb branchGame
-  rw [h, ENNReal.toReal_one]
+  unfold TwoProverGame.winProb
+  rw [branchGame_questions, branchGame_accepts, h, ENNReal.toReal_one]
 
 /-- The honest strategy wins the low individual degree game with probability one. -/
 theorem winProb_honest {n d : ℕ} (P : MvPolynomial (Fin (n + 1)) F)
