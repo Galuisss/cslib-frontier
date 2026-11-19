@@ -128,7 +128,8 @@ private theorem selected_poly {n : ℕ} (s : Level) (l : List (Pos n)) (hl : l.N
     simp_rw [parse]
     change (PMF.uniformOfFintype (Pos n → Digit s)).map (value ∘ fun d j => d (e j)) = _
     rw [← PMF.map_comp, PMF.uniformOfFintype_pi_map_comp_embedding]
-    rw [MatrixOracle.shortPolyLaw, PMF.pi_map, PMF.pi_uniformOfFintype, PMF.map_comp]
+    rw [MatrixOracle.shortPolyLaw, MatrixOracle.shortCoefficientLaw, PMF.pi_map,
+       PMF.pi_uniformOfFintype, PMF.map_comp]
     rfl
   · have parse (d : Pos n → Digit s) : asPoly (l.map fun j => shortCoeff s (d j)) = none := by
       simp [asPoly, Nat.lt_of_not_ge enough]

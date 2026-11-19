@@ -584,7 +584,8 @@ theorem privateKey_of_keyGen {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys
         H.h256.readBytes keys.publicKey 64,
         sk.s₁, sk.s₂, publicKeyLowPart s.params 13 sk.publicKey⟩ ∧
       (∀ i j, |(sk.s₁ i j).valMinAbs| ≤ s.params.η) ∧
-      (∀ i j, |(sk.s₂ i j).valMinAbs| ≤ s.params.η) := by
+      (∀ i j, |(sk.s₂ i j).valMinAbs| ≤ s.params.η) ∧
+      H.expandS s (((H.expandKeySeed s seed).drop 32).take 64) = some (sk.s₁, sk.s₂) := by
   unfold Xofs.keyGen Xofs.expandS Xofs.expandKeySeed at hg
   generalize hh : H.h256.readBytes
     (seed.toList ++ [Fin.ofNat 256 s.params.k, Fin.ofNat 256 s.params.ℓ]) 128 = expanded at hg
@@ -617,7 +618,7 @@ theorem privateKey_of_keyGen {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys
         simp only [ha, h₁, h₂, Option.bind_eq_bind, Option.bind_some, Option.pure_def,
           materialized, Option.some.injEq, ht] at hg
         subst keys
-        refine ⟨rho, sk, hrho ▸ ha, ?_, ?_, sa, sb⟩
+        refine ⟨rho, sk, hrho ▸ ha, ?_, ?_, sa, sb, ?_⟩
         · rw [hrho]
         · rw [hrho]
           simp only [Xofs.expandKeySeed, hh]
@@ -628,6 +629,9 @@ theorem privateKey_of_keyGen {H : Xofs} {s : Level} {seed : FixedBytes 32} {keys
           · exact sa
           · exact sb
           · exact low
+        · rw [show H.expandKeySeed s seed = expanded from hh]
+          simp only [Xofs.expandS, h₁, h₂, Option.bind_eq_bind, Option.bind_some, Option.pure_def]
+          rfl
 
 /-- The encoded public key from Algorithm 6. -/
 def keyGenPublic (s : Level) (seed : FixedBytes 32) : Option (List Byte) :=
