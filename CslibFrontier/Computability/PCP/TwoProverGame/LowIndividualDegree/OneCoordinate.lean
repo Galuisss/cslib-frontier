@@ -86,17 +86,11 @@ theorem exists_polynomial_measurements_one (S : CommutingStrategy Q Q Ans Ans �
   let R := (S.bob (.axis univ)).map (decodePolynomial d)
   refine ⟨P, R, ?_, ?_, ?_⟩
   · intro u p a
-    simp only [R, Measurement.map_effect]
-    apply Commute.sum_left
-    intro i _
-    apply Commute.sum_right
-    exact fun j _ => S.commute (.point u) (.axis univ) i j
+    exact Measurement.commute_map_map _ _ (S.commute (.point u) (.axis univ))
+      decodePoint (decodePolynomial d) a p
   · intro u p a
-    simp only [P, Measurement.map_effect]
-    apply Commute.sum_left
-    intro i _
-    apply Commute.sum_right
-    exact fun j _ => S.commute (.axis univ) (.point u) i j
+    exact Measurement.commute_map_map _ _ (S.commute (.axis univ) (.point u))
+      (decodePolynomial d) decodePoint p a
   · rw [axisScore_one]
     refine sum_le_sum fun u _ => mul_le_mul_of_nonneg_left ?_ ENNReal.toReal_nonneg
     apply div_le_div_of_nonneg_right _ (by norm_num)

@@ -95,7 +95,7 @@ theorem map_effect [DecidableEq β] (f : α → β) (M : Measurement α A) (b : 
     (M.map f).effect b = ∑ a with f a = b, M.effect a :=
   rfl
 
-/-- An operator commuting with the original effects commutes with the postprocessed effects. -/
+/-- An operator commuting with the original effects commutes with their postprocessing. -/
 theorem commute_map_right [DecidableEq β] (M : Measurement α A) (f : α → β)
     (e : A) (h : ∀ a, Commute e (M.effect a)) (b : β) : Commute e ((M.map f).effect b) := by
   rw [map_effect]
