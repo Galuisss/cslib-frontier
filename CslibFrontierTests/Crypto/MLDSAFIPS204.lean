@@ -14,6 +14,7 @@ import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 import all CslibFrontier.Crypto.Computational.MLDSA.PublicPairSigning
 import CslibFrontier.Crypto.Computational.MLDSA.RejNTTExhaustion
 meta import CslibFrontier.Crypto.Computational.MLDSA.FIPS204
+meta import CslibFrontier.Crypto.Computational.MLDSA.FullPairMLWE
 meta import CslibFrontier.Crypto.Computational.MLDSA.AmbientVerification
 meta import CslibFrontier.Crypto.Computational.MLDSA.PublicPairSigning
 meta import CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
