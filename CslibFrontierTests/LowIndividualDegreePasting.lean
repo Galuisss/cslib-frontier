@@ -8,14 +8,16 @@ module
 -- upstream: local-only (tests)
 
 import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerifierPasting
+import CslibFrontierTests.QubitMeasurementFixture
 import Mathlib.Algebra.Field.ZMod
 
 /-! # Pasting on three slices over the field with three elements -/
 
 set_option linter.privateModule false
 
-open Cslib.PCP.LowIndividualDegree Cslib.Quantum MvPolynomial
-open scoped ComplexOrder
+open Cslib.PCP Cslib.PCP.LowIndividualDegree Cslib.Quantum MvPolynomial Finset
+open scoped ComplexOrder MatrixOrder Matrix.Norms.L2Operator BigOperators Real
+open Matrix CslibFrontierTests.QubitMeasurementFixture
 
 private instance : Fact (Nat.Prime 3) := ⟨by decide⟩
 
@@ -165,10 +167,188 @@ example :
       exact zero_ne_one
     simp only [PMF.toOuterMeasure_pure_apply, hzero, hone, ↓reduceIte,
       ENNReal.toReal_zero, ENNReal.toReal_one, zero_add]
+private noncomputable def zeroConstant : BoundedPolynomial F 0 0 := ⟨0, fun i => Fin.elim0 i⟩
+private noncomputable def zeroPaste : BoundedPolynomial F 1 0 := ⟨0, by simp⟩
 
+private noncomputable def singleSlice (x : F) :
+    Measurement (Option (BoundedPolynomial F 0 0)) ℂ := by
+  classical
+  exact Measurement.const (if x = 0 then some zeroConstant else none)
 
-private instance : Nonempty (Fin 1 ↪ F) :=
-  ⟨(Fin.castLEEmb (by decide : 1 ≤ 3)).trans nodes⟩
+private theorem singleSlice_projective (x : F) : (singleSlice x).IsProjective := by
+  classical
+  exact Measurement.isProjective_const _
+
+private def singletonEmbedding (x : F) : Fin 1 ↪ F :=
+  ⟨fun _ => x, fun _ _ _ => Subsingleton.elim _ _⟩
+
+private def singletonEquiv : (Fin 1 ↪ F) ≃ F where
+  toFun x := x 0
+  invFun := singletonEmbedding
+  left_inv x := by
+    ext i
+    rw [Subsingleton.elim i 0]
+    rfl
+  right_inv _ := rfl
+
+private theorem fixed_single_slice_effect (x : Fin 1 ↪ F) (p : BoundedPolynomial F 1 0) :
+    (pasteProjectiveSlices x singleSlice singleSlice_projective).effect (some p) =
+      if p = zeroPaste ∧ x 0 = 0 then 1 else 0 := by
+  classical
+  let g (_ : Fin 1) := some zeroConstant
+  have hg : pasteOutcome x g = some zeroPaste := by
+    apply (pasteOutcome_eq_some_iff _ _ _).mpr
+    refine ⟨Finset.card_pos.mpr ⟨0, by simp [g]⟩, ?_⟩
+    intro i q h
+    have hq := Option.some.inj h
+    subst q
+    apply Subtype.ext
+    change specializeLast (x i) (0 : MvPolynomial (Fin 1) F) = 0
+    exact map_zero _
+  have hread : (0 < (successfulSlices g).card ∧ FitsSlices x g p) ↔ p = zeroPaste := by
+    rw [← pasteOutcome_eq_some_iff, hg, Option.some.injEq, eq_comm]
+  rw [pasteProjectiveSlices_effect_some]
+  simp only [Measurement.sequentialProjective_effect_one, sum_filter]
+  by_cases hx : x 0 = 0
+  · rw [sum_eq_single_of_mem g (mem_univ g)]
+    · by_cases hp : p = zeroPaste
+      · rw [ite_eq_left (hread.mpr hp), ite_eq_left ⟨hp, hx⟩]
+        simp [singleSlice, Measurement.const, g, hx]
+      · rw [ite_eq_right (fun h => hp (hread.mp h))]
+        simp [hp]
+    · intro w _ hne
+      have hw : w 0 ≠ some zeroConstant := fun he => hne (by
+        funext i
+        simpa only [Subsingleton.elim i (0 : Fin 1), g] using he)
+      simp [singleSlice, Measurement.const, hx, hw]
+  · simp only [hx, and_false, ite_false]
+    refine sum_eq_zero fun w _ => ?_
+    by_cases hw : w 0 = none
+    · have hnone : successfulSlices w = ∅ := by
+        ext i
+        simp [Subsingleton.elim i (0 : Fin 1), hw]
+      simp [hnone]
+    · simp [singleSlice, Measurement.const, hx, hw]
+
+private instance : Nonempty (Fin 1 ↪ F) := ⟨singletonEmbedding 0⟩
+
+private theorem averaged_single_slice_effect (p : BoundedPolynomial F 1 0) :
+    (pasteSlices 1 singleSlice singleSlice_projective).effect (some p) =
+      if p = zeroPaste then 1 / 3 else 0 := by
+  classical
+  let _ : Fintype (Fin 1 ↪ F) := Fintype.ofFinite _
+  rw [pasteSlices_effect]
+  have hcard : Fintype.card (Fin 1 ↪ F) = 3 :=
+    (Fintype.card_congr singletonEquiv).trans (ZMod.card 3)
+  simp only [fixed_single_slice_effect, Cslib.Probability.PMF.uniformOfFintype_apply, hcard,
+    ENNReal.toReal_inv]
+  let term (t : F) : ℂ := (3 : ℝ)⁻¹ • (if p = zeroPaste ∧ t = 0 then 1 else 0)
+  change (∑ x : Fin 1 ↪ F, term (singletonEquiv x)) = _
+  rw [Equiv.sum_comp]
+  by_cases hp : p = zeroPaste
+  · simp [term, hp, one_div, Algebra.smul_def]
+  · simp [term, hp]
+
+private theorem averaged_single_slice_failure :
+    (pasteSlices 1 singleSlice singleSlice_projective).effect none = 2 / 3 := by
+  classical
+  have h := (pasteSlices 1 singleSlice singleSlice_projective).sum_effect
+  rw [Fintype.sum_option] at h
+  simp only [averaged_single_slice_effect, sum_ite_eq', mem_univ, ite_true] at h
+  linear_combination h
+
+/-- The first measurement sandwiches the second, with distinct values for the
+off-diagonal entry when the order is reversed. -/
+example :
+    let D := binary diagonalProjection diagonalProjection_star diagonalProjection_sq
+    let U := binary uniformProjection uniformProjection_star uniformProjection_sq
+    let hD := binary_projective _ diagonalProjection_star diagonalProjection_sq
+    let hU := binary_projective _ uniformProjection_star uniformProjection_sq
+    ((Measurement.sequentialProjective ![D, U] (pair_projective D U hD hU)).effect
+      (fun _ => true)) 0 1 = 0 ∧
+    ((Measurement.sequentialProjective ![U, D] (pair_projective U D hU hD)).effect
+      (fun _ => true)) 0 1 = 1 / 4 := by
+  intro D U hD hU
+  constructor
+  · rw [Measurement.sequentialProjective_effect_succ, Measurement.sequentialProjective_effect_one]
+    change (diagonalProjection * uniformProjection * diagonalProjection) 0 1 = 0
+    norm_num [diagonalProjection, uniformProjection, Matrix.mul_apply, Fin.sum_univ_two]
+  · rw [Measurement.sequentialProjective_effect_succ, Measurement.sequentialProjective_effect_one]
+    change (uniformProjection * diagonalProjection * uniformProjection) 0 1 = 1 / 4
+    norm_num [diagonalProjection, uniformProjection, Matrix.mul_apply, Fin.sum_univ_two]
+
+private noncomputable def zeroVerifier (φ : AlgState ℂ) :
+    CommutingStrategy (Question F 1) (Question F 1) (Answer F 1) (Answer F 1) ℂ := by
+  classical
+  exact {
+    state := φ
+    alice q := Measurement.const (honest zeroPaste.val q)
+    bob q := Measurement.const (honest zeroPaste.val q)
+    commute _ _ _ _ := Commute.all _ _ }
+
+private theorem zeroVerifier_score (φ : AlgState ℂ) (b : Branch) :
+    (branchGame (F := F) 0 0 b).commutingWinProb (zeroVerifier φ) = 1 := by
+  classical
+  let reply := honest zeroPaste.val
+  have h (x y : Question F 1) :
+      (zeroVerifier φ).answers x y = PMF.pure (reply x, reply y) := by
+    ext ⟨a, c⟩
+    rw [CommutingStrategy.answers_apply, PMF.pure_apply]
+    by_cases ha : a = reply x <;> by_cases hc : c = reply y <;>
+      simp [zeroVerifier, CommutingStrategy.prob, Measurement.const, reply, ha, hc]
+  calc
+    _ = (branchGame (F := F) 0 0 b).quantumWinProb
+        (QuantumStrategy.ofDeterministic reply reply) := by
+      rw [TwoProverGame.commutingWinProb, TwoProverGame.quantumWinProb]
+      congr 1
+      funext x y
+      rw [h, QuantumStrategy.answers_ofDeterministic]
+    _ = 1 := by
+      rw [TwoProverGame.quantumWinProb_ofDeterministic]
+      exact winProb_branch_honest zeroPaste.val zeroPaste.prop b
+
+private theorem singleSlice_mismatch_zero (φ : AlgState ℂ) (u : Point F 0) (t : F) :
+    Measurement.successfulMismatch φ (evaluatePolynomialMeasurement (singleSlice t) u)
+      (decodedPoint (zeroVerifier φ).bob (Fin.snoc u t)) = 0 := by
+  classical
+  rw [evaluatePolynomialMeasurement, decodedPoint, Measurement.successfulMismatch_map_map]
+  refine sum_eq_zero fun a _ => sum_eq_zero fun b _ => ?_
+  by_cases ht : t = 0
+  · have hv : honest zeroPaste.val (.point (Fin.snoc u 0)) = Sum.inl (0 : F) := by
+      rw [honest_point]
+      simp [zeroPaste]
+    have hz : eval u zeroConstant.val = 0 := by simp [zeroConstant]
+    by_cases ha : a = some zeroConstant <;> by_cases hb : b = Sum.inl (0 : F) <;>
+      simp [singleSlice, zeroVerifier, Measurement.const, hv, hz, ht, ha, hb]
+  · by_cases ha : a = none <;>
+      simp [singleSlice, Measurement.const, ht, ha]
+
+/-- A one-slice paste passes the degree-zero threshold. The successful effect has
+mass one third and agrees with the honest point answer. The two thirds of failure
+mass contribute zero to the verifier-pasting mismatch bound. -/
+example (φ : AlgState ℂ) :
+    (pasteSlices 1 singleSlice singleSlice_projective).effect (some zeroPaste) = 1 / 3 ∧
+    (pasteSlices 1 singleSlice singleSlice_projective).effect none = 2 / 3 ∧
+    (𝔼 u : Point F 0, 𝔼 t : F, Measurement.successfulMismatch φ
+      (evaluatePolynomialMeasurement (pasteSlices 1 singleSlice singleSlice_projective)
+        (Fin.snoc u t)) (decodedPoint (zeroVerifier φ).bob (Fin.snoc u t))) ≤ 0 := by
+  classical
+  refine ⟨by simp [averaged_single_slice_effect], averaged_single_slice_failure, ?_⟩
+  have hpair : (𝔼 x : F, 𝔼 y : F,
+      Measurement.successfulPairDefect φ (singleSlice x) (singleSlice y)) ≤ 0 := by
+    simp [Measurement.successfulPairDefect, mul_comm]
+  have hcopy : (𝔼 x : F, Measurement.successfulCopyDefect φ (singleSlice x) (singleSlice x)) ≤ 0 :=
+    by simp [Measurement.successfulCopyDefect]
+  have hp : (𝔼 u : Point F 0, 𝔼 t : F, Measurement.successfulMismatch φ
+      (evaluatePolynomialMeasurement (singleSlice t) u)
+      (decodedPoint (zeroVerifier φ).bob (Fin.snoc u t))) ≤ 0 := by
+    simp [singleSlice_mismatch_zero]
+  have h := average_pastedPointMismatch_le_of_verifier 1 (zeroVerifier φ)
+    singleSlice singleSlice singleSlice_projective singleSlice_projective
+    (fun _ _ _ _ => Commute.all _ _) (fun _ _ _ _ => Commute.all _ _)
+    hpair hcopy hp
+  norm_num [zeroVerifier_score] at h ⊢
+  exact h
 
 open scoped Classical in
 /-- Even a successful slice cannot meet the degree-one threshold on a single
