@@ -8,6 +8,7 @@ module
 -- upstream: local-only (tests)
 
 import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SliceCommutativity
+import CslibFrontierTests.QubitMeasurementFixture
 import Mathlib.Algebra.Field.ZMod
 
 /-! # Evaluated slice failure and commutation estimates -/
@@ -15,54 +16,12 @@ import Mathlib.Algebra.Field.ZMod
 set_option linter.privateModule false
 
 open Cslib.PCP Cslib.PCP.LowIndividualDegree Cslib.Quantum Matrix Finset
+open CslibFrontierTests.QubitMeasurementFixture
 open scoped BigOperators Real MatrixOrder Matrix.Norms.L2Operator
 
 namespace CslibFrontierTests.LowIndividualDegreeSliceBoundedness
 
-private abbrev Mat := Matrix (Fin 2) (Fin 2) ℂ
 private abbrev F := ZMod 2
-
-private def diagonalProjection : Mat := !![1, 0; 0, 0]
-private noncomputable def uniformProjection : Mat := !![1 / 2, 1 / 2; 1 / 2, 1 / 2]
-
-private theorem diagonalProjection_star : star diagonalProjection = diagonalProjection := by
-  ext i j
-  fin_cases i <;> fin_cases j <;> simp [diagonalProjection, Matrix.star_apply]
-
-private theorem uniformProjection_star : star uniformProjection = uniformProjection := by
-  ext i j
-  fin_cases i <;> fin_cases j <;> simp [uniformProjection, Matrix.star_apply]
-
-private theorem diagonalProjection_sq :
-    diagonalProjection * diagonalProjection = diagonalProjection := by
-  ext i j
-  fin_cases i <;> fin_cases j <;> norm_num [diagonalProjection, Matrix.mul_apply, Fin.sum_univ_two]
-
-private theorem uniformProjection_sq :
-    uniformProjection * uniformProjection = uniformProjection := by
-  ext i j
-  fin_cases i <;> fin_cases j <;>
-    norm_num [uniformProjection, Matrix.mul_apply, Fin.sum_univ_two]
-
-private theorem complement_sq (e : Mat) (he₂ : e * e = e) : (1 - e) * (1 - e) = 1 - e := by
-  simp only [mul_sub, sub_mul, one_mul, mul_one, he₂, sub_self, sub_zero]
-
-private def binary (e : Mat) (he : star e = e) (he₂ : e * e = e) : Measurement Bool Mat where
-  effect b := if b then e else 1 - e
-  nonneg b := by
-    cases b
-    · simpa only [Bool.false_eq_true, ite_false, star_sub, star_one, he, complement_sq e he₂]
-        using star_mul_self_nonneg (1 - e)
-    · simpa only [ite_true, he, he₂] using star_mul_self_nonneg e
-  sum_effect := by simp
-
-private theorem binary_projective (e : Mat) (he : star e = e) (he₂ : e * e = e) :
-    (binary e he he₂).IsProjective := by
-  intro b
-  cases b
-  · change (1 - e) * (1 - e) = 1 - e
-    exact complement_sq e he₂
-  · exact he₂
 
 private noncomputable def zeroSlice : BoundedPolynomial F 0 0 := ⟨0, fun i => Fin.elim0 i⟩
 
@@ -83,11 +42,6 @@ private theorem commute_const_effect {α : Type*} [Fintype α] [DecidableEq α]
   split_ifs
   · exact Commute.one_right _
   · exact Commute.zero_right _
-
-private noncomputable def basisVector : EuclideanSpace ℂ (Fin 2) := EuclideanSpace.single 1 1
-
-private noncomputable def φ : AlgState Mat :=
-  AlgState.vector basisVector (EuclideanSpace.orthonormal_single.norm_eq_one 1)
 
 private noncomputable def failureTerm : ℝ :=
   𝔼 u : Point F 0, ∑ a : Unit, ∑ b : F,

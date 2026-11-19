@@ -10,6 +10,8 @@ module
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSH
 public import CslibFrontier.Computability.PCP.TwoProverGame.Quantum
 public import CslibFrontier.Foundations.Quantum.Algebra.Measurement
+public import CslibFrontier.Foundations.Quantum.Algebra.SuccessfulAgreement
+import CslibFrontier.Probability.PMF.Event
 public import CslibFrontier.Foundations.Quantum.Algebra.Tsirelson
 import CslibFrontier.Foundations.Analysis.SpecialFunctions.Trigonometric.Basic
 
@@ -105,10 +107,15 @@ def swap (S : CommutingStrategy X Y A B 𝒜) : CommutingStrategy Y X B A 𝒜 w
   rw [(S.commute x y a b).eq]
   rfl
 
+/-- Summing over Bob's answers gives Alice's marginal probability. -/
+theorem sum_prob_bob (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) (a : A) :
+    ∑ b, S.prob x y a b = (S.state ((S.alice x).effect a)).re := by
+  simp only [prob, ← Complex.re_sum, ← map_sum, ← mul_sum, (S.bob y).sum_effect, mul_one]
+
 theorem sum_prob (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) :
     ∑ a, ∑ b, S.prob x y a b = 1 := by
-  simp only [prob, ← Complex.re_sum, ← map_sum, ← mul_sum, (S.bob y).sum_effect, mul_one,
-    (S.alice x).sum_effect, AlgState.map_one, Complex.one_re]
+  simp only [sum_prob_bob, ← Complex.re_sum, ← map_sum, (S.alice x).sum_effect,
+    AlgState.map_one, Complex.one_re]
 
 end Ring
 
@@ -151,6 +158,21 @@ theorem answers_map_fst (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) :
   simp only [h, ← ENNReal.ofReal_sum_of_nonneg (fun b _ => S.prob_nonneg x y a b)]
   simp only [prob, ← Complex.re_sum, ← map_sum, ← Finset.mul_sum, (S.bob y).sum_effect,
     mul_one, Measurement.prob]
+
+/-- The successful mismatch of decoded measurements is the joint probability
+that the first decoded answer succeeds and differs from the second. -/
+theorem successfulMismatch_map_map_eq_event {C : Type*} [Fintype C] [DecidableEq C]
+    [IsOrderedAddMonoid 𝒜] (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y)
+    (f : A → Option C) (g : B → C) :
+    Measurement.successfulMismatch S.state ((S.alice x).map f) ((S.bob y).map g) =
+      ((S.answers x y).toOuterMeasure {ab | ∃ c, f ab.1 = some c ∧ c ≠ g ab.2}).toReal := by
+  classical
+  rw [Measurement.successfulMismatch_map_map, Cslib.Probability.PMF.toOuterMeasure_apply_toReal,
+    Fintype.sum_prod_type]
+  simp only [Set.mem_ofPred_eq, answers_apply]
+  refine sum_congr rfl fun a _ => sum_congr rfl fun b _ => ?_
+  rw [ENNReal.toReal_ofReal (S.prob_nonneg x y a b)]
+  rfl
 
 end CFC
 

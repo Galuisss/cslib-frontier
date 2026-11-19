@@ -332,6 +332,13 @@ def honest (P : MvPolynomial (Fin m) F) : Question F m → Answer F m
   | .point u => .inl (MvPolynomial.eval u P)
   | .axis L | .diagonal L => .inr ⟨L, fun u => MvPolynomial.eval u.val P⟩
 
+omit [Fintype F] [DecidableEq F] in
+/-- The honest point answer is the polynomial's value at that point. -/
+theorem honest_point (P : MvPolynomial (Fin m) F) (u : Point F m) :
+    honest P (.point u) = .inl (MvPolynomial.eval u P) := by
+  unfold honest
+  rfl
+
 private theorem honest_lineAgrees (P : MvPolynomial (Fin m) F) (u v : Point F m) (d : ℕ)
     (hd : (P.restrictAffineLine u v).natDegree ≤ d) :
     lineAgrees d (linePoints u v) u
