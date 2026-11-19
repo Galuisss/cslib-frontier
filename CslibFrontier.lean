@@ -7173,6 +7173,7 @@ public import CslibFrontier.Foundations.Quantum.DensityMatrix.Normalize
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.PartialTracePairing
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Pure
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.PurificationOverlap
+public import CslibFrontier.Foundations.Quantum.DensityMatrix.QuantumPinsker
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.QuantumRaz
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropy
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropyConvexity
