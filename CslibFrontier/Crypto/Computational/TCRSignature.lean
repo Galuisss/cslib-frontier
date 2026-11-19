@@ -115,10 +115,12 @@ collisions. Instead, construction `(13.2)` of [BonehShoup2023], Section 13.2.1 (
   `Cslib.Crypto.TCRSignature.isPPT_tcrAdversary`: uniform strict PPT certificates for both
   reductions.
 * `Cslib.Crypto.TCRSignature.succProbability_indexedEufCmaGame_le_of_machine`,
-  `Cslib.Crypto.TCRSignature.exists_reduction_indexedEufCmaGame_le`: concrete Theorem 13.2 security
-  bound splitting indexed forgeries into one-time signature forgeries and target collisions.
+  `Cslib.Crypto.TCRSignature.exists_reduction_indexedEufCmaGame_le`: the one-time form of the
+  Theorem 13.2 bound, splitting indexed forgeries into one-time signature forgeries and target
+  collisions.
 * `Cslib.Crypto.SignatureScheme.OneTimeEUFCMA.indexedEUFCMA_tcrSignature`: `TCRSignature.scheme S H`
-  is `IndexedEUFCMA`-secure whenever `S` is `OneTimeEUFCMA` and `H` is target collision-resistant.
+  is `IndexedEUFCMA`-secure whenever `S` is `OneTimeEUFCMA` and `H` is target collision-resistant
+  (a step: the one-time form of Theorem 13.2, which the source states for many-time schemes).
 * `Cslib.Crypto.OneWay.exists_indexedEUFCMA_of_targetCollisionResistant`,
   `Cslib.Crypto.OneWay.exists_eufCMA_of_targetCollisionResistant`: capacity-`2` indexed and
   stateless many-time `EUFCMA` signatures from a one-way function and a target collision-resistant
@@ -1586,10 +1588,10 @@ theorem exists_ots_bounds (S : SignatureScheme) (H : KeyedHashFamily) :
   have hkPair := hkgLen (otsParam H n) keys hkeys
   enc_len at hkPair
 
-/-- **Existential reduction for `TCRSignature.scheme`** ([BonehShoup2023], Section 13.2.1,
-Theorem 13.2): every strict oracle-PPT indexed forger `adversary` induces a strict oracle-PPT
-one-time forger `otForger` and a strict PPT two-stage `TargetCollisionFinder` `tcrAdv` bounding
-`adversary`'s indexed forging probability at every security parameter `n`. -/
+/-- **Existential reduction for `TCRSignature.scheme`**, after the proof of [BonehShoup2023],
+Theorem 13.2, with one signing query: every strict oracle-PPT indexed forger `adversary` induces a
+strict oracle-PPT one-time forger `otForger` and a strict PPT two-stage `TargetCollisionFinder`
+`tcrAdv` bounding `adversary`'s indexed forging probability at every security parameter `n`. -/
 theorem exists_reduction_indexedEufCmaGame_le (S : SignatureScheme) (H : KeyedHashFamily)
     {adversary : IndexedForger}
     (hadversary : IsOraclePPT encIndexedSignedMessage adversary) :
@@ -1631,11 +1633,18 @@ theorem negligible_comp_otsParam {f : ℕ → ℝ≥0} (hf : Negligible f) (H : 
 
 end TCRSignature
 
-/-- **Fresh-key TCR hash-and-sign security** ([BonehShoup2023], Section 13.2.1, Theorem 13.2,
-adapted to capacity-`1` indexed signatures over a one-time signature scheme): if `S` is one-time
-EUF-CMA secure (`OneTimeEUFCMA`) and `H` is target collision-resistant on `List Bool`, then
-`TCRSignature.scheme S H` is an `IndexedEUFCMA`-secure capacity-`1` indexed signature scheme on
-arbitrary-length bit strings. -/
+/-- One-time form of [BonehShoup2023], Theorem 13.2 (Section 13.2.1, p. 534): a step, not the
+cited result. The source states Theorem 13.2 for a many-time secure `S` and concludes many-time
+security of the derived scheme; that statement is `SignatureScheme.EUFCMA.eufCMA_wordScheme`. For
+one-time signatures it only remarks that short messages suffice "as discussed in Section 13.2"
+(p. 584). Here, if `S` is one-time EUF-CMA secure (`OneTimeEUFCMA`, Definition 14.1) and `H` is
+target collision resistant on every word, then construction `(13.2)` over `S`, as the capacity-`1`
+indexed scheme `TCRSignature.scheme S H` on messages of any length, is one-time secure
+(`IndexedEUFCMA` at the single index `0`). The proof is the source's case split with one signing
+query. As in `eufCMA_wordScheme`, `S` runs at the parameter `otsParam H n` on the zero-padded word
+of `(r, H(r, m))`. This is the first step of the route from one-way functions and target collision
+resistant hashing to many-time signatures (`OneWay.exists_eufCMA_of_targetCollisionResistant`;
+#5686). -/
 theorem SignatureScheme.OneTimeEUFCMA.indexedEUFCMA_tcrSignature
     {S : SignatureScheme} (hS : S.OneTimeEUFCMA)
     {H : KeyedHashFamily} (hH : H.TargetCollisionResistant) :
