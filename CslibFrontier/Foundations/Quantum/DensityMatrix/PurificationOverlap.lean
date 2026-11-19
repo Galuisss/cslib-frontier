@@ -23,7 +23,7 @@ finite-dimensional purification comparison used in
 ## Main results
 
 * `exists_localUnitary_of_partialTraceRight_eq`: exact local alignment for equal left reductions.
-* `exists_localUnitary_inner_re_eq_rootFidelity`: a local unitary attains the root fidelity.
+* `exists_localUnitary_inner_eq_rootFidelity`: a local unitary attains the root fidelity.
 * `inner_localUnitary_re_le_rootFidelity`: every local unitary obeys the fidelity upper bound.
 -/
 
@@ -137,14 +137,24 @@ theorem inner_localUnitary_re_le_rootFidelity (ψ φ : EuclideanSpace ℂ (ι ×
   exact re_trace_conjTranspose_mul_le_traceNorm _ _ (transpose_mem_unitaryGroup_iff.mpr hU)
 
 /-- Uhlmann's overlap theorem for purifications on the same bipartite space. -/
+theorem exists_localUnitary_inner_eq_rootFidelity (ψ φ : EuclideanSpace ℂ (ι × κ)) :
+    ∃ U ∈ unitaryGroup κ ℂ,
+      inner ℂ (WithLp.toLp 2 (((1 : Matrix ι ι ℂ) ⊗ₖ U) *ᵥ ψ.ofLp)) φ =
+        (rootFidelity (partialTraceRight (pureState ψ))
+          (partialTraceRight (pureState φ)) : ℂ) := by
+  let A := (coefficients ψ)ᴴ * coefficients φ
+  obtain ⟨U, hU, h⟩ := A.exists_unitary_polar
+  refine ⟨Uᵀ, transpose_mem_unitaryGroup_iff.mpr hU, ?_⟩
+  rw [inner_localUnitary_eq_trace, transpose_transpose,
+    trace_conjTranspose_mul_eq_traceNorm_of_polar _ _ hU h, traceNorm_coefficients_cross]
+
+/-- The real-part equality of the attaining unitary. -/
 theorem exists_localUnitary_inner_re_eq_rootFidelity (ψ φ : EuclideanSpace ℂ (ι × κ)) :
     ∃ U ∈ unitaryGroup κ ℂ,
       (inner ℂ (WithLp.toLp 2 (((1 : Matrix ι ι ℂ) ⊗ₖ U) *ᵥ ψ.ofLp)) φ).re =
         rootFidelity (partialTraceRight (pureState ψ)) (partialTraceRight (pureState φ)) := by
-  obtain ⟨U, hU, h, -⟩ := traceNorm_eq_max_re_trace ((coefficients ψ)ᴴ * coefficients φ)
-  refine ⟨Uᵀ, transpose_mem_unitaryGroup_iff.mpr hU, ?_⟩
-  rw [inner_localUnitary_eq_trace, transpose_transpose, h, traceNorm_coefficients_cross]
-
+  obtain ⟨U, hU, h⟩ := exists_localUnitary_inner_eq_rootFidelity ψ φ
+  exact ⟨U, hU, by simpa only [Complex.ofReal_re] using congrArg Complex.re h⟩
 
 /-- The local unitary furnished by Uhlmann's theorem has a squared vector error of
 twice one minus the root fidelity for unit purifications. -/
