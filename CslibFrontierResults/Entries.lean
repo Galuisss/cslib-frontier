@@ -11,6 +11,7 @@ import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 import CslibFrontier.Computability.PCP.TwoProverGame.Synchronous
 import CslibFrontier.Foundations.Algebra.Group.HomomorphismTesting
 import CslibFrontier.Foundations.Quantum.DensityMatrix.PurificationOverlap
+import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropy
 import CslibFrontier.Foundations.Quantum.DensityMatrix.FidelityTraceDistance
 import CslibFrontier.Probability.MarkovChain.RandomWalk
 import CslibFrontier.Probability.MarkovChain.RotationMap
@@ -10857,6 +10858,19 @@ register_result "mpda-one-hole-is-no-hole" where
     informally; the Lean statement is for all complete runs and does not need acceptance. \
     Source check: independent agent review (codex-f4a705f4) on PR #6587, against \
     arXiv:2002.05950v2 Definition 1, PDF pp. 5-6, and Appendix G.1, Theorem 2, PDF p. 37."
+
+register_result "quantum-relative-entropy-nonnegative" where
+  title := "Nonnegativity of quantum relative entropy for finite density matrices"
+  topic := "quantum information"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Proposition 5.2",
+      locator := "arXiv:1509.07466v2, §5.1, printed p. 19" }
+  ]
+  theorems := [Cslib.Quantum.relativeEntropy_nonneg]
+  scope := "For arbitrary finite complex positive semidefinite trace-one matrices, including \
+    singular states, quantum relative entropy is nonnegative. The trace formula uses natural \
+    logarithms and requires support containment, stated as reverse kernel inclusion. When that \
+    containment fails, the divergence is positive infinity."
 
 register_result "uhlmann-finite-dimensional-local-overlap" where
   title := "Uhlmann’s theorem for finite-dimensional purifications"
