@@ -10,10 +10,12 @@ import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 import CslibFrontier.Computability.PCP.TwoProverGame.Synchronous
 import CslibFrontier.Foundations.Algebra.Group.HomomorphismTesting
+import CslibFrontier.Foundations.Quantum.DensityMatrix.ClassicalQuantumInformationChain
 import CslibFrontier.Foundations.Quantum.DensityMatrix.PurificationOverlap
 import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropy
 import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropyConvexity
 import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropyDataProcessing
+import CslibFrontier.Foundations.Quantum.DensityMatrix.QuantumRaz
 import CslibFrontier.Foundations.Quantum.DensityMatrix.FidelityTraceDistance
 import CslibFrontier.Foundations.LinearAlgebra.Matrix.PowersStormer
 import CslibFrontier.Probability.MarkovChain.RandomWalk
@@ -10905,6 +10907,21 @@ register_result "quantum-relative-entropy-partial-trace" where
     statement to unnormalized matrices, uses natural logarithms and includes singular \
     states. A joint support mismatch makes the right side positive infinity."
 
+register_result "quantum-raz-coordinate-mutual-information" where
+  title := "Quantum Raz's coordinate information bound"
+  topic := "quantum information"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Lemma 5.10",
+      locator := "arXiv:1509.07466v2, equation (24), printed p. 21" }
+  ]
+  theorems := [Cslib.Quantum.sum_mutualInformation_classicalQuantumMarginal_le_relativeEntropy]
+  scope := "An arbitrary finite classical tuple, with a possibly different alphabet at each \
+    coordinate, and a finite quantum register. The sum of the coordinate mutual informations \
+    is bounded by relative entropy to a product classical law with a common density matrix. \
+    Natural logarithms, zero-mass labels, singular states and the empty tuple are allowed. \
+    Source check by codex-f4a705f4 at \
+    https://github.com/cslib-community/cslib-frontier/pull/6660#issuecomment-7020254927."
+
 register_result "uhlmann-finite-dimensional-local-overlap" where
   title := "Uhlmann’s theorem for finite-dimensional purifications"
   topic := "quantum information"
@@ -10942,3 +10959,17 @@ register_result "fuchs-van-de-graaf-lower" where
   scope := "Arbitrary finite-dimensional complex positive semidefinite trace-one matrices, \
     including singular states. One minus the unsquared fidelity is bounded above by the \
     trace distance, which is half the trace norm of the difference."
+
+register_result "classical-quantum-tuple-mutual-information-chain" where
+  title := "Mutual information chain rule for finite classical tuples and a quantum register"
+  topic := "quantum information"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Chain equality in equation (27)",
+      locator := "arXiv:1509.07466v2, §5.1, printed p. 21" }
+  ]
+  theorems := [Cslib.Quantum.mutualInformation_classicalQuantumState_eq_sum_coordinates]
+  scope := "Arbitrary finite tuples whose coordinate alphabets may differ, with any joint \
+    probability mass function and finite complex density matrices as conditional blocks. \
+    The coordinate terms average conditional mutual information over preceding labels, \
+    with null prefixes weighted zero. The chain uses natural logarithms and includes the \
+    empty tuple."
