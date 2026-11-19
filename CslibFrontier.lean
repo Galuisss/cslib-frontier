@@ -7135,6 +7135,7 @@ public import CslibFrontier.Foundations.Quantum.Algebra.CHSHRigidity
 public import CslibFrontier.Foundations.Quantum.Algebra.CStar
 public import CslibFrontier.Foundations.Quantum.Algebra.CommutatorTransfer
 public import CslibFrontier.Foundations.Quantum.Algebra.CompletedMeasurement
+public import CslibFrontier.Foundations.Quantum.Algebra.CompletionConsistency
 public import CslibFrontier.Foundations.Quantum.Algebra.Consistency
 public import CslibFrontier.Foundations.Quantum.Algebra.GatedAgreement
 public import CslibFrontier.Foundations.Quantum.Algebra.Involution
