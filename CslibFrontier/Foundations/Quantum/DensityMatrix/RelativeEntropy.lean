@@ -48,6 +48,23 @@ protected theorem SupportLE.refl (ρ : Matrix ι ι ℂ) : SupportLE ρ ρ :=
   fun _ h => h
 
 omit [DecidableEq ι] in
+/-- Support inclusion is transitive. -/
+protected theorem SupportLE.trans {ρ σ τ : Matrix ι ι ℂ}
+    (hρσ : SupportLE ρ σ) (hστ : SupportLE σ τ) : SupportLE ρ τ :=
+  fun x hx => hρσ x (hστ x hx)
+
+omit [DecidableEq ι] in
+/-- The support of a positive semidefinite matrix is contained in that of every
+larger positive semidefinite matrix. -/
+theorem SupportLE.of_le {σ τ : Matrix ι ι ℂ} (hσ : σ.PosSemidef) (h : σ ≤ τ) :
+    SupportLE σ τ := by
+  intro x hx
+  apply hσ.dotProduct_mulVec_zero_iff.mp
+  have hdiff := ((Matrix.le_iff.mp h).dotProduct_mulVec_nonneg x)
+  rw [sub_mulVec, dotProduct_sub, hx, dotProduct_zero, zero_sub, neg_nonneg] at hdiff
+  exact le_antisymm hdiff (hσ.dotProduct_mulVec_nonneg x)
+
+omit [DecidableEq ι] in
 /-- Support inclusion is preserved by nonnegative weighted sums of the pairs when the
 reference matrices are positive semidefinite. -/
 theorem SupportLE.sum_smul {κ : Type*} [Fintype κ] (w : κ → ℝ) (hw : ∀ k, 0 ≤ w k)
@@ -359,5 +376,45 @@ theorem relativeEntropy_nonneg {ρ σ : Matrix ι ι ℂ} (hρ : IsDensityMatrix
     exact_mod_cast relativeEntropyReal_nonneg hρ hσ h
   · rw [relativeEntropy_of_not_supportLE h]
     exact le_top
+
+/-- Scaling the reference by a positive constant subtracts the logarithm of that
+constant times the source trace. The identity uses only the support of the source. -/
+theorem relativeEntropy_smul_right {ρ σ : Matrix ι ι ℂ}
+    (hρ : ρ.IsHermitian) (hσ : σ.IsHermitian) {c : ℝ} (hc : 0 < c) :
+    relativeEntropy ρ (c • σ) =
+      relativeEntropy ρ σ + ((-(Real.log c * ρ.trace.re) : ℝ) : WithTop ℝ) := by
+  have hsupp : SupportLE ρ (c • σ) ↔ SupportLE ρ σ := by
+    simp only [SupportLE, smul_mulVec, smul_eq_zero, hc.ne', false_or]
+  by_cases hs : SupportLE ρ σ
+  · have hfinite : (spectrum ℝ σ).Finite :=
+      hσ.spectrum_real_eq_range_eigenvalues.symm ▸ Set.finite_range _
+    have hcomp : cfc Real.log (c • σ) = cfc (fun x : ℝ => Real.log (c * x)) σ :=
+      (cfc_comp_const_mul c Real.log σ
+        ((hfinite.image _).continuousOn Real.log) hσ.isSelfAdjoint).symm
+    rw [relativeEntropy_of_supportLE (hsupp.mpr hs), relativeEntropy_of_supportLE hs,
+      ← WithTop.coe_add, WithTop.coe_eq_coe]
+    simp only [relativeEntropyReal, mul_sub, trace_sub, Complex.sub_re]
+    have hρtrace : ρ.trace.re = ∑ i, hρ.eigenvalues i := by
+      rw [hρ.trace_eq_sum_eigenvalues, Complex.re_sum]
+      exact sum_congr rfl fun i _ => Complex.ofReal_re (hρ.eigenvalues i)
+    have htrace : (ρ * cfc (fun x : ℝ => Real.log (c * x)) σ).trace.re =
+        (ρ * cfc Real.log σ).trace.re + Real.log c * ρ.trace.re := by
+      rw [trace_mul_cfc_re _ _ hρ hσ, trace_mul_cfc_re _ _ hρ hσ,
+        hρtrace, mul_sum, ← sum_add_distrib]
+      refine sum_congr rfl fun i _ => ?_
+      have hrow := sum_eigenbasis_overlap_row hρ hσ i
+      rw [← mul_one (Real.log c * hρ.eigenvalues i), ← hrow, mul_sum, ← sum_add_distrib]
+      refine sum_congr rfl fun j _ => ?_
+      by_cases hz : hσ.eigenvalues j = 0
+      · have hzero := eigenvalue_mul_overlap_eq_zero_of_supportLE hρ hσ hs i j hz
+        simp only [hz, mul_zero, Real.log_zero, zero_mul, zero_add]
+        rw [mul_assoc, hzero, mul_zero]
+      · rw [Real.log_mul hc.ne' hz]
+        ring
+    rw [hcomp, htrace]
+    ring
+  · rw [relativeEntropy_of_not_supportLE hs,
+      relativeEntropy_of_not_supportLE (fun h => hs (hsupp.mp h))]
+    simp
 
 end Cslib.Quantum
