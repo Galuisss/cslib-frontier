@@ -151,4 +151,7 @@ theorem univ_notMem_SPARSE : (Set.univ : Set (List Bool)) ∉ SPARSE encBits := 
   rw [Set.encard_coe_eq_coe_finsetCard, BitString.card_wordsOfLength] at hle
   exact absurd (Nat.cast_le.mp hle) (not_le.mpr hn)
 
+/-- Languages whose complements have only polynomially many words of each encoded length. -/
+def coSPARSE (enc : α ↪ List Bool) : Set (Set α) := {A | Aᶜ ∈ SPARSE enc}
+
 end Cslib.Complexity

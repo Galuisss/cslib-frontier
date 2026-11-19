@@ -274,4 +274,7 @@ theorem PolyTimeReducible.mem_AM {encB : β ↪ List Bool} {B : Set β}
       (fun w => ∀ y : Fin (q.eval (encB (f a)).length) → Bool, V (f a, w ++ List.ofFn y) = false)
       ((hVB (f a)).2 fun hb => ha ((hAB a).2 hb))⟩
 
+/-- The complements of languages in `MA`, with respect to the same instance encoding. -/
+def coMA (enc : α ↪ List Bool) : Set (Set α) := {A | Aᶜ ∈ MA enc}
+
 end Cslib.Complexity

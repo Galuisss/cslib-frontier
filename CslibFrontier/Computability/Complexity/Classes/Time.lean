@@ -408,4 +408,7 @@ theorem mem_BPP_iff_exists_mem_BPTIME {α : Type} {enc : α ↪ List Bool} {A : 
       rw [hr]
       decide
 
+/-- Quasi-realtime languages, decided by a nondeterministic multitape machine in linear time. -/
+def Q (enc : α ↪ List Bool) : Set (Set α) := NTIME enc id
+
 end Cslib.Complexity

@@ -66,6 +66,10 @@ def NSPACE (enc : α ↪ List Bool) (s : ℕ → ℕ) : Set (Set α) :=
   {A | ∃ (k : ℕ) (State : Type) (_ : Finite State) (ntm : MultiTapeNTM k Bool State)
     (c₁ c₂ : ℕ), ntm.DecidesInSpace enc A fun a => c₁ * s (enc a).length + c₂}
 
+/-- Context-sensitive languages, presented by their linear nondeterministic space
+characterization. -/
+def CSL (enc : α ↪ List Bool) : Set (Set α) := NSPACE enc id
+
 /-- The complements of the problems in `NSPACE enc s`, with the same encoding. -/
 def coNSPACE (enc : α ↪ List Bool) (s : ℕ → ℕ) : Set (Set α) := {A | Aᶜ ∈ NSPACE enc s}
 

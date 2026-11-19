@@ -146,4 +146,7 @@ theorem NP_eq_coNP_iff_coNP_subset_NP :
   rw [mem_coNP]
   exact h encC (by rwa [mem_coNP, compl_compl])
 
+/-- Languages with polynomial-time certificates for both membership and nonmembership. -/
+def NPInterCoNP (enc : α ↪ List Bool) : Set (Set α) := NP enc ∩ coNP enc
+
 end Cslib.Complexity

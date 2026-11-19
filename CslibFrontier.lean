@@ -1921,6 +1921,7 @@ public import CslibFrontier.Computability.Complexity.Classes.AWPP.Closure
 public import CslibFrontier.Computability.Complexity.Classes.AWPP.Lowness
 public import CslibFrontier.Computability.Complexity.Classes.AWPP.OracleWeights
 public import CslibFrontier.Computability.Complexity.Classes.AWPP.WPP
+public import CslibFrontier.Computability.Complexity.Classes.Ack
 public import CslibFrontier.Computability.Complexity.Classes.Advice
 public import CslibFrontier.Computability.Complexity.Classes.Advice.Hierarchy
 public import CslibFrontier.Computability.Complexity.Classes.Advice.LengthComparison
@@ -2045,6 +2046,7 @@ public import CslibFrontier.Computability.Complexity.Classes.EXP.Padding
 public import CslibFrontier.Computability.Complexity.Classes.EXP.Separation
 public import CslibFrontier.Computability.Complexity.Classes.EXPSPACE
 public import CslibFrontier.Computability.Complexity.Classes.EXPSPACE.Separation
+public import CslibFrontier.Computability.Complexity.Classes.FBPP
 public import CslibFrontier.Computability.Complexity.Classes.FPAUS
 public import CslibFrontier.Computability.Complexity.Classes.FPAUS.Amplification
 public import CslibFrontier.Computability.Complexity.Classes.FPAUS.Counting
@@ -2054,12 +2056,14 @@ public import CslibFrontier.Computability.Complexity.Classes.FPAUS.OfFPRAS
 public import CslibFrontier.Computability.Complexity.Classes.FPAUS.Sampler
 public import CslibFrontier.Computability.Complexity.Classes.FPAUS.SelfReducible
 public import CslibFrontier.Computability.Complexity.Classes.FPRAS
+public import CslibFrontier.Computability.Complexity.Classes.Few
 public import CslibFrontier.Computability.Complexity.Classes.FewP
 public import CslibFrontier.Computability.Complexity.Classes.FewP.Machine
 public import CslibFrontier.Computability.Complexity.Classes.FunctionTime
 public import CslibFrontier.Computability.Complexity.Classes.FunctionTime.Bounds
 public import CslibFrontier.Computability.Complexity.Classes.FunctionTime.Decide
 public import CslibFrontier.Computability.Complexity.Classes.FunctionTime.WordRAM
+public import CslibFrontier.Computability.Complexity.Classes.GI
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.LazyDiagonal
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.LazyDiagonalBounds
@@ -6386,6 +6390,7 @@ public import CslibFrontier.Foundations.Combinatorics.WeightedCut.MinCutBetween
 public import CslibFrontier.Foundations.Combinatorics.WeightedCut.Multigraph
 public import CslibFrontier.Foundations.Combinatorics.WeightedCut.RealCut
 public import CslibFrontier.Foundations.Combinatorics.WeightedTail
+public import CslibFrontier.Foundations.Computability.ArithmeticHierarchy
 public import CslibFrontier.Foundations.Computability.ComputablePred
 public import CslibFrontier.Foundations.Computability.ContextFreeGrammar
 public import CslibFrontier.Foundations.Computability.DistinctValues
