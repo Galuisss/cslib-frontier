@@ -378,6 +378,16 @@ omit [Field F] in
   rfl
 
 omit [Field F] in
+/-- Restriction preserves the state in the commuting representation as well. -/
+theorem restrictSliceTensor_joint_state
+    (S : QuantumStrategy (Question F (m + 1)) (Question F (m + 1))
+      (Answer F (m + 1)) (Answer F (m + 1)) ι κ) (t : F) :
+    (restrictSliceTensor S t).toCommuting.state = S.toCommuting.state := by
+  change AlgState.vector (restrictSliceTensor S t).state (restrictSliceTensor S t).norm_state =
+    AlgState.vector S.state S.norm_state
+  simp only [restrictSliceTensor_state]
+
+omit [Field F] in
 /-- Equal local measurements remain equal upon restriction. -/
 theorem restrictSliceTensor_bob_eq_alice
     (S : QuantumStrategy (Question F (m + 1)) (Question F (m + 1))
