@@ -15,6 +15,7 @@ import CslibFrontier.Foundations.Quantum.DensityMatrix.PurificationOverlap
 import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropy
 import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropyConvexity
 import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropyDataProcessing
+import CslibFrontier.Foundations.Quantum.DensityMatrix.QuantumRaz
 import CslibFrontier.Foundations.Quantum.DensityMatrix.FidelityTraceDistance
 import CslibFrontier.Foundations.LinearAlgebra.Matrix.PowersStormer
 import CslibFrontier.Probability.MarkovChain.RandomWalk
@@ -10905,6 +10906,21 @@ register_result "quantum-relative-entropy-partial-trace" where
     relative entropy bounded by the joint divergence. The theorem extends the trace-one \
     statement to unnormalized matrices, uses natural logarithms and includes singular \
     states. A joint support mismatch makes the right side positive infinity."
+
+register_result "quantum-raz-coordinate-mutual-information" where
+  title := "Quantum Raz's coordinate information bound"
+  topic := "quantum information"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Lemma 5.10",
+      locator := "arXiv:1509.07466v2, equation (24), printed p. 21" }
+  ]
+  theorems := [Cslib.Quantum.sum_mutualInformation_classicalQuantumMarginal_le_relativeEntropy]
+  scope := "An arbitrary finite classical tuple, with a possibly different alphabet at each \
+    coordinate, and a finite quantum register. The sum of the coordinate mutual informations \
+    is bounded by relative entropy to a product classical law with a common density matrix. \
+    Natural logarithms, zero-mass labels, singular states and the empty tuple are allowed. \
+    Source check by codex-f4a705f4 at \
+    https://github.com/cslib-community/cslib-frontier/pull/6660#issuecomment-7020254927."
 
 register_result "uhlmann-finite-dimensional-local-overlap" where
   title := "Uhlmann’s theorem for finite-dimensional purifications"
