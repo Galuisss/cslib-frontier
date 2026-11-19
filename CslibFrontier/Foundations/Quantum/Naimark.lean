@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Foundations.Quantum.Algebra.Measurement
+public import CslibFrontier.Foundations.Quantum.POVM.Restriction
 import CslibFrontier.Foundations.LinearAlgebra.Matrix.Polar
 public import Mathlib.Analysis.InnerProductSpace.PiL2
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
@@ -36,6 +37,7 @@ basis (`Matrix.exists_unitary_extension`); and `P_a = Uᴴ (1 ⊗ |a⟩⟨a|) U`
 
 * `Cslib.Quantum.POVM.isProjective_dilate`: the dilation is projective.
 * `Cslib.Quantum.POVM.compress_dilate`: the dilation compresses to the POVM.
+* `Cslib.Quantum.POVM.restrictBasis_dilate`: restriction to the prepared ancilla recovers the POVM.
 
 ## References
 
@@ -236,6 +238,18 @@ theorem compress_dilate (a : A) :
   rw [dilate_effect, ← M.naimarkIsometry_compress a, ← M.naimarkUnitary_mul_ancillaEmbed a₀,
     conjTranspose_mul]
   simp only [Matrix.mul_assoc]
+
+/-- Restricting the dilation of a POVM recovers the original POVM. -/
+@[simp] theorem restrictBasis_dilate :
+    (M.dilate a₀).restrictBasis (ancillaBasis a₀) = M := by
+  have h : ((M.dilate a₀).restrictBasis (ancillaBasis a₀)).effect = M.effect := by
+    funext a
+    rw [restrictBasis_effect, ← compress_ancillaEmbed, compress_dilate]
+  generalize (M.dilate a₀).restrictBasis (ancillaBasis a₀) = N at h ⊢
+  cases N
+  cases M
+  cases h
+  rfl
 
 end POVM
 

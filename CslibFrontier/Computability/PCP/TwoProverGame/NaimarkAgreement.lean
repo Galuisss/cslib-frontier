@@ -9,7 +9,6 @@ module
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.Commuting
 public import CslibFrontier.Computability.PCP.TwoProverGame.Naimark
-public import CslibFrontier.Foundations.Quantum.POVM.Restriction
 
 /-!
 # Transporting measurement agreement through Naimark dilation
@@ -53,21 +52,3 @@ theorem agreement_dilate_restrictBasis (S : QuantumStrategy X Y A B ι κ)
   · simp only [he, ite_false]
 
 end Cslib.PCP.QuantumStrategy
-
-namespace Cslib.Quantum.POVM
-
-variable {A ι : Type*} [Fintype A] [DecidableEq A] [Fintype ι] [DecidableEq ι]
-
-/-- Restricting the dilation of a POVM recovers the original POVM. -/
-@[simp] theorem restrictBasis_dilate (M : POVM A ι) (a₀ : A) :
-    (M.dilate a₀).restrictBasis (ancillaBasis a₀) = M := by
-  have h : ((M.dilate a₀).restrictBasis (ancillaBasis a₀)).effect = M.effect := by
-    funext a
-    rw [restrictBasis_effect, ← compress_ancillaEmbed, compress_dilate]
-  generalize (M.dilate a₀).restrictBasis (ancillaBasis a₀) = N at h ⊢
-  cases N
-  cases M
-  cases h
-  rfl
-
-end Cslib.Quantum.POVM
