@@ -135,11 +135,7 @@ private noncomputable def targetHedge {C : QuantumSigningForger} (key : List Byt
     word = some (maskSeedInput key r (List.ofFn μ)) then h.choose else fun _ => 0
 
 private def queryKeyPrefix {C : QuantumSigningForger} (addr : Option (Address C)) :
-    Option (List Bool) := do
-  let a ← addr
-  guard (a 0)
-  let x ← Xofs.unpad (List.ofFn fun i : Fin (C.addressBits + 1) => a i.succ)
-  return x.take 256
+    Option (List Bool) := (Xofs.shake256QueryInput addr).map (·.take 256)
 
 private theorem seed_hedge_of_differs {C : QuantumSigningForger} {base : Xofs} {s : Level}
     {seed : FixedBytes 32} {a b n : ℕ} {t : Fin n ↪ FixedBytes 32} {ha : 1024 ≤ a}
@@ -174,8 +170,8 @@ private theorem seed_hedge_of_differs {C : QuantumSigningForger} {base : Xofs} {
         · have len : (Keccak.bytesToBitsLE key).length = 256 := by
             change (Keccak.bytesToBitsLE (signingSeedBytes p.background s seed)).length = 256
             rw [Keccak.length_bytesToBitsLE, signingSeedBytes_length]
-          simp only [queryKeyPrefix, Option.bind_eq_bind, Option.bind_some, strength, guard,
-            ↓reduceIte, Option.pure_def, hx]
+          simp only [queryKeyPrefix, Xofs.shake256QueryInput, Option.bind_some, strength,
+            ↓reduceIte, hx, Option.map_some]
           rw [← eq]
           change some ((Keccak.bytesToBitsLE (key ++ (t i).toList) ++ List.ofFn μ).take 256) = _
           rw [show Keccak.bytesToBitsLE (key ++ (t i).toList) =

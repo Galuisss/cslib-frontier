@@ -16,6 +16,8 @@ import all CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 import all CslibFrontier.Crypto.Computational.MLDSA.KeySeedSearch
 import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 import all CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
+import CslibFrontier.Probability.IID.FirstSome
+import Batteries.Data.Fin.Lemmas
 import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204Signing
 
 /-!
@@ -186,16 +188,11 @@ private theorem draw_eq_map {s : Level} {L R : Xofs} (pair : MLDSA.PublicKey s.p
 private theorem retries_eq_map {α β ι : Type} (p : PMF (Option α)) (f : α → β) (l : List ι) :
     (l.findSomeM? fun _ => p.map (Option.map f)) =
       (l.findSomeM? fun _ => p).map (Option.map f) := by
-  induction l with
-  | nil => simp [List.findSomeM?_nil, PMF.monad_pure_eq_pure]
-  | cons a l ih =>
-    simp only [List.findSomeM?_cons, PMF.monad_bind_eq_bind, PMF.monad_pure_eq_pure,
-      PMF.bind_map, PMF.map_bind, Function.comp_def]
-    apply congrArg (PMF.bind p ·)
-    funext x
-    cases x with
-    | none => exact ih
-    | some x => simp
+  have identity := PMF.iid_map_findSome p id l
+  simp only [PMF.map_id, id_eq] at identity
+  rw [← PMF.iid_map_findSome, ← identity, PMF.map_comp]
+  exact congrArg (fun h => (PMF.iid p l.length).map h)
+    (funext fun v => (Fin.map_findSome? v f).symm)
 
 -- Both calls use the same matrix, full pair, and public-key hash, with their own raw streams
 -- and certified write histories. The continuation can observe every write and the full reply.
@@ -390,7 +387,7 @@ private def queryChanged (C : QuantumSigningForger) {s : Level} (device referenc
 private theorem hit_of_change (C : QuantumSigningForger) {s : Level} {v : SecretExpansionViews s}
     {L R : Xofs} (h : RowAgreement v L R) (o : List (TerminalSigningWrite s) × Option (Address C))
     (diff : C.queryChanged L R o = true) :
-    hitsExpansionInput s v.keySeed v.secretSeed (rawShake256 (C := C) o.2) = true := by
+    hitsExpansionInput s v.keySeed v.secretSeed (Xofs.shake256QueryInput o.2) = true := by
   obtain ⟨ws, addr⟩ := o
   have agree := h.replay ws
   cases addr with
@@ -406,8 +403,8 @@ private theorem hit_of_change (C : QuantumSigningForger) {s : Level} {v : Secret
       cases strength : a 0 with
       | false => exact (diff (by simp [strength, agree.1])).elim
       | true =>
-        simp only [rawShake256, Option.bind_some, strength, guard, ↓reduceIte, Option.pure_def,
-          Option.bind_eq_bind, word, hitsExpansionInput, Option.any_some, decide_eq_true_eq]
+        simp only [Xofs.shake256QueryInput, Option.bind_some, strength, ↓reduceIte, word,
+          hitsExpansionInput, Option.any_some, decide_eq_true_eq]
         by_contra miss
         push Not at miss
         have read := read_eq_of_byteAt_eq (n := C.responseBytes) fun i _ =>

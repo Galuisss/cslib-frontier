@@ -352,12 +352,6 @@ theorem Xofs.refreshKeySeed_queryHit_le {s : Level} (base : Xofs) {a b : ℕ}
 
 namespace QuantumSigningForger
 
-private def rawShake256 {C : QuantumSigningForger} (addr : Option (Address C)) :
-    Option (List Bool) := do
-  let a ← addr
-  guard (a 0)
-  Xofs.unpad (List.ofFn fun i : Fin (C.addressBits + 1) => a i.succ)
-
 -- The challenger retains earlier writes so it can compare the responses at the measured address.
 private noncomputable def queryWrites (C : QuantumSigningForger) (s : Level) (j : ℕ)
     (H : Xofs) (rho : FixedBytes 32) (pair : MLDSA.PublicKey s.params) :
@@ -372,7 +366,7 @@ private noncomputable def queryWrites (C : QuantumSigningForger) (s : Level) (j 
 signing experiment. An absent query, SHAKE128 query or invalid padding returns `none`. -/
 noncomputable def publicPairQueryAddress (C : QuantumSigningForger) (s : Level) (j : ℕ)
     (H : Xofs) (rho : FixedBytes 32) (pair : MLDSA.PublicKey s.params) : PMF (Option (List Bool)) :=
-  (C.queryWrites s j H rho pair).map fun x => rawShake256 (C := C) x.2
+  (C.queryWrites s j H rho pair).map fun x => Xofs.shake256QueryInput x.2
 
 /-- At any chosen query of the adaptive public-pair signer with a refreshed key seed row,
 the measured SHAKE256 address hits a private expansion input with probability at most 2⁻²⁵⁶. -/

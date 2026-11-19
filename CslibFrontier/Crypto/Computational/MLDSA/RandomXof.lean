@@ -40,6 +40,11 @@ private def unpad : List Bool → Option (List Bool)
   | true :: x => some x
   | false :: x => unpad x
 
+/-- Decode a measured SHAKE256 address. A missing address, SHAKE128 tag or missing delimiter
+has no SHAKE256 input. -/
+def shake256QueryInput {a : ℕ} (addr : Option (BitString (a + 2))) : Option (List Bool) :=
+  addr.bind fun v => if v 0 then unpad (List.ofFn fun i : Fin (a + 1) => v i.succ) else none
+
 private theorem unpad_word (k : ℕ) (x : List Bool) :
     unpad (List.replicate k false ++ true :: x) = some x := by
   induction k with
