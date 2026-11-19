@@ -19,6 +19,12 @@ Restricting the tagged anticommutation questions of a single strategy to one odd
 pair gives a commuting CHSH strategy. Its logical second player's observables
 are exactly those checked in the matched consistency rounds.
 
+The soundness estimate specializes [Natarajan and Vidick, Lemma 18][NatarajanVidick2017]
+(arXiv:1610.03574v1, §4.3.2, p. 21) to CHSH. It uses the CHSH and consistency scores
+of one commuting-operator strategy and bounds the squared state-norm anticommutator
+averaged conditionally on odd pairs. The source treats a supplied
+anticommutation game and also proves honest-strategy completeness.
+
 ## Main results
 
 * `Cslib.PCP.commutingWinProb_pauliBraidingAnticommutation_eq_expect`: the branch score is
@@ -288,11 +294,6 @@ theorem expect_norm_pauliBraidingBasis_anticomm_sq_le
     refine Measurement.commute_observable_average _ _ fun d => ?_
     have h := (decoded basis p).commute_observable (x, d) q
     cases roles <;> exact h
-  have hmass (q : Bool) : ((TwoProverGame.chsh.questions.map Prod.snd) q).toReal = 1 / 2 := by
-    change (((Probability.PMF.uniformOfFintype (Bool × Bool)).map Prod.snd) q).toReal = _
-    rw [Probability.PMF.uniformOfFintype_prod_map_snd, Probability.PMF.uniformOfFintype_apply,
-      ENNReal.toReal_inv]
-    norm_num
   let density : ℝ := (oddPairs (Fin n)).dens
   have hdensity : 0 < density := by
     obtain ⟨p⟩ := oddPairs_nonempty (ι := Fin n)
@@ -305,7 +306,7 @@ theorem expect_norm_pauliBraidingBasis_anticomm_sq_le
     have h := weighted_expect_norm_pauliBraidingAverage_sub_special_sq_le
       TwoProverGame.chsh id (fun _ => id) roles basis S
     dsimp only at h
-    rw [hmass] at h
+    rw [TwoProverGame.chsh_questions_snd_toReal] at h
     apply (mul_le_mul_iff_right₀ (show 0 < (1 / 2 : ℝ) * density by positivity)).mp
     convert h using 1 <;> first | rfl | ring
   have h := expect_norm_mul_sub_smul_mul_sq_le_of_consistent S.state
