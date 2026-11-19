@@ -9,7 +9,7 @@ module
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.Sequential
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.Pasting
-public import CslibFrontier.Foundations.Quantum.Algebra.PrefixCommutator
+public import CslibFrontier.Foundations.Quantum.Algebra.CompletedMeasurement
 public import CslibFrontier.Probability.PMF.Event
 public import Mathlib.Algebra.BigOperators.Expect
 import CslibFrontier.Probability.IID.Distinct
@@ -270,5 +270,40 @@ theorem average_pastedLineMismatch_le_of_pairwise [Fintype F] (k : ℕ) [Nonempt
 
 end Strategy
 
+
+section Completed
+
+open Cslib.Quantum
+
+variable {A : Type*} [CStarAlgebra A] [PartialOrder A] [StarOrderedRing A] [Fintype β]
+
+/-- The pasted vertical-line estimate needs commutator and copy bounds only on successful
+slice outcomes. The failure outcome is controlled by projectivity and completion. -/
+theorem average_pastedLineMismatch_le_of_successful [Fintype F] (k : ℕ)
+    [Nonempty (Fin k ↪ F)]
+    (S : CommutingStrategy F (Fin m → F) (Option (BoundedPolynomial F m d)) β A)
+    (hM : ∀ t, (S.alice t).IsProjective)
+    (R : F → Measurement (Option (BoundedPolynomial F m d)) A)
+    (hR : ∀ t, (R t).IsProjective)
+    (hc : ∀ x y a b, Commute ((S.alice x).effect a) ((R y).effect b))
+    (lineValue : β → F → F)
+    (hline : ∀ b, ∃ f : Polynomial F, f.natDegree ≤ d ∧ ∀ t, f.eval t = lineValue b t)
+    {χ ζ : ℝ}
+    (hpair : (𝔼 x : F, 𝔼 y : F, Measurement.successfulPairDefect S.state
+      (S.alice x) (S.alice y)) ≤ χ)
+    (hcopy : (𝔼 x : F, Measurement.successfulCopyDefect S.state (S.alice x) (R x)) ≤ ζ) :
+    letI : Fintype (Fin k ↪ F) := Fintype.ofFinite _
+    (𝔼 u : Fin m → F, 𝔼 x : Fin k ↪ F, 𝔼 t : F,
+      ((((S.sequential k hM).answers x u).map (Prod.map (pasteOutcome x) id)).toOuterMeasure
+        (pastedLineMismatch (d := d) u t lineValue)).toReal) ≤
+    (k.choose 2 : ℝ) / Fintype.card F +
+      k * (𝔼 u : Fin m → F, 𝔼 t : F, isolatedSliceMismatch S lineValue u t) +
+      k * ((k - 1 : ℕ) : ℝ) * √(162 * χ + 176 * ζ) := by
+  obtain ⟨hp, hs⟩ := Measurement.average_completedDefects_le S.state S.alice R hM hR hc hpair hcopy
+  have h := average_pastedLineMismatch_le_of_pairwise k S hM R hR hc lineValue hline hp hs
+  have he : 2 * (81 * χ + 80 * ζ) + 8 * (2 * ζ) = 162 * χ + 176 * ζ := by ring
+  simpa only [he] using h
+
+end Completed
 
 end Cslib.PCP.LowIndividualDegree

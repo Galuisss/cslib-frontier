@@ -92,12 +92,12 @@ private theorem rootEnergy_neg {ι : Type*} [Fintype ι] (φ : AlgState A) (U : 
   simp only [rootEnergy, φ.norm_neg]
 
 /-- Sum of squared commutators of two measurements, over their outcome pairs. -/
-noncomputable def pairCommutatorDefect (φ : AlgState A) (E : Measurement β A)
+@[expose] noncomputable def pairCommutatorDefect (φ : AlgState A) (E : Measurement β A)
     (M : Measurement α A) : ℝ :=
   ∑ a, ∑ b, φ.norm (E.effect a * M.effect b - M.effect b * E.effect a) ^ 2
 
 /-- Squared state-dependent discrepancy between a measurement and its commuting copy. -/
-noncomputable def copyDefect (φ : AlgState A) (M R : Measurement α A) : ℝ :=
+@[expose] noncomputable def copyDefect (φ : AlgState A) (M R : Measurement α A) : ℝ :=
   ∑ b, φ.norm (M.effect b - R.effect b) ^ 2
 
 theorem pairCommutatorDefect_eq_zero (φ : AlgState A) (E : Measurement β A)

@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 module
 -- upstream: local-only (tests)
 
-import CslibFrontier.Foundations.Quantum.Algebra.PrefixCommutator
+import CslibFrontier.Foundations.Quantum.Algebra.CompletedMeasurement
 
 /-! # An interior coordinate of a sequential projective measurement -/
 
@@ -62,3 +62,15 @@ example :
       (χ := 0) (ζ := 0) (by simp [hp]) (by simp)
     simpa using h
   · exact Finset.expect_nonneg fun _ _ => prefixCommutatorDefect_nonneg _ _ _
+
+
+private def certainSuccess : Measurement (Option Bool) ℂ := const (some true)
+private def certainFailure : Measurement (Option Bool) ℂ := const none
+
+/-- The successful part contributes one unit of discrepancy, and the failure effect
+contributes a second unit. The factor two in the completion bound is attained. -/
+example : successfulCopyDefect scalarState certainSuccess certainFailure = 1 ∧
+    copyDefect scalarState certainSuccess certainFailure = 2 := by
+  unfold successfulCopyDefect copyDefect
+  norm_num [certainSuccess, certainFailure, const, Fintype.sum_option, AlgState.norm_one,
+    AlgState.norm_neg]
