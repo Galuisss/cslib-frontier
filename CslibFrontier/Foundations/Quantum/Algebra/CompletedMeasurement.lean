@@ -11,6 +11,7 @@ public import CslibFrontier.Foundations.Quantum.Algebra.CStar
 public import CslibFrontier.Foundations.Quantum.Algebra.PrefixCommutator
 public import Mathlib.Algebra.BigOperators.Expect
 public import Mathlib.Data.Fintype.Option
+import CslibFrontier.Probability.PMF.Event
 import Mathlib.Algebra.Order.BigOperators.Expect
 
 /-!
@@ -51,6 +52,20 @@ theorem effect_none_eq_one_sub_successfulEffect (M : Measurement (Option α) A) 
     M.effect none = 1 - M.successfulEffect := by
   unfold successfulEffect
   exact eq_sub_of_add_eq (by simpa only [Fintype.sum_option] using M.sum_effect)
+
+omit [StarOrderedRing A] in
+/-- The expectation of the successful effect is the probability of a nonfailure outcome. -/
+theorem successfulEffect_eq_success_prob
+    (φ : AlgState A) (M : Measurement (Option α) A) :
+    (φ M.successfulEffect).re =
+      ((M.distribution φ).toOuterMeasure {q | q.isSome}).toReal := by
+  classical
+  simp only [Cslib.Probability.PMF.toOuterMeasure_apply_toReal, Fintype.sum_option,
+    Set.mem_ofPred_eq,
+    Option.isSome_none, Option.isSome_some, Bool.false_eq_true, ite_false, ite_true, zero_add,
+    Measurement.distribution_apply, ENNReal.toReal_ofReal (M.prob_nonneg φ _)]
+  unfold Measurement.successfulEffect Measurement.prob
+  rw [map_sum, Complex.re_sum]
 
 /-- The success effect is a positive contraction. -/
 theorem successfulEffect_mem_Icc (P : Measurement (Option α) A) :

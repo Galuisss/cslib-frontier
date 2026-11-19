@@ -7,14 +7,15 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 module
 -- upstream: local-only (tests)
 
-import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PastingCompleteness
+import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerifierPasting
 import Mathlib.Algebra.Field.ZMod
 
 /-! # Pasting on three slices over the field with three elements -/
 
 set_option linter.privateModule false
 
-open Cslib.PCP.LowIndividualDegree MvPolynomial
+open Cslib.PCP.LowIndividualDegree Cslib.Quantum MvPolynomial
+open scoped ComplexOrder
 
 private instance : Fact (Nat.Prime 3) := ⟨by decide⟩
 
@@ -164,3 +165,34 @@ example :
       exact zero_ne_one
     simp only [PMF.toOuterMeasure_pure_apply, hzero, hone, ↓reduceIte,
       ENNReal.toReal_zero, ENNReal.toReal_one, zero_add]
+
+
+private instance : Nonempty (Fin 1 ↪ F) :=
+  ⟨(Fin.castLEEmb (by decide : 1 ≤ 3)).trans nodes⟩
+
+open scoped Classical in
+/-- Even a successful slice cannot meet the degree-one threshold on a single
+sample. Completion puts the resulting unit failure effect on the chosen polynomial. -/
+example :
+    let M (_ : F) : Measurement (Option (BoundedPolynomial F 1 1)) ℂ :=
+      Measurement.const (some zeroSlice)
+    let hp (_ : F) := Measurement.isProjective_const (A := ℂ) (some zeroSlice)
+    (pasteSlices 1 M hp).effect none = 1 ∧
+      (completedPaste 1 M hp productPoly).effect productPoly = 1 := by
+  intro M hp
+  have hs (p : BoundedPolynomial F 2 1) : (pasteSlices 1 M hp).effect (some p) = 0 := by
+    rw [pasteSlices_effect]
+    refine Finset.sum_eq_zero fun x _ => ?_
+    rw [pasteProjectiveSlices_effect_some]
+    suffices hempty : (Finset.univ.filter fun g : Fin 1 → Option (BoundedPolynomial F 1 1) =>
+        1 < (successfulSlices g).card ∧ FitsSlices x g p) = ∅ by
+      rw [hempty, Finset.sum_empty, smul_zero]
+    apply Finset.eq_empty_iff_forall_notMem.mpr
+    intro g hg
+    have hcard := Finset.card_le_univ (successfulSlices g)
+    simp only [Fintype.card_fin] at hcard
+    exact (not_lt_of_ge hcard) (Finset.mem_filter.mp hg).2.1
+  have hf : (pasteSlices 1 M hp).effect none = 1 := by
+    rw [Measurement.effect_none_eq_one_sub_successfulEffect]
+    simp [Measurement.successfulEffect, hs]
+  exact ⟨hf, by rw [completedPaste_effect]; simp [hf, hs]⟩
