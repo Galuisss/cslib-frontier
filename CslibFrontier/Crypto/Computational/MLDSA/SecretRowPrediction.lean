@@ -16,7 +16,7 @@ import all CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 import all CslibFrontier.Crypto.Computational.MLDSA.KeySeedSearch
 import all CslibFrontier.Crypto.Computational.MLDSA.RandomXof
 import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204
-import CslibFrontier.Probability.PMF.UniformPoint
+import CslibFrontier.Crypto.Primitives.ByteString.Uniform
 
 /-!
 # Prediction of the private FIPS expansion inputs
@@ -40,8 +40,40 @@ open scoped ENNReal
 /-- Successful key generation produces a public-key hash equal to its own private Algorithm 33
 prefix. This is the exceptional honest representative input in the shared-row comparison. -/
 def SecretExpansionViews.publicHashMatch {s : Level} (v : SecretExpansionViews s) : Bool :=
-  v.pair.any fun pk => v.background.h256.readBytes (encodePublic s v.publicSeed.toList pk.t) 64 ==
+  v.pair.any fun pk => v.shared.h256.readBytes (encodePublic s v.publicSeed.toList pk.t) 64 ==
     v.secretSeed.toList
+
+/-- The native and detached devices return the same public-key hash, at every read length. -/
+theorem SecretExpansionViews.read_publicKey_of_mem {s : Level} {base : Xofs} {a b : ℕ}
+    {ha : 528 ≤ a} {hb : 481 ≤ b} {v : SecretExpansionViews s}
+    (hv : v ∈ (base.sampleSecretExpansionViews s ha hb).support) (t : Fin s.params.k → Poly)
+    (n : ℕ) : v.shared.h256.readBytes (encodePublic s v.publicSeed.toList t) n =
+      v.background.h256.readBytes (encodePublic s v.publicSeed.toList t) n := by
+  apply ExtendableOutput.read_eq_of_byteAt_eq
+  intro i _
+  apply (agree_of_mem hv).2 _ i
+  right
+  intro j e
+  have h := congrArg List.length e
+  rw [Keccak.length_bytesToBitsLE, length_encodePublic, FixedBytes.length_toList,
+    length_nonceInput_bits] at h
+  cases s <;> contradiction
+
+/-- On successful setup, the honest empty request reads nonce zero exactly when the
+native public-key hash matches the private prefix. -/
+theorem SecretExpansionViews.publicHashMatch_iff {s : Level} {v : SecretExpansionViews s}
+    {pk : MLDSA.PublicKey s.params} (hp : v.pair = some pk) :
+    v.publicHashMatch ↔
+      representativeInput (v.shared.h256.readBytes (encodePublic s v.publicSeed.toList pk.t) 64)
+        (formatMessage [] []) = Keccak.bytesToBitsLE (nonceInput v.secretSeed.toList 0) := by
+  let tr := v.shared.h256.readBytes (encodePublic s v.publicSeed.toList pk.t) 64
+  obtain ⟨t, ht⟩ := FixedBytes.exists_toList (show tr.length = 64 from v.shared.h256.length_read ..)
+  change v.publicHashMatch = true ↔ representativeInput tr _ = _
+  simp only [publicHashMatch, hp, Option.any_some, beq_iff_eq]
+  change tr = v.secretSeed.toList ↔ representativeInput tr _ = _
+  rw [← ht]
+  have eq := representativeInput_eq_nonceInput_iff t v.secretSeed [] [] (0 : Fin 65536)
+  simpa only [Fin.val_zero, and_self, and_true, FixedBytes.toList, List.ofFn_inj] using eq.symm
 
 private theorem replace_expansion (H : Xofs) (s : Level) (seed : FixedBytes 32)
     (x y : FixedBytes 128) :
@@ -61,21 +93,6 @@ private abbrev SeedScore (s : Level) (α : Type) :=
 
 private def gen {s : Level} (H : Xofs) (rho : FixedBytes 32) (rows : Nonce s × Fin 481 → Byte) :=
   generatedPair (H.expandA s rho.toList) (vectors s (rowPair s rows))
-
-private def matrixSeed (H : Xofs) (s : Level) (seed : FixedBytes 32) : FixedBytes 32 :=
-  fun i => ((H.expandKeySeed s seed).take 32)[i.val]!
-
-private theorem matrixSeed_bytes (H : Xofs) (s : Level) (seed : FixedBytes 32) :
-    (matrixSeed H s seed).toList = (H.expandKeySeed s seed).take 32 := by
-  have len : (H.expandKeySeed s seed).length = 128 := H.h256.length_read ..
-  let rho := (H.expandKeySeed s seed).take 32
-  have hr : rho.length = 32 := by simp [rho, len]
-  obtain ⟨r, eq⟩ := FixedBytes.exists_toList hr
-  change FixedBytes.toList (n := 32) (fun i => rho[i.val]!) = rho
-  rw [← eq]
-  congr 1
-  funext i
-  simp only [FixedBytes.toList, List.length_ofFn, getElem!_pos, i.isLt, List.getElem_ofFn]
 
 private noncomputable def scoreRefresh {s : Level} {α : Type} (H : Xofs) (seed : FixedBytes 32)
     (rows : Nonce s × Fin 481 → Byte) (score : SeedScore s α) : PMF α :=
@@ -218,14 +235,6 @@ theorem Xofs.refreshKeySeed_independent {s : Level} {α : Type} (base : Xofs) {a
   simp only [observe', PMF.bind_const]
 
 
-private theorem one_seed {n : ℕ} {win : FixedBytes n → Bool}
-    (unique : {x | win x = true}.Subsingleton) :
-    ((PMF.uniformOfFintype (FixedBytes n)).map win) true ≤ (2 ^ (8 * n) : ℝ≥0∞)⁻¹ := by
-  have size : Fintype.card (FixedBytes n) = 2 ^ (8 * n) := by
-    rw [Fintype.card_fun, Fintype.card_fin, Fintype.card_fin, ← pow_mul]
-  simpa only [PMF.map, Function.comp_def, size, Nat.cast_pow, Nat.cast_ofNat] using
-    PMF.uniformOfFintype_bind_pure_apply_true_le unique
-
 /-- The FIPS public-key hash hits the private secret-expansion prefix with probability at
 most 2⁻⁵¹² at every level. This bounds the exceptional honest representative for all requests
 together. Failed matrix or secret expansion scores zero. -/
@@ -234,7 +243,8 @@ theorem publicHashMatch_le (s : Level) (base : Xofs) {a b : ℕ} (ha : 528 ≤ a
       (2 ^ 512 : ℝ≥0∞)⁻¹ := by
   let test : SeedScore s Bool := fun H rho pair _ r => PMF.pure (pair.any fun pk =>
     H.h256.readBytes (encodePublic s rho.toList pk.t) 64 == r.toList)
-  have keep (v : SecretExpansionViews s) :
+  let V := base.sampleSecretExpansionViews s ha hb
+  have keep (v : SecretExpansionViews s) (hv : v ∈ V.support) :
       v.refreshKeySeed.bind (fun H => test H v.publicSeed v.pair v.keySeed v.secretSeed) =
       PMF.pure v.publicHashMatch := by
     have read (fresh : FixedBytes 128) (pk : MLDSA.PublicKey s.params) :
@@ -245,17 +255,18 @@ theorem publicHashMatch_le (s : Level) (base : Xofs) {a b : ℕ} (ha : 528 ≤ a
       rw [Keccak.length_bytesToBitsLE, length_encodePublic, FixedBytes.length_toList]
       cases s <;> decide
     simp only [SecretExpansionViews.refreshKeySeed, PMF.bind_map, Function.comp_def, test, read,
-      PMF.bind_const, SecretExpansionViews.publicHashMatch]
+      PMF.bind_const, SecretExpansionViews.publicHashMatch, v.read_publicKey_of_mem hv]
   change ((base.sampleSecretExpansionViews s ha hb).bind fun v =>
     PMF.pure v.publicHashMatch) true ≤ _
-  simp_rw [← keep]
+  have eq := PMF.bind_congr_on_support V _ _ (fun v hv => (keep v hv).symm)
+  rw [eq]
   rw [base.refreshKeySeed_independent ha hb test]
   apply PMF.bind_apply_le_on_support
   intro v _
   apply PMF.bind_apply_le_on_support
   intro H _
   simp only [test, PMF.bind_const]
-  apply one_seed (n := 64)
+  apply FixedBytes.uniform_test_le (n := 64)
   intro x hx y hy
   cases hp : v.pair with
   | none => simp [hp] at hx
@@ -282,7 +293,7 @@ private theorem uniform_hit_le (s : Level) (address : Option (List Bool)) :
       rw [PMF.bind_comm]
       apply PMF.bind_apply_le_on_support
       intro r _
-      apply one_seed (n := 32)
+      apply FixedBytes.uniform_test_le (n := 32)
       have off (j : Fin (s.params.ℓ + s.params.k)) :
           x ≠ Keccak.bytesToBitsLE (nonceInput r.toList j.val) := by
         intro h
@@ -296,7 +307,7 @@ private theorem uniform_hit_le (s : Level) (address : Option (List Bool)) :
     · apply PMF.bind_apply_le_on_support
       intro xi _
       have off : x ≠ keySeedInput s xi := fun h => width (h ▸ length_keySeedInput s xi)
-      apply le_trans (one_seed (n := 64) ?_)
+      apply le_trans (FixedBytes.uniform_test_le (n := 64) ?_)
       · exact ENNReal.inv_le_inv.mpr
           (pow_le_pow_right₀ (by norm_num : (1 : ℝ≥0∞) ≤ 2) (by decide : 256 ≤ 8 * 64))
       · intro r hr t ht

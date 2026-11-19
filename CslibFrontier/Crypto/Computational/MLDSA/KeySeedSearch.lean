@@ -375,10 +375,9 @@ private theorem two_guesses {C : QuantumSigningForger} (hash : Option (List Byte
   have one (candidate) :
       ((PMF.uniformOfFintype (FixedBytes 32)).map (matched candidate)) true ≤
         (2 ^ 256 : ℝ≥0∞)⁻¹ := by
-    apply (PMF.uniformOfFintype_bind_pure_apply_true_le ?_).trans_eq
-    · rw [card_hedge, Nat.cast_pow, Nat.cast_ofNat]
-    · intro x hx y hy
-      exact inj (Option.some.inj ((of_decide_eq_true hx).symm.trans (of_decide_eq_true hy)))
+    apply FixedBytes.uniform_test_le (n := 32)
+    intro x hx y hy
+    exact inj (Option.some.inj ((of_decide_eq_true hx).symm.trans (of_decide_eq_true hy)))
   let pub := hash.map fun tr => Keccak.bytesToBitsLE (tr.take 32)
   let qry := queryKeyPrefix (C := C) addr
   refine (PMF.map_true_le_add _ (A := matched pub) (B := matched qry) ?_).trans
@@ -502,17 +501,16 @@ private theorem changed_keySeed_le (C : QuantumSigningForger) (s : Level) (H : X
       (addr.any fun v => decide ((H.withKeySeedExpansion s seed out).queryTable
         C.addressBits C.responseBytes v ≠ H.queryTable C.addressBits C.responseBytes v))) true ≤
         (2 ^ 256 : ℝ≥0∞)⁻¹ := by
-  apply (PMF.uniformOfFintype_bind_pure_apply_true_le ?_).trans_eq
-  · rw [card_hedge, Nat.cast_pow, Nat.cast_ofNat]
-  · intro x hx y hy
-    have hx := queriesKeySeed_of_change (C := C) s _ x _ addr hx
-    have hy := queriesKeySeed_of_change (C := C) s _ y _ addr hy
-    cases addr with
-    | none => exact Bool.noConfusion (show false = true from hx)
-    | some v =>
-      simp only [queriesKeySeed, Bool.and_eq_true, beq_iff_eq] at hx hy
-      have eq := Option.some.inj (hx.2.symm.trans hy.2)
-      exact List.ofFn_inj.mp (List.append_cancel_right (Keccak.bytesToBitsLE_injective eq))
+  apply FixedBytes.uniform_test_le (n := 32)
+  intro x hx y hy
+  have hx := queriesKeySeed_of_change (C := C) s _ x _ addr hx
+  have hy := queriesKeySeed_of_change (C := C) s _ y _ addr hy
+  cases addr with
+  | none => exact Bool.noConfusion (show false = true from hx)
+  | some v =>
+    simp only [queriesKeySeed, Bool.and_eq_true, beq_iff_eq] at hx hy
+    have eq := Option.some.inj (hx.2.symm.trans hy.2)
+    exact List.ofFn_inj.mp (List.append_cancel_right (Keccak.bytesToBitsLE_injective eq))
 
 /-- Measure the selected coherent address of the background device. Test whether the XOR
 response at that address would change if the 128-byte key expansion were installed. -/
