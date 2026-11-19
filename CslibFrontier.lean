@@ -2742,6 +2742,7 @@ public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSyst
 public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Recognition.CSPBounds
 public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Recognition.CrossingNeighborhoods
 public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Recognition.Declarations
+public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Recognition.EmbeddingNecessity
 public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Recognition.Frame
 public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Recognition.FrozenReference
 public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Recognition.Input
@@ -2971,6 +2972,7 @@ public import CslibFrontier.Computability.Complexity.Problems.XORSAT.Dense
 public import CslibFrontier.Computability.Complexity.Problems.XSAT
 public import CslibFrontier.Computability.Complexity.ProofSystem
 public import CslibFrontier.Computability.Complexity.ProofSystem.Exhaustive
+public import CslibFrontier.Computability.Complexity.RealAlgebraic.Controlled
 public import CslibFrontier.Computability.Complexity.Reduction
 public import CslibFrontier.Computability.Complexity.Reduction.Autoreducibility
 public import CslibFrontier.Computability.Complexity.Reduction.BoundedOracle
@@ -4108,6 +4110,8 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.CHSH
 public import CslibFrontier.Computability.PCP.TwoProverGame.CHSHRigidity
 public import CslibFrontier.Computability.PCP.TwoProverGame.Commuting
 public import CslibFrontier.Computability.PCP.TwoProverGame.CommutingValue
+public import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebra
+public import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 public import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 public import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystemConverse
 public import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystemPerfect
@@ -5004,6 +5008,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.AdaptiveKeySeed
 public import CslibFrontier.Crypto.Computational.MLDSA.AmbientVerification
 public import CslibFrontier.Crypto.Computational.MLDSA.Basic
 public import CslibFrontier.Crypto.Computational.MLDSA.ChallengeRowProgramming
+public import CslibFrontier.Crypto.Computational.MLDSA.CommitmentContinuation
 public import CslibFrontier.Crypto.Computational.MLDSA.CompressedKeyOnly
 public import CslibFrontier.Crypto.Computational.MLDSA.Decompose
 public import CslibFrontier.Crypto.Computational.MLDSA.DigestSigningQueries
@@ -5019,6 +5024,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.KeyOnly
 public import CslibFrontier.Crypto.Computational.MLDSA.KeySeedSearch
 public import CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 public import CslibFrontier.Crypto.Computational.MLDSA.MatrixOracle
+public import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskExpansion
 public import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskSeedGame
 public import CslibFrontier.Crypto.Computational.MLDSA.PublicPairSigning
 public import CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitmentRegister
@@ -5029,6 +5035,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.RandomXofMask
 public import CslibFrontier.Crypto.Computational.MLDSA.RandomXofMatrix
 public import CslibFrontier.Crypto.Computational.MLDSA.RejNTTExhaustion
 public import CslibFrontier.Crypto.Computational.MLDSA.RejNTTProgramming
+public import CslibFrontier.Crypto.Computational.MLDSA.RejectedCommitmentWrites
 public import CslibFrontier.Crypto.Computational.MLDSA.ResponseBinding
 public import CslibFrontier.Crypto.Computational.MLDSA.SecretExpansionLaw
 public import CslibFrontier.Crypto.Computational.MLDSA.SignedExtraction
@@ -5972,6 +5979,7 @@ public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.TotalIsolati
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.TotalRatPoly
 public import CslibFrontier.Foundations.Algebra.Quaternion.BpInfinity
 public import CslibFrontier.Foundations.Algebra.Shear
+public import CslibFrontier.Foundations.Algebra.Star.FreeSelfAdjoint
 public import CslibFrontier.Foundations.Algebra.Tropical
 public import CslibFrontier.Foundations.AlgebraicGeometry.EllipticCurve.Decidable
 public import CslibFrontier.Foundations.AlgebraicGeometry.EllipticCurve.Edwards
@@ -6652,6 +6660,7 @@ public import CslibFrontier.Foundations.Data.MvPolynomial.AffineLine
 public import CslibFrontier.Foundations.Data.MvPolynomial.AffineTaylor
 public import CslibFrontier.Foundations.Data.MvPolynomial.Bihomogeneous
 public import CslibFrontier.Foundations.Data.MvPolynomial.Catalecticant
+public import CslibFrontier.Foundations.Data.MvPolynomial.CoeffNorm1
 public import CslibFrontier.Foundations.Data.MvPolynomial.CoefficientDegree
 public import CslibFrontier.Foundations.Data.MvPolynomial.DualNumber
 public import CslibFrontier.Foundations.Data.MvPolynomial.Hessian
@@ -6660,6 +6669,7 @@ public import CslibFrontier.Foundations.Data.MvPolynomial.HessianRank
 public import CslibFrontier.Foundations.Data.MvPolynomial.InitialMonomial
 public import CslibFrontier.Foundations.Data.MvPolynomial.InterpolateLast
 public import CslibFrontier.Foundations.Data.MvPolynomial.IteratedPDerivSpan
+public import CslibFrontier.Foundations.Data.MvPolynomial.LastVariable
 public import CslibFrontier.Foundations.Data.MvPolynomial.LinearSubstitution
 public import CslibFrontier.Foundations.Data.MvPolynomial.LowDegreeRoot
 public import CslibFrontier.Foundations.Data.MvPolynomial.LowestComponent
@@ -6817,6 +6827,7 @@ public import CslibFrontier.Foundations.FieldTheory.Finite.UnitSum
 public import CslibFrontier.Foundations.FieldTheory.TensorBasis
 public import CslibFrontier.Foundations.Geometry.Euclidean.Angle.Cap
 public import CslibFrontier.Foundations.Geometry.Euclidean.Angle.Unoriented.Basic
+public import CslibFrontier.Foundations.Geometry.FiniteLineAvoidance
 public import CslibFrontier.Foundations.Geometry.Orthogonal
 public import CslibFrontier.Foundations.Geometry.Orthogonal.Directions
 public import CslibFrontier.Foundations.Geometry.Orthogonal.Endpoint
@@ -6865,6 +6876,7 @@ public import CslibFrontier.Foundations.Geometry.Polygonal.RayParityTransport
 public import CslibFrontier.Foundations.Geometry.Polygonal.Reverse
 public import CslibFrontier.Foundations.Geometry.Polygonal.Route
 public import CslibFrontier.Foundations.Geometry.Polygonal.RouteInterior
+public import CslibFrontier.Foundations.Geometry.Polygonal.RouteParity
 public import CslibFrontier.Foundations.Geometry.Polygonal.Segment
 public import CslibFrontier.Foundations.Geometry.Polygonal.SegmentRays
 public import CslibFrontier.Foundations.Geometry.Polygonal.SlopeDetour
@@ -7157,6 +7169,9 @@ public import CslibFrontier.Foundations.RingTheory.CyclicIntRing
 public import CslibFrontier.Foundations.RingTheory.CyclicIntRing.Coefficients
 public import CslibFrontier.Foundations.RingTheory.Derivation.Wronskian
 public import CslibFrontier.Foundations.RingTheory.GaloisRing
+public import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.Basis
+public import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.Relations
+public import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.Residue
 public import CslibFrontier.Foundations.RingTheory.Polynomial.Hermite
 public import CslibFrontier.Foundations.RingTheory.PowerSeries.Constants
 public import CslibFrontier.Foundations.RingTheory.RootsOfUnity.Principal

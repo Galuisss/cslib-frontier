@@ -78,12 +78,6 @@ private theorem sum_norm_selected_effect_mul_sq_le (φ : AlgState A) (M : Measur
     _ = ∑ b ∈ univ.map ι, φ.norm (M.effect b * x) ^ 2 := by rw [sum_map]
     _ ≤ _ := sum_le_sum_of_subset_of_nonneg (subset_univ _) fun _ _ _ => sq_nonneg _
 
-private def someEmbedding : α ↪ Option α :=
-  ⟨some, fun _ _ h => Option.some.inj h⟩
-
-omit [Fintype α] in
-private theorem someEmbedding_apply (a : α) : someEmbedding a = some a := rfl
-
 /-- Commuting with each successful projection, together with a commuting copy for those
 projections, controls commutation with the total successful effect. -/
 theorem sum_successfulEffect_commutator_sq_le (φ : AlgState A)
@@ -118,19 +112,19 @@ theorem sum_successfulEffect_commutator_sq_le (φ : AlgState A)
           Q.effect (ι b) * (P.effect (some a) * P.effect (some a)) := by rw [hidem]
       _ = _ := by noncomm_ring
   have hu (b : κ) : φ.norm (U b) ^ 2 ≤ ∑ a, φ.norm (X a b) ^ 2 :=
-    norm_sum_effect_mul_sq_le φ P hP someEmbedding _
+    norm_sum_effect_mul_sq_le φ P hP Function.Embedding.some _
   have hv (b : κ) : φ.norm (V b) ^ 2 ≤ ∑ a, φ.norm (X a b) ^ 2 :=
-    norm_sum_effect_mul_sq_le φ R hR someEmbedding _
+    norm_sum_effect_mul_sq_le φ R hR Function.Embedding.some _
   have hw : ∑ b, φ.norm (W b) ^ 2 ≤ ∑ a, φ.norm (D a) ^ 2 := by
     calc
       _ ≤ ∑ b, ∑ a, φ.norm (Q.effect (ι b) * D a) ^ 2 := sum_le_sum fun b _ =>
-        norm_sum_effect_mul_sq_le φ P hP someEmbedding _
+        norm_sum_effect_mul_sq_le φ P hP Function.Embedding.some _
       _ ≤ _ := by
         rw [sum_comm]
         exact sum_le_sum fun a _ => sum_norm_selected_effect_mul_sq_le φ Q hQ ι _
   have hz : ∑ b, φ.norm (Z b) ^ 2 ≤ ∑ a, φ.norm (D a) ^ 2 :=
     (sum_norm_selected_effect_mul_sq_le φ Q hQ ι _).trans
-      (norm_sum_effect_mul_sq_le φ P hP someEmbedding _)
+      (norm_sum_effect_mul_sq_le φ P hP Function.Embedding.some _)
   have hpoint (b : κ) : φ.norm (U b + V b + W b - Z b) ^ 2 ≤
       4 * (φ.norm (U b) ^ 2 + φ.norm (V b) ^ 2 + φ.norm (W b) ^ 2 + φ.norm (Z b) ^ 2) := by
     have h := (φ.norm_sub_le (U b + V b + W b) (Z b)).trans (add_le_add_left
@@ -237,7 +231,7 @@ theorem pairCommutatorDefect_le_successful (φ : AlgState A)
       successfulCopyDefect] using h
   have hright : (∑ a : α, f (some a) none) ≤
       8 * (successfulPairDefect φ P Q + successfulCopyDefect φ Q T) := by
-    have h := sum_successfulEffect_commutator_sq_le φ Q T P someEmbedding
+    have h := sum_successfulEffect_commutator_sq_le φ Q T P Function.Embedding.some
       hQ hT hP (fun a b => hQT (some a) (some b)) (fun a b => hPT b (some a))
     have hn (a : α) :
         φ.norm (Q.successfulEffect * P.effect (some a) -
@@ -248,7 +242,7 @@ theorem pairCommutatorDefect_le_successful (φ : AlgState A)
         φ.norm (Q.effect (some b) * P.effect (some a) - P.effect (some a) * Q.effect (some b)) =
         φ.norm (P.effect (some a) * Q.effect (some b) - Q.effect (some b) * P.effect (some a)) :=
       φ.norm_sub_comm _ _
-    simpa only [someEmbedding_apply, hn, hs, f,
+    simpa only [Function.Embedding.some_apply, hn, hs, f,
       successfulPairDefect, successfulCopyDefect] using h
   have hsuccess : ∑ a : α, ∑ b, f (some a) b =
       (∑ a : α, f (some a) none) + successfulPairDefect φ P Q := by

@@ -15,7 +15,7 @@ import Mathlib.Algebra.Field.ZMod
 set_option linter.privateModule false
 
 open Cslib.PCP Cslib.PCP.LowIndividualDegree Cslib.Quantum
-open scoped MatrixOrder ComplexOrder BigOperators
+open scoped MatrixOrder ComplexOrder BigOperators Real
 
 private instance : Fact (Nat.Prime 3) := ⟨by decide⟩
 
@@ -44,6 +44,13 @@ private noncomputable def verticalStrategy :
   classical
   exact QuantumStrategy.ofDeterministic (honest prodVars) (honest prodVars)
 
+private theorem verticalStrategy_score (b : Branch) :
+    (branchGame (F := ZMod 3) 1 1 b).commutingWinProb verticalStrategy.toCommuting = 1 := by
+  rw [TwoProverGame.commutingWinProb_toCommuting]
+  unfold verticalStrategy
+  rw [TwoProverGame.quantumWinProb_ofDeterministic]
+  exact winProb_branch_honest prodVars prodVars_degree b
+
 /-- For the honest product polynomial on two coordinates, the decoded vertical
 measurements and the endpoint measurements have zero state distance. -/
 example : let S := verticalStrategy.toCommuting
@@ -52,10 +59,26 @@ example : let S := verticalStrategy.toCommuting
         ((decodedVertical S.bob 1 u).map (fun f => f.value t)).effect a) ^ 2) ≤ 0 := by
   intro S
   classical
-  have h (b : Branch) : (branchGame (F := ZMod 3) 1 1 b).commutingWinProb S = 1 := by
-    dsimp only [S]
-    rw [TwoProverGame.commutingWinProb_toCommuting]
-    unfold verticalStrategy
-    rw [TwoProverGame.quantumWinProb_ofDeterministic]
-    exact winProb_branch_honest prodVars prodVars_degree b
-  simpa only [h, sub_self, mul_zero, add_zero] using bob_vertical_stateDist_le S 1
+  simpa only [S, verticalStrategy_score, sub_self, mul_zero, add_zero] using
+    bob_vertical_stateDist_le S 1
+
+private def shiftedSuccess (t : ZMod 3) (a : Answer (ZMod 3) 2) : Option (ZMod 3) :=
+  if t = 0 then none else some (decodePoint a + 1)
+
+/-- Compare the actual successful mismatch events when the first decoder may fail. -/
+example : let S := verticalStrategy.toCommuting
+    (𝔼 u : Point (ZMod 3) 1, 𝔼 t : ZMod 3,
+      ((S.answers (.point (Fin.snoc u t)) (.axis (verticalLine u))).toOuterMeasure
+        {ab | ∃ a, shiftedSuccess t ab.1 = some a ∧
+          a ≠ (decodeVertical 1 u ab.2).value t}).toReal) ≤
+      (𝔼 u : Point (ZMod 3) 1, 𝔼 t : ZMod 3,
+        ((S.answers (.point (Fin.snoc u t)) (.point (Fin.snoc u t))).toOuterMeasure
+          {ab | ∃ a, shiftedSuccess t ab.1 = some a ∧ a ≠ decodePoint ab.2}).toReal) := by
+  intro S
+  classical
+  let P (u : Point (ZMod 3) 1) (t : ZMod 3) :=
+    (S.alice (.point (Fin.snoc u t))).map (shiftedSuccess t)
+  have h := successfulMismatch_vertical_le (F := ZMod 3) (n := 1) S 1 P
+  simp only [P, decodedPoint, decodedVertical, Measurement.map_map, Function.comp_apply,
+    CommutingStrategy.successfulMismatch_map_map_eq_event] at h
+  simpa only [S, verticalStrategy_score, sub_self, mul_zero, add_zero, Real.sqrt_zero] using h

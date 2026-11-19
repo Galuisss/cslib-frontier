@@ -29,9 +29,10 @@ open scoped Real
 
 variable {A α : Type*} [Fintype α] [Ring A] [PartialOrder A] [Algebra ℂ A]
 
-/-- The mass of disagreements between successful outcomes on the first side and outcomes on
-the second side. Failure on the first side contributes zero. -/
-noncomputable def successfulMismatch (φ : AlgState A) (P : Measurement (Option α) A)
+/-- The state pairing of successful effects with the opposing disagreement effects.
+For commuting measurements this is the probability of differing answers with a
+successful first outcome. -/
+@[expose] noncomputable def successfulMismatch (φ : AlgState A) (P : Measurement (Option α) A)
     (Q : Measurement α A) : ℝ :=
   ∑ a, (φ (P.effect (some a) * (1 - Q.effect a))).re
 
