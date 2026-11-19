@@ -198,6 +198,15 @@ theorem ofSpectralCut_prob_eq_zero (s : Cuts)
   change (s.val.card : ℝ)⁻¹ * (Matrix.trace ((M x).effect a * (M x).effect b)).re = 0
   rw [(hM x).mul_eq_zero hab, Matrix.trace_zero, Complex.zero_re, mul_zero]
 
+/-- Matching-answer agreement in a Schmidt strategy is the geometric-mean-weighted
+agreement of its Alice POVM. -/
+theorem sum_prob_same_ofSchmidt (d : ι → ℝ) (hd : ∀ i, 0 ≤ d i) (htrace : ∑ i, d i = 1)
+    (M : X → POVM A ι) (x : X) :
+    (∑ a, (ofSchmidt d hd htrace M).prob x x a a) = (M x).toMeasurement.schmidtAgreement d := by
+  simp_rw [prob_ofSchmidt_same, Measurement.schmidtAgreement, POVM.toMeasurement_effect, mul_sum]
+  rw [sum_comm]
+  exact sum_congr rfl fun i _ => sum_comm
+
 variable [Fintype X]
 
 
@@ -224,12 +233,8 @@ theorem exists_projective_spectral_mixture (d : ι → ℝ) (hd : ∀ i, 0 ≤ d
              (Matrix.trace (E * E * spectralCutDensity s)).re) ≤
         9 * δ + 10 * Real.sqrt (2 * δ) := by
   intro S δ
-  have hagree (x : X) : (∑ a, S.prob x x a a) = (M x).toMeasurement.schmidtAgreement d := by
-    dsimp only [S]
-    simp_rw [prob_ofSchmidt_same, Measurement.schmidtAgreement, POVM.toMeasurement_effect,
-      mul_sum]
-    rw [sum_comm]
-    exact sum_congr rfl fun i _ => sum_comm
+  have hagree (x : X) : (∑ a, S.prob x x a a) = (M x).toMeasurement.schmidtAgreement d :=
+    sum_prob_same_ofSchmidt d hd htrace M x
   obtain ⟨R, hR, hround⟩ :=
     Measurement.exists_projective_cutColumnError_average_le
       (fun x => (M x).toMeasurement) ν d hd htrace
