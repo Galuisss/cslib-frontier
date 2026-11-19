@@ -8,6 +8,8 @@ module
 -- upstream: local-only (tests)
 
 import CslibFrontier.Foundations.Quantum.Algebra.SpectralCut
+import CslibFrontier.Foundations.Quantum.Algebra.Involution
+import CslibFrontier.Foundations.Quantum.Pauli
 
 /-! # Spectral cuts of an unequal two-coordinate spectrum -/
 
@@ -34,9 +36,50 @@ example (A : Matrix Bool Bool ℂ) :
       ‖A‖ ^ 2 / 2 := by
   simpa using AlgState.norm_sq_normalizedMatrixTrace A
 
-/-- Compression to one coordinate preserves each effect on that coordinate. -/
-example (M : Measurement Bool (Matrix Bool Bool ℂ)) (a : Bool) :
-    let e : Unit ↪ Bool := ⟨fun _ => false, fun {_ _} _ => Subsingleton.elim _ _⟩
-    (M.principalSubmatrix e).effect a () () = M.effect a false false := by
-  simp only [Measurement.principalSubmatrix_effect_apply]
-  rfl
+private noncomputable def pauliXMeasurement : Measurement Bool (Matrix Bool Bool ℂ) :=
+  Measurement.ofInvolution pauliX_isHermitian.isSelfAdjoint pauliX_mul_self
+
+private def pureSpectrum (b : Bool) : ℝ := if b then 0 else 1
+
+private theorem norm_pauliX_effect (a i j : Bool) :
+    ‖pauliXMeasurement.effect a i j‖ = 1 / 2 := by
+  change ‖signProj pauliX a i j‖ = _
+  rw [signProj]
+  change ‖(2⁻¹ : ℂ) * ((1 : Matrix Bool Bool ℂ) i j +
+    (Cslib.BitString.signVal a : ℂ) * pauliX i j)‖ = _
+  cases a <;> cases i <;> cases j <;>
+    norm_num [Matrix.one_apply, Cslib.BitString.signVal, Complex.norm_mul]
+
+/-- The Pauli X measurement on the pure diagonal state has agreement one half and
+a strictly positive squared commutator sum. -/
+example :
+    let P := fun s : Finset Bool => diagonal fun i => if i ∈ s then (1 : ℂ) else 0
+    (∑ s : {s : Finset Bool // s.Nonempty}, diagonalCutWidth pureSpectrum s *
+        ∑ a, ‖pauliXMeasurement.effect a * P s.val - P s.val * pauliXMeasurement.effect a‖ ^ 2) =
+      1 ∧ 1 ≤ 2 * Real.sqrt (2 * (1 / 2)) := by
+  intro P
+  have hd (i : Bool) : 0 ≤ pureSpectrum i := by cases i <;> norm_num [pureSpectrum]
+  have he (a : Bool) :
+      (∑ s : {s : Finset Bool // s.Nonempty},
+        diagonalCutWidth pureSpectrum s *
+          ‖pauliXMeasurement.effect a * P s.val - P s.val * pauliXMeasurement.effect a‖ ^ 2) =
+        1 / 2 := by
+    rw [← integral_diagonalCutSupport pureSpectrum
+      (fun s => ‖pauliXMeasurement.effect a * P s - P s * pauliXMeasurement.effect a‖ ^ 2)
+      (by simp [P])]
+    simp only [P, ← diagonalCut_eq_diagonal_support]
+    rw [integral_norm_commutator_diagonalCut_sq pureSpectrum hd]
+    norm_num [Fintype.sum_bool, pureSpectrum, norm_pauliX_effect]
+  have hsum :
+      (∑ s : {s : Finset Bool // s.Nonempty}, diagonalCutWidth pureSpectrum s *
+        ∑ a, ‖pauliXMeasurement.effect a * P s.val - P s.val * pauliXMeasurement.effect a‖ ^ 2) =
+      1 := by
+    simp_rw [Finset.mul_sum]
+    rw [Finset.sum_comm]
+    norm_num [he]
+  have hbound := pauliXMeasurement.sum_diagonalCutWidth_norm_commutator_sq_le pureSpectrum hd
+    (by norm_num [Fintype.sum_bool, pureSpectrum]) (1 / 2) (by
+      norm_num [Fintype.sum_bool, pureSpectrum, norm_pauliX_effect])
+  change _ ≤ _ at hbound
+  rw [hsum] at hbound
+  exact ⟨hsum, hbound⟩

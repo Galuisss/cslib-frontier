@@ -45,6 +45,16 @@ theorem frobenius_norm_sq_eq_sum {κ E : Type*} [Fintype ι] [Fintype κ]
   simp only [Real.rpow_two, ← Real.sqrt_eq_rpow]
   exact Real.sq_sqrt (Finset.sum_nonneg fun i _ => Finset.sum_nonneg fun j _ => sq_nonneg _)
 
+/-- The diagonal of a Gram matrix gives the squared column norm. -/
+theorem re_star_mul_self_diag [Fintype ι] (A : Matrix ι ι ℂ) (i : ι) :
+    ((star A * A) i i).re = ∑ j, ‖A j i‖ ^ 2 := by
+  rw [Matrix.mul_apply, Complex.re_sum]
+  refine Finset.sum_congr rfl fun j _ => ?_
+  simp only [Matrix.star_apply]
+  rw [mul_comm]
+  simpa only [starRingEnd_apply, ← Complex.ofReal_pow, Complex.ofReal_re] using
+    congrArg Complex.re (Complex.mul_conj' (A j i))
+
 section Projection
 
 variable [DecidableEq ι]
