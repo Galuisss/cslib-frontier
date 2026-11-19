@@ -28,11 +28,42 @@ open scoped Real
 
 variable {A α : Type*} [Fintype α] [Ring A] [PartialOrder A] [Algebra ℂ A]
 
-/-- The mass of disagreements between successful outcomes on the first side and outcomes on
-the second side. Failure on the first side contributes zero. -/
-noncomputable def successfulMismatch (φ : AlgState A) (P : Measurement (Option α) A)
+/-- The state pairing of successful effects with the opposing disagreement effects.
+For commuting measurements this is the probability of differing answers with a
+successful first outcome. -/
+@[expose] noncomputable def successfulMismatch (φ : AlgState A) (P : Measurement (Option α) A)
     (Q : Measurement α A) : ℝ :=
   ∑ a, (φ (P.effect (some a) * (1 - Q.effect a))).re
+
+/-- For postprocessed measurements, the mismatch is the sum of the original joint weights
+whose decoded outcomes disagree and whose first outcome decodes successfully. -/
+theorem successfulMismatch_map_map {β γ : Type*} [Fintype β] [Fintype γ]
+    [DecidableEq α] [IsOrderedAddMonoid A] (φ : AlgState A) (P : Measurement β A)
+    (Q : Measurement γ A) (f : β → Option α) (g : γ → α) :
+    successfulMismatch φ (P.map f) (Q.map g) =
+      ∑ b, ∑ c, if ∃ a, f b = some a ∧ a ≠ g c then (φ (P.effect b * Q.effect c)).re else 0 := by
+  classical
+  have hComplement (a : α) : 1 - (Q.map g).effect a = ∑ c with g c ≠ a, Q.effect c := by
+    rw [Measurement.map_effect, sub_eq_iff_eq_add]
+    rw [sum_filter_not_add_sum_filter, Q.sum_effect]
+  calc
+    _ = ∑ a, ∑ b, ∑ c, if f b = some a then
+        if g c ≠ a then (φ (P.effect b * Q.effect c)).re else 0 else 0 := by
+      simp only [successfulMismatch, hComplement]
+      simp only [Measurement.map_effect, sum_mul, mul_sum, map_sum, Complex.re_sum, sum_filter]
+      refine sum_congr rfl fun a _ => ?_
+      rw [sum_comm]
+      refine sum_congr rfl fun b _ => sum_congr rfl fun c _ => ?_
+      split_ifs <;> simp_all
+    _ = _ := by
+      rw [sum_comm]
+      refine sum_congr rfl fun b _ => ?_
+      rw [sum_comm]
+      refine sum_congr rfl fun c _ => ?_
+      cases h : f b with
+      | none => simp
+      | some a =>
+        simp [ne_comm, sum_ite_eq]
 
 variable [StarRing A] [StarOrderedRing A] [TopologicalSpace A]
   [ContinuousFunctionalCalculus ℝ A IsSelfAdjoint] [NonnegSpectrumClass ℝ A]
