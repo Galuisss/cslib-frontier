@@ -10,6 +10,7 @@ import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 import CslibFrontier.Computability.PCP.TwoProverGame.Synchronous
 import CslibFrontier.Foundations.Algebra.Group.HomomorphismTesting
+import CslibFrontier.Foundations.Quantum.DensityMatrix.ClassicalQuantumInformationChain
 import CslibFrontier.Foundations.Quantum.DensityMatrix.PurificationOverlap
 import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropy
 import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropyConvexity
@@ -10942,3 +10943,17 @@ register_result "fuchs-van-de-graaf-lower" where
   scope := "Arbitrary finite-dimensional complex positive semidefinite trace-one matrices, \
     including singular states. One minus the unsquared fidelity is bounded above by the \
     trace distance, which is half the trace norm of the difference."
+
+register_result "classical-quantum-tuple-mutual-information-chain" where
+  title := "Mutual information chain rule for finite classical tuples and a quantum register"
+  topic := "quantum information"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Chain equality in equation (27)",
+      locator := "arXiv:1509.07466v2, §5.1, printed p. 21" }
+  ]
+  theorems := [Cslib.Quantum.mutualInformation_classicalQuantumState_eq_sum_coordinates]
+  scope := "Arbitrary finite tuples whose coordinate alphabets may differ, with any joint \
+    probability mass function and finite complex density matrices as conditional blocks. \
+    The coordinate terms average conditional mutual information over preceding labels, \
+    with null prefixes weighted zero. The chain uses natural logarithms and includes the \
+    empty tuple."

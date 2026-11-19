@@ -7,7 +7,7 @@ Authors: Samuel Schlesinger
 import CslibFrontier.Crypto.Protocols.Quantum.OneTimePad
 import CslibFrontier.Foundations.Quantum.Bell
 import CslibFrontier.Foundations.Quantum.DensityMatrix.FidelityTraceDistance
-import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropy
+import CslibFrontier.Foundations.Quantum.DensityMatrix.ClassicalQuantumInformationChain
 import CslibFrontier.Foundations.Quantum.Pauli
 
 /-! Density matrices, the partial trace, no-signalling and the quantum one-time pad: concrete
@@ -187,7 +187,8 @@ example :
   norm_num [Fintype.card_bool]
 
 -- Disjoint one-dimensional supports give infinite relative entropy.
-example : relativeEntropy (pureState (ket false)) (pureState (ket true)) = ⊤ := by
+private theorem relativeEntropy_orthogonal_qubit_states :
+    relativeEntropy (pureState (ket false)) (pureState (ket true)) = ⊤ := by
   apply relativeEntropy_of_not_supportLE
   intro h
   let v := (ket false).ofLp
@@ -196,5 +197,104 @@ example : relativeEntropy (pureState (ket false)) (pureState (ket true)) = ⊤ :
     cases i <;> simp [v, mulVec, dotProduct, pureState_apply, ket_apply]
   have he := congrFun (h v hz) false
   simp [v, mulVec, dotProduct, pureState_apply, ket_apply] at he
+
+-- Zero relative entropy of the common rank-one reduction gives exact alignment even
+-- when the original purifying vectors use different coordinates.
+example : ∃ U ∈ unitaryGroup (Fin 3) ℂ,
+    WithLp.toLp 2 (((1 : Matrix Bool Bool ℂ) ⊗ₖ U) *ᵥ
+      (ket (false, (0 : Fin 3))).ofLp) = ket (false, (1 : Fin 3)) := by
+  obtain ⟨U, hU, h⟩ := exists_localUnitary_norm_sub_sq_le_relativeEntropy
+    (ket (false, (0 : Fin 3))) (ket (false, (1 : Fin 3))) (norm_ket _) (norm_ket _)
+  rw [partialTraceRight_ket_pair, partialTraceRight_ket_pair, relativeEntropy_self,
+    ← WithTop.coe_zero, WithTop.coe_le_coe] at h
+  have hz := sq_eq_zero_iff.mp (le_antisymm h (sq_nonneg _))
+  exact ⟨U, hU, sub_eq_zero.mp (norm_eq_zero.mp hz)⟩
+
+-- An incompatible conditional block contributes zero when its source label has zero mass.
+example : relativeEntropy
+    (classicalQuantumState (PMF.pure false) (fun _ => pureState (ket false)))
+    (classicalQuantumState (PMF.pure false) (fun x => pureState (ket x))) = 0 := by
+  let : MeasurableSpace Bool := ⊤
+  let : MeasurableSingletonClass Bool := ⟨fun _ => trivial⟩
+  rw [relativeEntropy_classicalQuantumState _ _
+    (fun _ => isDensityMatrix_pureState (norm_ket false))
+    (fun x => isDensityMatrix_pureState (norm_ket x)), InformationTheory.klDiv_self,
+    Fintype.sum_bool]
+  simp [PMF.pure_apply]
+
+-- At positive source mass, the same support failure gives infinite divergence.
+example : relativeEntropy
+    (classicalQuantumState (PMF.pure false) (fun _ => pureState (ket false)))
+    (classicalQuantumState (PMF.pure false) (fun _ => pureState (ket true))) = ⊤ := by
+  let : MeasurableSpace Bool := ⊤
+  let : MeasurableSingletonClass Bool := ⟨fun _ => trivial⟩
+  rw [relativeEntropy_classicalQuantumState _ _
+    (fun _ => isDensityMatrix_pureState (norm_ket false))
+    (fun _ => isDensityMatrix_pureState (norm_ket true)), InformationTheory.klDiv_self,
+    Fintype.sum_bool]
+  simp [PMF.pure_apply, relativeEntropy_orthogonal_qubit_states]
+
+-- A common reference orthogonal to the only active conditional state puts the
+-- infinity in the marginal-divergence term of the decomposition.
+example : relativeEntropy
+    (partialTraceRight (classicalQuantumState (PMF.pure false) (fun x => pureState (ket x))))
+    (pureState (ket true)) = ⊤ := by
+  have h := sum_weighted_relativeEntropy_eq_mutualInformation_add (PMF.pure false)
+    (fun x => isDensityMatrix_pureState (norm_ket x)) (pureState (ket true))
+  rw [mutualInformation_classicalQuantumState_pure false
+    (fun x => isDensityMatrix_pureState (norm_ket x)), zero_add, Fintype.sum_bool] at h
+  simpa [PMF.pure_apply, relativeEntropy_orthogonal_qubit_states] using h.symm
+
+-- Only the second label varies, and its two conditional qubit states are orthogonal.
+-- The first label's null branch makes no contribution to the information chain.
+example (q : PMF Bool) :
+    let p := q.map (false, ·)
+    mutualInformation (classicalQuantumState p (fun z => pureState (ket z.2))) =
+      mutualInformation (classicalQuantumState (Cslib.Probability.PMF.conditionalSnd p false)
+        (fun y => pureState (ket y))) := by
+  dsimp only
+  let p := q.map (false, ·)
+  let ρ (z : Bool × Bool) := pureState (ket z.2)
+  have hρ (z : Bool × Bool) : IsDensityMatrix (ρ z) := isDensityMatrix_pureState (norm_ket _)
+  change mutualInformation (classicalQuantumState p ρ) = _
+  have hp : p.map Prod.fst = PMF.pure false := by
+    change (q.map (false, ·)).map Prod.fst = _
+    rw [PMF.map_comp]
+    exact PMF.map_const _ _
+  have hzero : mutualInformation (classicalQuantumState (p.map Prod.fst)
+      (quantumMarginalGiven p ρ)) = 0 := by
+    rw [hp]
+    exact mutualInformation_classicalQuantumState_pure false
+      (isDensityMatrix_quantumMarginalGiven p hρ)
+  rw [mutualInformation_classicalQuantumState_prod p hρ, hzero, zero_add, hp, Fintype.sum_bool]
+  simp [PMF.pure_apply, p, ρ]
+
+-- An empty classical register has zero information under any label law.
+example (p : PMF (Fin 0 → Bool)) :
+    mutualInformation (classicalQuantumState p (fun _ => pureState (ket false))) = 0 := by
+  rw [mutualInformation_classicalQuantumState_eq_sum_coordinates (fun _ : Fin 0 => Bool) p
+    (fun _ => isDensityMatrix_pureState (norm_ket false))]
+  simp
+
+private abbrev twoLabelAlphabet (i : Fin 2) : Type :=
+  Fin.cases (motive := fun _ => Type) Bool (fun _ => Fin 3) i
+
+local instance (i : Fin 2) : Fintype (twoLabelAlphabet i) :=
+  Fin.cases (motive := fun j => Fintype (twoLabelAlphabet j))
+    (inferInstanceAs (Fintype Bool)) (fun _ => inferInstanceAs (Fintype (Fin 3))) i
+
+local instance (i : Fin 2) : DecidableEq (twoLabelAlphabet i) :=
+  Fin.cases (motive := fun j => DecidableEq (twoLabelAlphabet j))
+    (inferInstanceAs (DecidableEq Bool)) (fun _ => inferInstanceAs (DecidableEq (Fin 3))) i
+
+-- The chain accepts a Boolean label followed by a ternary label.
+example (p : PMF (∀ i, twoLabelAlphabet i)) :
+    let ρ (z : ∀ i, twoLabelAlphabet i) := pureState (ket (z 0 : Bool))
+    mutualInformation (classicalQuantumState p ρ) =
+      ((coordinateMutualInformationTerms twoLabelAlphabet p ρ 0 +
+        coordinateMutualInformationTerms twoLabelAlphabet p ρ 1 : ℝ) : WithTop ℝ) := by
+  dsimp only
+  rw [mutualInformation_classicalQuantumState_eq_sum_coordinates twoLabelAlphabet p
+    (fun z => isDensityMatrix_pureState (norm_ket (z 0 : Bool))), Fin.sum_univ_two]
 
 end CslibFrontierTests.QuantumDensity
