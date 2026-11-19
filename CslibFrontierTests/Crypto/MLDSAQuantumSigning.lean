@@ -10,7 +10,7 @@ module
 import all CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
 import all CslibFrontier.Crypto.Computational.MLDSA.RandomXof
 import CslibFrontier.Crypto.Computational.MLDSA.RandomXofCoverage
-import CslibFrontier.Crypto.Computational.MLDSA.SecretRowServices
+import CslibFrontier.Crypto.Computational.MLDSA.SharedKeyGame
 import CslibFrontier.Crypto.Computational.MLDSA.RandomXofMask
 import CslibFrontier.Computability.Circuit.Quantum.Oracle.Controller.Circuit
 meta import CslibFrontier.Crypto.Computational.MLDSA.RandomXof
@@ -185,3 +185,17 @@ example (lo hi : Xofs) :
       switchMessage.randomPrefixGame .mlDSA44 hi 20992 1788 :=
   switchMessage.randomPrefixGame_stable .mlDSA44 fits_three (by decide) (by decide)
     (by decide) (by decide) lo hi
+
+-- At 2 ^ 64 coherent queries the two device changes add 2^-62 to the square root.
+-- The separate setup exception is charged once, after squaring, at every FIPS level.
+example (C : QuantumSigningForger) (s : Level) (H : Xofs) {a b : ℕ} (ha : 528 ≤ a)
+    (hb : 894 ≤ b) (cost : C.XofCallsLe (2 ^ 64)) :
+    let test := C.fullPairMLWETest s H a b
+    let real := (MLDSA.keyLaw s.params (MatrixOracle.shortCoefficientLaw s)).bind test
+    let uniform := (MLDSA.uniformKeyLaw s.params).bind test
+    (((H.uniformPrefixes a b).bind fun G => G.fullPairExperiment s
+      (fun rho pk => (C.publicPairSigning s G rho pk).map (·.trial.newDigestWin))) true).toReal ≤
+      (√((uniform true).toReal + (Game.advantage real uniform : ℝ)) + ((2 : ℝ) ^ 62)⁻¹) ^ 2 +
+        ((2 : ℝ) ^ 512)⁻¹ := by
+  have scale : 4 * ((2 ^ 64 : ℕ) : ℝ) / 2 ^ 128 = ((2 : ℝ) ^ 62)⁻¹ := by norm_num
+  simpa only [scale] using C.nativeFullPair_le_uniformPair s H ha hb cost
