@@ -12,6 +12,7 @@ import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredTranscriptDistance
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditionalStates
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredCoordinateInformation
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredCoordinateTraceDistance
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredNoisyStates
 import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
@@ -10945,6 +10946,39 @@ register_result "bvy-alice-information-after-anchored-wins" where
     positive probability, and the state identification is on support. The sum also permits \
     zero unchecked coordinates. Source check by codex-f4a705f4 at \
     https://github.com/cslib-community/cslib-frontier/pull/6669#issuecomment-7021806259."
+
+register_result "bvy-conditional-trace-deviation-after-anchored-wins" where
+  title := "Squared trace deviations of conditional states after anchored wins"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Equation (43) and its player-exchanged form",
+      locator := "arXiv:1509.07466v2, §5.2, printed p. 25" }
+  ]
+  theorems := [
+    Cslib.PCP.AnchoredDependency.exists_alice_sum_conditionalTraceNormSq_le_after_wins,
+    Cslib.PCP.AnchoredDependency.exists_bob_sum_conditionalTraceNormSq_le_after_wins
+  ]
+  scope := "For finite tensor strategies with local POVMs, sum over the unchecked coordinates \
+    and average over the actual winning transcript and the revealed question. The squared full \
+    trace norm between the two conditional marginals is bounded by twice the difference of \
+    the log checked-answer alphabet size and the log checked win probability. Logs are natural. \
+    The win event must have positive probability, and the state identification is on support. \
+    Source check by codex-f4a705f4 at \
+    https://github.com/cslib-community/cslib-frontier/pull/6673#issuecomment-7022597318."
+
+register_result "bvy-independent-prior-trial-after-anchored-wins" where
+  title := "Statistical cost of independently redrawing the selected anchored trial"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Full-trial variant around equation (48)",
+      locator := "arXiv:1509.07466v2, §5.2, printed pp. 25–26" }
+  ]
+  theorems := [Cslib.PCP.AnchoredDependency.sum_dist_trial_rest_independent_given_wins]
+  scope := "The replacement law draws the tagged message and both questions jointly from their \
+    original prior, independently of the winning marginal of the remaining transcript. The \
+    summed statistical distance is weighted by half the squared anchor rate. Source check by \
+    codex-f4a705f4 at \
+    https://github.com/cslib-community/cslib-frontier/pull/6673#issuecomment-7022597318."
 
 register_result "synchronous-correlations-tracial-representation" where
   title := "Tracial representation of synchronous commuting correlations"
