@@ -43,7 +43,7 @@ variable {A α β κ : Type*} [CStarAlgebra A] [PartialOrder A] [StarOrderedRing
   [Fintype α] [Fintype β] [Fintype κ]
 
 /-- The sum of the successful effects within a completed measurement. -/
-def successfulEffect (M : Measurement (Option α) A) : A :=
+@[expose] def successfulEffect (M : Measurement (Option α) A) : A :=
   ∑ a, M.effect (some a)
 
 omit [StarOrderedRing A] in

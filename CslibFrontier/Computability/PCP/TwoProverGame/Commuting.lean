@@ -136,6 +136,22 @@ theorem answers_apply (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) (a : 
     S.answers x y (a, b) = ENNReal.ofReal (S.prob x y a b) := by
   rw [answers, PMF.ofFintype_apply]
 
+/-- Alice's answer marginal is her measurement law and is independent of Bob's question. -/
+theorem answers_map_fst (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) :
+    (S.answers x y).map Prod.fst = (S.alice x).distribution S.state := by
+  classical
+  ext a
+  rw [PMF.map_apply, tsum_fintype, Fintype.sum_prod_type, Measurement.distribution_apply]
+  have h (b : B) :
+      (∑ a', if a = a' then S.answers x y (a', b) else 0) =
+        ENNReal.ofReal (S.prob x y a b) := by
+    simp only [Finset.sum_ite_eq, Finset.mem_univ, ite_true, S.answers_apply]
+  rw [Finset.sum_comm]
+  change (∑ b : B, ∑ a' : A, if a = a' then S.answers x y (a', b) else 0) = _
+  simp only [h, ← ENNReal.ofReal_sum_of_nonneg (fun b _ => S.prob_nonneg x y a b)]
+  simp only [prob, ← Complex.re_sum, ← map_sum, ← Finset.mul_sum, (S.bob y).sum_effect,
+    mul_one, Measurement.prob]
+
 end CFC
 
 /-! ### Correlations of binary strategies -/

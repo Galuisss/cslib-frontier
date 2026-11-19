@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Foundations.Quantum.Algebra.BinomialTail
+public import CslibFrontier.Foundations.Quantum.Algebra.MeasurementMixture
 public import CslibFrontier.Foundations.Quantum.Algebra.SequentialCopy
 public import Mathlib.Algebra.BigOperators.Expect
 import CslibFrontier.Foundations.Data.Finset.Expect
@@ -70,12 +71,6 @@ private theorem commute_averageSuccessEffect (M : Q → Measurement α A) (succe
     Commute E (averageSuccessEffect M success) :=
   ((Commute.sum_left _ _ _ fun x _ =>
     Commute.sum_left _ _ _ fun a _ => (h x a).symm).symm).smul_right _
-
-omit [StarOrderedRing A] in
-private theorem re_apply_average {ι : Type*} [Fintype ι] (φ : AlgState A) (f : ι → A) :
-    (φ ((Fintype.card ι : ℝ)⁻¹ • ∑ x, f x)).re = 𝔼 x, (φ (f x)).re := by
-  rw [← IsScalarTower.algebraMap_smul ℂ, map_smul, Complex.coe_algebraMap, smul_eq_mul,
-    Complex.re_ofReal_mul, map_sum, Complex.re_sum, Fintype.expect_eq_sum_div_card, inv_mul_eq_div]
 
 /-- Count the successful entries of an outcome word. -/
 @[expose] def transcriptSuccessCount {k : ℕ} (success : α → Bool) (g : Fin k → α) : ℕ :=
@@ -157,7 +152,7 @@ private theorem transferred_trial_eq (φ : AlgState A) (M R : Q → Measurement 
   have havg (b : Bool) :
       (𝔼 y : Q, (φ (H x g * W g b * ∑ a with success a = b, (R y).effect a)).re) =
         (φ (H x g * W g b * if b then G else 1 - G)).re := by
-    rw [← re_apply_average, ← mul_sum, ← mul_smul_comm, average_class_effect]
+    rw [← AlgState.re_apply_uniformAverage, ← mul_sum, ← mul_smul_comm, average_class_effect]
   rw [Fintype.sum_bool]
   simp only [havg, Bool.false_eq_true, ite_false, ite_true]
   dsimp only [hybridSuccessScore, W, H, G, Bool.false_eq_true, ite_false, ite_true, add_zero]
