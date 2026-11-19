@@ -20,7 +20,12 @@ public import Mathlib.Data.Fintype.Powerset
 For a nonnegative spectrum, the projection at a positive threshold keeps the coordinates
 whose eigenvalues meet that threshold. Integrating its diagonal recovers the spectrum.
 Integrating the squared Frobenius norm of its commutator with a matrix weights each squared
-entry by the gap between the two eigenvalues.
+entry by the gap between the two eigenvalues. The cut weights are lengths of the intervals
+on which the retained coordinate set is fixed. Their finite sum can replace integration
+for any function of the cut that vanishes on the empty set.
+
+These identities implement the diagonal-basis spectral-cut step of
+[Vidick, §2.4 and §3.2][Vidick2022].
 -/
 
 public section
@@ -31,6 +36,14 @@ open scoped Matrix.Norms.Frobenius
 namespace Matrix
 
 variable {ι : Type*}
+
+/-- The squared Frobenius norm is the sum of the squared entry norms. -/
+theorem frobenius_norm_sq_eq_sum {κ E : Type*} [Fintype ι] [Fintype κ]
+    [SeminormedAddCommGroup E] (A : Matrix ι κ E) :
+    ‖A‖ ^ 2 = ∑ i, ∑ j, ‖A i j‖ ^ 2 := by
+  rw [frobenius_norm_def]
+  simp only [Real.rpow_two, ← Real.sqrt_eq_rpow]
+  exact Real.sq_sqrt (Finset.sum_nonneg fun i _ => Finset.sum_nonneg fun j _ => sq_nonneg _)
 
 section Projection
 
@@ -82,12 +95,6 @@ private theorem commutator_cut_entry (d : ι → ℝ) (A : Matrix ι ι ℂ) (t 
       exact (le_max_iff.mp h.2).elim (fun h' => hti ⟨ht, h'⟩) fun h' => htj ⟨ht, h'⟩
     simp [indicator, hti, htj, hout]
 
-private theorem frobenius_sq_eq_sum (A : Matrix ι ι ℂ) :
-    ‖A‖ ^ 2 = ∑ i, ∑ j, ‖A i j‖ ^ 2 := by
-  rw [frobenius_norm_def]
-  simp only [Real.rpow_two, ← Real.sqrt_eq_rpow]
-  exact Real.sq_sqrt (Finset.sum_nonneg fun i _ => Finset.sum_nonneg fun j _ => sq_nonneg _)
-
 /-- The integrated squared commutator with the cuts is a sum weighted by the spectral gaps. -/
 theorem integral_norm_commutator_diagonalCut_sq (d : ι → ℝ) (hd : ∀ i, 0 ≤ d i)
     (A : Matrix ι ι ℂ) :
@@ -98,7 +105,7 @@ theorem integral_norm_commutator_diagonalCut_sq (d : ι → ℝ) (hd : ∀ i, 0 
   have hf (i j : ι) : Integrable (f i j) := by
     apply IntegrableOn.integrable_indicator _ measurableSet_Ioc
     exact integrableOn_const (hs := by simp [Real.volume_Ioc])
-  simp_rw [frobenius_sq_eq_sum, commutator_cut_entry d A _ _ _ (hd _) (hd _)]
+  simp_rw [frobenius_norm_sq_eq_sum, commutator_cut_entry d A _ _ _ (hd _) (hd _)]
   change ∫ t : ℝ, (∑ i, ∑ j, f i j t) = _
   rw [integral_finsetSum _ (fun i _ => integrable_finsetSum _ (fun j _ => hf i j))]
   refine Finset.sum_congr rfl fun i _ => ?_
@@ -149,7 +156,7 @@ theorem sum_integral_norm_commutator_diagonalCut_sq_le {α : Type*} [Fintype α]
       (Real.sqrt (d j) + Real.sqrt (d i)) * ‖A a i j‖ ^ 2) * Real.sq_sqrt (hw a)
   have hcs := Real.sum_mul_le_sqrt_mul_sqrt (Finset.univ : Finset (α × ι × ι))
     (fun p => f p.1 p.2.1 p.2.2) (fun p => g p.1 p.2.1 p.2.2)
-  simpa only [Fintype.sum_prod_type, hfg, hf, hg, ← Finset.mul_sum, ← frobenius_sq_eq_sum,
+  simpa only [Fintype.sum_prod_type, hfg, hf, hg, ← Finset.mul_sum, ← frobenius_norm_sq_eq_sum,
     integral_norm_commutator_diagonalCut_sq d hd] using hcs
 
 end Projection
@@ -292,5 +299,85 @@ theorem sum_diagonalCutWidth_norm_commutator_sq_le [DecidableEq ι] {α : Type*}
   rw [Finset.sum_comm]
   simp_rw [← Finset.mul_sum, he]
   exact sum_integral_norm_commutator_diagonalCut_sq_le d hd w hw A
+
+/-- For a matrix family of bounded row and column square mass, a lower bound on its
+geometric-mean-weighted square mass bounds the average cut commutator. For measurements in
+a Schmidt basis, the geometric-mean-weighted mass is the diagonal answer agreement. -/
+theorem sum_diagonalCutWidth_norm_commutator_sq_le_of_agreement
+    [DecidableEq ι] {α : Type*} [Fintype α]
+    (d : ι → ℝ) (hd : ∀ i, 0 ≤ d i) (w : α → ℝ) (hw : ∀ a, 0 ≤ w a)
+    (A : α → Matrix ι ι ℂ) (δ : ℝ) :
+    let N := fun i j => ∑ a, w a * ‖A a i j‖ ^ 2
+    (∀ i, ∑ j, N i j ≤ 1) →
+    (∀ j, ∑ i, N i j ≤ 1) →
+    (∑ i, d i) - δ ≤ ∑ i, ∑ j, (Real.sqrt (d i) * Real.sqrt (d j)) * N i j →
+    let P := fun s : Finset ι => diagonal fun i => if i ∈ s then (1 : ℂ) else 0
+    (∑ s : {s : Finset ι // s.Nonempty},
+        diagonalCutWidth d s * ∑ a, w a * ‖A a * P s.val - P s.val * A a‖ ^ 2) ≤
+      Real.sqrt (2 * δ) * Real.sqrt (4 * ∑ i, d i) := by
+  intro N hrow hcol hagree P
+  let D := diagonal fun i => (Real.sqrt (d i) : ℂ)
+  have hN (i j : ι) : 0 ≤ N i j :=
+    Finset.sum_nonneg fun a _ => mul_nonneg (hw a) (sq_nonneg _)
+  have henergy (r : ℝ) :
+      ∑ a, w a * ‖A a * D + r • (D * A a)‖ ^ 2 =
+        ∑ i, ∑ j, (Real.sqrt (d j) + r * Real.sqrt (d i)) ^ 2 * N i j := by
+    have hentry (a : α) (i j : ι) :
+        (A a * D + r • (D * A a)) i j =
+          ((Real.sqrt (d j) + r * Real.sqrt (d i) : ℝ) : ℂ) * A a i j := by
+      change (A a * D) i j + (r • (D * A a)) i j = _
+      simp only [D, Matrix.smul_apply, mul_diagonal, diagonal_mul, Complex.real_smul,
+        Complex.ofReal_add, Complex.ofReal_mul]
+      ring
+    calc
+      _ = ∑ a, ∑ i, ∑ j, (Real.sqrt (d j) + r * Real.sqrt (d i)) ^ 2 *
+          (w a * ‖A a i j‖ ^ 2) := by
+        simp only [frobenius_norm_sq_eq_sum, hentry, norm_mul, Complex.norm_real, Real.norm_eq_abs,
+          sq_abs, mul_pow, Finset.mul_sum]
+        refine Finset.sum_congr rfl fun a _ => Finset.sum_congr rfl fun i _ =>
+          Finset.sum_congr rfl fun j _ => ?_
+        ring
+      _ = _ := by
+        rw [Finset.sum_comm]
+        refine Finset.sum_congr rfl fun i _ => ?_
+        rw [Finset.sum_comm]
+        simp only [← Finset.mul_sum, N]
+  have hmass : ∑ i, ∑ j, (d j + d i) * N i j ≤ 2 * ∑ i, d i := by
+    have hr : ∑ i, ∑ j, d i * N i j ≤ ∑ i, d i := by
+      simp only [← Finset.mul_sum]
+      exact Finset.sum_le_sum fun i _ => (mul_le_mul_of_nonneg_left (hrow i) (hd i)).trans_eq
+        (mul_one (d i))
+    have hc : ∑ i, ∑ j, d j * N i j ≤ ∑ j, d j := by
+      rw [Finset.sum_comm]
+      simp only [← Finset.mul_sum]
+      exact Finset.sum_le_sum fun j _ => (mul_le_mul_of_nonneg_left (hcol j) (hd j)).trans_eq
+        (mul_one (d j))
+    simp only [add_mul, Finset.sum_add_distrib]
+    linarith
+  have hminus : ∑ a, w a * ‖A a * D - D * A a‖ ^ 2 ≤ 2 * δ := by
+    rw [sub_eq_add_neg] at hagree
+    simp only [sub_eq_add_neg, ← neg_one_smul ℝ (D * A _), henergy, neg_one_mul]
+    have he (i j : ι) : (Real.sqrt (d j) + -Real.sqrt (d i)) ^ 2 * N i j =
+        (d j + d i) * N i j - 2 * ((Real.sqrt (d i) * Real.sqrt (d j)) * N i j) := by
+      rw [show (Real.sqrt (d j) + -Real.sqrt (d i)) ^ 2 =
+          d j + d i - 2 * Real.sqrt (d i) * Real.sqrt (d j) by
+        nlinarith [Real.sq_sqrt (hd i), Real.sq_sqrt (hd j)]]
+      ring
+    simp_rw [he, Finset.sum_sub_distrib, ← Finset.mul_sum]
+    linarith
+  have hplus : ∑ a, w a * ‖A a * D + D * A a‖ ^ 2 ≤ 4 * ∑ i, d i := by
+    have he (i j : ι) : (Real.sqrt (d j) + Real.sqrt (d i)) ^ 2 ≤ 2 * (d j + d i) := by
+      nlinarith [Real.sq_sqrt (hd i), Real.sq_sqrt (hd j),
+        sq_nonneg (Real.sqrt (d j) - Real.sqrt (d i))]
+    calc
+      _ = ∑ i, ∑ j, (Real.sqrt (d j) + Real.sqrt (d i)) ^ 2 * N i j := by
+        simpa only [one_smul, one_mul] using henergy 1
+      _ ≤ ∑ i, ∑ j, (2 * (d j + d i)) * N i j :=
+        Finset.sum_le_sum fun i _ => Finset.sum_le_sum fun j _ =>
+          mul_le_mul_of_nonneg_right (he i j) (hN i j)
+      _ ≤ _ := by simp only [mul_assoc, ← Finset.mul_sum]; linarith
+  exact (sum_diagonalCutWidth_norm_commutator_sq_le d hd w hw A).trans
+    (mul_le_mul (Real.sqrt_le_sqrt hminus) (Real.sqrt_le_sqrt hplus)
+      (Real.sqrt_nonneg _) (Real.sqrt_nonneg _))
 
 end Matrix
