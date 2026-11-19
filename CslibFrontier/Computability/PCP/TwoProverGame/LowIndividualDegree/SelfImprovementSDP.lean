@@ -7,7 +7,8 @@ Authors: Christian Reitwiessner
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SliceBoundedness
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialPointEffect
+public import Mathlib.Data.Fintype.Option
 import CslibFrontier.Foundations.Quantum.POVM.Optimization
 
 /-!
@@ -39,7 +40,7 @@ majorant with complementary slackness and equal primal and dual values. The prim
 variables range over polynomial submeasurements, represented with a failure outcome.
 The dual variables range over all common majorants of the averaged point effects. -/
 theorem exists_selfImprovement_trace_certificate
-    (B : Point F m → Measurement F (Matrix ι ι ℂ)) :
+    (B : (Fin m → F) → Measurement F (Matrix ι ι ℂ)) :
     ∃ (T : Measurement (BoundedPolynomial F m d) (Matrix ι ι ℂ)) (Z : Matrix ι ι ℂ),
       0 ≤ Z ∧ (∀ g : BoundedPolynomial F m d, averagePolynomialPointEffect B g ≤ Z) ∧
       (∀ g, T.effect g * Z = T.effect g * averagePolynomialPointEffect B g) ∧
