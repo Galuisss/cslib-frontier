@@ -93,7 +93,8 @@ theorem commute_averagePolynomialPointEffect
   rw [averagePolynomialPointEffect_eq]
   exact (Commute.sum_left _ _ _ fun u _ => (hc u _).symm).symm.smul_right _
 
-private theorem evaluation_some (P : Measurement (Option (BoundedPolynomial F m d)) A)
+/-- The effect of a successful value sums precisely the polynomials evaluating to it. -/
+theorem evaluatePolynomialMeasurement_effect_some (P : Measurement (Option (BoundedPolynomial F m d)) A)
     (u : Fin m → F) (b : F) : (evaluatePolynomialMeasurement P u).effect (some b) =
       ∑ g with eval u g.val = b, P.effect (some g) := by
   rw [evaluatePolynomialMeasurement, Measurement.map_effect, sum_filter, Fintype.sum_option,
@@ -140,7 +141,7 @@ theorem abs_average_evaluated_sandwich_failure_le {β : Type*} [Fintype β]
           N.effect (some a) * P.effect none * (B u).effect b)).re) =
         ∑ g, (φ (star (K (a, g)) * K (a, g) * P.effect none *
           (B u).effect (eval u g.val))).re := by
-    simp only [evaluation_some, mul_sum, sum_mul, map_sum, Complex.re_sum]
+    simp only [evaluatePolynomialMeasurement_effect_some, mul_sum, sum_mul, map_sum, Complex.re_sum]
     conv_rhs => rw [← sum_fiberwise univ (fun g : BoundedPolynomial F m d => eval u g.val)]
     refine sum_congr rfl fun b _ => sum_congr rfl fun g hg => ?_
     rw [hKTerm, (mem_filter.mp hg).2]
@@ -190,7 +191,7 @@ theorem abs_average_evaluated_failure_rightPoint_le {β : Type*} [Fintype β]
         ∑ p, (φ (star (L p) * Y u p)).re := by
     rw [sum_comm, Fintype.sum_prod_type]
     refine sum_congr rfl fun b _ => ?_
-    simp only [evaluation_some, sum_mul, map_sum, Complex.re_sum]
+    simp only [evaluatePolynomialMeasurement_effect_some, sum_mul, map_sum, Complex.re_sum]
     conv_rhs => rw [← sum_fiberwise univ (fun g : BoundedPolynomial F m d => eval u g.val)]
     refine sum_congr rfl fun a _ => sum_congr rfl fun g hg => ?_
     have he := (mem_filter.mp hg).2
