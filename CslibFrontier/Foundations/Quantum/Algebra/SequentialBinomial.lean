@@ -11,6 +11,7 @@ public import CslibFrontier.Foundations.Quantum.Algebra.BinomialTail
 public import CslibFrontier.Foundations.Quantum.Algebra.SequentialCopy
 public import Mathlib.Algebra.BigOperators.Expect
 import CslibFrontier.Foundations.Data.Finset.Expect
+public import CslibFrontier.Foundations.Quantum.Algebra.MeasurementMixture
 import Mathlib.Algebra.Order.BigOperators.Expect
 
 /-!
@@ -41,41 +42,29 @@ private theorem expect_sqrt_le_sqrt_expect {ι : Type*} [Fintype ι]
 variable {A α Q : Type*} [CStarAlgebra A] [PartialOrder A] [StarOrderedRing A]
   [Fintype α] [Fintype Q] [Nonempty Q]
 
-/-- Average over questions the sum of the effects of successful answers. -/
+/-- The success effect after uniformly mixing the question measurements and
+coarsening their answers to success or failure. -/
 @[expose] noncomputable def averageSuccessEffect (M : Q → Measurement α A)
     (success : α → Bool) : A :=
-  (Fintype.card Q : ℝ)⁻¹ • ∑ x, ∑ a with success a, (M x).effect a
+  ((mixture (Cslib.Probability.PMF.uniformOfFintype Q) M).map success).effect true
 
-omit [PartialOrder A] [StarOrderedRing A] in
-private theorem average_one :
-    (Fintype.card Q : ℝ)⁻¹ • (∑ _ : Q, (1 : A)) = 1 := by
-  have h : (Fintype.card Q : ℝ) ≠ 0 := by exact_mod_cast Fintype.card_ne_zero
-  rw [sum_const, card_univ, ← Nat.cast_smul_eq_nsmul ℝ, smul_smul, inv_mul_cancel₀ h, one_smul]
+/-- The averaged success effect is the mean of the sums of the successful effects. -/
+theorem averageSuccessEffect_eq (M : Q → Measurement α A) (success : α → Bool) :
+    averageSuccessEffect M success =
+      (Fintype.card Q : ℝ)⁻¹ • ∑ x, ∑ a with success a, (M x).effect a := by
+  rw [averageSuccessEffect, map_mixture, mixture_uniform_effect]
+  simp only [map_effect]
 
 theorem averageSuccessEffect_mem_Icc (M : Q → Measurement α A) (success : α → Bool) :
-    averageSuccessEffect M success ∈ Set.Icc (0 : A) 1 := by
-  constructor
-  · exact smul_nonneg (by positivity : 0 ≤ (Fintype.card Q : ℝ)⁻¹)
-      (sum_nonneg fun x _ => sum_nonneg fun a _ => (M x).nonneg a)
-  · unfold averageSuccessEffect
-    rw [← average_one (Q := Q) (A := A)]
-    exact smul_le_smul_of_nonneg_left
-      (sum_le_sum fun x _ =>
-        (sum_le_sum_of_subset_of_nonneg (filter_subset _ _) fun a _ _ =>
-          (M x).nonneg a).trans_eq (M x).sum_effect) (by positivity)
+    averageSuccessEffect M success ∈ Set.Icc (0 : A) 1 :=
+  ⟨nonneg _ true, effect_le_one _ true⟩
 
-omit [StarOrderedRing A] [Nonempty Q] in
 private theorem commute_averageSuccessEffect (M : Q → Measurement α A) (success : α → Bool)
     (E : A) (h : ∀ x a, Commute E ((M x).effect a)) :
-    Commute E (averageSuccessEffect M success) :=
-  ((Commute.sum_left _ _ _ fun x _ =>
+    Commute E (averageSuccessEffect M success) := by
+  rw [averageSuccessEffect_eq]
+  exact ((Commute.sum_left _ _ _ fun x _ =>
     Commute.sum_left _ _ _ fun a _ => (h x a).symm).symm).smul_right _
-
-omit [StarOrderedRing A] in
-private theorem re_apply_average {ι : Type*} [Fintype ι] (φ : AlgState A) (f : ι → A) :
-    (φ ((Fintype.card ι : ℝ)⁻¹ • ∑ x, f x)).re = 𝔼 x, (φ (f x)).re := by
-  rw [← IsScalarTower.algebraMap_smul ℂ, map_smul, Complex.coe_algebraMap, smul_eq_mul,
-    Complex.re_ofReal_mul, map_sum, Complex.re_sum, Fintype.expect_eq_sum_div_card, inv_mul_eq_div]
 
 /-- Count the successful entries of an outcome word. -/
 @[expose] def transcriptSuccessCount {k : ℕ} (success : α → Bool) (g : Fin k → α) : ℕ :=
@@ -112,19 +101,20 @@ private theorem first_successScore_eq (φ : AlgState A) (M : Q → Measurement �
     sequentialProjective_effect_succ, transcriptSuccessCount, Fin.sum_univ_succ,
     Fin.cons_succ, Fin.tail, add_comm]
 
-omit [StarOrderedRing A] in
 private theorem average_class_effect (R : Q → Measurement α A) (success : α → Bool)
     (b : Bool) :
     ((Fintype.card Q : ℝ)⁻¹ • ∑ y, ∑ a with success a = b, (R y).effect a) =
       if b then averageSuccessEffect R success else 1 - averageSuccessEffect R success := by
+  let T := (mixture (Cslib.Probability.PMF.uniformOfFintype Q) R).map success
+  have h (c : Bool) : T.effect c =
+      (Fintype.card Q : ℝ)⁻¹ • ∑ y, ∑ a with success a = c, (R y).effect a := by
+    simp only [T, map_mixture, mixture_uniform_effect, map_effect]
+  rw [← h]
   cases b
-  · simp only [Bool.false_eq_true, ite_false, averageSuccessEffect]
-    have h (y : Q) : (∑ a with success a = false, (R y).effect a) =
-        1 - ∑ a with success a, (R y).effect a := by
-      apply eq_sub_of_add_eq
-      simpa only [Bool.not_eq_true, (R y).sum_effect] using
-        (sum_filter_not_add_sum_filter (s := univ) (fun a => success a = true) (R y).effect)
-    rw [sum_congr rfl (fun y _ => h y), sum_sub_distrib, smul_sub, average_one (Q := Q)]
+  · simp only [Bool.false_eq_true, ite_false]
+    apply eq_sub_of_add_eq
+    change T.effect false + T.effect true = 1
+    simpa only [Fintype.sum_bool, add_comm] using T.sum_effect
   · rfl
 
 private theorem transferred_trial_eq (φ : AlgState A) (M R : Q → Measurement α A)
@@ -157,7 +147,7 @@ private theorem transferred_trial_eq (φ : AlgState A) (M R : Q → Measurement 
   have havg (b : Bool) :
       (𝔼 y : Q, (φ (H x g * W g b * ∑ a with success a = b, (R y).effect a)).re) =
         (φ (H x g * W g b * if b then G else 1 - G)).re := by
-    rw [← re_apply_average, ← mul_sum, ← mul_smul_comm, average_class_effect]
+    rw [← AlgState.re_apply_uniformAverage, ← mul_sum, ← mul_smul_comm, average_class_effect]
   rw [Fintype.sum_bool]
   simp only [havg, Bool.false_eq_true, ite_false, ite_true]
   dsimp only [hybridSuccessScore, W, H, G, Bool.false_eq_true, ite_false, ite_true, add_zero]
