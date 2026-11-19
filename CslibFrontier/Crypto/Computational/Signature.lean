@@ -264,6 +264,65 @@ def eufCmaGame (S : SignatureScheme) (adversary : Forger) (n : ℕ) :
   return (msig.1.length == n) && !out.2.contains msig.1 &&
     S.verify keys.1 msig.1 msig.2
 
+/-- The common certificate of the guarded signing oracles: running an oracle-PPT forger against the
+oracle that signs a request and prepends it to the log when `admit n msg queried` holds, and
+otherwise answers the empty word without recording anything, is uniformly strict PPT whenever the
+admission test is decidable in polynomial time. -/
+private theorem isPPTOn_run_guardedSigningOracle
+    {admit : ℕ → List Bool → List (List Bool) → Bool}
+    (hadmit : ComputableInPolyTime
+      (fun p : ℕ × List Bool × List (List Bool) => admit p.1 p.2.1 p.2.2)
+      (encPair encUnary (encPair encBits (encList encBits))) encBool)
+    {sign : List Bool → List Bool → ProbComp (List Bool)}
+    (hsign : IsPPTOn (encPair encBits encBits) encBits (fun p => sign p.1 p.2))
+    {adversary : Forger} (hadversary : IsOraclePPT (encPair encBits encBits) adversary) :
+    IsPPTOn encKeyPairInput encForgeryLog
+      (fun caller : ℕ × (List Bool × List Bool) =>
+        (OracleComp.interpret
+          (OracleComp.sumHandler (fun k => StateT.lift (ProbComp.unifFin k))
+            (fun (request : Unit × List Bool) (queried : List (List Bool)) =>
+              if admit caller.1 request.2 queried then do
+                let sig ← sign caller.2.2 request.2
+                return (sig, request.2 :: queried)
+              else
+                return ([], queried)))
+          (adversary caller.1 caller.2.1)).run []) := by
+  obtain ⟨c, d, hlen⟩ := hsign.length_le
+  have hcaller := ComputableInPolyTime.fst
+    (encPair encUnary (encPair encBits encBits))
+    (encPair (encPair (encFinEnum Unit) encBits) (encList encBits))
+  have hstate := ComputableInPolyTime.snd
+    (encPair encUnary (encPair encBits encBits))
+    (encPair (encPair (encFinEnum Unit) encBits) (encList encBits))
+  apply hadversary.run_interpret_preprocess (operationEncoding := encFinEnum Unit)
+    (prepare := fun caller : ℕ × (List Bool × List Bool) => (caller.1, caller.2.1))
+    (initial := fun _ => ([] : List (List Bool)))
+    (resources := fun caller query =>
+      c * (2 * caller.2.2.length + query.length + 2) ^ d + 2 * query.length + 2)
+    ((ComputableInPolyTime.fst _ _).prod (ComputableInPolyTime.snd _ _).fst')
+    (IsPPTOn.cond (hadmit.comp (hcaller.fst'.prod (hstate.fst'.snd'.prod hstate.snd')))
+      ((hsign.preprocess
+        (hcaller.snd'.snd'.prod hstate.fst'.snd')).bind_with
+        (ComputableInPolyTime.prod (.snd _ _)
+          (ComputableInPolyTime.cons' (hstate.fst'.snd'.comp (.fst _ _))
+            (hstate.snd'.comp (.fst _ _)))).isPPTOn)
+      ((ComputableInPolyTime.const ([] : List Bool)).prod hstate.snd').isPPTOn)
+    (.const []) (fun _ _ => True) (fun _ => trivial)
+    (computableInPolyTime_signResources c d)
+  intro caller request queried _ result hresult
+  split_ifs at hresult
+  · simp only [ProbComp.eval_bind, ProbComp.eval_pure,
+      PMF.mem_support_bind_iff, PMF.mem_support_pure_iff] at hresult
+    obtain ⟨sig, hsig, rfl⟩ := hresult
+    have hsigLen := hlen (caller.2.2, request.2) sig hsig
+    simp only [encBits_apply, length_encPair] at hsigLen
+    refine ⟨trivial, by lia, ?_⟩
+    simp only [encList_cons, List.length_append, length_frame, encBits_apply]
+    lia
+  · simp only [ProbComp.eval_pure, PMF.mem_support_pure_iff] at hresult
+    subst result
+    exact ⟨trivial, by simp, by lia⟩
+
 /-- Running an oracle-PPT forger against `signingOracleOn (adm n) sign` is uniformly strict PPT in
 the unary security parameter `n`, public/auxiliary input, and secret key, when the message space
 `adm` is decidable in polynomial time. -/
@@ -279,45 +338,10 @@ theorem isPPTOn_run_signingOracleOn {adm : ℕ → List Bool → Bool}
         (OracleComp.interpret
           (OracleComp.sumHandler (fun k => StateT.lift (ProbComp.unifFin k))
             (signingOracleOn (adm caller.1) sign caller.2.2))
-          (adversary caller.1 caller.2.1)).run []) := by
-  obtain ⟨c, d, hlen⟩ := hsign.length_le
-  have hcaller := ComputableInPolyTime.fst
-    (encPair encUnary (encPair encBits encBits))
-    (encPair (encPair (encFinEnum Unit) encBits) (encList encBits))
-  have hstate := ComputableInPolyTime.snd
-    (encPair encUnary (encPair encBits encBits))
-    (encPair (encPair (encFinEnum Unit) encBits) (encList encBits))
-  apply hadversary.run_interpret_preprocess (operationEncoding := encFinEnum Unit)
-    (handler := fun caller : ℕ × (List Bool × List Bool) =>
-      signingOracleOn (adm caller.1) sign caller.2.2)
-    (prepare := fun caller : ℕ × (List Bool × List Bool) => (caller.1, caller.2.1))
-    (initial := fun _ => ([] : List (List Bool)))
-    (resources := fun caller query =>
-      c * (2 * caller.2.2.length + query.length + 2) ^ d + 2 * query.length + 2)
-    ((ComputableInPolyTime.fst _ _).prod (ComputableInPolyTime.snd _ _).fst')
-    (IsPPTOn.cond (hadm.comp (hcaller.fst'.prod hstate.fst'.snd'))
-      ((hsign.preprocess
-        (hcaller.snd'.snd'.prod hstate.fst'.snd')).bind_with
-        (ComputableInPolyTime.prod (.snd _ _)
-          (ComputableInPolyTime.cons' (hstate.fst'.snd'.comp (.fst _ _))
-            (hstate.snd'.comp (.fst _ _)))).isPPTOn)
-      ((ComputableInPolyTime.const ([] : List Bool)).prod hstate.snd').isPPTOn)
-    (.const []) (fun _ _ => True) (fun _ => trivial)
-    (computableInPolyTime_signResources c d)
-  intro caller request queried _ result hresult
-  unfold signingOracleOn at hresult
-  split_ifs at hresult
-  · simp only [ProbComp.eval_bind, ProbComp.eval_pure,
-      PMF.mem_support_bind_iff, PMF.mem_support_pure_iff] at hresult
-    obtain ⟨sig, hsig, rfl⟩ := hresult
-    have hsigLen := hlen (caller.2.2, request.2) sig hsig
-    simp only [encBits_apply, length_encPair] at hsigLen
-    refine ⟨trivial, by lia, ?_⟩
-    simp only [encList_cons, List.length_append, length_frame, encBits_apply]
-    lia
-  · simp only [ProbComp.eval_pure, PMF.mem_support_pure_iff] at hresult
-    subst result
-    exact ⟨trivial, by simp, by lia⟩
+          (adversary caller.1 caller.2.1)).run []) :=
+  isPPTOn_run_guardedSigningOracle (admit := fun n msg _ => adm n msg)
+    (hadm.comp ((ComputableInPolyTime.fst _ _).prod (ComputableInPolyTime.snd _ _).fst'))
+    hsign hadversary
 
 /-- Running an oracle-PPT forger against `signingOracleOf sign` is uniformly strict PPT in the
 unary security parameter, public/auxiliary input, and secret key. -/
@@ -423,6 +447,23 @@ def eufOneTimeGame (S : SignatureScheme) (adversary : Forger) (n : ℕ) :
   return (msig.1.length == n) && !out.2.contains msig.1 &&
     S.verify keys.1 msig.1 msig.2
 
+/-- The one-time oracle on `adm` is the guarded signing oracle whose admission test also asks
+for an empty log: on an admitted query the log is empty, so `[msg] = msg :: queried`. -/
+private theorem oneTimeSigningOracleOn_eq_guarded (adm : List Bool → Bool)
+    (sign : List Bool → List Bool → ProbComp (List Bool)) (sk : List Bool) :
+    oneTimeSigningOracleOn adm sign sk = fun request queried =>
+      if adm request.2 && queried.isEmpty then do
+        let sig ← sign sk request.2
+        return (sig, request.2 :: queried)
+      else
+        return ([], queried) := by
+  funext request queried
+  cases queried with
+  | nil => rfl
+  | cons head tail =>
+    simp only [oneTimeSigningOracleOn, List.isEmpty_cons, Bool.and_false, Bool.false_eq_true,
+      ↓reduceIte]
+
 /-- Running an oracle-PPT forger against `oneTimeSigningOracleOn (adm n) sign` is uniformly strict
 PPT in the unary security parameter `n`, public/auxiliary input, and secret key, when the message
 space `adm` is decidable in polynomial time. -/
@@ -439,47 +480,13 @@ theorem isPPTOn_run_oneTimeSigningOracleOn {adm : ℕ → List Bool → Bool}
           (OracleComp.sumHandler (fun k => StateT.lift (ProbComp.unifFin k))
             (oneTimeSigningOracleOn (adm caller.1) sign caller.2.2))
           (adversary caller.1 caller.2.1)).run []) := by
-  obtain ⟨c, d, hlen⟩ := hsign.length_le
-  have hcaller := ComputableInPolyTime.fst
-    (encPair encUnary (encPair encBits encBits))
-    (encPair (encPair (encFinEnum Unit) encBits) (encList encBits))
-  have hstate := ComputableInPolyTime.snd
-    (encPair encUnary (encPair encBits encBits))
-    (encPair (encPair (encFinEnum Unit) encBits) (encList encBits))
-  apply hadversary.run_interpret_preprocess (operationEncoding := encFinEnum Unit)
-    (handler := fun caller : ℕ × (List Bool × List Bool) =>
-      oneTimeSigningOracleOn (adm caller.1) sign caller.2.2)
-    (prepare := fun caller : ℕ × (List Bool × List Bool) => (caller.1, caller.2.1))
-    (initial := fun _ => ([] : List (List Bool)))
-    (resources := fun caller query =>
-      c * (2 * caller.2.2.length + query.length + 2) ^ d + 2 * query.length + 2)
-    ((ComputableInPolyTime.fst _ _).prod (ComputableInPolyTime.snd _ _).fst')
-    (IsPPTOn.cond ((hadm.comp (hcaller.fst'.prod hstate.fst'.snd')).bool_and'
-        ((ComputableInPolyTime.listIsEmpty (encA := encBits)).comp hstate.snd'))
-      ((hsign.preprocess
-        (hcaller.snd'.snd'.prod hstate.fst'.snd')).bind_with
-        (ComputableInPolyTime.prod (.snd _ _)
-          (ComputableInPolyTime.cons' (hstate.fst'.snd'.comp (.fst _ _))
-            (.const []))).isPPTOn)
-      ((ComputableInPolyTime.const ([] : List Bool)).prod hstate.snd').isPPTOn)
-    (.const []) (fun _ _ => True) (fun _ => trivial)
-    (computableInPolyTime_signResources c d)
-  intro caller request queried _ result hresult
-  unfold oneTimeSigningOracleOn at hresult
-  split_ifs at hresult with hempty
-  · simp only [ProbComp.eval_bind, ProbComp.eval_pure,
-      PMF.mem_support_bind_iff, PMF.mem_support_pure_iff] at hresult
-    obtain ⟨sig, hsig, rfl⟩ := hresult
-    have hsigLen := hlen (caller.2.2, request.2) sig hsig
-    simp only [encBits_apply, length_encPair] at hsigLen
-    refine ⟨trivial, by lia, ?_⟩
-    rw [List.isEmpty_iff.mp (Bool.and_eq_true_iff.mp hempty).2]
-    simp only [encList_cons, encList_nil, List.length_append, List.length_nil, length_frame,
-      encBits_apply]
-    lia
-  · simp only [ProbComp.eval_pure, PMF.mem_support_pure_iff] at hresult
-    subst result
-    exact ⟨trivial, by simp, by lia⟩
+  simpa only [oneTimeSigningOracleOn_eq_guarded] using
+    isPPTOn_run_guardedSigningOracle (admit := fun n msg queried => adm n msg && queried.isEmpty)
+      ((hadm.comp ((ComputableInPolyTime.fst _ _).prod
+          (ComputableInPolyTime.snd _ _).fst')).bool_and'
+        ((ComputableInPolyTime.listIsEmpty (encA := encBits)).comp
+          (ComputableInPolyTime.snd _ _).snd'))
+      hsign hadversary
 
 /-- Running an oracle-PPT forger against `oneTimeSigningOracle` is uniformly strict PPT in the
 unary security parameter, public key, and secret key. -/
