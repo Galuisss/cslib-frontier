@@ -31,18 +31,20 @@ namespace Cslib.Quantum.Measurement
 
 variable {ι α : Type*} [Fintype ι] [DecidableEq ι] [Fintype α]
 
+/-- Effects are Hermitian, so exchanging the row and column preserves an entry's norm. -/
+theorem norm_effect_entry_swap (M : Measurement α (Matrix ι ι ℂ)) (a : α) (i j : ι) :
+    ‖M.effect a i j‖ = ‖M.effect a j i‖ := by
+  rw [← (Matrix.nonneg_iff_posSemidef.mp (M.nonneg a)).isHermitian.apply i j, norm_star]
+
 open scoped Matrix.Norms.L2Operator in
-private theorem sum_norm_effect_row_sq_le_one (M : Measurement α (Matrix ι ι ℂ)) (i : ι) :
+/-- The squared row mass of a measurement, summed over outcomes, is at most one. -/
+theorem sum_norm_effect_row_sq_le_one (M : Measurement α (Matrix ι ι ℂ)) (i : ι) :
     ∑ a, ∑ j, ‖M.effect a i j‖ ^ 2 ≤ 1 := by
   have hentry (a : α) :
       ((M.effect a * M.effect a) i i).re = ∑ j, ‖M.effect a i j‖ ^ 2 := by
-    have he := (Matrix.nonneg_iff_posSemidef.mp (M.nonneg a)).isHermitian
-    rw [Matrix.mul_apply, Complex.re_sum]
-    refine Finset.sum_congr rfl fun j _ => ?_
-    rw [← he.apply j i]
-    change (M.effect a i j * star (M.effect a i j)).re = _
-    simpa only [starRingEnd_apply, ← Complex.ofReal_pow, Complex.ofReal_re] using
-      congrArg Complex.re (Complex.mul_conj' (M.effect a i j))
+    have he := (Matrix.nonneg_iff_posSemidef.mp (M.nonneg a)).isHermitian.isSelfAdjoint
+    simpa only [he.star_eq, M.norm_effect_entry_swap a _ i] using
+      Matrix.re_star_mul_self_diag (M.effect a) i
   calc
     _ = ∑ a, ((M.effect a * M.effect a) i i).re := by simp only [hentry]
     _ ≤ ∑ a, (M.effect a i i).re := by
@@ -68,10 +70,7 @@ theorem sum_diagonalCutWidth_norm_commutator_sq_le (M : Measurement α (Matrix �
     rw [Finset.sum_comm]
     exact M.sum_norm_effect_row_sq_le_one i
   have hcol (j : ι) : ∑ i, ∑ a, ‖M.effect a i j‖ ^ 2 ≤ 1 := by
-    have he (a : α) (i : ι) : ‖M.effect a i j‖ = ‖M.effect a j i‖ := by
-      rw [← (Matrix.nonneg_iff_posSemidef.mp (M.nonneg a)).isHermitian.apply i j,
-        norm_star]
-    simpa only [he] using hrow j
+    simpa only [M.norm_effect_entry_swap _ j _] using hrow j
   have h := Matrix.sum_diagonalCutWidth_norm_commutator_sq_le_of_agreement d hd (fun _ => 1)
     (fun _ => zero_le_one) M.effect δ
   simp only [one_mul, htrace] at h
@@ -137,15 +136,8 @@ divided by the dimension. -/
 theorem norm_sq_normalizedMatrixTrace (A : Matrix ι ι ℂ) :
     (normalizedMatrixTrace : AlgState (Matrix ι ι ℂ)).norm A ^ 2 =
       ‖A‖ ^ 2 / (Fintype.card ι : ℝ) := by
-  have hentry (i : ι) : ((star A * A) i i).re = ∑ j, ‖A j i‖ ^ 2 := by
-    rw [Matrix.mul_apply, Complex.re_sum]
-    refine Finset.sum_congr rfl fun j _ => ?_
-    simp only [Matrix.star_apply]
-    rw [mul_comm]
-    simpa only [starRingEnd_apply, ← Complex.ofReal_pow, Complex.ofReal_re] using
-      congrArg Complex.re (Complex.mul_conj' (A j i))
   have htrace : (Matrix.trace (star A * A)).re = ‖A‖ ^ 2 := by
-    simp only [Matrix.trace, Matrix.diag_apply, Complex.re_sum, hentry,
+    simp only [Matrix.trace, Matrix.diag_apply, Complex.re_sum, Matrix.re_star_mul_self_diag,
       Matrix.frobenius_norm_sq_eq_sum]
     rw [Finset.sum_comm]
   rw [AlgState.norm_sq, normalizedMatrixTrace_apply, ← Complex.ofReal_natCast,
