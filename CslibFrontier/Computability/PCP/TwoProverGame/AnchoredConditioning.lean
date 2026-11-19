@@ -69,7 +69,7 @@ local notation "Transcript" => ((Info × CheckedAnswers) × (Free → PairQ))
 
 /-- Sample the unchecked pairs given the revealed information and retain the strategy's
 answers on the checked coordinates. -/
-noncomputable def sideKernel (S : RepeatedStrategy) (t : Info) :
+@[expose] noncomputable def sideKernel (S : RepeatedStrategy) (t : Info) :
     PMF ((Free → PairQ) × CheckedAnswers) :=
   (pi fun j => pairGiven G α C j t).bind fun u =>
     (checkedAnswerLaw C S (t.combine u)).map (u, ·)
@@ -83,7 +83,7 @@ theorem map_fst_sideKernel (S : RepeatedStrategy) (t : Info) :
   simp only [sideKernel, PMF.map_bind, PMF.map_comp, Function.comp_def, h, PMF.bind_pure]
 
 /-- The joint law of the transcript and the unchecked questions. -/
-noncomputable def transcriptLaw (S : RepeatedStrategy) : PMF Transcript :=
+@[expose] noncomputable def transcriptLaw (S : RepeatedStrategy) : PMF Transcript :=
   sideJoint (infoLaw G α C) (sideKernel G α C S)
 
 /-- The verifier accepts every coordinate in the checked set. -/
