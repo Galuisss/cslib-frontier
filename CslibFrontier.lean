@@ -2982,6 +2982,7 @@ public import CslibFrontier.Computability.Complexity.RealAlgebraic.CoefficientEv
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.Controlled
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.ControlledCoefficients
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.ControlledSigns
+public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalJacobianEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalNumericEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalPolynomialEvaluation
@@ -2992,6 +2993,7 @@ public import CslibFrontier.Computability.Complexity.RealAlgebraic.ModularMatrix
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.MultivariateCoefficients
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.PartialDerivativeEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.PowerProductCoefficients
+public import CslibFrontier.Computability.Complexity.RealAlgebraic.QuotientCharacteristicEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.QuotientTraceEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.ResidueEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.TraceExponential
