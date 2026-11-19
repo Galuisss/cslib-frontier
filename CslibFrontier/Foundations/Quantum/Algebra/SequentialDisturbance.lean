@@ -114,7 +114,7 @@ theorem weighted_sandwich_le (φ : AlgState A) (M : Measurement α A) (hM : M.Is
 
 /-- The sum of squared commutator norms between the target projection and the adjoint
 of the preceding transcript product. Later measurements do not enter the defect. -/
-noncomputable def prefixCommutatorDefect {k : ℕ} (φ : AlgState A)
+@[expose] noncomputable def prefixCommutatorDefect {k : ℕ} (φ : AlgState A)
     (M : Fin k → Measurement α A) (i : Fin k) : ℝ :=
   ∑ a, ∑ p, φ.norm ((M i).effect a * star (transcriptProduct (before M i) p) -
     star (transcriptProduct (before M i) p) * (M i).effect a) ^ 2
