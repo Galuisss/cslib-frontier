@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (tests)
 
-import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerticalAxis
+import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PointCommutativity
 import Mathlib.Algebra.Field.ZMod
 
 /-! # The two-coordinate low individual degree verifier over three elements -/
@@ -38,24 +38,35 @@ example (u : Point (ZMod 3) 2) :
   simp
 
 
-private noncomputable def verticalStrategy :
+private noncomputable def honestProductStrategy :
     QuantumStrategy (Question (ZMod 3) 2) (Question (ZMod 3) 2)
       (Answer (ZMod 3) 2) (Answer (ZMod 3) 2) (Fin 1) (Fin 1) := by
   classical
   exact QuantumStrategy.ofDeterministic (honest prodVars) (honest prodVars)
 
+private theorem honestProductBranchScore (b : Branch) :
+    (branchGame (F := ZMod 3) 1 1 b).commutingWinProb honestProductStrategy.toCommuting = 1 := by
+  rw [TwoProverGame.commutingWinProb_toCommuting]
+  unfold honestProductStrategy
+  rw [TwoProverGame.quantumWinProb_ofDeterministic]
+  exact winProb_branch_honest prodVars prodVars_degree b
+
 /-- For the honest product polynomial on two coordinates, the decoded vertical
 measurements and the endpoint measurements have zero state distance. -/
-example : let S := verticalStrategy.toCommuting
+example : let S := honestProductStrategy.toCommuting
     (𝔼 u : Point (ZMod 3) 1, 𝔼 t : ZMod 3, ∑ a, S.state.norm
       ((decodedPoint S.bob (Fin.snoc u t)).effect a -
         ((decodedVertical S.bob 1 u).map (fun f => f.value t)).effect a) ^ 2) ≤ 0 := by
   intro S
   classical
-  have h (b : Branch) : (branchGame (F := ZMod 3) 1 1 b).commutingWinProb S = 1 := by
-    dsimp only [S]
-    rw [TwoProverGame.commutingWinProb_toCommuting]
-    unfold verticalStrategy
-    rw [TwoProverGame.quantumWinProb_ofDeterministic]
-    exact winProb_branch_honest prodVars prodVars_degree b
-  simpa only [h, sub_self, mul_zero, add_zero] using bob_vertical_stateDist_le S 1
+  simpa only [S, honestProductBranchScore, sub_self, mul_zero, add_zero] using
+    bob_vertical_stateDist_le S 1
+
+/-- Conditioning on any prefix with Alice in the point role preserves perfect
+diagonal acceptance of the honest product polynomial. -/
+example (i : Fin 2) :
+    (𝔼 u : Point (ZMod 3) 2, 𝔼 v : Fin (i.val + 1) → ZMod 3,
+      (1 - acceptScore honestProductStrategy.toCommuting 1
+        (.point u) (.diagonal (linePoints u (prefixDirection i v))))) ≤ 0 := by
+  simpa only [honestProductBranchScore, sub_self, mul_zero] using
+    diagonalPointLossAt_le 1 1 honestProductStrategy.toCommuting i

@@ -142,6 +142,13 @@ theorem exists_legal_of_accepts_axis_point (d : ℕ) (L : Finset (Point F m)) (u
   cases a <;> cases b <;> simp only [accepts] at h
   exact ⟨_, _, rfl, rfl, h⟩
 
+/-- Accepted diagonal and point answers agree at the queried point. -/
+theorem exists_agree_of_accepts_point_diagonal (d : ℕ) (L : Finset (Point F m))
+    (u : Point F m) (a b : Answer F m) (h : accepts d (.point u) (.diagonal L) a b) :
+    ∃ g z, a = .inl z ∧ b = .inr g ∧ ∃ hu : u ∈ g.1, g.2 ⟨u, hu⟩ = z := by
+  cases a <;> cases b <;> simp only [accepts] at h
+  exact ⟨_, _, rfl, rfl, h.2.2⟩
+
 theorem accepts_point_axis_iff (d : ℕ) (L : Finset (Point F m)) (u : Point F m)
     (a b : Answer F m) :
     accepts d (.point u) (.axis L) a b ↔ accepts d (.axis L) (.point u) b a := by
@@ -197,12 +204,19 @@ def prefixDirectionEquiv (i : Fin m) :
 
 /-- Diagonal branch, with a uniform point, uniform prefix length and uniform direction within
 that prefix. Zero directions occur with the sampling probability specified in Figure 2. -/
-noncomputable def diagonalQuestions (n : ℕ) :
+@[expose] noncomputable def diagonalQuestions (n : ℕ) :
     PMF (Question F (n + 1) × Question F (n + 1)) :=
   (uniformOfFintype (Point F (n + 1))).bind fun u =>
     (uniformOfFintype (Fin (n + 1))).bind fun i =>
       (uniformOfFintype (Fin (i.val + 1) → F)).bind fun v =>
         assignLineRoles (.diagonal (linePoints u (prefixDirection i v))) (.point u)
+
+omit [Fintype F] [DecidableEq F] in
+/-- At the full prefix, extending the direction is the identity. -/
+@[simp] theorem prefixDirection_last {n : ℕ} (v : Point F (n + 1)) :
+    prefixDirection (Fin.last n) v = v := by
+  funext j
+  simp [prefixDirection, j.isLt]
 
 /-- Every prefix direction and either role assignment occurs in the diagonal branch. -/
 theorem mem_diagonalQuestions_support {n : ℕ} {q : Question F (n + 1) × Question F (n + 1)} :
@@ -246,6 +260,11 @@ theorem branchGame_questions (n d : ℕ) (b : Branch) :
 
 theorem branchQuestions_axis (n : ℕ) :
     branchQuestions (F := F) n .axis = axisQuestions n := by
+  unfold branchQuestions
+  rfl
+
+theorem branchQuestions_diagonal (n : ℕ) :
+    branchQuestions (F := F) n .diagonal = diagonalQuestions n := by
   unfold branchQuestions
   rfl
 

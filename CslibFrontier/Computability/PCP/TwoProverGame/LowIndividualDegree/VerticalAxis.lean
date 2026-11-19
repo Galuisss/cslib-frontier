@@ -75,7 +75,7 @@ section Measurement
 variable [Ring A] [PartialOrder A] [IsOrderedAddMonoid A]
 
 /-- Decode the outcomes of a point measurement. -/
-noncomputable def decodedPoint (M : Question F (n + 1) → Measurement (Answer F (n + 1)) A)
+@[expose] noncomputable def decodedPoint (M : Question F (n + 1) → Measurement (Answer F (n + 1)) A)
     (u : Point F (n + 1)) : Measurement F A :=
   (M (.point u)).map decodePoint
 
@@ -84,19 +84,13 @@ noncomputable def decodedVertical (M : Question F (n + 1) → Measurement (Answe
     (d : ℕ) (u : Point F n) : Measurement (PolynomialFunction F d) A :=
   (M (.axis (verticalLine u))).map (decodeVertical d u)
 
-private theorem commute_postprocess {α β : Type*} [Fintype α] [Fintype β] [DecidableEq β]
-    (M : Measurement α A) (f : α → β) (e : A) (h : ∀ a, Commute e (M.effect a)) (b : β) :
-    Commute e ((M.map f).effect b) := by
-  rw [Measurement.map_effect]
-  exact (Commute.sum_left _ _ _ fun a _ => (h a).symm).symm
-
 /-- An operator commuting with the raw point effects also commutes with the decoded effects. -/
 theorem commute_decodedPoint
     (M : Question F (n + 1) → Measurement (Answer F (n + 1)) A)
     (u : Point F (n + 1)) (e : A)
     (h : ∀ a, Commute e ((M (.point u)).effect a)) (b : F) :
     Commute e ((decodedPoint M u).effect b) :=
-  commute_postprocess _ _ e h b
+  Measurement.commute_map_right _ _ e h b
 
 /-- An operator commuting with the raw line effects also commutes with the decoded effects. -/
 theorem commute_decodedVertical
@@ -105,7 +99,7 @@ theorem commute_decodedVertical
     (h : ∀ a, Commute e ((M (.axis (verticalLine u))).effect a)) (b : PolynomialFunction F d) :
     Commute e ((decodedVertical M d u).effect b) := by
   classical
-  exact commute_postprocess _ _ e h b
+  exact Measurement.commute_map_right _ _ e h b
 
 end Measurement
 
@@ -159,17 +153,6 @@ section Norm
 
 variable [StarModule ℂ A] [SelfAdjointDecompose A]
 
-omit [Algebra ℂ A] [TopologicalSpace A] [ContinuousFunctionalCalculus ℝ A IsSelfAdjoint]
-  [NonnegSpectrumClass ℝ A] [StarModule ℂ A] [SelfAdjointDecompose A] in
-private theorem commute_map_map {α β γ ω : Type*} [Fintype α] [Fintype β]
-    [Fintype γ] [Fintype ω] [DecidableEq γ] [DecidableEq ω]
-    (P : Measurement α A) (R : Measurement β A)
-    (h : ∀ a b, Commute (P.effect a) (R.effect b)) (f : α → γ) (g : β → ω)
-    (c : γ) (z : ω) : Commute ((P.map f).effect c) ((R.map g).effect z) := by
-  simp only [Measurement.map_effect]
-  exact Commute.sum_left _ _ _ fun a _ =>
-    (Commute.sum_left _ _ _ fun b _ => (h a b).symm).symm
-
 private theorem decodedPoint_stateDist_le (S : CommutingStrategy Q Q Ans Ans A) (d : ℕ) :
     (𝔼 u : Point F (n + 1), ∑ a,
       S.state.norm ((decodedPoint S.bob u).effect a - (decodedPoint S.alice u).effect a) ^ 2) ≤
@@ -191,7 +174,8 @@ private theorem decodedPoint_stateDist_le (S : CommutingStrategy Q Q Ans Ans A) 
           (decodedPoint S.alice u).effect a) ^ 2) ≤
         2 * (1 - acceptScore S d (.point u) (.point u)) := by
     have h := Measurement.sum_norm_sub_sq_le S.state (decodedPoint S.alice u) (decodedPoint S.bob u)
-      (fun a => commute_map_map _ _ (S.commute (.point u) (.point u)) decodePoint decodePoint a a)
+      (fun a => Measurement.commute_map_map _ _ (S.commute (.point u) (.point u))
+        decodePoint decodePoint a a)
     have he (a : F) := S.state.norm_sub_comm ((decodedPoint S.bob u).effect a)
       ((decodedPoint S.alice u).effect a)
     simp only [he]
@@ -217,8 +201,8 @@ private theorem vertical_stateDist_le (S : CommutingStrategy Q Q Ans Ans A) (d :
         ((decodedVertical S.bob d u).map (fun f => f.value t)) (fun a => by
           unfold decodedPoint decodedVertical
           rw [Measurement.map_map]
-          exact commute_map_map _ _ (S.commute (.point (Fin.snoc u t)) (.axis (verticalLine u)))
-            _ _ a a)
+          exact Measurement.commute_map_map _ _
+            (S.commute (.point (Fin.snoc u t)) (.axis (verticalLine u))) _ _ a a)
       dsimp only [loss]
       linarith
     _ = 2 * (𝔼 u : Point F n, 𝔼 t : F, loss u t) := by simp only [← Finset.mul_expect]
