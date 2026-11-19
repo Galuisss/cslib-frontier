@@ -4982,6 +4982,7 @@ public import CslibFrontier.Crypto.Computational.Lattice.ShortestVector
 public import CslibFrontier.Crypto.Computational.LubyRackoff
 public import CslibFrontier.Crypto.Computational.MAC
 public import CslibFrontier.Crypto.Computational.MAC.Counter
+public import CslibFrontier.Crypto.Computational.MLDSA.AdaptiveKeySeed
 public import CslibFrontier.Crypto.Computational.MLDSA.AmbientVerification
 public import CslibFrontier.Crypto.Computational.MLDSA.Basic
 public import CslibFrontier.Crypto.Computational.MLDSA.ChallengeRowProgramming
@@ -5020,6 +5021,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
 public import CslibFrontier.Crypto.Computational.MLDSA.Signing
 public import CslibFrontier.Crypto.Computational.MLDSA.SigningHedges
 public import CslibFrontier.Crypto.Computational.MLDSA.SigningMaskSeeds
+public import CslibFrontier.Crypto.Computational.MLDSA.SigningQueryComparison
 public import CslibFrontier.Crypto.Computational.MLDSA.SigningROM
 public import CslibFrontier.Crypto.Computational.MLDSA.SigningSimulation
 public import CslibFrontier.Crypto.Computational.MerkleDamgard
