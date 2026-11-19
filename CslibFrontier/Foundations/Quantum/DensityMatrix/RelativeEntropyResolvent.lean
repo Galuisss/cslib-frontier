@@ -196,13 +196,20 @@ theorem relativeEntropyResolvent_eq_sum {t : ℝ} (ht : 0 < t)
     {ρ σ : Matrix ι ι ℂ} (hρ : ρ.PosSemidef) (hσ : σ.PosSemidef) :
     relativeEntropyResolvent t ρ σ =
       ∑ j, ∑ i, hρ.isHermitian.eigenvalues j ^ 2 *
-        Complex.normSq (((hσ.isHermitian.eigenvectorUnitary : Matrix ι ι ℂ)ᴴ *
-          (hρ.isHermitian.eigenvectorUnitary : Matrix ι ι ℂ)) i j) /
+        Complex.normSq (((hρ.isHermitian.eigenvectorUnitary : Matrix ι ι ℂ)ᴴ *
+          (hσ.isHermitian.eigenvectorUnitary : Matrix ι ι ℂ)) j i) /
         (hσ.isHermitian.eigenvalues i + t * hρ.isHermitian.eigenvalues j) := by
   obtain ⟨B, hB, hv⟩ := resolvent_solution ht hρ hσ
   rw [relativeEntropyResolvent, iSup,
     (quadraticObjective_isGreatest (resolventMatrix_posSemidef ht.le hρ hσ) hB).csSup_eq,
     star_vec_dotProduct_vec, hv]
+  let U : Matrix ι ι ℂ := hρ.isHermitian.eigenvectorUnitary
+  let V : Matrix ι ι ℂ := hσ.isHermitian.eigenvectorUnitary
+  have hW : Vᴴ * U = (Uᴴ * V)ᴴ := by rw [conjTranspose_mul, conjTranspose_conjTranspose]
+  refine sum_congr rfl fun j _ => sum_congr rfl fun i _ => ?_
+  change _ * Complex.normSq ((Vᴴ * U) i j) / _ =
+    _ * Complex.normSq ((Uᴴ * V) j i) / _
+  rw [hW, conjTranspose_apply, Complex.star_def, Complex.normSq_conj]
 
 private theorem quadraticObjective_resolvent (t : ℝ) (ρ σ X : Matrix ι ι ℂ) :
     quadraticObjective (resolventMatrix t ρ σ) ρ.vec X.vec =
