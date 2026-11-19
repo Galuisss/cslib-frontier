@@ -19,7 +19,7 @@ each column in turn with its derivative (`Derivation.map_det`). The identity hol
 arbitrary derivation of a commutative algebra and requires no invertibility hypothesis.
 -/
 
-@[expose] public section
+public section
 
 namespace Derivation
 
