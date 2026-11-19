@@ -4123,6 +4123,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PastingConsistency
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PointCommutativity
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialAnswer
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SelfImprovementSDP
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SliceBoundedness
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerifierPasting
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerticalAxis
@@ -7154,6 +7155,7 @@ public import CslibFrontier.Foundations.Quantum.NoCloning
 public import CslibFrontier.Foundations.Quantum.POVM
 public import CslibFrontier.Foundations.Quantum.POVM.Density
 public import CslibFrontier.Foundations.Quantum.POVM.Mixture
+public import CslibFrontier.Foundations.Quantum.POVM.Optimization
 public import CslibFrontier.Foundations.Quantum.Pauli
 public import CslibFrontier.Foundations.Quantum.PauliTwirl
 public import CslibFrontier.Foundations.Quantum.Register
