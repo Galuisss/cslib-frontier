@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Foundations.Quantum.DensityMatrix
 public import Mathlib.Analysis.Matrix.HermitianFunctionalCalculus
+import CslibFrontier.Foundations.LinearAlgebra.Matrix.PosSemidefKernel
 import CslibFrontier.Foundations.LinearAlgebra.Matrix.PolarDecomposition
 import CslibFrontier.Probability.Divergence
 
@@ -53,20 +54,14 @@ theorem SupportLE.sum_smul {κ : Type*} [Fintype κ] (w : κ → ℝ) (hw : ∀ 
     {ρ σ : κ → Matrix ι ι ℂ} (hσ : ∀ k, (σ k).PosSemidef) (hs : ∀ k, SupportLE (ρ k) (σ k)) :
     SupportLE (∑ k, w k • ρ k) (∑ k, w k • σ k) := by
   intro x hx
-  have hx' := congrArg (fun y : ι → ℂ => (star x ⬝ᵥ y).re) hx
-  have hre (r : ℝ) (z : ℂ) : (r • z).re = r * z.re := Complex.reLm.map_smul r z
-  simp only [sum_mulVec, smul_mulVec, dotProduct_sum, dotProduct_smul, Complex.re_sum, hre,
-    dotProduct_zero, Complex.zero_re] at hx'
-  have hzero := (sum_eq_zero_iff_of_nonneg fun k _ =>
-    mul_nonneg (hw k) ((hσ k).re_dotProduct_nonneg x)).mp hx'
+  have hzero := (mulVec_sum_smul_eq_zero_iff univ w σ
+    (fun k _ => hw k) (fun k _ => hσ k) x).mp hx
   rw [sum_mulVec]
-  refine sum_eq_zero fun k _ => ?_
+  refine sum_eq_zero fun k hk => ?_
   rw [smul_mulVec]
-  rcases mul_eq_zero.mp (hzero k (mem_univ _)) with hw' | hq
-  · rw [hw', zero_smul]
-  · have him := (Complex.nonneg_iff.mp ((hσ k).dotProduct_mulVec_nonneg x)).2
-    have hz : star x ⬝ᵥ (σ k *ᵥ x) = 0 := Complex.ext hq him.symm
-    rw [hs k x ((hσ k).dotProduct_mulVec_zero_iff.mp hz), smul_zero]
+  by_cases hwk : w k = 0
+  · rw [hwk, zero_smul]
+  · rw [hs k x (hzero k hk hwk), smul_zero]
 
 omit [DecidableEq ι] in
 /-- A rectangular compression preserves support inclusion when its reference is positive
