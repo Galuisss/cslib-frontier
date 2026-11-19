@@ -4119,6 +4119,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditionalStates
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredCoordinateInformation
+public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredCoordinateTraceDistance
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredNoisyStates
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredTranscript
@@ -7166,6 +7167,7 @@ public import CslibFrontier.Foundations.Quantum.DensityMatrix.ClassicalQuantumCo
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.ClassicalQuantumEntropy
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.ClassicalQuantumInformationChain
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.ClassicalQuantumMarginal
+public import CslibFrontier.Foundations.Quantum.DensityMatrix.ClassicalQuantumPinsker
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.FidelityTraceDistance
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Isometry
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Linear
