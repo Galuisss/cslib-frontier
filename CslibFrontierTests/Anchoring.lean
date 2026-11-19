@@ -231,7 +231,7 @@ example (S : Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option
     let P := (T.filter W (acceptingGame_win_supported S)).map (aliceTranscriptProjection C e)
     ∃ ρ : _ → Matrix (Fin 3) (Fin 3) ℂ,
       (∀ z, Cslib.Quantum.IsDensityMatrix (ρ z)) ∧
-      Cslib.Quantum.sum_conditionalTraceNormSq P ρ ≤ 2 * Real.log 4 := by
+      Cslib.Quantum.sumConditionalTraceNormSq P ρ ≤ 2 * Real.log 4 := by
   dsimp only
   obtain ⟨ρ, hρ, _, h⟩ := exists_bob_sum_conditionalTraceNormSq_le_after_wins
     acceptingGame half {0} S (Fintype.equivFinOfCardEq (by decide : _ = 1)).symm

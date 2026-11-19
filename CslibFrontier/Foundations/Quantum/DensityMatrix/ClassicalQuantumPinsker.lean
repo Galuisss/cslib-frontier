@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.ClassicalQuantumMarginal
 import CslibFrontier.Foundations.Quantum.DensityMatrix.QuantumPinsker
+import CslibFrontier.Foundations.Algebra.Order.WithTop
 
 /-!
 # Squared trace deviation of conditional quantum states
@@ -29,13 +30,6 @@ open Cslib.Probability.PMF (conditionalSnd)
 variable {ι X Y T : Type*} [Fintype ι] [DecidableEq ι]
   [Fintype X] [DecidableEq X] [Fintype Y] [DecidableEq Y]
 
-private theorem mul_le_mul_of_nonneg_real {a : ℝ} (ha : 0 ≤ a)
-    {b c : WithTop ℝ} (h : b ≤ c) : (a : WithTop ℝ) * b ≤ (a : WithTop ℝ) * c := by
-  rcases ha.eq_or_lt with ha | ha
-  · simp [← ha]
-  · exact (WithTop.mul_right_strictMono (WithTop.coe_pos.mpr ha)
-      WithTop.coe_ne_top).monotone h
-
 /-- One half of the mean squared trace deviation is bounded by classical–quantum mutual
 information. Individual labels may have zero probability. -/
 theorem mean_traceNorm_sub_sq_div_two_le_mutualInformation (p : PMF X)
@@ -55,14 +49,14 @@ theorem mean_traceNorm_sub_sq_div_two_le_mutualInformation (p : PMF X)
   apply sum_le_sum
   intro y _
   rw [WithTop.coe_mul]
-  refine mul_le_mul_of_nonneg_real ENNReal.toReal_nonneg ?_
+  refine WithTop.mul_le_mul_of_nonneg_coe_left ENNReal.toReal_nonneg ?_
   exact traceNorm_sub_sq_div_two_le_relativeEntropy (hσ y)
     (isDensityMatrix_classicalQuantumState p hρ).partialTraceRight
 
 /-- Sum over the coordinates and average over the observed coordinate values and the
 retained transcript. The reference quantum state at each transcript averages over the
 whole tuple. The distance is the full trace norm, without a factor of one half. -/
-noncomputable def sum_conditionalTraceNormSq {m : ℕ} [Fintype T] (P : PMF (T × (Fin m → X)))
+noncomputable def sumConditionalTraceNormSq {m : ℕ} [Fintype T] (P : PMF (T × (Fin m → X)))
     (ρ : T × (Fin m → X) → Matrix ι ι ℂ) : ℝ :=
   ∑ t, ((P.map Prod.fst) t).toReal * ∑ i : Fin m,
     let q := conditionalSnd P t
@@ -73,19 +67,19 @@ noncomputable def sum_conditionalTraceNormSq {m : ℕ} [Fintype T] (P : PMF (T �
 
 /-- A transcript-averaged coordinate information budget in nats gives at most twice
 that budget for the summed mean squared trace deviation. -/
-theorem sum_conditionalTraceNormSq_le_of_information_bound {m : ℕ} [Fintype T]
+theorem sumConditionalTraceNormSq_le_of_information_bound {m : ℕ} [Fintype T]
     (P : PMF (T × (Fin m → X))) {ρ : T × (Fin m → X) → Matrix ι ι ℂ}
     (hρ : ∀ z, IsDensityMatrix (ρ z)) {K : ℝ}
     (hK : (∑ t, (((P.map Prod.fst) t).toReal : WithTop ℝ) * ∑ i : Fin m,
       mutualInformation (classicalQuantumMarginal (conditionalSnd P t)
         (fun x => ρ (t, x)) (fun x => x i))) ≤ (K : WithTop ℝ)) :
-    sum_conditionalTraceNormSq P ρ ≤ 2 * K := by
-  have h : ((sum_conditionalTraceNormSq P ρ / 2 : ℝ) : WithTop ℝ) ≤
+    sumConditionalTraceNormSq P ρ ≤ 2 * K := by
+  have h : ((sumConditionalTraceNormSq P ρ / 2 : ℝ) : WithTop ℝ) ≤
       ∑ t, (((P.map Prod.fst) t).toReal : WithTop ℝ) * ∑ i : Fin m,
         mutualInformation (classicalQuantumMarginal (conditionalSnd P t)
           (fun x => ρ (t, x)) (fun x => x i)) := by
-    simp only [sum_conditionalTraceNormSq, sum_div, mul_div_assoc, WithTop.coe_sum, WithTop.coe_mul]
-    refine sum_le_sum fun t _ => mul_le_mul_of_nonneg_real ENNReal.toReal_nonneg
+    simp only [sumConditionalTraceNormSq, sum_div, mul_div_assoc, WithTop.coe_sum, WithTop.coe_mul]
+    refine sum_le_sum fun t _ => WithTop.mul_le_mul_of_nonneg_coe_left ENNReal.toReal_nonneg
       (sum_le_sum fun i _ => ?_)
     simpa only [WithTop.coe_sum, WithTop.coe_mul, quantumMarginalGiven] using
       mean_traceNorm_sub_sq_div_two_le_mutualInformation (conditionalSnd P t)
