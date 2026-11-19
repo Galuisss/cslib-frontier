@@ -64,6 +64,20 @@ theorem conjTranspose_ancillaEmbed_mul (a₀ : A) :
     simp [ancillaEmbed, ite_and]
   · simp [ancillaEmbed, ite_and, h, Ne.symm h]
 
+omit [Fintype ι] [DecidableEq ι] [Fintype A] [DecidableEq A] in
+/-- The basis coordinates with the ancilla fixed to `a₀`. -/
+def ancillaBasis (a₀ : A) : ι ↪ ι × A :=
+  ⟨fun i => (i, a₀), fun _ _ h => congrArg Prod.fst h⟩
+
+/-- Compression to the prepared ancilla selects a principal submatrix. -/
+theorem compress_ancillaEmbed (a₀ : A) (M : Matrix (ι × A) (ι × A) ℂ) :
+    (ancillaEmbed a₀)ᴴ * M * ancillaEmbed a₀ =
+      M.submatrix (ancillaBasis a₀) (ancillaBasis a₀) := by
+  rw [Matrix.mul_assoc]
+  ext i j
+  change ((ancillaEmbed (ι := ι) a₀)ᴴ * (M * ancillaEmbed (ι := ι) a₀)) i j = M (i, a₀) (j, a₀)
+  simp [Matrix.mul_apply, ancillaEmbed, ite_mul, mul_ite]
+
 /-- The projection `1 ⊗ |a⟩⟨a|` onto the ancilla value `a`. -/
 def ancillaProj (a : A) : Matrix (ι × A) (ι × A) ℂ :=
   1 ⊗ₖ Matrix.single a a 1
