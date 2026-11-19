@@ -8,6 +8,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 import CslibFrontierResults.Registry
 import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
+import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
 import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 import CslibFrontier.Computability.PCP.TwoProverGame.Synchronous
@@ -10833,6 +10834,23 @@ register_result "bvy-anchored-noisy-reveal-laws" where
     messages. For either designated player, forgetting the message recovers the anchored question \
     law, including anchor rates zero and one. Agreement of the left-message conditional with \
     the original anchored conditional assumes a supported message and an interior anchor rate."
+
+register_result "bvy-anchored-conditioning-bounds" where
+  title := "Movement of free trials and question resampling after checked wins"
+  topic := "nonlocal games"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Lemma 4.6(1)–(2)",
+      locator := "arXiv:1509.07466v2, §4.3, printed pp. 14–15" }
+  ]
+  theorems := [
+    Cslib.PCP.AnchoredDependency.sum_sq_dist_freeTrials_given_wins_le,
+    Cslib.PCP.AnchoredDependency.sum_dist_questions_given_wins_le
+  ]
+  scope := "Finite alphabets and local tensor POVMs, with checked answers from the same strategy that \
+    supplies the positive-probability checked-win event. The first bound sums squared distances \
+    and the second sums transcript and question-resampling distances. Distances are half-L1. \
+    The constants use natural logarithms with Pinsker’s factor 1/2 and count the full checked-answer \
+    alphabet. Any checked set is allowed, including when no free coordinate remains."
 
 register_result "synchronous-correlations-tracial-representation" where
   title := "Tracial representation of synchronous commuting correlations"
