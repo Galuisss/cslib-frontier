@@ -26,11 +26,11 @@ coherent query device and the independent-expansion device to the same refreshed
 Signing uses the same classical service in all three games. Every terminal signing write updates
 the table for the next coherent query, and intermediate measurements retain the conditional state.
 
-The query-magnitude argument of [Bennett et al.][BBBV1997], §3.1, bounds the squared change
-in square-root success by the sum of measured query disturbances times four times the query
-budget. Here it applies to the full public-pair signing service, whose randomized replies and
-writes have finite support. The private-input estimates give an increment of `4m / 2^128`
-on the square root, plus a single `2^-512` probability for the public-key hash exception.
+The adaptive query comparison in `SigningQueryComparison` bounds the squared change in
+square-root success by four times the query budget times the sum of the measured hit probabilities.
+Here the finite-support signing service samples both a response and terminal writes.
+The private-input estimates give an increment of `4m / 2^128` on the square root, plus a
+single `2^-512` probability for the public-key hash exception.
 
 The resulting probability comparison is an original step toward strong unforgeability of
 [FIPS 204][NISTFIPS204]. The distinguishing term is evaluated on the constructed test. Certifying
@@ -88,226 +88,6 @@ private theorem finite_signingCall (s : Level) (pair : MLDSA.PublicKey s.params)
     rintro (_ | w) _
     all_goals simp
 
-private theorem support_law {α : Type} (p : PMF α) :
-    ∃ r : PMF p.support, r.map Subtype.val = p := by
-  classical
-  let fallback : p.support := ⟨p.support_nonempty.choose, p.support_nonempty.choose_spec⟩
-  let cast (x : α) : p.support := if h : x ∈ p.support then ⟨x, h⟩ else fallback
-  refine ⟨p.map cast, ?_⟩
-  rw [PMF.map_comp]
-  refine (PMF.map_congr_on_support p _ id fun x hx => ?_).trans (PMF.map_id p)
-  simp only [Function.comp_apply, cast, dite_eq_left hx, id_eq]
-
-variable {C : QuantumSigningForger} {s : Level} {H : Xofs} {tr : List Byte}
-  (pair : MLDSA.PublicKey s.params) (raw : History s H tr → Xofs)
-
-private noncomputable def measured (pair : MLDSA.PublicKey s.params)
-    (raw : History s H tr → Xofs) {α : Type} (prog : Program C α)
-    (test : α → History s H tr → Test C) (d : Device C) (st : History s H tr) : PMF Bool :=
-  (ProbOracleComp.runWith (C.programmedCommands s H tr (publicDraw s pair) raw)
-    prog (d, st)).bind fun (x, dev, t) => (test x t).measureDensity dev.density dev.isDensityMatrix
-
-private theorem measured_step {α : Type} {q : Request C} {k : _ → Program C α}
-    (test : α → History s H tr → Test C) (d : Device C) (st : History s H tr) :
-    measured pair raw (OracleComp.query q >>= k) test d st =
-      (OracleComp.sumHandler (m := StateT (Device C × History s H tr) PMF)
-        (fun n z => (ProbComp.unifOracle n).map (·, z))
-        (C.programmedCommands s H tr (publicDraw s pair) raw) q (d, st)).bind
-        fun (x, dev, t) => measured pair raw (k x) test dev t := by
-  simp only [measured, ProbOracleComp.runWith, OracleComp.runWith_bind, OracleComp.runWith_query,
-    PMF.bind_bind]
-  rfl
-
-private theorem measured_pure {α : Type} (x : α) (test : α → History s H tr → Test C)
-    (d : Device C) (st : History s H tr) :
-    measured pair raw (pure x) test d st =
-      (test x st).measureDensity d.density d.isDensityMatrix := by
-  simp [measured, ProbOracleComp.runWith_pure]
-
-private theorem measured_coin {α : Type} {coin : ℕ} {k : Fin (coin + 1) → Program C α}
-    (test : α → History s H tr → Test C) (d : Device C) (st : History s H tr) :
-    measured pair raw (OracleComp.query (.inl coin) >>= k) test d st =
-      (ProbComp.unifOracle coin).bind fun i => measured pair raw (k i) test d st := by
-  rw [measured_step]
-  simp [OracleComp.sumHandler, pmf_norm]
-
-private theorem measured_gate {α : Type} {g : PhaseGateCode} {k : List Bool → Program C α}
-    (test : α → History s H tr → Test C) (d : Device C) (st : History s H tr) :
-    measured pair raw (OracleComp.query (.inr (.inl (.gate g))) >>= k) test d st =
-      measured pair raw (k []) test
-        (d.instruction ((raw st).queryTable C.addressBits C.responseBytes) (.gate g)) st := by
-  rw [measured_step]
-  simp [programmedCommands, OracleComp.sumHandler, deviceCommand, deviceHandler_gate, pmf_norm]
-
-private theorem measured_query {α : Type} {k : List Bool → Program C α}
-    (test : α → History s H tr → Test C) (d : Device C) (st : History s H tr) :
-    measured pair raw (OracleComp.query (.inr (.inl .query)) >>= k) test d st =
-      measured pair raw (k []) test
-        (d.instruction ((raw st).queryTable C.addressBits C.responseBytes) .query) st := by
-  rw [measured_step]
-  simp [programmedCommands, OracleComp.sumHandler, deviceCommand, deviceHandler_query, pmf_norm]
-
-private theorem measured_measure {α : Type} {wire : Fin (Width C)} {k : List Bool → Program C α}
-    (test : α → History s H tr → Test C) (d : Device C) (st : History s H tr) :
-    measured pair raw (OracleComp.query (.inr (.inl (.measure wire))) >>= k) test d st =
-      (d.measure (fun x => x wire)).bind fun (y, dev) => measured pair raw (k [y]) test dev st := by
-  rw [measured_step]
-  simp [programmedCommands, OracleComp.sumHandler, deviceCommand, deviceHandler_measure, pmf_norm]
-
-private theorem measured_sign {α : Type} {ask : SigningQuery}
-    {k : Option (List Byte) → Program C α}
-    (test : α → History s H tr → Test C) (d : Device C) (st : History s H tr) :
-    measured pair raw (OracleComp.query (.inr (.inr ask)) >>= k) test d st =
-      (signingCall s tr (publicDraw s pair) ask st).bind fun (r, t) =>
-        measured pair raw (k r) test d t := by
-  rw [measured_step]
-  simp [programmedCommands, OracleComp.sumHandler, pmf_norm]
-
-private theorem measured_readout {α : Type} (p : Program C α)
-    (test : α → History s H tr → Test C) (st : History s H tr) :
-    ∃ M : Test C, ∀ d, measured pair raw p test d st =
-      M.measureDensity d.density d.isDensityMatrix := by
-  classical
-  induction p generalizing st with
-  | pure x =>
-    exact ⟨test x st, fun d => by simp [measured, interp_norm, pmf_norm]⟩
-  | liftBind q k ih =>
-    choose M eq using ih
-    change ∃ M : Test C, ∀ d, measured _ _ (OracleComp.query q >>= k) _ d st = _
-    simp only [measured_step, programmedCommands, OracleComp.sumHandler]
-    rcases q with coin | cmd | ask
-    · exact ⟨POVM.mixture (ProbComp.unifOracle coin) (fun i => M i st), fun d => by
-        simp only [PMF.bind_map, Function.comp_def, eq, POVM.measureDensity_mixture]⟩
-    · cases cmd with
-      | service op _ => exact op.elim
-      | gate g =>
-        simpa only [deviceCommand, deviceHandler_gate, PMF.pure_map, PMF.pure_bind, eq,
-          StateT.run] using test_instruction (raw st) (.gate g) (M [] st)
-      | query =>
-        simpa only [deviceCommand, deviceHandler_query, PMF.pure_map, PMF.pure_bind, eq,
-          StateT.run] using test_instruction (raw st) .query (M [] st)
-      | measure wire =>
-        let f := fun (z : (Fin (Width C) → Bool) × Unit) => z.1 wire
-        refine ⟨POVM.afterRead f (fun y => M [y] st), fun d => ?_⟩
-        simp only [deviceCommand, deviceHandler_measure, PMF.bind_map,
-          Function.comp_def, eq, POVM.measureDensity_afterRead]
-        exact DeviceState.measure_bind (fun x => x wire) d
-          (fun y dev => (M [y] st).measureDensity dev.density dev.isDensityMatrix)
-    · let p := signingCall s tr (publicDraw s pair) ask st
-      obtain ⟨r, law⟩ := support_law p
-      let _ := (finite_signingCall s pair tr ask st).fintype
-      refine ⟨POVM.mixture r (fun z => M z.1.1 z.1.2), fun d => ?_⟩
-      simp only [PMF.bind_map, Function.comp_def, eq, POVM.measureDensity_mixture]
-      change p.bind _ = _
-      conv_lhs => rw [← law, PMF.bind_map]
-      rfl
-
-private noncomputable def changedAt {α : Type} (G R : History s H tr → Xofs)
-    (p : Program C α) (d : Device C) (st : History s H tr) (j : ℕ) : PMF Bool :=
-  measured pair R (queryPrefix p j) (fun b t => detector C (G t) (R t) b) d st
-
-private theorem changedAt_skip {α : Type} (G R : History s H tr → Xofs)
-    (q : Request C) (k : _ → Program C α) (hq : isXofQuery q = false)
-    (d : Device C) (st : History s H tr) (j : ℕ) :
-    changedAt pair G R (OracleComp.query q >>= k) d st j =
-      measured pair R (OracleComp.query q >>= fun x => queryPrefix (C := C) (k x) j)
-        (fun found t => detector C (G t) (R t) found) d st := by
-  change measured pair R (queryPrefix (C := C) (.liftBind q k) j) _ _ _ = _
-  rw [queryPrefix]
-  simp only [hq, Bool.false_and, Bool.false_eq_true, ↓reduceIte, Bool.toNat_false, Nat.sub_zero]
-  rfl
-
-private theorem finite_gap {β : Type} (p : PMF β) (hp : p.support.Finite)
-    (x y : β → PMF Bool) (hits : β → ℕ → PMF Bool) (n : ℕ)
-    (h : ∀ b, gap (x b) (y b) ≤ 4 * n * ∑ j ∈ Finset.range n, (hits b j true).toReal) :
-    gap (p.bind x) (p.bind y) ≤
-      4 * n * ∑ j ∈ Finset.range n, ((p.bind fun b => hits b j) true).toReal := by
-  obtain ⟨r, law⟩ := support_law p
-  let _ := hp.fintype
-  have eq {γ : Type} (k : β → PMF γ) : p.bind k = r.bind (k ∘ Subtype.val) := by
-    conv_lhs => rw [← law, PMF.bind_map]
-  simp only [eq]
-  exact gap_bind_le r _ _ (fun b => hits b.val) n fun b => h b
-
-private theorem measured_gap {α : Type} (G R : History s H tr → Xofs)
-    {p : Program C α} {m : ℕ}
-    (cost : OracleComp.IsCostBounded (fun q => (isXofQuery q).toNat) p m)
-    (test : α → History s H tr → Test C) (d : Device C) (st : History s H tr) :
-    gap (measured pair G p test d st) (measured pair R p test d st) ≤
-      4 * m * ∑ j ∈ Finset.range m, (changedAt pair G R p d st j true).toReal := by
-  classical
-  induction cost generalizing d st with
-  | pure x n =>
-    simp only [measured_pure, gap, sub_self, ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true,
-      zero_pow]
-    positivity
-  | liftBind q k n _ ih =>
-    rcases q with coin | cmd | ask
-    · have runPrefix (j : ℕ) := (changedAt_skip pair G R (.inl coin) k rfl d st j).trans
-          (measured_coin pair R (coin := coin) (k := fun x => queryPrefix (k x) j) _ d st)
-      rw [measured_coin pair G (k := k), measured_coin pair R (k := k)]
-      simp only [runPrefix, isXofQuery, Bool.toNat_false, Nat.add_zero]
-      exact gap_bind_le _ _ _ (fun i j => changedAt pair G R (k i) d st j) n fun i => ih i d st
-    · cases cmd with
-      | service op _ => exact op.elim
-      | gate g =>
-        let dev := d.instruction ((R st).queryTable C.addressBits C.responseBytes) (.gate g)
-        have runPrefix (j : ℕ) :=
-          (changedAt_skip pair G R (.inr (.inl (.gate g))) k rfl d st j).trans
-            (measured_gate pair R (g := g) (k := fun x => queryPrefix (k x) j) _ d st)
-        rw [measured_gate pair G (k := k), measured_gate pair R (k := k)]
-        simp only [runPrefix, isXofQuery, Bool.toNat_false, Nat.add_zero]
-        simpa only [changedAt, dev, DeviceState.instruction_apply, OracleGateCode.toPlacedGate?]
-          using ih [] dev st
-      | measure wire =>
-        obtain ⟨r, next, hm⟩ := measure_map d wire
-        have runPrefix (j : ℕ) :=
-          (changedAt_skip pair G R (.inr (.inl (.measure wire))) k rfl d st j).trans
-            (measured_measure pair R (wire := wire) (k := fun x => queryPrefix (k x) j) _ d st)
-        rw [measured_measure pair G (k := k), measured_measure pair R (k := k)]
-        simp only [runPrefix, hm, PMF.bind_map, Function.comp_def, isXofQuery, Bool.toNat_false,
-          Nat.add_zero]
-        exact gap_bind_le _ _ _ (fun y j => changedAt pair G R (k [y]) (next y) st j) n
-          fun y => ih [y] (next y) st
-      | query =>
-        let next (T : History s H tr → Xofs) :=
-          d.instruction ((T st).queryTable C.addressBits C.responseBytes) .query
-        let h :=
-          ((detector C (G st) (R st) true).measureDensity d.density d.isDensityMatrix true).toReal
-        have hz : changedAt pair G R (OracleComp.query (.inr (.inl .query)) >>= k) d st 0 =
-            (detector C (G st) (R st) true).measureDensity d.density d.isDensityMatrix := by
-          change measured pair R
-            (queryPrefix (C := C) (.liftBind (.inr (.inl .query)) k) 0) _ _ _ = _
-          rw [queryPrefix]
-          simp [isXofQuery, measured, interp_norm, pmf_norm]
-        have hs (j : ℕ) :
-            changedAt pair G R (OracleComp.query (.inr (.inl .query)) >>= k) d st (j + 1) =
-              changedAt pair G R (k []) (next R) st j := by
-          change measured pair R
-            (queryPrefix (C := C) (.liftBind (.inr (.inl .query)) k) (j + 1)) _ _ _ = _
-          rw [queryPrefix]
-          simp only [isXofQuery, Nat.succ_ne_zero, beq_iff_eq, Bool.true_and, Bool.toNat_true,
-            ↓reduceIte, Nat.add_sub_cancel]
-          change measured pair R (OracleComp.query _ >>= _) _ _ _ = _
-          simp only [measured_query (C := C) pair
-            (k := fun x => queryPrefix (C := C) (k x) j)]
-          rfl
-        obtain ⟨M, eq⟩ := measured_readout pair G (k []) test st
-        have one : gap (measured pair G (k []) test (next G) st)
-            (measured pair G (k []) test (next R) st) ≤ 4 * h := by
-          simpa only [eq, h, next] using single_gap C (G st) (R st) d M
-        have rest := ih [] (next R) st
-        simp only [measured_query (C := C) pair (k := k), isXofQuery, Bool.toNat_true,
-          Finset.sum_range_succ', hs, hz]
-        rw [add_comm (∑ _ ∈ _, _)]
-        exact gap_step n (Finset.sum_nonneg fun _ _ => ENNReal.toReal_nonneg) one rest
-    · have runPrefix (j : ℕ) := (changedAt_skip pair G R (.inr (.inr ask)) k rfl d st j).trans
-          (measured_sign pair R (ask := ask) (k := fun x => queryPrefix (k x) j) _ d st)
-      rw [measured_sign pair G (k := k), measured_sign pair R (k := k)]
-      simp only [runPrefix, isXofQuery, Bool.toNat_false, Nat.add_zero]
-      exact finite_gap _ (finite_signingCall ..) _ _
-        (fun z j => changedAt pair G R (k z.1) d z.2 j) n fun z => ih z.1 d z.2
-
 private theorem publicPair_gap (C : QuantumSigningForger) (s : Level) (G H : Xofs)
     (rho : FixedBytes 32) (pair : MLDSA.PublicKey s.params) {m : ℕ} (cost : C.XofCallsLe m) :
     gap (C.publicPairWinWithDevice s G H rho pair) (C.publicPairWinWithDevice s H H rho pair) ≤
@@ -317,16 +97,17 @@ private theorem publicPair_gap (C : QuantumSigningForger) (s : Level) (G H : Xof
   let tr := H.h256.readBytes pk 64
   let start : History s H tr := ⟨H, [], [], .initial, by simp, by simp⟩
   let raw (D : Xofs) (t : History s H tr) := TerminalSigningWrite.replay D t.writes
+  let sign := signingCall s (base := H) tr (publicDraw s pair)
   have honest : raw H = (·.xofs) := funext fun t => t.trace.replay_eq
   let test (f : Forgery) (t : History s H tr) : Test C := POVM.const
     (SignedMatrixTrial.newDigestWin ⟨t.xofs, pair.A, pk, f, t.log⟩)
   have win (D : Xofs) : C.publicPairWinWithDevice s D H rho pair =
-      measured pair (raw D) (C.program pk) test C.initial.1 start := by
+      measured sign (raw D) (C.program pk) test C.initial.1 start := by
     simp only [publicPairWinWithDevice, scoreProgram, measured, test, POVM.measureDensity_const,
       PMF.map, Function.comp_def]
     rfl
   have hit (j : ℕ) : C.publicPairResponseChange s j G H rho pair =
-      changedAt pair (raw G) (raw H) (C.program pk) C.initial.1 start j := by
+      changedAt sign (raw G) (raw H) (C.program pk) C.initial.1 start j := by
     simp only [publicPairResponseChange, queryWrites, changedAt, measured, runSigningProgram,
       PMF.map_bind, PMF.map_comp, Function.comp_def, honest]
     apply congrArg (PMF.bind _ ·)
@@ -340,7 +121,8 @@ private theorem publicPair_gap (C : QuantumSigningForger) (s : Level) (G H : Xof
     rw [eq]
     exact addressTest_law C _ found (dev, t.log)
   simp only [win, hit]
-  exact measured_gap pair (raw G) (raw H) (cost pk) test C.initial.1 start
+  exact measured_gap sign (finite_signingCall s pair tr) (raw G) (raw H) (cost pk) test
+    C.initial.1 start
 
 private theorem secretRow_sq_le (C : QuantumSigningForger) (s : Level) (base : Xofs)
     {a b m : ℕ} (ha : 528 ≤ a) (hb : 481 ≤ b) (cost : C.XofCallsLe m) (share : Bool) :
