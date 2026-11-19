@@ -7,6 +7,7 @@ Authors: Samuel Schlesinger
 import CslibFrontier.Crypto.Protocols.Quantum.OneTimePad
 import CslibFrontier.Foundations.Quantum.Bell
 import CslibFrontier.Foundations.Quantum.DensityMatrix.FidelityTraceDistance
+import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropy
 import CslibFrontier.Foundations.Quantum.Pauli
 
 /-! Density matrices, the partial trace, no-signalling and the quantum one-time pad: concrete
@@ -184,5 +185,16 @@ example :
     cases b <;> simp
   rw [hD, traceNorm, hgram, CFC.sqrt_one, trace_one]
   norm_num [Fintype.card_bool]
+
+-- Disjoint one-dimensional supports give infinite relative entropy.
+example : relativeEntropy (pureState (ket false)) (pureState (ket true)) = ⊤ := by
+  apply relativeEntropy_of_not_supportLE
+  intro h
+  let v := (ket false).ofLp
+  have hz : (pureState (ket true)) *ᵥ v = 0 := by
+    funext i
+    cases i <;> simp [v, mulVec, dotProduct, pureState_apply, ket_apply]
+  have he := congrFun (h v hz) false
+  simp [v, mulVec, dotProduct, pureState_apply, ket_apply] at he
 
 end CslibFrontierTests.QuantumDensity
