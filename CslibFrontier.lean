@@ -299,6 +299,7 @@ public import CslibFrontier.Algorithms.MatrixMultiplication.Strassen.Defs
 public import CslibFrontier.Algorithms.MatrixMultiplication.Strassen.Phases
 public import CslibFrontier.Algorithms.Quantum.PeriodFinding
 public import CslibFrontier.Algorithms.Reachability.BreadthFirst
+public import CslibFrontier.Algorithms.Reachability.DoubleCounting
 public import CslibFrontier.Algorithms.Reachability.InductiveCounting
 public import CslibFrontier.Algorithms.Reachability.InductiveCounting.Bounds
 public import CslibFrontier.Algorithms.Reachability.InductiveCounting.Completeness
@@ -3569,6 +3570,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.L
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.CounterProgram.Step.Init
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.CounterProgram.Unary
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.CounterProgram.Words
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.HaltingTime
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.InductiveCounting
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.InductiveCounting.Bounds

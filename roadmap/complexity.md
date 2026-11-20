@@ -45,6 +45,12 @@ Containments, separations, closure properties, complete problems and reductions 
   `RL = L` remains unresolved; this classical-first milestone has no preprint-estimator dependency.
 - **Further classical randomized logspace** ([#459](https://github.com/cslib-community/cslib-frontier/issues/459)): two-sided `BPL` amplification, the random-walk proof of `USTCON ∈ RL`, Nisan's generator with its read-once fooling theorem ([#3187](https://github.com/cslib-community/cslib-frontier/issues/3187)), space-efficient computation and configuration-graph bridge, `BPL ⊆ DSPACE(log² n)`, and Saks–Zhou's `BPL ⊆ DSPACE(log^{3/2} n)`.
   The Saks–Zhou iteration as pure mathematics is [#3247](https://github.com/cslib-community/cslib-frontier/issues/3247); these two-sided results are separate from the one-sided Savitch milestone.
+- **Hoza's `NL = UL`** ([#6747](https://github.com/cslib-community/cslib-frontier/issues/6747)):
+  certify the executable weight generator in native logarithmic space, implement the
+  Reinhardt–Allender validation and reachability scans with unique output branches, and
+  compose them with seed enumeration and an NL-complete layered reachability encoding.
+  The [bounded-round transcript contract](../CslibFrontier/Algorithms/Reachability/DoubleCounting.lean)
+  isolates the guarantees needed to stream and verify the guessed paths.
 - **Reingold:** a symmetric-machine model of SL, and the edge-list encoding of USTCON by a logspace reduction.
 - **Williams's `TIME[t] ⊆ SPACE[√(t log t)]`** ([#888](https://github.com/cslib-community/cslib-frontier/issues/888)): the native inclusion for arbitrary injective input encodings and every `t(n) ≥ n`, without time constructibility, via Tree Evaluation, together with the time–space separation corollaries ([WilliamsSeparation.lean](../CslibFrontier/Computability/Complexity/Classes/TimeSpace/WilliamsSeparation.lean), including linear space `SPACE(n) ⊄ TIME(n^{2-ε})` and `TIME(n^2 / (log₂ n + 1)^2) ⊂ SPACE(n)`).
   Cook–Mertz malformed-input handling and the refined `O(ℓ + H log(ℓ + 2))` bound remain open on [#2855](https://github.com/cslib-community/cslib-frontier/issues/2855).

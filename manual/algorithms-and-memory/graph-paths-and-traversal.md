@@ -169,6 +169,19 @@ From the repository root, check it with
 These are finite probability bounds; they assert no machine uniformity, running time,
 or Exercise 8.44 concentration endpoint.
 
+## Double counting for bounded reachability
+
+Import [DoubleCounting.lean](../../CslibFrontier/Algorithms/Reachability/DoubleCounting.lean)
+for the transcript contract of Reinhardt and Allender's bounded reachability scan.
+`Cslib.DoubleCounting.Passes` checks one skip or walk per vertex against the exact
+breadth-first round size and the sum of its shortest distances. Apply `isSome_iff`
+to recover whether a target is reachable in that round. Use `existsUnique_passes_iff`
+to reduce uniqueness of a passing transcript to uniqueness of the shortest walk to
+each round vertex. The [native terminal test](../../CslibFrontier/Computability/Machines/Turing/MultiTape/Complexity/LogSpace/DoubleCounting.lean)
+compares the two binary tallies in workspace linear in their encoded lengths. The machine
+that streams the guesses and preserves the transcript-to-branch correspondence is tracked
+in [#6747](https://github.com/cslib-community/cslib-frontier/issues/6747).
+
 ## Continuous metric graphs
 
 Import `CslibFrontier.Foundations.Combinatorics.SimpleGraph.MetricGraph.Basic` ([Basic.lean](../../CslibFrontier/Foundations/Combinatorics/SimpleGraph/MetricGraph/Basic.lean)), along with [Geodesic.lean](../../CslibFrontier/Foundations/Combinatorics/SimpleGraph/MetricGraph/Geodesic.lean), [Maps.lean](../../CslibFrontier/Foundations/Combinatorics/SimpleGraph/MetricGraph/Maps.lean), [Subdivision.lean](../../CslibFrontier/Foundations/Combinatorics/SimpleGraph/MetricGraph/Subdivision.lean), [Realization.lean](../../CslibFrontier/Foundations/Combinatorics/SimpleGraph/MetricGraph/Realization.lean), [NearVertex.lean](../../CslibFrontier/Foundations/Combinatorics/SimpleGraph/MetricGraph/NearVertex.lean) and [Bipartite.lean](../../CslibFrontier/Foundations/Combinatorics/SimpleGraph/MetricGraph/Bipartite.lean). Public declarations live in `SimpleGraph` and `SimpleGraph.MetricGraph`.
