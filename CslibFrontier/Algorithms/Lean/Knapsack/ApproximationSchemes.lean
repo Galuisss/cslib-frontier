@@ -7,9 +7,8 @@ Authors: Christian Reitwiessner
 module
 -- upstream: candidate
 
+public import CslibFrontier.Algorithms.Lean.Knapsack.PolyTime
 public import CslibFrontier.Computability.Complexity.Classes.ApproximationSchemes
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.List
-import CslibFrontier.Algorithms.Lean.Knapsack.PolyTime
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List.Sublist
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat.Binary
 
@@ -19,7 +18,10 @@ import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime
 The optimization problem chooses a subsequence of the items within the capacity and
 maximizes its total value. The existing knapsack approximation algorithm and its
 unary-accuracy time bound provide the solver for the generic FPTAS predicate
-[Williamson and Shmoys, Theorem 3.5][WilliamsonShmoys2011].
+[Williamson and Shmoys][WilliamsonShmoys2011], Theorem 3.5, §3.1, printed p. 68
+of the authors' electronic web edition. We also allow zero weights, values and capacity.
+The solver filters out items exceeding capacity. Selecting a subsequence preserves distinct
+positions for items with identical weights and values.
 -/
 
 public section
@@ -28,12 +30,6 @@ namespace Cslib.Algorithms.Lean.Knapsack
 
 open Cslib.Complexity Turing.MultiTapeTM ComputableInPolyTime
 open scoped List
-
-/-- A list of binary weight–value pairs. -/
-abbrev encItems : List (ℕ × ℕ) ↪ List Bool := encList (encPair encNat encNat)
-
-/-- The items followed by a binary capacity. -/
-abbrev encInstance : (List (ℕ × ℕ) × ℕ) ↪ List Bool := encPair encItems encNat
 
 /-- The 0–1 knapsack maximization problem, with a list of selected items as a solution. -/
 @[expose] def optimizationProblem : NPOptimizationProblem encInstance encItems where
