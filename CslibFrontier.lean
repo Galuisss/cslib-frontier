@@ -987,6 +987,8 @@ public import CslibFrontier.Algorithms.WordRAM.ThreeSum.Weight
 public import CslibFrontier.Computability.Automata.MPDA.Basic
 public import CslibFrontier.Computability.Automata.MPDA.Holes
 public import CslibFrontier.Computability.Automata.MPDA.OneHole
+public import CslibFrontier.Computability.Automata.MPDA.ScopeHoles
+public import CslibFrontier.Computability.Automata.MPDA.Underapprox
 public import CslibFrontier.Computability.Automata.MPDA.WellNested
 public import CslibFrontier.Computability.Automata.NA.Map
 public import CslibFrontier.Computability.BlumComplexity.Basic
@@ -2075,6 +2077,7 @@ public import CslibFrontier.Computability.Complexity.Classes.FunctionTime.WordRA
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.LazyDiagonal
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.LazyDiagonalBounds
+public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.LazyDiagonalVerifier
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.LogClock
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.Nondeterministic
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.NondeterministicExponentialTime
@@ -4155,10 +4158,12 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialAnswer
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialMeasurement
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialPointEffect
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialSliceCommutativity
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.RestrictedStrategy
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SelfImprovementSDP
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SelfImprovementSandwich
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SliceBoundedness
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SliceCommutativity
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.Slices
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerifierPasting
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerticalAxis
@@ -6684,6 +6689,7 @@ public import CslibFrontier.Foundations.Data.List.SortedAssoc
 public import CslibFrontier.Foundations.Data.List.SortedAssoc.Flatten
 public import CslibFrontier.Foundations.Data.List.SortedAssoc.Scan
 public import CslibFrontier.Foundations.Data.List.SortedCount
+public import CslibFrontier.Foundations.Data.List.Splits
 public import CslibFrontier.Foundations.Data.List.SumIndicator
 public import CslibFrontier.Foundations.Data.List.Swap
 public import CslibFrontier.Foundations.Data.List.TakeQuantifiers
@@ -7181,6 +7187,7 @@ public import CslibFrontier.Foundations.Quantum.Algebra.JointMeasurement
 public import CslibFrontier.Foundations.Quantum.Algebra.MaxEntangled
 public import CslibFrontier.Foundations.Quantum.Algebra.Measurement
 public import CslibFrontier.Foundations.Quantum.Algebra.MeasurementMixture
+public import CslibFrontier.Foundations.Quantum.Algebra.OutcomeCommutator
 public import CslibFrontier.Foundations.Quantum.Algebra.PrefixCommutator
 public import CslibFrontier.Foundations.Quantum.Algebra.SandwichedMeasurement
 public import CslibFrontier.Foundations.Quantum.Algebra.SequentialBinomial
