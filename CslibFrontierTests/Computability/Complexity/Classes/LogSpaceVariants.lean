@@ -11,6 +11,7 @@ import CslibFrontier.Computability.Complexity.Classes.LogSpace.Counting
 import CslibFrontier.Computability.Complexity.Classes.LogSpace.Function
 import CslibFrontier.Computability.Complexity.Classes.LogSpace.NondeterministicOracle
 import CslibFrontier.Computability.Complexity.Classes.NP.Logarithmic
+import CslibFrontierTests.CountingAmbiguity
 
 open Cslib.Complexity Turing Turing.MultiTapeTM
 
@@ -21,6 +22,18 @@ example {α : Type} {enc : α ↪ List Bool} {A : Set α} (hA : A ∈ UL enc) :
   refine ⟨f, hf, fun a => (hpos a).trans ?_⟩
   have h : f a = 0 ∨ f a = 1 := by have := hle a; omega
   obtain h | h := h <;> rw [h] <;> decide
+
+-- Two occurrences of the same accepting action violate weak unambiguity.
+example : ¬ (CslibFrontierTests.CountingAmbiguity.machine 2).WeaklyUnambiguousFrom
+    (Cfg.init () [true]) := by
+  intro h
+  have collision := h (first := [0]) (second := [1]) rfl rfl rfl rfl
+  cases collision
+
+-- The global one-branch bound implies the terminal configuration condition.
+example {α : Type} {enc : α ↪ List Bool} {A : Set α} (hA : A ∈ UL enc) :
+    A ∈ LogFewNL enc :=
+  UL_subset_LogFewNL hA
 
 -- A constant gap of one has nonzero residue modulo two, so this witness accepts every input.
 example {α : Type} {enc : α ↪ List Bool}
