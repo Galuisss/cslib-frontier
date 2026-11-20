@@ -16,8 +16,10 @@ import CslibFrontier.Foundations.Quantum.Algebra.CompletionConsistency
 
 Round the two consistent polynomial POVMs separately on their original spaces.
 Agreement on full polynomial outcomes controls the change caused by rounding
-also after grouping outcomes by evaluation. This proves a quantitative form of
-[JNVWY2020LowIndividualDegree, Theorem 3.10] with the errors of the formalized induction.
+also after grouping outcomes by evaluation. This proves a quantitative variant of
+[JNVWY2020LowIndividualDegree, Theorem 3.10]. It uses the explicit induction,
+collision and rounding errors given below in place of the source's common
+1/40000-power error.
 -/
 
 public section
@@ -37,8 +39,9 @@ local notation "Poly" => BoundedPolynomial F (n + 1) d
 
 /-- For arbitrary projective tensor strategies, the two local projective
 polynomial measurements agree on full outcomes and with the opposing players'
-decoded point measurements. The bound uses the three branch losses and allows
-an independent diagonal cutoff `D`. Set `D = (n + 1) * d` for the Figure 2 verifier. -/
+decoded point measurements. The bounds are those of the quantitative variant described
+above. They use the three branch losses and allow an independent diagonal cutoff `D`.
+Set `D = (n + 1) * d` for the Figure 2 verifier. -/
 theorem exists_projective_polynomial_POVMs {k : ℕ} (D : ℕ)
     (hk : (n + 1) * d ≤ k) (S : QuantumStrategy Q Q Ans Ans ι κ)
     (hA : ∀ q, (S.alice q).toMeasurement.IsProjective)
@@ -138,7 +141,8 @@ verifier rejection probability `ε`, and degree-to-field-size ratio `r`. -/
   ⟨σ + √(8 * ζ + 4 * √(18 * ζ)), ζ + 2 * √(18 * ζ)⟩
 
 /-- Low-individual-degree soundness stated using the loss in the full verifier.
-Each branch loses with probability at most three times that loss. -/
+This specializes the quantitative variant above by substituting three times the full
+verifier loss for each branch loss in the two fields of soundnessErrors. -/
 theorem exists_projective_polynomial_POVMs_of_winProb {k : ℕ}
     (hk : (n + 1) * d ≤ k) (S : QuantumStrategy Q Q Ans Ans ι κ)
     (hA : ∀ q, (S.alice q).toMeasurement.IsProjective)
