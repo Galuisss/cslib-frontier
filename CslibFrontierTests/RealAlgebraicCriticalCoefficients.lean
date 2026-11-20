@@ -8,6 +8,7 @@ module
 
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
 import CslibFrontier.Foundations.Data.MvPolynomial.Degrees
+import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.ResidueCoeffNorm
 import Mathlib.Tactic.NormNum
 import Mathlib.Tactic.Ring
 
@@ -132,5 +133,27 @@ example : quotientCharacteristicValue 101 1 2 3 0
   change _ = (Int.castRingHom (ZMod 101) (M.charpoly.coeff 0)).val at h
   rw [h, hcoeff]
   decide
+
+-- In one variable, the residue of X₀³ modulo X₀² - U is the parameter U.
+-- The norm bound applies with unit relation norm even though the numerator needs reduction.
+example : Polynomial.coeffNorm1 (residue 2
+    (fun _ : Fin 1 => C (Polynomial.X : Polynomial ℤ))
+    (X (0 : Fin 1) ^ 3)) ≤ 4 := by
+  have hX : Polynomial.coeffNorm1 (Polynomial.X : Polynomial ℤ) = 1 := by
+    simpa only [mul_one, Polynomial.coeffNorm1_one] using
+      Polynomial.coeffNorm1_X_mul (1 : Polynomial ℤ)
+  have hr (i : Fin 1) : (C (Polynomial.X : Polynomial ℤ) :
+      MvPolynomial (Fin 1) (Polynomial ℤ)).totalDegree < 2 := by
+    rw [totalDegree_C]
+    decide
+  have hdeg : (X (0 : Fin 1) ^ 3 : MvPolynomial (Fin 1) (Polynomial ℤ)).totalDegree ≤ 3 :=
+    (totalDegree_pow _ _).trans (by simp)
+  have h := coeffNorm1_residue_le (B := 3) (R := 1) (by decide : 1 ≤ 2) (by decide)
+    (fun _ : Fin 1 => C (Polynomial.X : Polynomial ℤ)) hr
+    (by intro i; simp [hX]) _ hdeg
+  have hv := ParameterCoeffNorm.pow_le (X (0 : Fin 1) :
+    MvPolynomial (Fin 1) (Polynomial ℤ)) 3
+  simp only [ParameterCoeffNorm.X, one_pow] at hv
+  exact h.trans (by simpa using Nat.mul_le_mul_left 4 hv)
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
