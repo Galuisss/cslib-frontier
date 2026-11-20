@@ -6,6 +6,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 
 -- upstream: local-only (result registry collection)
 import CslibFrontierResults.Registry
+import CslibFrontier.Computability.PCP.TwoProverGame.AveragedAnswerMarginals
 import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
@@ -11068,6 +11069,28 @@ register_result "quantum-relative-entropy-reference-domination" where
     when total weight differs from one. Claim 5.13 uses these comparisons and remains open. \
     Outside source check: \
     https://github.com/cslib-community/cslib-frontier/pull/6664#issuecomment-7020792318."
+
+register_result "bvy-checked-answer-marginal-entropy" where
+  title := "Marginal domination and entropy cost for checked-answer postselection"
+  topic := "quantum information"
+  sources := [
+    { paper := BavarianVidickYuen2022, theorem := "Claim 5.13 (proof step)",
+      locator := "arXiv:1509.07466v2, printed pp. 23–24" }
+  ]
+  theorems := [
+    Cslib.PCP.QuantumStrategy.sum_partialTraceRight_averagedCheckedVector,
+    Cslib.PCP.QuantumStrategy.partialTraceRight_averagedCheckedVector_le,
+    Cslib.PCP.QuantumStrategy.isDensityMatrix_averagedCheckedMarginalAlice,
+    Cslib.PCP.QuantumStrategy.relativeEntropy_normalizedCheckedVector_partialTraceRight_le
+  ]
+  scope := "A checked-answer marginal and postselection step in the proof of Claim 5.13. \
+    For finite tensor strategies with local POVMs and independent full-question laws, \
+    forgetting Bob’s checked answers leaves the selected Alice marginal. Each branch lies \
+    below a common trace-one reference independent of Bob’s question law. At positive actual \
+    Born weight w the normalized reduced branch has Umegaki relative entropy at most −log w \
+    in nats. The full opposite-question register, win-conditioned and averaged coordinate \
+    information bounds, and local-unitary estimates remain open. Outside source check: \
+    https://github.com/cslib-community/cslib-frontier/pull/6665#issuecomment-7020963630."
 
 register_result "uhlmann-finite-dimensional-local-overlap" where
   title := "Uhlmann’s theorem for finite-dimensional purifications"
