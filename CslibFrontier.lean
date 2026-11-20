@@ -125,6 +125,7 @@ public import CslibFrontier.Algorithms.Lean.Karger.Memory
 public import CslibFrontier.Algorithms.Lean.Karger.Memory.Contract
 public import CslibFrontier.Algorithms.Lean.Karger.Memory.Layout
 public import CslibFrontier.Algorithms.Lean.Karger.MinCutCount
+public import CslibFrontier.Algorithms.Lean.Knapsack.ApproximationSchemes
 public import CslibFrontier.Algorithms.Lean.Knapsack.FPTAS
 public import CslibFrontier.Algorithms.Lean.Knapsack.PolyTime
 public import CslibFrontier.Algorithms.Lean.Knapsack.ProfitDP
@@ -1949,6 +1950,7 @@ public import CslibFrontier.Computability.Complexity.Classes.Alternation.Savitch
 public import CslibFrontier.Computability.Complexity.Classes.Alternation.Space
 public import CslibFrontier.Computability.Complexity.Classes.Alternation.SpaceGame
 public import CslibFrontier.Computability.Complexity.Classes.Alternation.TQBF
+public import CslibFrontier.Computability.Complexity.Classes.ApproximationSchemes
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.Advice
 public import CslibFrontier.Computability.Complexity.Classes.ArthurMerlin.Amplification
@@ -3613,6 +3615,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.P
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Lex
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List.AdjacentTrace
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List.Sublist
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.ListsUpTo
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Matrix.Binary
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Membership

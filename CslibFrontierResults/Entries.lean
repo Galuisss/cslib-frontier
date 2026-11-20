@@ -6,6 +6,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 
 -- upstream: local-only (result registry collection)
 import CslibFrontierResults.Registry
+import CslibFrontier.Algorithms.Lean.Knapsack.ApproximationSchemes
 import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
@@ -11327,3 +11328,14 @@ register_result "mpda-scope-bounded-hole-bounded" where
     independent agent review (reviewer-codex-edemaine) on PR #6615, against \
     arXiv:2002.05950v2, printed pp. 4-6: \
     https://github.com/cslib-community/cslib-frontier/pull/6615#pullrequestreview-5981924133."
+
+register_result "knapsack-fptas" where
+  title := "0–1 knapsack has a fully polynomial-time approximation scheme"
+  topic := "approximation algorithms"
+  sources := [
+    { paper := WilliamsonShmoys2011, theorem := "Theorem 3.5", locator := "§3.2" }
+  ]
+  theorems := [Cslib.Algorithms.Lean.Knapsack.optimizationProblem_fptas]
+  scope := "Natural weights, values and capacity in binary. The solver returns a feasible \
+    item subsequence of value at least 1 − 1/k times optimal, with one native polynomial-time \
+    algorithm on the instance and positive unary k. Items exceeding the capacity are discarded."
