@@ -18,7 +18,8 @@ its parent's result. We use the binary branching model, counting the two moves s
 as in the binary normal form of [Niedermeier and Rossmanith][NiedermeierRossmanith1998],
 Definition 11 and Theorem 13.
 
-The separate polynomial clock covers every branch. In `CslibFrontierTests/Alternation.lean`,
+The separate polynomial clock covers every branch. In the [checked examples]
+(https://github.com/cslib-community/cslib-frontier/blob/e95c90d139/CslibFrontierTests/Alternation.lean),
 a one-step machine witnesses membership in `UAP`, and an existential root with an accepting
 move still fails the restriction when its other move leads to an ambiguous universal node.
 
