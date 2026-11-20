@@ -40,7 +40,7 @@ variable {F A : Type*} {m : ℕ} [Field F] [Fintype F] [DecidableEq F]
     (S : CommutingStrategy (Question F m) (Question F m) (Answer F m) (Answer F m) A)
     (d D : ℕ) (x y : Question F m) : ℝ := by
   classical
-  exact ∑ a, ∑ b, if acceptsAtDegrees d D x y a b then S.prob x y a b else 0
+  exact ∑ a, ∑ b, if acceptsWithDiagonalCap d D x y a b then S.prob x y a b else 0
 
 /-- The probability of acceptance for a fixed pair of verifier questions. -/
 @[expose] noncomputable def acceptScore
@@ -54,10 +54,11 @@ theorem acceptScore_eq_sum
     (d : ℕ) (x y : Question F m) :
     acceptScore S d x y = ∑ a, ∑ b, if accepts d x y a b then S.prob x y a b else 0 := by
   classical
-  rw [accepts_eq_atDegrees]
+  rw [accepts_eq_withDiagonalCap]
   rfl
 
-private theorem uniform_sum_eq_expect {ι : Type*} [Fintype ι] [Nonempty ι] (f : ι → ℝ) :
+/-- A real-valued sum weighted by the uniform PMF is a finite expectation. -/
+theorem uniform_sum_eq_expect {ι : Type*} [Fintype ι] [Nonempty ι] (f : ι → ℝ) :
     (∑ x, (uniformOfFintype ι x).toReal * f x) = 𝔼 x, f x := by
   simp only [uniformOfFintype_apply, ENNReal.toReal_inv, ENNReal.toReal_natCast,
     inv_mul_eq_div, Fintype.expect_eq_sum_div_card, sum_div]
@@ -100,11 +101,12 @@ theorem acceptScore_le_decodedAgreement {B : Type*} [Fintype B] [DecidableEq B]
 private theorem branchWinProbAtDegrees_eq_weighted {n : ℕ} (d D : ℕ) (b : Branch)
     (S : CommutingStrategy (Question F (n + 1)) (Question F (n + 1))
       (Answer F (n + 1)) (Answer F (n + 1)) A) :
-    (branchGameAtDegrees (F := F) n d D b).commutingWinProb S =
+    (branchGameWithDiagonalCap (F := F) n d D b).commutingWinProb S =
       ∑ q, (branchQuestions (F := F) n b q).toReal * acceptScoreAtDegrees S d D q.1 q.2 := by
   classical
   rw [TwoProverGame.commutingWinProb_eq_sum, Fintype.sum_prod_type]
-  simp only [acceptScoreAtDegrees, branchGameAtDegrees_questions, branchGameAtDegrees_accepts]
+  simp only [acceptScoreAtDegrees, branchGameWithDiagonalCap_questions,
+    branchGameWithDiagonalCap_accepts]
 
 omit [Field F] [DecidableEq F] in
 private theorem sum_assignLineRoles_eq (line point : Question F m)
@@ -133,7 +135,7 @@ theorem lineScoreAtDegrees_le_one
 theorem axisScoreAtDegrees_eq_expect (n d D : ℕ)
     (S : CommutingStrategy (Question F (n + 1)) (Question F (n + 1))
       (Answer F (n + 1)) (Answer F (n + 1)) A) :
-    (branchGameAtDegrees (F := F) n d D .axis).commutingWinProb S =
+    (branchGameWithDiagonalCap (F := F) n d D .axis).commutingWinProb S =
       𝔼 u : Point F (n + 1), 𝔼 i : Fin (n + 1),
         lineScoreAtDegrees S d D u (.axis (linePoints u (Pi.single i (1 : F)))) := by
   rw [branchWinProbAtDegrees_eq_weighted, branchQuestions_axis, axisQuestions, sum_bind_mul]
@@ -143,7 +145,7 @@ theorem axisScoreAtDegrees_eq_expect (n d D : ℕ)
 theorem consistencyScoreAtDegrees_eq_expect (n d D : ℕ)
     (S : CommutingStrategy (Question F (n + 1)) (Question F (n + 1))
       (Answer F (n + 1)) (Answer F (n + 1)) A) :
-    (branchGameAtDegrees (F := F) n d D .consistency).commutingWinProb S =
+    (branchGameWithDiagonalCap (F := F) n d D .consistency).commutingWinProb S =
       𝔼 u : Point F (n + 1), acceptScoreAtDegrees S d D (.point u) (.point u) := by
   rw [branchWinProbAtDegrees_eq_weighted, branchQuestions_consistency, consistencyQuestions,
     sum_map_mul, uniform_sum_eq_expect]
@@ -152,7 +154,7 @@ theorem consistencyScoreAtDegrees_eq_expect (n d D : ℕ)
 theorem diagonalScoreAtDegrees_eq_expect (n d D : ℕ)
     (S : CommutingStrategy (Question F (n + 1)) (Question F (n + 1))
       (Answer F (n + 1)) (Answer F (n + 1)) A) :
-    (branchGameAtDegrees (F := F) n d D .diagonal).commutingWinProb S =
+    (branchGameWithDiagonalCap (F := F) n d D .diagonal).commutingWinProb S =
       𝔼 u : Point F (n + 1), 𝔼 i : Fin (n + 1), 𝔼 v,
         lineScoreAtDegrees S d D u (.diagonal (linePoints u (prefixDirection i v))) := by
   rw [branchWinProbAtDegrees_eq_weighted, branchQuestions_diagonal, diagonalQuestions, sum_bind_mul]
@@ -163,7 +165,7 @@ omit [StarRing A] [StarOrderedRing A] [TopologicalSpace A]
 private theorem acceptScoreAtDegrees_congr_cutoff
     (S : CommutingStrategy (Question F m) (Question F m) (Answer F m) (Answer F m) A)
     (d D E : ℕ) (x y : Question F m)
-    (h : ∀ a b, acceptsAtDegrees d D x y a b ↔ acceptsAtDegrees d E x y a b) :
+    (h : ∀ a b, acceptsWithDiagonalCap d D x y a b ↔ acceptsWithDiagonalCap d E x y a b) :
     acceptScoreAtDegrees S d D x y = acceptScoreAtDegrees S d E x y := by
   classical
   simp only [acceptScoreAtDegrees, h]
@@ -172,9 +174,9 @@ private theorem acceptScoreAtDegrees_congr_cutoff
 theorem axisWinProbAtDegrees_eq (n d D : ℕ)
     (S : CommutingStrategy (Question F (n + 1)) (Question F (n + 1))
       (Answer F (n + 1)) (Answer F (n + 1)) A) :
-    (branchGameAtDegrees (F := F) n d D .axis).commutingWinProb S =
+    (branchGameWithDiagonalCap (F := F) n d D .axis).commutingWinProb S =
       (branchGame (F := F) n d .axis).commutingWinProb S := by
-  rw [branchGame_eq_atDegrees, axisScoreAtDegrees_eq_expect, axisScoreAtDegrees_eq_expect]
+  rw [branchGame_eq_withDiagonalCap, axisScoreAtDegrees_eq_expect, axisScoreAtDegrees_eq_expect]
   refine expect_congr rfl fun u _ => expect_congr rfl fun i _ => ?_
   unfold lineScoreAtDegrees
   refine congrArg (· / 2) (congrArg₂ (· + ·) ?_ ?_)
@@ -187,9 +189,9 @@ theorem axisWinProbAtDegrees_eq (n d D : ℕ)
 theorem consistencyWinProbAtDegrees_eq (n d D : ℕ)
     (S : CommutingStrategy (Question F (n + 1)) (Question F (n + 1))
       (Answer F (n + 1)) (Answer F (n + 1)) A) :
-    (branchGameAtDegrees (F := F) n d D .consistency).commutingWinProb S =
+    (branchGameWithDiagonalCap (F := F) n d D .consistency).commutingWinProb S =
       (branchGame (F := F) n d .consistency).commutingWinProb S := by
-  rw [branchGame_eq_atDegrees, consistencyScoreAtDegrees_eq_expect,
+  rw [branchGame_eq_withDiagonalCap, consistencyScoreAtDegrees_eq_expect,
     consistencyScoreAtDegrees_eq_expect]
   refine expect_congr rfl fun u _ => ?_
   apply acceptScoreAtDegrees_congr_cutoff
@@ -209,7 +211,7 @@ theorem axisScore_eq_expect (n d : ℕ)
       (Answer F (n + 1)) (Answer F (n + 1)) A) :
     (branchGame (F := F) n d .axis).commutingWinProb S =
       𝔼 u : Point F (n + 1), 𝔼 i : Fin (n + 1), axisScoreAt S d u i := by
-  rw [branchGame_eq_atDegrees, axisScoreAtDegrees_eq_expect]
+  rw [branchGame_eq_withDiagonalCap, axisScoreAtDegrees_eq_expect]
   rfl
 
 /-- Conditioning the axis test on a particular coordinate increases its loss by at most
@@ -238,7 +240,7 @@ theorem consistencyScore_eq_expect (n d : ℕ)
       (Answer F (n + 1)) (Answer F (n + 1)) A) :
     (branchGame (F := F) n d .consistency).commutingWinProb S =
       𝔼 u : Point F (n + 1), acceptScore S d (.point u) (.point u) := by
-  rw [branchGame_eq_atDegrees, consistencyScoreAtDegrees_eq_expect]
+  rw [branchGame_eq_withDiagonalCap, consistencyScoreAtDegrees_eq_expect]
   rfl
 
 /-- Diagonal acceptance at a fixed base point and prefix direction, averaging the two roles. -/
@@ -254,7 +256,7 @@ theorem diagonalScore_eq_expect (n d : ℕ)
       (Answer F (n + 1)) (Answer F (n + 1)) A) :
     (branchGame (F := F) n d .diagonal).commutingWinProb S =
       𝔼 u : Point F (n + 1), 𝔼 i : Fin (n + 1), 𝔼 v, diagonalScoreAt S d u i v := by
-  rw [branchGame_eq_atDegrees, diagonalScoreAtDegrees_eq_expect]
+  rw [branchGame_eq_withDiagonalCap, diagonalScoreAtDegrees_eq_expect]
   rfl
 
 /-- Conditioning the diagonal test on a prefix and the point-first role assignment

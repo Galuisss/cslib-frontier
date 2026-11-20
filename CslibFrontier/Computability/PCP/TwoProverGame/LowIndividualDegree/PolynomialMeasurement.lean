@@ -52,10 +52,8 @@ variable [Ring A] [PartialOrder A] [IsOrderedAddMonoid A]
 theorem evaluatePolynomialMeasurement_effect_some
     (P : Measurement (Option (BoundedPolynomial F m d)) A) (u : Fin m → F) (b : F) :
     (evaluatePolynomialMeasurement P u).effect (some b) =
-      ∑ g with eval u g.val = b, P.effect (some g) := by
-  rw [evaluatePolynomialMeasurement, Measurement.map_effect, sum_filter, Fintype.sum_option,
-    sum_filter]
-  simp
+      ∑ g with eval u g.val = b, P.effect (some g) :=
+  P.map_option_effect_some (fun g => eval u g.val) b
 
 end OrderedRing
 
