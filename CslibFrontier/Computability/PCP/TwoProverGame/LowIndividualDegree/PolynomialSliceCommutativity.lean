@@ -128,7 +128,7 @@ theorem polynomialSlice_successfulPairDefect_le_atDegrees
       (decodedPoint S.alice w)) ≤ η) :
     (𝔼 x, 𝔼 y, Measurement.successfulPairDefect S.state (M x) (M y)) ≤
       32 * (4 * √(2 * η) + 2 * √(64 * (m + 1 : ℝ) *
-        (1 - (branchGameAtDegrees (F := F) m degree D .diagonal).commutingWinProb S)) +
+        (1 - (branchGameWithDiagonalCap (F := F) m degree D .diagonal).commutingWinProb S)) +
         2 * √ζ + 2 * √ξ) + 30 * ξ + 20 * ((m : ℝ) * d / Fintype.card F) := by
   have he := evaluatedSlice_successfulPairDefect_le_atDegrees S hPoint hLine degree D M hM Z hZ
     hbound hMP hMZ N hN hMN hcopy hfail hpoint
@@ -160,7 +160,7 @@ theorem polynomialSlice_successfulPairDefect_le
       32 * (4 * √(2 * η) + 2 * √(64 * (m + 1 : ℝ) *
         (1 - (branchGame (F := F) m degree .diagonal).commutingWinProb S)) +
         2 * √ζ + 2 * √ξ) + 30 * ξ + 20 * ((m : ℝ) * d / Fintype.card F) := by
-  rw [branchGame_eq_atDegrees]
+  rw [branchGame_eq_withDiagonalCap]
   exact polynomialSlice_successfulPairDefect_le_atDegrees S hPoint hLine degree ((m + 1) * degree)
     M N hM hN hMN Z hZ hbound hMP hMZ hcopy hfail hpoint
 

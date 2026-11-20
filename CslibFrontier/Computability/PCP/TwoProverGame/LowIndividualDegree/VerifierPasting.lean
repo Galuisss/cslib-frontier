@@ -52,7 +52,7 @@ local notation "RawStrategy" => CommutingStrategy (Question F (n + 1)) (Question
     CommutingStrategy F (Point F n) (Option (BoundedPolynomial F n d))
       (PolynomialFunction F d) A :=
   sliceLineStrategy S.state M (decodedVertical S.bob d) fun t u a b =>
-    commute_decodedVertical S.bob d u ((M t).effect a) (hComm t u a) b
+    Measurement.commute_map_right _ (decodeVertical d u) _ (hComm t u a) b
 
 /-- The isolated slice mismatch for the decoded vertical line is bounded by the slice
 mismatch for Bob's point answer and the verifier's two branch losses. -/
@@ -185,9 +185,8 @@ private theorem completedPaste_disagreement_le (k : ℕ) [Nonempty (Fin k ↪ F)
   have hc : Commute ((evaluatePolynomialMeasurement P w).effect none)
       ((decodedPoint S.bob w).effect z) := by
     rw [evaluatePolynomialMeasurement_effect_none]
-    apply commute_decodedPoint
-    intro a
-    exact commute_pasteSlices k M hM _ (fun x q => hComm x (.point w) q a) none
+    exact Measurement.commute_map_right (S.bob (.point w)) decodePoint _
+      (fun a => commute_pasteSlices k M hM _ (fun x q => hComm x (.point w) q a) none) z
   rw [he, ← evaluatePolynomialMeasurement_effect_none P w]
   exact Measurement.one_sub_agreement_map_getD_le _ _ _ _ hc
 
@@ -262,7 +261,9 @@ theorem average_completedPaste_disagreement_le_of_slice_majorants_atDegrees
     let verticalError :=
       √(8 * (n + 1 : ℝ) * (1 - (branchGame (F := F) n d .axis).commutingWinProb S) +
         4 * (1 - (branchGame (F := F) n d .consistency).commutingWinProb S))
-    let diagonalLoss := 1 - (branchGameAtDegrees (F := F) n d D .diagonal).commutingWinProb S.swap
+    let diagonalLoss :=
+      1 - (branchGameWithDiagonalCap (F :=
+      F) n d D .diagonal).commutingWinProb S.swap
     let commutatorError :=
       32 * (4 * √(2 * η) + 2 * √(64 * (n + 1 : ℝ) * diagonalLoss) +
         2 * √τ + 2 * √ζ) + 30 * ζ + 20 * ((n : ℝ) * d / Fintype.card F)
@@ -283,7 +284,9 @@ theorem average_completedPaste_disagreement_le_of_slice_majorants_atDegrees
   have hpair : (𝔼 x : F, 𝔼 y : F, Measurement.successfulPairDefect S.state (M x) (M y)) ≤
       commutatorError :=
     polynomialSlice_successfulPairDefect_le_atDegrees S.swap hPoint hLine d D M R hM hR hCopies
-      Z hZ hbound (fun x w g _ => commute_decodedPoint _ _ _ (fun b => hComm x (.point w) g b) _)
+      Z hZ hbound (fun x w g a =>
+        Measurement.commute_map_right (S.bob (.point w)) decodePoint _
+          (fun b => hComm x (.point w) g b) a)
       hMZ hcopy hfail hpoint'
   exact average_completedPaste_disagreement_le_of_verifier k hk S M R hM hR hComm hCopies
     fallback hθ₀ hθ₁ hsize hmass hpair hcopy hpoint
@@ -325,7 +328,7 @@ theorem average_completedPaste_disagreement_le_of_slice_majorants
         (1 + √2) * (k * √(2 * ζ) + (k : ℝ) ^ 2 * sliceError) +
         3 * ((k.choose 2 : ℝ) / Fintype.card F) + (n * d : ℝ) / Fintype.card F +
         2 * k * η + (2 * k + 1 : ℝ) * verticalError + 2 * k * ((k - 1 : ℕ) : ℝ) * sliceError := by
-  rw [branchGame_eq_atDegrees n d .diagonal]
+  rw [branchGame_eq_withDiagonalCap n d .diagonal]
   exact average_completedPaste_disagreement_le_of_slice_majorants_atDegrees k hk S ((n + 1) * d)
     hPoint hLine M R hM hR hComm hCopies Z hZ hbound hMZ fallback hθ₀ hθ₁ hsize
     hmass hcopy hfail hpoint

@@ -156,7 +156,8 @@ theorem exists_paste_of_slice_agreement
     let C := S.toCommuting
     let ε := 1 - (branchGame (F := F) (n + 1) d .axis).commutingWinProb C
     let δ := 1 - (branchGame (F := F) (n + 1) d .consistency).commutingWinProb C
-    let γ := 1 - (branchGameAtDegrees (F := F) (n + 1) d D .diagonal).commutingWinProb C
+    let γ :=
+      1 - (branchGameWithDiagonalCap (F := F) (n + 1) d D .diagonal).commutingWinProb C
     let r := (d : ℝ) / Fintype.card F
     let ζ := 3000 * (n + 2 : ℝ) * (ε ^ (1 / 32 : ℝ) + δ ^ (1 / 32 : ℝ) + r ^ (1 / 32 : ℝ))
     let κ := (𝔼 x, σ x) + ζ
