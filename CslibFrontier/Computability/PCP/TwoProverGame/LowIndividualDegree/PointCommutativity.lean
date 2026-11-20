@@ -86,7 +86,7 @@ theorem decodedPoint_prefixCommutatorDefect_le_atDegrees (S : CommutingStrategy 
     (𝔼 u : Point F (n + 1), 𝔼 v : Fin (i.val + 1) → F, Measurement.pairCommutatorDefect S.state
       (decodedPoint S.alice u) (decodedPoint S.alice (u + prefixDirection i v))) ≤
       64 * (n + 1 : ℝ) *
-        (1 - (branchGameAtDegrees (F := F) n d D .diagonal).commutingWinProb S) := by
+        (1 - (branchGameWithDiagonalCap (F := F) n d D .diagonal).commutingWinProb S) := by
   classical
   let direction := prefixDirection (F := F) i
   let err (u : Point F (n + 1)) (v : Fin (i.val + 1) → F) :=
@@ -94,7 +94,7 @@ theorem decodedPoint_prefixCommutatorDefect_le_atDegrees (S : CommutingStrategy 
       (evaluatedDiagonal S.bob (linePoints u (direction v)) u)
   have herr : (𝔼 u : Point F (n + 1), 𝔼 v, err u v) ≤
       4 * (n + 1 : ℝ) *
-        (1 - (branchGameAtDegrees (F := F) n d D .diagonal).commutingWinProb S) := by
+        (1 - (branchGameWithDiagonalCap (F := F) n d D .diagonal).commutingWinProb S) := by
     calc
       _ ≤ 𝔼 u : Point F (n + 1), 𝔼 v,
           (2 * (1 - acceptScoreAtDegrees S d D (.point u)
@@ -139,7 +139,7 @@ theorem decodedPoint_prefixCommutatorDefect_le (S : CommutingStrategy Q Q Ans An
     (𝔼 u : Point F (n + 1), 𝔼 v : Fin (i.val + 1) → F, Measurement.pairCommutatorDefect S.state
       (decodedPoint S.alice u) (decodedPoint S.alice (u + prefixDirection i v))) ≤
       64 * (n + 1 : ℝ) * (1 - (branchGame (F := F) n d .diagonal).commutingWinProb S) := by
-  rw [branchGame_eq_atDegrees]
+  rw [branchGame_eq_withDiagonalCap]
   exact decodedPoint_prefixCommutatorDefect_le_atDegrees S hPoint hLine d ((n + 1) * d) i
 
 /-- For two independent uniform points the squared commutator defect is at most
@@ -150,7 +150,7 @@ theorem decodedPoint_pairCommutatorDefect_le_atDegrees (S : CommutingStrategy Q 
     (𝔼 u : Point F (n + 1), 𝔼 w : Point F (n + 1), Measurement.pairCommutatorDefect S.state
       (decodedPoint S.alice u) (decodedPoint S.alice w)) ≤
       64 * (n + 1 : ℝ) *
-        (1 - (branchGameAtDegrees (F := F) n d D .diagonal).commutingWinProb S) := by
+        (1 - (branchGameWithDiagonalCap (F := F) n d D .diagonal).commutingWinProb S) := by
   have h := decodedPoint_prefixCommutatorDefect_le_atDegrees S hPoint hLine d D (Fin.last n)
   simp only [prefixDirection_last] at h
   refine le_of_eq_of_le (expect_congr rfl fun u _ => ?_) h
@@ -164,7 +164,7 @@ theorem decodedPoint_pairCommutatorDefect_le (S : CommutingStrategy Q Q Ans Ans 
     (𝔼 u : Point F (n + 1), 𝔼 w : Point F (n + 1), Measurement.pairCommutatorDefect S.state
       (decodedPoint S.alice u) (decodedPoint S.alice w)) ≤
       64 * (n + 1 : ℝ) * (1 - (branchGame (F := F) n d .diagonal).commutingWinProb S) := by
-  rw [branchGame_eq_atDegrees]
+  rw [branchGame_eq_withDiagonalCap]
   exact decodedPoint_pairCommutatorDefect_le_atDegrees S hPoint hLine d ((n + 1) * d)
 
 end Cslib.PCP.LowIndividualDegree

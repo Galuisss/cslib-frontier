@@ -106,16 +106,6 @@ private theorem exists_projective_approx_of_symmetric_successfulGap
     simp only [he] at hround
     simpa only [Measurement.toPOVM_effect, show (9 : ℝ) * (2 * ζ) = 18 * ζ by ring] using hround
 
-private theorem polynomialEvaluation_agreement (φ : AlgState (Matrix (ι × ι) (ι × ι) ℂ))
-    (A : Measurement F (Matrix (ι × ι) (ι × ι) ℂ))
-    (H : Measurement (Option Poly) (Matrix (ι × ι) (ι × ι) ℂ)) (u : Point F (n + 1)) :
-    Measurement.agreement φ (A.map some) (evaluatePolynomialMeasurement H u) =
-      ∑ b, (φ (A.effect b * (evaluatePolynomialMeasurement H u).effect (some b))).re := by
-  have he (b : Option F) : (A.map some).effect b = b.elim 0 A.effect := by
-    cases b <;> simp [Measurement.map_effect, sum_filter]
-  simp only [Measurement.agreement, Fintype.sum_option, he, Option.elim_none, Option.elim_some,
-    zero_mul, map_zero, Complex.zero_re, zero_add]
-
 private theorem boundedness_le_evaluatedGap
     (φ : AlgState (Matrix (ι × ι) (ι × ι) ℂ))
     (A : Point F (n + 1) → Measurement F (Matrix (ι × ι) (ι × ι) ℂ))
@@ -235,7 +225,7 @@ private theorem exists_roundedSymmetricSelfImprovement
     have h := (Measurement.abs_agreement_sub_right_le C.state ((A u).map some)
       (evaluatePolynomialMeasurement HR u) (evaluatePolynomialMeasurement PR u)).trans
       (Real.sqrt_le_sqrt (hcoarse u))
-    rwa [polynomialEvaluation_agreement, polynomialEvaluation_agreement] at h
+    simpa only [Measurement.agreement_map_left] using h
   have hbad (N : Measurement (Option Poly) (Matrix (ι × ι) (ι × ι) ℂ))
       (hc : ∀ a u b, Commute ((A u).effect b) (N.effect a)) (u : Point F (n + 1)) :
       Measurement.successfulMismatch C.state (evaluatePolynomialMeasurement N u) (A u) =
@@ -254,7 +244,7 @@ private theorem exists_roundedSymmetricSelfImprovement
       evaluatePolynomialMeasurement_successfulEffect]
   have hA (N : POVM (Option Poly) ι) (a : Option Poly) (u : Point F (n + 1)) (b : F) :
       Commute ((A u).effect b) ((QuantumStrategy.rightMeasurement (ι := ι) N).effect a) :=
-    (commute_decodedPoint C.alice u _ (fun c =>
+    (Measurement.commute_map_right (C.alice (.point u)) decodePoint _ (fun c =>
       (commute_kroneckerOne_oneKronecker ((S.alice (.point u)).effect c) (N.effect a)).symm) b).symm
   have hmatch : 1 - (2 * ζ + 2 * s) ≤ Measurement.agreement C.state PL PR := by
     have h1 := (Measurement.abs_agreement_sub_right_le C.state HL HR PR).trans
@@ -450,7 +440,7 @@ theorem exists_projectiveSymmetricSelfImprovement
         _ ≤ ∑ g : Poly, (C.state (G'.effect (some g))).re := by
           refine sum_le_sum fun g _ => C.state.re_apply_mono ?_
           have hc : Commute (G'.effect (some g)) (A.effect (MvPolynomial.eval u g.val)) :=
-            commute_decodedPoint C.alice u _ (fun a =>
+            Measurement.commute_map_right (C.alice (.point u)) decodePoint _ (fun a =>
               (commute_kroneckerOne_oneKronecker ((S.alice (.point u)).effect a)
                 (G.effect (some g))).symm) _
           have h := ((Commute.one_right _).sub_right hc).mul_nonneg (G'.nonneg _)

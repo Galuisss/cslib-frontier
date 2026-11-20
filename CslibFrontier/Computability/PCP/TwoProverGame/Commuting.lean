@@ -14,6 +14,8 @@ public import CslibFrontier.Foundations.Quantum.Algebra.SuccessfulAgreement
 import CslibFrontier.Probability.PMF.Event
 public import CslibFrontier.Foundations.Quantum.Algebra.Tsirelson
 import CslibFrontier.Foundations.Analysis.SpecialFunctions.Trigonometric.Basic
+import CslibFrontier.Probability.PMF.Map
+import CslibFrontier.Foundations.Quantum.Algebra.MaxEntangled
 import CslibFrontier.Foundations.Quantum.Algebra.TensorState
 
 /-!
@@ -72,7 +74,7 @@ open scoped Real
 /-- A **commuting-operator strategy** for a game with questions `X`, `Y` and answers `A`, `B`, in
 the algebra of observables `𝒜`: a state, a measurement for each question of each player, and
 every effect of Alice commutes with every effect of Bob. -/
-structure CommutingStrategy (X Y A B 𝒜 : Type*) [Fintype A] [Fintype B] [Ring 𝒜]
+@[ext] structure CommutingStrategy (X Y A B 𝒜 : Type*) [Fintype A] [Fintype B] [Ring 𝒜]
     [PartialOrder 𝒜] [Algebra ℂ 𝒜] where
   /-- The shared state. -/
   state : AlgState 𝒜
@@ -117,6 +119,20 @@ theorem sum_prob (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) :
     ∑ a, ∑ b, S.prob x y a b = 1 :=
   Measurement.sum_re_effect_mul_effect S.state (S.alice x) (S.bob y)
 
+/-- Pull back each player's questions and post-process each player's outcomes independently. -/
+noncomputable def relabel {X' Y' A' B' : Type*} [Fintype A'] [Fintype B']
+    [IsOrderedAddMonoid 𝒜] (S : CommutingStrategy X Y A B 𝒜)
+    (qx : X' → X) (qy : Y' → Y) (fa : A → A') (fb : B → B') :
+    CommutingStrategy X' Y' A' B' 𝒜 := by
+  classical
+  exact
+    { state := S.state
+      alice := fun x => (S.alice (qx x)).map fa
+      bob := fun y => (S.bob (qy y)).map fb
+      commute := fun x y =>
+        Measurement.commute_map_map (S.alice (qx x)) (S.bob (qy y))
+          (S.commute (qx x) (qy y)) fa fb }
+
 end Ring
 
 section CFC
@@ -142,6 +158,27 @@ noncomputable def answers (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) :
 theorem answers_apply (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) (a : A) (b : B) :
     S.answers x y (a, b) = ENNReal.ofReal (S.prob x y a b) := by
   rw [answers, PMF.ofFintype_apply]
+
+/-- The distribution of relabeled answers is the pushforward of the original
+distribution at the corresponding questions. -/
+theorem answers_relabel {X' Y' A' B' : Type*} [Fintype A'] [Fintype B']
+    [IsOrderedAddMonoid 𝒜] (S : CommutingStrategy X Y A B 𝒜)
+    (qx : X' → X) (qy : Y' → Y) (fa : A → A') (fb : B → B') (x : X') (y : Y') :
+    (S.relabel qx qy fa fb).answers x y =
+      (S.answers (qx x) (qy y)).map (Prod.map fa fb) := by
+  classical
+  ext ⟨a, b⟩
+  apply (ENNReal.toReal_eq_toReal_iff' (PMF.apply_ne_top _ _) (PMF.apply_ne_top _ _)).mp
+  rw [answers_apply, ENNReal.toReal_ofReal ((S.relabel qx qy fa fb).prob_nonneg x y a b),
+    Cslib.Probability.PMF.map_apply_toReal, Fintype.sum_prod_type]
+  simp only [relabel, prob, Measurement.map_effect, Finset.sum_mul, Finset.mul_sum, map_sum,
+    Complex.re_sum, Finset.sum_filter, Prod.map_apply, Prod.mk.injEq]
+  rw [Finset.sum_comm]
+  refine sum_congr rfl fun a' _ => sum_congr rfl fun b' _ => ?_
+  rw [answers_apply, ENNReal.toReal_ofReal (S.prob_nonneg (qx x) (qy y) a' b')]
+  simp only [prob, show (fa a' = a) ↔ (a = fa a') from eq_comm,
+    show (fb b' = b) ↔ (b = fb b') from eq_comm]
+  by_cases ha : a = fa a' <;> by_cases hb : b = fb b' <;> simp_all
 
 /-- Alice's answer marginal is her measurement law and is independent of Bob's question. -/
 theorem answers_map_fst (S : CommutingStrategy X Y A B 𝒜) (x : X) (y : Y) :
@@ -307,7 +344,8 @@ noncomputable def rightMeasurement (N : POVM B κ) : Measurement B (Matrix (ι �
 theorem commute_liftedEffects (L : POVM A ι) (R : POVM B κ) (a : A) (b : B) :
     Commute ((leftMeasurement (κ := κ) L).effect a) ((rightMeasurement (ι := ι) R).effect b) := by
   change Commute (L.effect a ⊗ₖ (1 : Matrix κ κ ℂ)) ((1 : Matrix ι ι ℂ) ⊗ₖ R.effect b)
-  simp only [Commute, SemiconjBy, ← mul_kronecker_mul, Matrix.mul_one, Matrix.one_mul]
+  simpa only [kroneckerOne_apply, oneKronecker_apply] using
+    commute_kroneckerOne_oneKronecker (L.effect a) (R.effect b)
 
 /-- A projective local measurement stays projective on the first tensor factor. -/
 theorem leftMeasurement_isProjective (M : POVM A ι) (h : M.toMeasurement.IsProjective) :
