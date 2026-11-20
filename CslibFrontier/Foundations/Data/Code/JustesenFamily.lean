@@ -11,6 +11,7 @@ public import CslibFrontier.Foundations.Data.Code.Justesen
 public import CslibFrontier.Foundations.FieldTheory.Finite.BinaryField
 import CslibFrontier.Foundations.Data.BitString.Binary
 import CslibFrontier.Foundations.FieldTheory.Finite.BinaryFieldArithmetic
+import CslibFrontier.Foundations.FieldTheory.Finite.HornerCoordinates
 import Mathlib.Data.Nat.Bitwise
 import Mathlib.LinearAlgebra.Lagrange
 
@@ -220,15 +221,12 @@ theorem log_le_hammingDist {w n : ℕ} {v v' : Fin w} (hne : v ≠ v') :
   have hd := (length_bounds w n).1.trans (length_le_mul_hammingDist (n := n) hne)
   omega
 
-private def hornerBits (b : ℕ) (mul : List Bool → List Bool → List Bool) (x : List Bool)
-    {k : ℕ} (coeff : Fin k → List Bool) : List Bool :=
-  Fin.foldr k (fun i acc => BitString.listXor b [coeff i, mul acc x]) []
-
 private def codewordBitWith {w n : ℕ} (mul : List Bool → List Bool → List Bool)
     (v : Fin w) (point : BitString (fieldDegree w n)) (half : Fin 2)
     (j : Fin (fieldDegree w n)) : Bool :=
   let x := List.ofFn point
-  let a := hornerBits (fieldDegree w n) mul x fun i => List.ofFn (coefficientBits (n := n) v i)
+  let a := BinaryField.hornerBits (fieldDegree w n) mul x
+    fun i => List.ofFn (coefficientBits (n := n) v i)
   let block := if half = 0 then a else mul x a
   block.getD j false
 
@@ -240,26 +238,6 @@ def codewordBit {w n : ℕ} (v : Fin w) (point : BitString (fieldDegree w n)) (h
   codewordBitWith (fieldMul (fieldTable (fieldDegree w n))) v point half j
 
 open BinaryField in
-private theorem fieldOfBits_hornerBits {b k : ℕ} {hb : b ≠ 0}
-    {mul : List Bool → List Bool → List Bool}
-    (hmul : ∀ a b, fieldOfBits (basis hb) (mul a b) =
-      fieldOfBits (basis hb) a * fieldOfBits (basis hb) b)
-    (x : List Bool) (coeff : Fin k → List Bool) :
-    fieldOfBits (basis hb) (hornerBits b mul x coeff) =
-      ∑ i, fieldOfBits (basis hb) (coeff i) * fieldOfBits (basis hb) x ^ i.val := by
-  induction k with
-  | zero => simp [hornerBits]
-  | succ k ih =>
-    unfold hornerBits
-    simp only [Fin.foldr_succ, fieldOfBits_listXor, List.map_cons, List.map_nil, List.sum_cons,
-      List.sum_nil, add_zero, hmul]
-    rw [show fieldOfBits (basis hb) (Fin.foldr k
-        (fun i acc => BitString.listXor b [coeff i.succ, mul acc x]) []) = _ from
-      ih (fun i => coeff i.succ)]
-    simp only [Fin.sum_univ_succ, Fin.val_zero, pow_zero, mul_one, Fin.val_succ, pow_succ,
-      Finset.sum_mul, mul_assoc]
-
-open BinaryField in
 private theorem fieldOfBits_evalBits {w n : ℕ} {mul : List Bool → List Bool → List Bool}
     (hmul : ∀ a b, fieldOfBits (basis (fieldDegree_ne_zero w n)) (mul a b) =
       fieldOfBits (basis (fieldDegree_ne_zero w n)) a *
@@ -269,7 +247,7 @@ private theorem fieldOfBits_evalBits {w n : ℕ} {mul : List Bool → List Bool 
         (hornerBits (fieldDegree w n) mul (List.ofFn point)
           fun i => List.ofFn (coefficientBits (n := n) v i)) =
       (message (n := n) v).val.eval ((equivBits (fieldDegree_ne_zero w n)).symm point) := by
-  rw [fieldOfBits_hornerBits hmul,
+  rw [fieldOfBits_hornerBits _ hmul,
     eval_eq_sum_degreeLTEquiv (message (n := n) v).2]
   refine Finset.sum_congr rfl fun i _ => ?_
   rw [fieldOfBits_ofFn, fieldOfBits_ofFn, message, LinearEquiv.apply_symm_apply]
