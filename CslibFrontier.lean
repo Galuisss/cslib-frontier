@@ -6239,6 +6239,8 @@ public import CslibFrontier.Foundations.Combinatorics.Design.ReedSolomon
 public import CslibFrontier.Foundations.Combinatorics.Digraph.Arborescence
 public import CslibFrontier.Foundations.Combinatorics.Digraph.Branching
 public import CslibFrontier.Foundations.Combinatorics.Digraph.Connectivity
+public import CslibFrontier.Foundations.Combinatorics.Digraph.Layered
+public import CslibFrontier.Foundations.Combinatorics.Digraph.Layered.MinIsolation
 public import CslibFrontier.Foundations.Combinatorics.Digraph.MatrixTree
 public import CslibFrontier.Foundations.Combinatorics.ErdosSzekeres
 public import CslibFrontier.Foundations.Combinatorics.Expander.AffineFamily
