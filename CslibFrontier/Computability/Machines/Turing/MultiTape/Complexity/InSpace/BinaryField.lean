@@ -9,7 +9,6 @@ module
 
 public import CslibFrontier.Foundations.FieldTheory.Finite.BinaryFieldArithmetic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpaceLib
-import all CslibFrontier.Foundations.FieldTheory.Finite.BinaryPolynomial
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.ZipFold
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.ListSlice
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
@@ -60,17 +59,18 @@ private theorem coefficients_length (a : List Bool) :
     (encCoefficients a).length = 3 * a.length := by
   simp [encCoefficients, length_encList, encBool_apply, Nat.mul_comm]
 
-private theorem zipFold_length (f : Bool → Option Bool → Option Bool) (a b : List Bool) :
-    (zipFold (fun (_ : Bool) => f) false a b).length ≤ a.length := by
+private theorem zipFold_length (f : Bool → Option Bool → Option Bool) (p : Bool)
+    (a b : List Bool) :
+    (MultiTapeTM.zipFold (fun (_ : Bool) => f) p a b).length ≤ a.length := by
   induction a generalizing b with
-  | nil => simp [zipFold]
+  | nil => simp [MultiTapeTM.zipFold]
   | cons bit a ih =>
     have := ih b.tail
-    cases h : f bit b.head? <;> simp [zipFold, h] <;> omega
+    cases h : f bit b.head? <;> simp [MultiTapeTM.zipFold, h] <;> omega
 
 private theorem zip_inSpace (f : Bool → Option Bool → Option Bool) :
     ComputableInSpace (fun p : List Bool × List Bool =>
-      zipFold (fun (_ : Bool) => f) false p.1 p.2)
+      MultiTapeTM.zipFold (fun (_ : Bool) => f) false p.1 p.2)
       (encPair encCoefficients encCoefficients) encCoefficients
       (fun p => (encPair encCoefficients encCoefficients p).length) := by
   have hf := ComputableInSpace.of_finite
@@ -79,7 +79,8 @@ private theorem zip_inSpace (f : Bool → Option Bool → Option Bool) :
   obtain ⟨K, h⟩ := ComputableInSpace.zipFold hf
     (B := fun q : Bool × List Bool × List Bool => 3 * q.2.1.length) (fun q i => by
       rw [coefficients_length]
-      exact Nat.mul_le_mul_left 3 ((zipFold_length f _ _).trans (List.length_take_le _ _)))
+      exact Nat.mul_le_mul_left 3 ((zipFold_length f q.1 (q.2.1.take i) q.2.2).trans
+        (by simp only [List.length_take]; exact Nat.min_le_right _ _)))
   have hlin := h.weaken (show
       (fun q : Bool × List Bool × List Bool => K *
         ((encPair encBool (encPair encCoefficients encCoefficients) q).length +
@@ -88,17 +89,20 @@ private theorem zip_inSpace (f : Bool → Option Bool → Option Bool) :
     .of_le_linear (4 * K + 1) (4 * K + 1) fun q => by
       rw [length_encPair, length_encPair, coefficients_length, coefficients_length]
       cases q.1 <;> simp [encBool_apply] <;> nlinarith)
-  have hp := budget_prod
+  have hp : ComputableInSpace (fun p : List Bool × List Bool => (false, p))
+      (encPair encCoefficients encCoefficients)
+      (encPair encBool (encPair encCoefficients encCoefficients))
+      (fun p => (encPair encCoefficients encCoefficients p).length) := budget_prod
     (budget_const (encB := encBool) false (.refl _))
     (ComputableInSpace.of_inO ComputableInO.id')
   exact budget_comp_linear hlin hp
 
 private theorem zip_xor (a b : List Bool) :
-    zipFold (fun (_ : Bool) bit other => other.map (xor bit)) false a b =
+    MultiTapeTM.zipFold (fun (_ : Bool) bit other => other.map (xor bit)) false a b =
       a.zipWith xor b := by
   induction a generalizing b with
   | nil => rfl
-  | cons bit a ih => cases b <;> simp [zipFold, ih]
+  | cons bit a ih => cases b <;> simp [MultiTapeTM.zipFold, ih]
 
 private theorem xor_inSpace :
     ComputableInSpace (fun p : List Bool × List Bool => p.1.zipWith xor p.2)
@@ -107,15 +111,20 @@ private theorem xor_inSpace :
   simpa only [zip_xor] using zip_inSpace (fun bit other => other.map (xor bit))
 
 private def pad (template word : List Bool) : List Bool :=
-  zipFold (fun (_ : Bool) _ bit => some (bit.getD false)) false template word
+  MultiTapeTM.zipFold (fun (_ : Bool) _ bit => some (bit.getD false)) false template word
 
 private theorem pad_eq (template word : List Bool) :
     pad template word = List.ofFn (fun i : Fin template.length => word.getD i false) := by
   induction template generalizing word with
-  | nil => simp [pad, zipFold]
+  | nil => simp [pad, MultiTapeTM.zipFold]
   | cons bit template ih =>
-    cases word <;> simp [pad, zipFold, List.ofFn_succ, List.getD] at ih ⊢
-    all_goals exact ih _
+    cases word with
+    | nil =>
+      simpa [pad, MultiTapeTM.zipFold, List.ofFn_succ, List.getD] using
+        congrArg (false :: ·) (ih [])
+    | cons head tail =>
+      simpa [pad, MultiTapeTM.zipFold, List.ofFn_succ, List.getD] using
+        congrArg (head :: ·) (ih tail)
 
 private theorem pad_inSpace :
     ComputableInSpace (fun p : List Bool × List Bool => pad p.1 p.2)
@@ -131,7 +140,7 @@ private theorem pad_nil (template : List Bool) :
   induction template with
   | nil => rfl
   | cons bit template ih =>
-    simp only [pad, zipFold, List.head?_nil, Option.getD_none, Option.toList_some,
+    simp only [pad, MultiTapeTM.zipFold, List.head?_nil, Option.getD_none, Option.toList_some,
       List.singleton_append, List.tail_nil, List.length_cons, List.replicate_succ]
     exact congrArg (false :: ·) ih
 
@@ -146,7 +155,9 @@ private theorem mulXMod_inSpace :
   have ht := budget_headD false (budget_comp_linear (listDrop encBool) (budget_prod hs hn))
   have hx := budget_comp_linear xor_inSpace (budget_prod hs hg)
   exact (budget_comp_linear (listTake encBool)
-    (budget_prod (budget_ite ht hx hs) hn)).of_enc_eq fun _ => rfl
+    (budget_prod (budget_ite ht hx hs) hn)).of_enc_eq fun p => by
+      simp only [mulXMod, List.getD_eq_getElem?_getD, List.headD_eq_head?_getD,
+        List.head?_drop]
 
 /-- The two coefficient registers carried by multiplication. -/
 private structure Registers where
@@ -182,7 +193,7 @@ private theorem advance_lengths (g : List Bool) (s : Registers) (bit : Bool) (d 
     unfold mulXMod
     exact Nat.le_trans (List.length_take_le _ _) hg
   · simp only [advance]
-    split <;> simp_all only [List.length_zipWith] <;> omega
+    split <;> simp_all only [List.length_zipWith]; omega
 
 private theorem fold_lengths (g bits : List Bool) (s : Registers) (d : ℕ)
     (hs : s.shift.length ≤ d) (ha : s.product.length ≤ d) (hg : g.length - 1 ≤ d) :
@@ -232,7 +243,7 @@ theorem fieldMulMod_inSpace :
     (B := fun p => 9 * p.modulus.length + 1)
     (fun p i hi => by
       have h := hstates p i
-      simp only [length_encPair, encBool_apply, List.length_singleton]
+      simp only [length_encPair, coefficients_length, encBool_apply, List.length_singleton]
       have hm : 3 * p.modulus.length ≤ (encMulInput p).length := by
         simp only [encMulInput_apply, encMulInputFields, length_encPair, coefficients_length]
         omega
@@ -244,6 +255,6 @@ theorem fieldMulMod_inSpace :
       pad_length, List.length_tail]
     omega
   · rw [fold_agrees, fieldMulMod, modMulBits, pad_nil]
-    simp only [pad_eq, List.length_tail]
+    simp only [pad_eq, List.length_tail, Fin.val_cast]
 
 end Turing.BinaryField

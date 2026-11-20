@@ -31,7 +31,7 @@ example : ComputableInSpace
     (fun p : MulInput => fieldMulMod p.modulus p.right p.left)
     encMulInput encCoefficients (fun p => (encMulInput p).length) := by
   have hid : ComputableInSpace (fun p : MulInput => p) encMulInput encMulInput
-      (fun p => (encMulInput p).length) := of_inO ComputableInO.id'
+      (fun p => (encMulInput p).length) := of_inO (ComputableInO.of_eq fun _ => rfl)
   exact budget_comp_linear fieldMulMod_inSpace
     (encMulInput_mk_budget (encMulInput_modulus_budget hid)
       (encMulInput_right_budget hid) (encMulInput_left_budget hid))
