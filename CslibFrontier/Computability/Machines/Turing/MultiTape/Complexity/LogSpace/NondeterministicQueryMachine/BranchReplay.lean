@@ -88,4 +88,44 @@ theorem finish_replay (a : α) (s : σ)
   | cons j rest =>
     simp [MultiTapeCTM.runBranch_of_halted _ hqhalt] at htail
 
+/-- One selected native pass records its selector and updates the boundary according to the
+abstract step. The continuation check records no choice. -/
+theorem exists_pass_replay (a : α) (s : σ)
+    (hs : (M.withInit (start a)).Reachable (enc a) s) (b flag : Bool) (out : List Bool) :
+    ∃ indices, Native.replayChoices R.I R.P R.F R.C
+      (wordsCfg (enc a) (some .choose) (R.boundary s flag) out) indices =
+      some ([b], wordsCfg (enc a)
+        (some (if M.halted (M.step (enc a) s b) then .finish R.F.q₀ else .choose))
+        (R.boundary (M.step (enc a) s b) (!M.halted (M.step (enc a) s b))) out) := by
+  obtain ⟨t, ht⟩ := R.pass_spec a s hs b flag
+  obtain ⟨ws', e, ⟨hws, he⟩, q₀, hqhead, hqlast, _, _⟩ := ht _ _ out ⟨rfl, rfl⟩
+  obtain ⟨q, hhead', hlast', _, _⟩ := q₀.exists_running (by rw [hqlast]; rfl)
+  let f : ((R.P b).runningStepRel (enc a)).Hom (R.machine.runningStepRel (enc a)) :=
+    ⟨Cfg.mapState (Native.passState b), fun h =>
+      ⟨by change some _ ≠ none; simp, (Native.passHom R.I R.P R.F R.C b).map_rel' h⟩⟩
+  let p := q.map f
+  have hphead : p.head = wordsCfg (enc a) (some (.pass b (R.P b).q₀))
+      (R.boundary s flag) out := by simp [p, f, hhead', hqhead, Native.passState]
+  have hplast : p.last = wordsCfg (enc a) (some .check) ws' out := by
+    simp [p, f, hlast', hqlast, Native.passState, he]
+  have hp := Native.replayChoices_replicate_zero R.I R.P R.F R.C p (by
+    intro i
+    change (some ((q i.castSucc).state.elim Native.State.check (Native.State.pass b))) ≠
+      some Native.State.choose
+    cases (q i.castSucc).state <;> simp)
+  have hstep : R.machine.Step p.last
+      (wordsCfg (enc a) (some (if ws' R.C = [] then .finish R.F.q₀ else .choose)) ws' out) := by
+    rw [hplast]
+    exact (Native.step_iff R.I R.P R.F R.C).mpr
+      ⟨false, Native.step_check_words R.I R.P R.F R.C false ws' out⟩
+  have hcheck := Native.replayChoices_step_zero R.I R.P R.F R.C
+    (show p.last.state ≠ some .choose by rw [hplast]; exact fun h => by cases h)
+    (show ¬p.last.Halted by rw [hplast]; exact fun h => by cases h) hstep []
+  refine ⟨b.toNat :: (List.replicate p.length 0 ++ [0]), ?_⟩
+  rw [Native.replayChoices_choose _ _ _ _ _ rfl, withState_wordsCfg, ← hphead,
+    Native.replayChoices_append, hp]
+  simp only [Option.bind, hcheck, Native.replayChoices_nil, Option.map_some, List.nil_append]
+  rw [hws, R.boundary_flag]
+  cases M.halted (M.step (enc a) s b) <;> simp [flagWord]
+
 end Turing.NondeterministicQueryMachine.Routines

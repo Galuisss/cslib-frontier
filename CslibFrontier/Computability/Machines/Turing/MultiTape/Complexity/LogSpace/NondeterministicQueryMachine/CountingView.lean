@@ -170,6 +170,23 @@ theorem replayChoices_choose {input : List Bool} (cfg : Cfg k Bool (State SI SP 
   rw [replayChoices, hstep]
   cases b <;> simp [Option.bind, atChoice, hcfg]
 
+/-- A live native step outside a choice boundary has one occurrence and records no bit. -/
+theorem replayChoices_step_zero {input : List Bool}
+    {cfg next : Cfg k Bool (State SI SP SF) input}
+    (hstate : cfg.state ≠ some .choose) (hlive : ¬cfg.Halted)
+    (hstep : (machine I P F C).Step cfg next) (rest : List ℕ) :
+    replayChoices I P F C cfg (0 :: rest) = replayChoices I P F C next rest := by
+  have hat : atChoice cfg = false := by
+    cases h : cfg.state with
+    | none => simp [atChoice, h]
+    | some q => cases q <;> simp_all [atChoice]
+  rw [← toNTM_countingMachine] at hstep
+  obtain ⟨j, hj⟩ := ((countingMachine I P F C).step_toNTM_iff hlive).mp hstep
+  have hj' := step_index_lt I P F C hj
+  obtain rfl : j = 0 := by simpa [hat, Nat.lt_one_iff] using hj'
+  rw [replayChoices, hj]
+  simp [hat, Option.bind]
+
 /-- A running path through deterministic routines has a replay with no recorded choice bits. -/
 theorem replayChoices_replicate_zero {input : List Bool}
     (p : RelSeries ((machine I P F C).runningStepRel input))
@@ -188,20 +205,13 @@ theorem replayChoices_replicate_zero {input : List Bool}
       change (p.snoc next hs (Fin.last p.length).castSucc).state ≠ some .choose at hi
       change (p (Fin.last p.length)).state ≠ some .choose
       exact (RelSeries.snoc_castSucc p next hs (Fin.last p.length)) ▸ hi
-    have hat : atChoice p.last = false := by
-      cases hstate : p.last.state with
-      | none => simp [atChoice, hstate]
-      | some q => cases q <;> simp_all [atChoice]
-    have hstep : (countingMachine I P F C).toNTM.Step p.last next := by
-      rw [toNTM_countingMachine]
-      exact hs.2
-    obtain ⟨j, hj⟩ := ((countingMachine I P F C).step_toNTM_iff hs.1).mp hstep
-    have hj' := step_index_lt I P F C hj
-    have hz : j = 0 := by simpa [hat, Nat.lt_one_iff] using hj'
-    subst j
     rw [RelSeries.snoc_length, List.replicate_succ', RelSeries.head_snoc,
       replayChoices_append, ih hbefore]
-    simp [replayChoices, hj, hat, Option.bind]
+    simpa only [Option.bind, List.nil_append, RelSeries.last_snoc, replayChoices_nil,
+      Option.map_some] using
+      congrArg (Option.map (fun p => (([] : List Bool) ++ p.1, p.2)))
+        (replayChoices_step_zero I P F C hlast hs.1 hs.2 [])
+
 
 /-- Among successful replays from the same configuration, a shorter replay whose
 choice bits are a prefix of the longer replay's bits is an occurrence prefix. -/
