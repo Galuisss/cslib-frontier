@@ -110,14 +110,16 @@ noncomputable def minIntervalWeight (code : V → Fin ℓ → Bool) (seed : Fin 
     (layers : Finset ℕ) (column : P → ℕ → V) (paths : Finset P) (hne : paths.Nonempty) : ℕ :=
   (paths.image fun p => intervalWeight code seed layers (column p)).min' (hne.image _)
 
-private theorem minIntervalWeight_le (code : V → Fin ℓ → Bool) (seed : Fin ℓ → Bool)
+/-- The minimum interval weight is no larger than the weight of any member. -/
+theorem minIntervalWeight_le (code : V → Fin ℓ → Bool) (seed : Fin ℓ → Bool)
     (layers : Finset ℕ) (column : P → ℕ → V) {paths : Finset P} (hne : paths.Nonempty)
     {p : P} (hp : p ∈ paths) :
     minIntervalWeight code seed layers column paths hne ≤
       intervalWeight code seed layers (column p) :=
   min'_le _ _ (mem_image_of_mem _ hp)
 
-private theorem exists_minIntervalWeight (code : V → Fin ℓ → Bool) (seed : Fin ℓ → Bool)
+/-- Some member of a nonempty path family attains its minimum interval weight. -/
+theorem exists_minIntervalWeight (code : V → Fin ℓ → Bool) (seed : Fin ℓ → Bool)
     (layers : Finset ℕ) (column : P → ℕ → V) {paths : Finset P} (hne : paths.Nonempty) :
     ∃ p ∈ paths, intervalWeight code seed layers (column p) =
       minIntervalWeight code seed layers column paths hne :=
