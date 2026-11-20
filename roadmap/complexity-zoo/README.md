@@ -3,8 +3,12 @@
 The first pass records **119 matches in cslib-frontier** and **5 matches in its pinned
 dependencies** at [main revision `c74b96b52f`](https://github.com/cslib-community/cslib-frontier/tree/c74b96b52fbba69d47652ae4a791d9527cc293f4).
 These are verified lower bounds. The 469 unassessed headings remain to be checked.
-The separately requested batch includes definitions in open PRs and is tracked in
-[#6641](https://github.com/cslib-community/cslib-frontier/issues/6641).
+The [requested batch](requested.csv) adds **95 distinct matched entries in submitted PRs**
+beyond the pinned main snapshot. This gives a lower bound of **214 entries defined
+in cslib-frontier on main or in those PRs**, with five further matches in dependencies.
+The request itself names 114 entries, including aliases. Of these, 111 have definitions,
+CLOG needs the continuous-time model, and two names need a definition convention.
+See [#6641](https://github.com/cslib-community/cslib-frontier/issues/6641).
 
 The [Zoo homepage](https://complexityzoo.net/index.php?oldid=20341) advertises **553
 classes**. Its All Classes index has 585 links to 583 distinct anchors. The link
