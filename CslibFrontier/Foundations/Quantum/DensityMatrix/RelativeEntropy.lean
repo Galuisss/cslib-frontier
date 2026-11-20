@@ -11,6 +11,7 @@ public import CslibFrontier.Foundations.Quantum.DensityMatrix.PurificationOverla
 public import CslibFrontier.Probability.Hellinger
 public import Mathlib.Analysis.Matrix.HermitianFunctionalCalculus
 import CslibFrontier.Foundations.LinearAlgebra.Matrix.PosSemidefKernel
+import CslibFrontier.Foundations.LinearAlgebra.Matrix.PolarDecomposition
 import CslibFrontier.Probability.ChiSquare
 import CslibFrontier.Probability.Divergence
 
@@ -271,6 +272,40 @@ theorem eigenvalue_mul_overlap_eq_zero_of_supportLE {A B : Matrix ι ι ℂ}
   · change _ * Complex.normSq (((U : Matrix ι ι ℂ)ᴴ * (V : Matrix ι ι ℂ)) i j) = _
     rw [hw, Complex.normSq_zero, mul_zero]
 
+/-- The squared overlaps with the eigenbasis of the second matrix sum to one in each row. -/
+theorem sum_eigenbasis_overlap_row {A B : Matrix ι ι ℂ}
+    (hA : A.IsHermitian) (hB : B.IsHermitian) (i : ι) :
+    (∑ j, Complex.normSq (((hA.eigenvectorUnitary : Matrix ι ι ℂ)ᴴ *
+      (hB.eigenvectorUnitary : Matrix ι ι ℂ)) i j)) = 1 := by
+  let U := hA.eigenvectorUnitary
+  let V := hB.eigenvectorUnitary
+  apply sum_normSq_row
+  change ((U : Matrix ι ι ℂ)ᴴ * (V : Matrix ι ι ℂ)) *
+    ((U : Matrix ι ι ℂ)ᴴ * (V : Matrix ι ι ℂ))ᴴ = 1
+  simp only [conjTranspose_mul, conjTranspose_conjTranspose, Matrix.mul_assoc]
+  rw [← Matrix.mul_assoc (V : Matrix ι ι ℂ) (V : Matrix ι ι ℂ)ᴴ (U : Matrix ι ι ℂ),
+    show (V : Matrix ι ι ℂ) * (V : Matrix ι ι ℂ)ᴴ = 1 from Unitary.coe_mul_star_self V,
+    Matrix.one_mul]
+  exact Unitary.coe_star_mul_self U
+
+/-- The finite trace formula expressed in the eigenbases of its two arguments. -/
+theorem relativeEntropyReal_eq_sum_eigenbasis {A B : Matrix ι ι ℂ}
+    (hA : A.IsHermitian) (hB : B.IsHermitian) :
+    relativeEntropyReal A B = ∑ i, ∑ j,
+      (hA.eigenvalues i * Real.log (hA.eigenvalues i) -
+        hA.eigenvalues i * Real.log (hB.eigenvalues j)) *
+        Complex.normSq (((hA.eigenvectorUnitary : Matrix ι ι ℂ)ᴴ *
+          (hB.eigenvectorUnitary : Matrix ι ι ℂ)) i j) := by
+  have hself : (A * cfc Real.log A).trace.re =
+      ∑ i, hA.eigenvalues i * Real.log (hA.eigenvalues i) := by
+    rw [trace_mul_cfc_re _ _ hA hA,
+      show (hA.eigenvectorUnitary : Matrix ι ι ℂ)ᴴ * (hA.eigenvectorUnitary : Matrix ι ι ℂ) = 1
+        from Unitary.coe_star_mul_self hA.eigenvectorUnitary]
+    refine sum_congr rfl fun i _ => ?_
+    simp [Matrix.one_apply]
+  rw [relativeEntropyReal, mul_sub, trace_sub, Complex.sub_re, hself, trace_mul_cfc_re _ _ hA hB]
+  simp only [sub_mul, sum_sub_distrib, ← Finset.mul_sum, sum_eigenbasis_overlap_row, mul_one]
+
 private theorem trace_mul_log_smul_re {A B : Matrix ι ι ℂ}
     (hA : A.IsHermitian) (hB : B.IsHermitian) (hs : SupportLE A B) {b : ℝ} (hb : 0 < b) :
     (A * cfc Real.log (b • B)).trace.re =
@@ -313,40 +348,6 @@ theorem relativeEntropyReal_smul {ρ σ : Matrix ι ι ℂ} (hρ : IsDensityMatr
     trace_mul_log_smul_re hρ.posSemidef.isHermitian hσ.posSemidef.isHermitian hs hb,
     hρ.trace_eq_one, Complex.one_re, mul_one, mul_one, Real.log_div ha.ne' hb.ne']
   ring
-
-/-- The squared overlaps with the eigenbasis of the second matrix sum to one in each row. -/
-theorem sum_eigenbasis_overlap_row {A B : Matrix ι ι ℂ}
-    (hA : A.IsHermitian) (hB : B.IsHermitian) (i : ι) :
-    (∑ j, Complex.normSq (((hA.eigenvectorUnitary : Matrix ι ι ℂ)ᴴ *
-      (hB.eigenvectorUnitary : Matrix ι ι ℂ)) i j)) = 1 := by
-  let U := hA.eigenvectorUnitary
-  let V := hB.eigenvectorUnitary
-  apply sum_normSq_row
-  change ((U : Matrix ι ι ℂ)ᴴ * (V : Matrix ι ι ℂ)) *
-    ((U : Matrix ι ι ℂ)ᴴ * (V : Matrix ι ι ℂ))ᴴ = 1
-  simp only [conjTranspose_mul, conjTranspose_conjTranspose, Matrix.mul_assoc]
-  rw [← Matrix.mul_assoc (V : Matrix ι ι ℂ) (V : Matrix ι ι ℂ)ᴴ (U : Matrix ι ι ℂ),
-    show (V : Matrix ι ι ℂ) * (V : Matrix ι ι ℂ)ᴴ = 1 from Unitary.coe_mul_star_self V,
-    Matrix.one_mul]
-  exact Unitary.coe_star_mul_self U
-
-/-- The finite trace formula expressed in the eigenbases of its two arguments. -/
-theorem relativeEntropyReal_eq_sum_eigenbasis {A B : Matrix ι ι ℂ}
-    (hA : A.IsHermitian) (hB : B.IsHermitian) :
-    relativeEntropyReal A B = ∑ i, ∑ j,
-      (hA.eigenvalues i * Real.log (hA.eigenvalues i) -
-        hA.eigenvalues i * Real.log (hB.eigenvalues j)) *
-        Complex.normSq (((hA.eigenvectorUnitary : Matrix ι ι ℂ)ᴴ *
-          (hB.eigenvectorUnitary : Matrix ι ι ℂ)) i j) := by
-  have hself : (A * cfc Real.log A).trace.re =
-      ∑ i, hA.eigenvalues i * Real.log (hA.eigenvalues i) := by
-    rw [trace_mul_cfc_re _ _ hA hA,
-      show (hA.eigenvectorUnitary : Matrix ι ι ℂ)ᴴ * (hA.eigenvectorUnitary : Matrix ι ι ℂ) = 1
-        from Unitary.coe_star_mul_self hA.eigenvectorUnitary]
-    refine sum_congr rfl fun i _ => ?_
-    simp [Matrix.one_apply]
-  rw [relativeEntropyReal, mul_sub, trace_sub, Complex.sub_re, hself, trace_mul_cfc_re _ _ hA hB]
-  simp only [sub_mul, sum_sub_distrib, ← Finset.mul_sum, sum_eigenbasis_overlap_row, mul_one]
 
 /-- Weight the squared eigenbasis overlaps by the two sets of eigenvalues. The resulting
 distributions give the finite trace formula and the square-root trace overlap. -/
