@@ -31,6 +31,10 @@ has one occurrence for each bit.
   labels recovers the original machine and its space bounds.
 * `Turing.NondeterministicQueryMachine.Native.eq_occurrences_of_replayChoices`: a first-halting
   branch is determined by the bit sequence at its choice boundaries.
+* `Turing.NondeterministicQueryMachine.Native.countingMachine_haltsWithin`: the original
+  time bound applies to counted runs.
+* `Turing.NondeterministicQueryMachine.Native.branchCount_le_one_of_choiceTrace`: a verdict
+  with a unique bit sequence has at most one counted branch.
 -/
 
 public section
@@ -72,6 +76,16 @@ theorem toNTM_countingMachine : (countingMachine I P F C).toNTM = machine I P F 
   congr 1
   funext q input work act
   exact propext (h q input work act)
+
+/-- A bound on the native computation paths is also a clock for the counting presentation. -/
+theorem countingMachine_haltsWithin {input : List Bool} {fuel : ℕ}
+    (h : (machine I P F C).RunsInTime input fuel) :
+    (countingMachine I P F C).HaltsWithin fuel
+      (Cfg.init (.init I.q₀) input) := by
+  apply MultiTapeCTM.haltsWithin_of_paths (countingMachine_nonblocking I P F C)
+  rw [toNTM_countingMachine]
+  intro p hp hlen
+  exact h ⟨p, hp⟩ hlen
 
 private def atChoice {input : List Bool} (cfg : Cfg k Bool (State SI SP SF) input) : Bool :=
   match cfg.state with
@@ -162,5 +176,31 @@ theorem eq_occurrences_of_replayChoices {input : List Bool}
       rw [hf₁] at hxs
       rw [hf₂] at hys
       exact congrArg (i :: ·) (ih hxs hys)
+
+/-- If a verdict determines the genuine choice sequence on every terminal replay, it has
+at most one counted branch. -/
+theorem branchCount_le_one_of_choiceTrace {input : List Bool}
+    (cfg : Cfg k Bool (State SI SP SF) input) (fuel : ℕ) (verdict : List Bool → Bool)
+    (bits : List Bool)
+    (hbits : ∀ indices trace final, replayChoices I P F C cfg indices = some (trace, final) →
+      final.Halted → verdict final.output → trace = bits) :
+    (countingMachine I P F C).branchCount verdict fuel cfg ≤ 1 := by
+  apply Finset.card_le_one_iff.mpr
+  have htrace {indices : List ℕ}
+      (h : indices ∈ ((countingMachine I P F C).branches fuel cfg).filter fun is =>
+        ((countingMachine I P F C).runBranch cfg is).any fun final => verdict final.output) :
+      ∃ final, replayChoices I P F C cfg indices = some (bits, final) ∧ final.Halted := by
+    obtain ⟨hmem, hv⟩ := Finset.mem_filter.mp h
+    obtain ⟨_, final, hr, hh⟩ := ((countingMachine I P F C).mem_branches_iff _ _ _).mp hmem
+    rw [← map_snd_replayChoices] at hr
+    obtain ⟨⟨trace, last⟩, ht, rfl⟩ := Option.map_eq_some_iff.mp hr
+    have hv' : verdict last.output := by
+      simpa [← map_snd_replayChoices, ht] using hv
+    obtain rfl := hbits _ _ _ ht hh hv'
+    exact ⟨last, ht, hh⟩
+  intro first second hfirst hsecond
+  obtain ⟨_, hf, hhf⟩ := htrace hfirst
+  obtain ⟨_, hs, hhs⟩ := htrace hsecond
+  exact eq_occurrences_of_replayChoices I P F C hf hs hhf hhs
 
 end Turing.NondeterministicQueryMachine.Native
