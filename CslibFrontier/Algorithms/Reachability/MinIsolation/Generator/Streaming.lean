@@ -74,6 +74,19 @@ theorem generatedWeightScan_prefix_lt {w n k : ℕ} (seed : Fin (codeLength w n)
       6 * a + (indexedCodewordMod v (j.castLE hk) && seed (j.castLE hk)).toNat) 0 < 6 ^ k :=
   accumulate_lt _
 
+/-- The binary logarithm of the prefix accumulator is bounded by three bits per digit.
+The additional bit in the bound is enough to represent zero at the empty prefix. -/
+theorem generatedWeightScan_prefix_log2_lt {w n k : ℕ} (seed : Fin (codeLength w n) → Bool)
+    (v : Fin w) (hk : k ≤ codeLength w n) :
+    Nat.log2 (Fin.foldl k (fun a j =>
+      6 * a + (indexedCodewordMod v (j.castLE hk) && seed (j.castLE hk)).toNat) 0) < 3 * k + 1 := by
+  rw [Nat.log2_eq_log_two]
+  apply Nat.log_lt_of_lt_pow' (Nat.succ_ne_zero _)
+  exact (generatedWeightScan_prefix_lt seed v hk).trans_le (calc
+    6 ^ k ≤ (2 ^ 3) ^ k := Nat.pow_le_pow_left (by decide) _
+    _ = 2 ^ (3 * k) := by rw [pow_mul]
+    _ ≤ 2 ^ (3 * k + 1) := Nat.pow_le_pow_right (by decide) (Nat.le_succ _))
+
 /-- Scan the seed through a read-only bit accessor. For a positive layer, evaluate code bits
 individually and accumulate the masked digits in base six. -/
 def generatedWeightScan {w n : ℕ} (seed : Fin (codeLength w n) → Bool)
