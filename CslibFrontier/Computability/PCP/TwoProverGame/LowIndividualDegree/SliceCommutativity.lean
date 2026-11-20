@@ -319,11 +319,7 @@ theorem evaluatedSlice_successfulPairDefect_le
         mul_sub, sub_mul, mul_one, map_sub, Complex.sub_re, sum_sub_distrib, expect_sub_distrib,
         mul_assoc, G]
     rw [abs_sub_comm, he]
-    have hsplit (u : Point F (m + 1)) :
-        (𝔼 v, loss u v) = 𝔼 x : F, 𝔼 v : Point F m, loss u (Fin.snoc v x) := by
-      rw [expect_comm univ univ]
-      exact (Fintype.expect_fin_snoc (loss u)).symm
-    simp only [hsplit]
+    simp only [Fintype.expect_eq_expect_snoc (loss _)]
     have hfixed (u : Point F (m + 1)) :
         |𝔼 x : F, 𝔼 v : Point F m, loss u (Fin.snoc v x)| ≤ √ζ :=
       abs_mean_le_sqrt _ (fun x => (S.state ((M x).effect none * Z x)).re)

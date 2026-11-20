@@ -312,13 +312,9 @@ theorem abs_average_evaluated_failure_pointProduct_le
       (fun g b => hMP x v g b) (fun b a => hnQ b v a) (fun g => hMZ x x g) hnZ
     simpa only [reordered, P, Fin.snoc_last, Fin.init_snoc,
       evaluatePolynomialMeasurement_effect_none] using h
-  have hsplit (f : Point F (m + 1) → ℝ) :
-      (𝔼 w, f w) = 𝔼 x : F, 𝔼 u : Point F m, f (Fin.snoc u x) := by
-    rw [expect_comm univ univ]
-    exact (Fintype.expect_fin_snoc f).symm
   have hremaining : |𝔼 u, 𝔼 v, reordered u v| ≤ √ζ := by
     rw [expect_comm univ univ]
-    simp_rw [hsplit (fun u => reordered u _)]
+    simp_rw [Fintype.expect_eq_expect_snoc (fun u => reordered u _)]
     refine (abs_expect_le _ _).trans ?_
     refine (expect_le_expect fun v _ => abs_expect_le _ _).trans ?_
     refine (expect_le_expect fun v _ => expect_le_expect fun x _ => hfixed x v).trans ?_

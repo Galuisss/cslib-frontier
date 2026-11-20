@@ -8,6 +8,7 @@ module
 -- upstream: local-only (tests)
 
 import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SliceCommutativity
+import CslibFrontier.Foundations.Quantum.Algebra.OutcomeCommutator
 import CslibFrontierTests.QubitMeasurementFixture
 import Mathlib.Algebra.Field.ZMod
 
@@ -190,5 +191,29 @@ example :
     (fun _ _ => commute_const_effect _ _ _) f⟩
   · norm_num [Measurement.successfulCopyDefect, L, R, Measurement.const, AlgState.norm_neg]
   · simp [Measurement.successfulCopyDefect, L, R, f, Measurement.map_effect, Measurement.const]
+
+/-- One of two relabelings merges both outcomes, and the other distinguishes them.
+The recovery estimate applies to the computational and uniform qubit measurements. -/
+example :
+    let L := (binary diagonalProjection diagonalProjection_star diagonalProjection_sq).map some
+    let Q := (binary uniformProjection uniformProjection_star uniformProjection_sq).map some
+    let R : Measurement (Option Bool) Mat := Measurement.const (some false)
+    let f (u a : Bool) := u && a
+    (𝔼 u : Bool, if f u false = f u true then (1 : ℝ) else 0) = 1 / 2 ∧
+    Measurement.successfulPairDefect φ L Q ≤
+      4 * (𝔼 u : Bool, Measurement.successfulPairDefect φ (L.map (Option.map (f u))) Q) +
+        6 * Measurement.successfulCopyDefect φ L R + 2 := by
+  intro L Q R f
+  have hcollision (a a' : Bool) (hne : a ≠ a') :
+      (𝔼 u : Bool, if f u a' = f u a then (1 : ℝ) else 0) = 1 / 2 := by
+    cases a <;> cases a' <;> norm_num [f, Fintype.expect_eq_sum_div_card, Fintype.sum_bool] at *
+  refine ⟨hcollision true false (by decide), ?_⟩
+  have h := Measurement.successfulPairDefect_le_average_map φ L R Q
+    ((binary_projective _ _ _).map _) (Measurement.isProjective_const _)
+    ((binary_projective _ _ _).map _) (fun _ _ => commute_const_effect _ _ _)
+    (fun _ _ => (commute_const_effect _ _ _).symm) f (κ := 1 / 2)
+    (by norm_num) (fun a a' hne => (hcollision a a' hne).le)
+  norm_num at h
+  exact h
 
 end CslibFrontierTests.LowIndividualDegreeSliceBoundedness
