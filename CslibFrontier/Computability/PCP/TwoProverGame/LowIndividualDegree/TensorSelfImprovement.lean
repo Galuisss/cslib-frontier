@@ -148,10 +148,10 @@ theorem exists_tensorSelfImprovement
       decodedPoint_stateDist_le C d
   have hmass := successfulMass_sandwichedPolynomial_lower_bound C.state L R V
     (fun u => (hLpoint u).map _) (fun u g b =>
-      (commute_decodedPoint C.bob u _ (hT (.point u) g) b).symm)
+      (Measurement.commute_map_right (C.bob (.point u)) decodePoint _ (hT (.point u) g) b).symm)
     (QuantumStrategy.rightMeasurement G) W hle hslack
     (fun g => (commute_kroneckerOne_oneKronecker Z (G.effect g)).symm)
-    (fun g u b => commute_decodedPoint C.alice u _
+    (fun g u b => Measurement.commute_map_right (C.alice (.point u)) decodePoint _
       (fun a =>
         (commute_kroneckerOne_oneKronecker ((S.alice (.point u)).effect a) (G.effect g)).symm) b)
   refine ⟨T, Z, hZ, hlocal,
@@ -387,7 +387,7 @@ theorem exists_symmetricSelfImprovement
         ((decodedPoint C.alice u).effect b) := by
     rw [evaluatePolynomialMeasurement_effect_some]
     refine Commute.sum_left _ _ _ fun g _ => ?_
-    exact commute_decodedPoint C.alice u _ (fun c =>
+    exact Measurement.commute_map_right (C.alice (.point u)) decodePoint _ (fun c =>
       (commute_kroneckerOne_oneKronecker
         ((S.alice (.point u)).effect c) (H.effect (some g))).symm) b
   rw [hleft] at hmass hpoint hgap
