@@ -233,10 +233,6 @@ private def decodeRunState (M : OracleDesc) (n : ℕ) : RunState :=
 private theorem primrec_decodeRunState (M : OracleDesc) : Primrec (decodeRunState M) :=
   Primrec.option_getD.comp Primrec.decode (Primrec.const ([], M.init))
 
-private theorem some_apply {α β : Type} (f : α → β) (p : Part α) :
-    Part.some f <*> p = p.map f :=
-  pure_seq _ _
-
 private theorem hasCode_encodedStep (M : OracleDesc) :
     HasCode (fun oracle n =>
       let (x, c) := decodeRunState M n
@@ -258,8 +254,7 @@ private theorem hasCode_encodedStep (M : OracleDesc) :
   refine ((HasCode.of_primrec hnat).comp
     ((HasCode.of_primrec Nat.Primrec.id).pair hcall)).of_eq ?_
   intro oracle n
-  simp only [id_eq, Part.bind_eq_bind, Part.bind_some, Part.map_eq_map, Part.map_some,
-    some_apply, Nat.unpair_pair]
+  simp only [id_eq, ← Part.pure_eq_some, pure_bind, map_pure, pure_seq, Nat.unpair_pair]
   cases hb : oracle (decodeRunState M n).2.queryLength <;> simp [step, hb]
 
 private def decodeInput (n : ℕ) : List ℕ := (Encodable.decode n).getD []
@@ -344,7 +339,10 @@ private theorem hasCode_evalEncoded (M : OracleDesc) :
   have hrun := (HasCode.of_primrec hout).comp (hasCode_encodedRun M)
   refine (hrun.comp ((HasCode.of_primrec Nat.Primrec.id).pair (hasCode_haltTime M))).of_eq ?_
   intro oracle n
-  simp [eval, Part.map_map, decodeRunState, Part.bind_some_eq_map, Function.comp_def, some_apply]
+  simp only [eval, Part.map_map, decodeRunState, Part.bind_some_eq_map, Function.comp_def,
+    id_eq, Part.map_eq_map, Part.map_some, Encodable.encode_prod_val, Part.bind_eq_bind]
+  rw [← Part.pure_eq_some (Nat.pair n), pure_seq, Part.map_eq_map, Part.map_map]
+  simp [Function.comp_def]
 
 /-- Relative evaluation of the finite oracle machine is partial recursive in its membership
 oracle. The computation returns the entire halted output word and diverges when the machine

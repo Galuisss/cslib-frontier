@@ -443,11 +443,7 @@ theorem primrec_step :
 /-- Append the emitted symbol, if there is one, to a finite output word. -/
 theorem primrec_output_append :
     Primrec₂ fun (out : List ℕ) (symbol : Option ℕ) => out ++ symbol.toList := by
-  have htoList : Primrec fun o : Option ℕ => o.toList :=
-    (Primrec.option_casesOn .id (Primrec.const [])
-      (Primrec.list_cons.comp Primrec.snd (Primrec.const [])).to₂).of_eq fun o => by
-      cases o <;> rfl
-  exact Primrec.list_append.comp Primrec.fst (htoList.comp Primrec.snd)
+  exact Primrec.list_append.comp Primrec.fst (Primrec.optionToList.comp Primrec.snd)
 
 theorem primrec_stepOut :
     Primrec fun p : (Desc × List ℕ) × (SCfg × List ℕ) => stepOut p.1.1 p.1.2 p.2 := by
