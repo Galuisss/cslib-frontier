@@ -6,6 +6,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 
 -- upstream: local-only (result registry collection)
 import CslibFrontierResults.Registry
+import CslibFrontier.Computability.Complexity.Reduction.LinearApproximation
 import CslibFrontier.Algorithms.Lean.Knapsack.ApproximationSchemes
 import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
@@ -11339,3 +11340,17 @@ register_result "knapsack-fptas" where
   scope := "Natural weights, values and capacity in binary. The solver returns a feasible \
     item subsequence of value at least 1 − 1/k times optimal, with one native polynomial-time \
     algorithm on the instance and positive unary k. Items exceeding the capacity are discarded."
+
+register_result "linear-reductions-preserve-ptas" where
+  title := "Linear reductions transfer approximation guarantees and PTAS"
+  topic := "approximation complexity"
+  sources := [
+    { paper := PapadimitriouYannakakis1991, theorem := "Proposition 2", locator := "§1, p. 427" }
+  ]
+  theorems := [
+    Cslib.Complexity.LReduction.isApproximate_recover,
+    Cslib.Complexity.LReduction.ptas
+  ]
+  scope := "Typed NP optimization problems with natural objectives and all feasible solutions \
+    length-bounded. Positive natural factors bound optimum growth and absolute error. \
+    Target inverse accuracy is the requested inverse accuracy multiplied by both factors."
