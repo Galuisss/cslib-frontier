@@ -14,7 +14,10 @@ public import CslibFrontier.Algorithms.Reachability.DoubleCounting
 
 A successful transcript answers membership in the current round. Scan successors of
 that round to obtain its next frontier. Each new vertex contributes once to the
-count, and its distance is the next round index [ReinhardtAllender2000, Figure 2].
+count, and its distance is the next round index. Figure 2 of [ReinhardtAllender2000]
+increments once per qualifying predecessor and flags ties. Its accumulator agrees
+with the set-based update here when the next-round predecessor test succeeds.
+On a tied round the set-based tally still counts each newly reached vertex once.
 Under uniqueness in the current round, a new vertex has a unique shortest walk
 exactly when it has a unique predecessor in that round.
 
