@@ -315,26 +315,34 @@ theorem sum_weighted_relativeEntropy_eq_mutualInformation_add (p : PMF X)
   · rw [relativeEntropy_of_not_supportLE hs, WithTop.add_top]
     exact sum_weighted_relativeEntropy_eq_top p (fun h => hs (hiff.mpr h))
 
-/-- For a classical–quantum source and a diagonal classical reference marginal, the
-product-reference bound of BVY Proposition 5.9 holds. The same quantum reference
-block is used for every classical label. -/
+/-- Relative entropy to a product reference bounds the mutual information plus
+the divergence of the quantum marginal from the common quantum reference. -/
+theorem mutualInformation_add_relativeEntropy_le_relativeEntropy_classicalQuantumState_const
+    [MeasurableSpace X] [MeasurableSingletonClass X] (p q : PMF X)
+    {ρ : X → Matrix ι ι ℂ} (hρ : ∀ x, IsDensityMatrix (ρ x))
+    {σ : Matrix ι ι ℂ} (hσ : IsDensityMatrix σ) :
+    mutualInformation (classicalQuantumState p ρ) +
+      relativeEntropy (partialTraceRight (classicalQuantumState p ρ)) σ ≤
+      relativeEntropy (classicalQuantumState p ρ) (classicalQuantumState q (fun _ => σ)) := by
+  rw [relativeEntropy_classicalQuantumState p q hρ (fun _ => hσ),
+    sum_weighted_relativeEntropy_eq_mutualInformation_add p hρ]
+  apply le_add_of_nonneg_left
+  split
+  · exact le_top
+  · exact_mod_cast ENNReal.toReal_nonneg
+
+/-- For a classical–quantum source, the divergence to a product reference bounds
+the mutual information. -/
 theorem mutualInformation_le_relativeEntropy_classicalQuantumState_const
     [MeasurableSpace X] [MeasurableSingletonClass X] (p q : PMF X)
     {ρ : X → Matrix ι ι ℂ} (hρ : ∀ x, IsDensityMatrix (ρ x))
     {σ : Matrix ι ι ℂ} (hσ : IsDensityMatrix σ) :
     mutualInformation (classicalQuantumState p ρ) ≤
-      relativeEntropy (classicalQuantumState p ρ) (classicalQuantumState q (fun _ => σ)) := by
-  rw [relativeEntropy_classicalQuantumState p q hρ (fun _ => hσ),
-    sum_weighted_relativeEntropy_eq_mutualInformation_add p hρ]
-  have hKL : (0 : WithTop ℝ) ≤
-      if klDiv p.toMeasure q.toMeasure = ⊤ then ⊤
-      else ((klDiv p.toMeasure q.toMeasure).toReal : WithTop ℝ) := by
-    split
-    · exact le_top
-    · exact_mod_cast ENNReal.toReal_nonneg
-  have hD := relativeEntropy_nonneg
-    (isDensityMatrix_classicalQuantumState p hρ).partialTraceRight hσ
-  exact (le_add_of_nonneg_right hD).trans (le_add_of_nonneg_left hKL)
+      relativeEntropy (classicalQuantumState p ρ) (classicalQuantumState q (fun _ => σ)) :=
+  (le_add_of_nonneg_right (relativeEntropy_nonneg
+    (isDensityMatrix_classicalQuantumState p hρ).partialTraceRight hσ)).trans
+    (mutualInformation_add_relativeEntropy_le_relativeEntropy_classicalQuantumState_const
+      p q hρ hσ)
 
 /-- For a classical–quantum state all active blocks have finite divergence to the quantum
 marginal, so the mutual information is the lift of an ordinary real sum. -/

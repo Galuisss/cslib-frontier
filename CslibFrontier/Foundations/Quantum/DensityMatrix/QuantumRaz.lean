@@ -128,16 +128,10 @@ private theorem head_information_add_tail_divergence_le
     reindex_classicalQuantumState_prod qprod (fun _ => σ) q (fun _ => r)
       (fun x y => bind_map_prodMk_apply q (fun _ => r) (x, y))]
   change _ ≤ relativeEntropy (classicalQuantumState μ A) (classicalQuantumState q (fun _ => B))
-  rw [relativeEntropy_classicalQuantumState μ q hA
-      (fun _ => isDensityMatrix_classicalQuantumState r (fun _ => hσ)),
-    sum_weighted_relativeEntropy_eq_mutualInformation_add μ hA, htail]
-  have hKL : (0 : WithTop ℝ) ≤
-      if klDiv μ.toMeasure q.toMeasure = ⊤ then ⊤
-      else ((klDiv μ.toMeasure q.toMeasure).toReal : WithTop ℝ) := by
-    split
-    · exact le_top
-    · exact_mod_cast ENNReal.toReal_nonneg
-  exact (add_le_add_left hhead _).trans (le_add_of_nonneg_left hKL)
+  have h := mutualInformation_add_relativeEntropy_le_relativeEntropy_classicalQuantumState_const
+    μ q hA (isDensityMatrix_classicalQuantumState r (fun _ => hσ))
+  rw [htail] at h
+  exact (add_le_add_left hhead _).trans h
 
 omit [Fintype ι] [DecidableEq ι] [Fintype X] in
 private theorem reindex_classicalQuantumState {Z : Type*} [DecidableEq Z] (e : X ≃ Z)
