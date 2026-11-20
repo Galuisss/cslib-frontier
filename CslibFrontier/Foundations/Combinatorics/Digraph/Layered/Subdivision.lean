@@ -58,6 +58,10 @@ def equivProd (V : Type*) (bound : ℕ) : Vertex V bound ≃ V × Fin (bound + 1
   left_inv _ := rfl
   right_inv _ := rfl
 
+@[simp] theorem equivProd_apply {V : Type*} {bound : ℕ} (v : Vertex V bound) :
+    equivProd V bound v = (v.vertex, v.offset) := by
+  rfl
+
 instance {V : Type*} [Fintype V] (bound : ℕ) : Fintype (Vertex V bound) :=
   Fintype.ofEquiv _ (equivProd V bound).symm
 
