@@ -2075,6 +2075,7 @@ public import CslibFrontier.Computability.Complexity.Classes.FunctionTime.WordRA
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.LazyDiagonal
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.LazyDiagonalBounds
+public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.LazyDiagonalVerifier
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.LogClock
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.Nondeterministic
 public import CslibFrontier.Computability.Complexity.Classes.Hierarchy.NondeterministicExponentialTime
@@ -4154,6 +4155,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialAnswer
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.RestrictedStrategy
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SliceBoundedness
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SliceCommutativity
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.Slices
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerifierPasting
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerticalAxis
