@@ -40,7 +40,8 @@ local notation "Poly" => BoundedPolynomial F (n + 1) d
 /-- For arbitrary projective tensor strategies, the two local projective
 polynomial measurements agree on full outcomes and with the opposing players'
 decoded point measurements. The bounds are those of the quantitative variant described
-above. They use the three branch losses and allow an independent diagonal cutoff `D`. Set `D = (n + 1) * d` for the Figure 2 verifier. -/
+above. They use the three branch losses and allow an independent diagonal cutoff `D`.
+Set `D = (n + 1) * d` for the Figure 2 verifier. -/
 theorem exists_projective_polynomial_POVMs {k : ℕ} (D : ℕ)
     (hk : (n + 1) * d ≤ k) (S : QuantumStrategy Q Q Ans Ans ι κ)
     (hA : ∀ q, (S.alice q).toMeasurement.IsProjective)
