@@ -200,12 +200,8 @@ theorem choose_output (a : α) (p : R.machine.RunPath (enc a)) (s : σ)
           (by simp only [p₁, RelSeries.drop_length]; omega) (Nat.lt_succ_self _)
         change p ⟨q.length + 1, by omega⟩ = q.last.mapState (Native.passState b) at h
         simpa [hlast', hqlast, Native.passState] using h
-      have hnext := p.step ⟨q.length + 1, hlong⟩
-      change R.machine.Step (p ⟨q.length + 1, by omega⟩)
-        (p ⟨q.length + 2, by omega⟩) at hnext
-      rw [hcfg] at hnext
-      obtain ⟨coin, hcoin⟩ := (Native.step_iff R.I R.P R.F R.C).mp hnext
-      rw [Native.step_check_words R.I R.P R.F R.C coin, hws, he, List.append_nil] at hcoin
+      have hnext := Native.head_drop_check R.I R.P R.F R.C p ⟨q.length + 1, hlong⟩ hcfg
+      rw [hws, he, List.append_nil] at hnext
       let cut : Fin (p.length + 1) := ⟨q.length + 2, by omega⟩
       have hreach := Reachable.step _ (enc a) hs b
       by_cases hblank : R.boundary (M.step (enc a) s b) (!M.halted (M.step (enc a) s b)) R.C = []
@@ -214,10 +210,10 @@ theorem choose_output (a : α) (p : R.machine.RunPath (enc a)) (s : σ)
           cases hh : M.halted (M.step (enc a) s b) <;> simp_all [flagWord]
         refine ⟨_, hreach, hhalt', ?_⟩
         simpa only [RelSeries.last_drop] using R.finish_output a _ hreach _ out (p.drop cut)
-          (by simpa [cut, hblank] using hcoin.symm) (by simpa using hhalt)
+          (by simpa [cut, hblank] using hnext) (by simpa using hhalt)
       · simpa only [RelSeries.last_drop] using ih (p.drop cut).length
           (by simp only [RelSeries.drop_length, cut]; omega) (p.drop cut) rfl _ hreach _ out
-          (by simpa [cut, hblank] using hcoin.symm) (by simpa using hhalt)
+          (by simpa [cut, hblank] using hnext) (by simpa using hhalt)
   exact aux p.length p rfl s hs flag out hhead hhalt
 
 private theorem exists_finish_path (a : α) (s : σ)
@@ -306,19 +302,16 @@ private theorem check_output (a : α) (p : R.machine.RunPath (enc a)) (s : σ)
       omega
     rw [hsame, hhead] at hhalt
     cases hhalt
-  have hstep := p.step ⟨0, hpos⟩
-  change R.machine.Step p.head (p ⟨1, by omega⟩) at hstep
-  rw [hhead] at hstep
-  obtain ⟨coin, hcoin⟩ := (Native.step_iff R.I R.P R.F R.C).mp hstep
-  rw [Native.step_check_words R.I R.P R.F R.C coin, R.boundary_flag] at hcoin
+  have hroute := Native.head_drop_check R.I R.P R.F R.C p ⟨0, hpos⟩ hhead
+  rw [R.boundary_flag] at hroute
   cases hh : M.halted s with
   | false =>
     simpa only [RelSeries.last_drop] using R.choose_output a (p.drop ⟨1, by omega⟩) s hs
-      true out (by simpa [hh, flagWord] using hcoin.symm) (by simpa using hhalt)
+      true out (by simpa [hh, flagWord] using hroute) (by simpa using hhalt)
   | true =>
     refine ⟨s, hs, hh, ?_⟩
     simpa only [RelSeries.last_drop] using R.finish_output a s hs false out
-      (p.drop ⟨1, by omega⟩) (by simpa [hh, flagWord] using hcoin.symm)
+      (p.drop ⟨1, by omega⟩) (by simpa [hh, flagWord] using hroute)
       (by simpa using hhalt)
 
 private theorem check_realizes (a : α) (choices : List Bool) (s : σ)

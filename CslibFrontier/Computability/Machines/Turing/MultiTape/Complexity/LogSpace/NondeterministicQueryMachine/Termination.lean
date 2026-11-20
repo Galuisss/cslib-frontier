@@ -102,14 +102,9 @@ theorem choose_haltsFrom {input : List Bool} (Inv : (Fin k → List Bool) → Pr
           have heq := follows_pass I P F C b p q hmap q.length (by omega) (Nat.lt_succ_self _)
           change p ⟨q.length, by omega⟩ = q.last.mapState (passState b) at heq
           simpa [hlast', hqlast, passState] using heq
-        have hstep := p.step ⟨q.length, hq⟩
-        change (machine I P F C).Step (p ⟨q.length, by omega⟩)
-          (p ⟨q.length + 1, by omega⟩) at hstep
-        rw [hcfg] at hstep
-        obtain ⟨coin, hcoin⟩ := (step_iff I P F C).mp hstep
-        rw [step_check_words I P F C coin] at hcoin
+        have hnext := head_drop_check I P F C p ⟨q.length, hq⟩ hcfg
         have htail := hNext (p.drop ⟨q.length + 1, by omega⟩)
-          (by simpa using hcoin.symm) (by simp only [RelSeries.drop_length]; omega)
+          (by simpa using hnext) (by simp only [RelSeries.drop_length]; omega)
         simpa using htail
       choose time htime using branches
       refine ⟨1 + max (time false) (time true), ?_⟩
@@ -145,12 +140,8 @@ private theorem check_haltsFrom {input : List Bool} (Inv : (Fin k → List Bool)
     · simpa [hblank] using choose_haltsFrom I P F C Inv rank hP hF hInv out
   refine ⟨t, ?_⟩
   intro p hhead hp
-  have hstep := p.step ⟨0, by omega⟩
-  change (machine I P F C).Step p.head (p ⟨1, by omega⟩) at hstep
-  rw [hhead] at hstep
-  obtain ⟨coin, hcoin⟩ := (step_iff I P F C).mp hstep
-  rw [step_check_words I P F C coin] at hcoin
-  have htail := ht (p.drop ⟨1, by omega⟩) (by simpa using hcoin.symm)
+  have hroute := head_drop_check I P F C p ⟨0, by omega⟩ hhead
+  have htail := ht (p.drop ⟨1, by omega⟩) (by simpa using hroute)
     (by simp only [RelSeries.drop_length]; omega)
   simpa using htail
 
