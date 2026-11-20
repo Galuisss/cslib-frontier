@@ -90,7 +90,7 @@ noncomputable def selected (w : Transcript α) : Finset α := by
   cases h : w v <;> simp [selected, h]
 
 /-- Number of edges guessed for a vertex. A skipped vertex contributes zero. -/
-def guessedLength (w : Transcript α) (v : α) : ℕ :=
+@[expose] def guessedLength (w : Transcript α) (v : α) : ℕ :=
   ((w v).getD []).length - 1
 
 /-- The two registers checked at the end of a scan. -/
@@ -105,7 +105,7 @@ structure Tally where
   ⟨(round r s k).card, ∑ v ∈ round r s k, distance r s v⟩
 
 /-- Terminal count and length sum of the chosen walks. -/
-noncomputable def observed (w : Transcript α) : Tally :=
+@[expose] noncomputable def observed (w : Transcript α) : Tally :=
   ⟨(selected w).card, ∑ v ∈ selected w, guessedLength w v⟩
 
 /-- The final test compares the two registers with their expected values. -/
@@ -120,7 +120,7 @@ theorem Tally.matches_iff (actual expected : Tally) :
 
 /-- The scan's terminal checks, using the correct count and distance sum as inputs.
 The chain condition also checks the initial and final vertices of each guess. -/
-def Passes (r : α → α → Prop) (s : α) (k : ℕ) (w : Transcript α) : Prop :=
+@[expose] def Passes (r : α → α → Prop) (s : α) (k : ℕ) (w : Transcript α) : Prop :=
   (∀ v p, w v = some p → p.IsChainFromTo r s v ∧ guessedLength w v ≤ k) ∧
   (observed w).matches (expected r s k)
 
