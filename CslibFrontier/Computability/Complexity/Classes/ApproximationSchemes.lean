@@ -15,9 +15,11 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Un
 # Polynomial-time approximation schemes
 
 An `NPOptimizationProblem` has typed instances and solutions, polynomially bounded feasible
-solutions, and polynomial-time feasibility and objective evaluation. The instance type
-contains the valid inputs. A feasible solution is required for each instance. The typed
-model adapts [Kann, Definition 1][Kann2000NPOCompendium] and permits zero objective values.
+solutions, and polynomial-time feasibility and objective evaluation. Its instance type
+supplies the valid inputs. The feasibility certificate starts with a typed instance and
+candidate solution. [Kann, Definition 1][Kann2000NPOCompendium] additionally requires
+recognizing valid encoded instances in polynomial time. The typed model permits zero
+objective values and requires a feasible solution for every instance.
 
 We use [Williamson and Shmoys, Definitions 3.3–3.4][WilliamsonShmoys2011]. A solution at
 accuracy `1 / k` for positive integer `k` is within the factor `1 + 1 / k` for minimization,
