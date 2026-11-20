@@ -8,7 +8,10 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PastingCompleteness
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SliceBoundedness
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerticalAxis
+import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialSliceCommutativity
+import CslibFrontier.Foundations.Data.Finset.Expect
 
 /-!
 # Pasting with the low-individual-degree verifier
@@ -25,6 +28,8 @@ the operator estimate obtained from the verifier's axis and consistency branches
   this bound back to the verifier's decoded point measurement.
 * `Cslib.PCP.LowIndividualDegree.average_completedPaste_disagreement_le_of_verifier` bounds
   disagreement after assigning failed outcomes to a fixed polynomial.
+* `Cslib.PCP.LowIndividualDegree.average_completedPaste_disagreement_le_of_slice_majorants`
+  derives the commutator premise for this bound from the diagonal test and slice majorants.
 -/
 
 public section
@@ -47,7 +52,7 @@ local notation "RawStrategy" => CommutingStrategy (Question F (n + 1)) (Question
     CommutingStrategy F (Point F n) (Option (BoundedPolynomial F n d))
       (PolynomialFunction F d) A :=
   sliceLineStrategy S.state M (decodedVertical S.bob d) fun t u a b =>
-    commute_decodedVertical S.bob d u ((M t).effect a) (hComm t u a) b
+    Measurement.commute_map_right _ (decodeVertical d u) _ (hComm t u a) b
 
 /-- The isolated slice mismatch for the decoded vertical line is bounded by the slice
 mismatch for Bob's point answer and the verifier's two branch losses. -/
@@ -180,9 +185,8 @@ private theorem completedPaste_disagreement_le (k : ℕ) [Nonempty (Fin k ↪ F)
   have hc : Commute ((evaluatePolynomialMeasurement P w).effect none)
       ((decodedPoint S.bob w).effect z) := by
     rw [evaluatePolynomialMeasurement_effect_none]
-    apply commute_decodedPoint
-    intro a
-    exact commute_pasteSlices k M hM _ (fun x q => hComm x (.point w) q a) none
+    exact Measurement.commute_map_right (S.bob (.point w)) decodePoint _
+      (fun a => commute_pasteSlices k M hM _ (fun x q => hComm x (.point w) q a) none) z
   rw [he, ← evaluatePolynomialMeasurement_effect_none P w]
   exact Measurement.one_sub_agreement_map_getD_le _ _ _ _ hc
 
@@ -230,5 +234,58 @@ theorem average_completedPaste_disagreement_le_of_verifier (k : ℕ) [Nonempty (
   simp only [mul_div_assoc (2 : ℝ)] at hsuccess
   dsimp only
   linarith
+
+/-- Apply conditional pasting with the polynomial-slice commutator bound derived from
+the diagonal test. The diagonal test is scored with the provers swapped, because
+the slice and pasted measurements are compared with Bob's point measurement. -/
+theorem average_completedPaste_disagreement_le_of_slice_majorants
+    (k : ℕ) [Nonempty (Fin k ↪ F)] (hk : 0 < k) (S : RawStrategy)
+    (hPoint : ∀ u, (S.bob (.point u)).IsProjective)
+    (hLine : ∀ L, (S.alice (.diagonal L)).IsProjective)
+    (M R : F → Measurement (Option (BoundedPolynomial F n d)) A)
+    (hM : ∀ t, (M t).IsProjective) (hR : ∀ t, (R t).IsProjective)
+    (hComm : ∀ x q a b, Commute ((M x).effect a) ((S.bob q).effect b))
+    (hCopies : ∀ x y a b, Commute ((M x).effect a) ((R y).effect b))
+    (Z : F → A) (hZ : ∀ x, 0 ≤ Z x)
+    (hbound : ∀ x (g : BoundedPolynomial F n d),
+      averagePolynomialPointEffect (fun u => decodedPoint S.bob (Fin.snoc u x)) g ≤ Z x)
+    (hMZ : ∀ x y g, Commute ((M x).effect g) (Z y))
+    (fallback : BoundedPolynomial F (n + 1) d) {κ θ ζ η τ : ℝ}
+    (hθ₀ : 0 < θ) (hθ₁ : θ < 1) (hsize : 2 * (d : ℝ) ≤ θ * k)
+    (hmass : 1 - κ ≤ (S.state (Measurement.averageSuccessEffect R Option.isSome)).re)
+    (hcopy : (𝔼 x : F, Measurement.successfulCopyDefect S.state (M x) (R x)) ≤ ζ)
+    (hfail : (𝔼 x : F, (S.state ((M x).effect none * Z x)).re) ≤ τ)
+    (hpoint : (𝔼 u : Point F n, 𝔼 t : F, Measurement.successfulMismatch S.state
+      (evaluatePolynomialMeasurement (M t) u) (decodedPoint S.bob (Fin.snoc u t))) ≤ η) :
+    let verticalError :=
+      √(8 * (n + 1 : ℝ) * (1 - (branchGame (F := F) n d .axis).commutingWinProb S) +
+        4 * (1 - (branchGame (F := F) n d .consistency).commutingWinProb S))
+    let diagonalLoss := 1 - (branchGame (F := F) n d .diagonal).commutingWinProb S.swap
+    let commutatorError :=
+      32 * (4 * √(2 * η) + 2 * √(64 * (n + 1 : ℝ) * diagonalLoss) +
+        2 * √τ + 2 * √ζ) + 30 * ζ + 20 * ((n : ℝ) * d / Fintype.card F)
+    let sliceError := √(162 * commutatorError + 176 * ζ)
+    (𝔼 u : Point F n, 𝔼 t : F, (1 - Measurement.agreement S.state
+      ((completedPaste k M hM fallback).map (fun p => MvPolynomial.eval (Fin.snoc u t) p.val))
+      (decodedPoint S.bob (Fin.snoc u t)))) ≤
+        κ / (1 - θ) + Real.exp (-(θ ^ 2 * k) / 2) +
+        (1 + √2) * (k * √(2 * ζ) + (k : ℝ) ^ 2 * sliceError) +
+        3 * ((k.choose 2 : ℝ) / Fintype.card F) + (n * d : ℝ) / Fintype.card F +
+        2 * k * η + (2 * k + 1 : ℝ) * verticalError + 2 * k * ((k - 1 : ℕ) : ℝ) * sliceError := by
+  intro verticalError diagonalLoss commutatorError sliceError
+  have hpoint' : (𝔼 w : Point F (n + 1), Measurement.successfulMismatch S.state
+      (evaluatePolynomialMeasurement (M (w (Fin.last n))) (Fin.init w))
+      (decodedPoint S.bob w)) ≤ η := by
+    rw [← Fintype.expect_fin_snoc]
+    simpa only [Fin.snoc_last, Fin.init_snoc] using hpoint
+  have hpair : (𝔼 x : F, 𝔼 y : F, Measurement.successfulPairDefect S.state (M x) (M y)) ≤
+      commutatorError :=
+    polynomialSlice_successfulPairDefect_le S.swap hPoint hLine d M R hM hR hCopies
+      Z hZ hbound (fun x w g a =>
+        Measurement.commute_map_right (S.bob (.point w)) decodePoint _
+          (fun b => hComm x (.point w) g b) a)
+      hMZ hcopy hfail hpoint'
+  exact average_completedPaste_disagreement_le_of_verifier k hk S M R hM hR hComm hCopies
+    fallback hθ₀ hθ₁ hsize hmass hpair hcopy hpoint
 
 end Cslib.PCP.LowIndividualDegree
