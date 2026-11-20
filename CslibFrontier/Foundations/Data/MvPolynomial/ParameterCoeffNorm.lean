@@ -10,6 +10,7 @@ public import CslibFrontier.Init
 public import CslibFrontier.Foundations.Data.MvPolynomial.CoeffNorm1
 public import CslibFrontier.Foundations.Data.Polynomial.CoeffNorm1
 public import Mathlib.Algebra.MvPolynomial.PDeriv
+import CslibFrontier.Foundations.Data.MvPolynomial.CoeffSumBounds
 
 /-!
 # Coefficient norm with one integer polynomial parameter
@@ -71,23 +72,9 @@ theorem coeff_le (p : MvPolynomial ι (Polynomial ℤ)) (m : ι →₀ ℕ) :
     Finsupp.single_eval_le_sum p.coeff (g := Polynomial.coeffNorm1)
       Polynomial.coeffNorm1_zero (fun _ => Nat.zero_le _) m
 
-private theorem norm_eq_sum (p : MvPolynomial ι (Polynomial ℤ)) (s : Finset (ι →₀ ℕ))
-    (hs : p.support ⊆ s) :
-    norm p = ∑ m ∈ s, Polynomial.coeffNorm1 (p.coeff m) := by
-  classical
-  apply Finset.sum_subset hs
-  intro m _ hm
-  simp only [notMem_support_iff.mp hm, Polynomial.coeffNorm1_zero]
-
 /-- The parameter coefficient norm satisfies the triangle inequality. -/
-theorem add_le (p q : MvPolynomial ι (Polynomial ℤ)) : norm (p + q) ≤ norm p + norm q := by
-  classical
-  let s := p.support ∪ q.support
-  rw [norm_eq_sum (p + q) s (fun _ h => support_add h), norm_eq_sum p s Finset.subset_union_left,
-    norm_eq_sum q s Finset.subset_union_right, ← Finset.sum_add_distrib]
-  exact Finset.sum_le_sum fun m _ => by
-    simpa only [AddMonoidAlgebra.coeff_add, Finsupp.add_apply] using
-      Polynomial.coeffNorm1_add_le (p.coeff m) (q.coeff m)
+theorem add_le (p q : MvPolynomial ι (Polynomial ℤ)) : norm (p + q) ≤ norm p + norm q :=
+  sum_add_le_of_subadditive Polynomial.coeffNorm1_zero Polynomial.coeffNorm1_add_le p q
 
 /-- Negation preserves the parameter coefficient norm. -/
 @[simp] theorem neg (p : MvPolynomial ι (Polynomial ℤ)) : norm (-p) = norm p := by
@@ -103,18 +90,9 @@ theorem sum_le {J : Type*} (s : Finset J) (p : J → MvPolynomial ι (Polynomial
   Finset.le_sum_of_subadditive norm zero.le add_le s p
 
 /-- The parameter coefficient norm is submultiplicative. -/
-theorem mul_le (p q : MvPolynomial ι (Polynomial ℤ)) : norm (p * q) ≤ norm p * norm q := by
-  classical
-  conv_lhs => rw [p.as_sum, q.as_sum]
-  rw [Finset.sum_mul]
-  simp only [Finset.mul_sum, monomial_mul_monomial]
-  apply (sum_le _ _).trans
-  apply (Finset.sum_le_sum (fun m _ => sum_le q.support _)).trans
-  simp only [monomial]
-  apply (Finset.sum_le_sum (fun m _ => Finset.sum_le_sum (fun j _ =>
-    Polynomial.coeffNorm1_mul_le (p.coeff m) (q.coeff j)))).trans
-  rw [norm, norm, Finset.sum_mul]
-  simp only [Finset.mul_sum, le_refl]
+theorem mul_le (p q : MvPolynomial ι (Polynomial ℤ)) : norm (p * q) ≤ norm p * norm q :=
+  sum_mul_le_of_submultiplicative Polynomial.coeffNorm1_zero Polynomial.coeffNorm1_add_le
+    Polynomial.coeffNorm1_mul_le p q
 
 /-- Powers satisfy the corresponding coefficient norm bound. -/
 theorem pow_le (p : MvPolynomial ι (Polynomial ℤ)) (n : ℕ) : norm (p ^ n) ≤ norm p ^ n := by
