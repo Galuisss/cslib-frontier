@@ -41,7 +41,10 @@ numbering decide each other.
 
 ## References
 
-* [Soare, *Recursively Enumerable Sets and Degrees*][Soare1987], §IV.2, p. 64.
+* [Kelly, *The Arithmetical Hierarchy*][KellyArithmeticalHierarchy], §13.3,
+  Proposition 13.4(3)–(4) and Corollary 13.5(1)–(2), pp. 104–105. The results use the
+  empty-base-oracle specialization for subsets of `ℕ`; the universal-level result is
+  the complement dual of the existential-level result.
   The model here is oracle recursive codes. The correspondence with an explicit oracle
   Turing machine remains a separate milestone of
   [#6650](https://github.com/cslib-community/cslib-frontier/issues/6650).

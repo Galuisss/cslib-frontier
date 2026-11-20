@@ -6,6 +6,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 
 -- upstream: local-only (result registry collection)
 import CslibFrontierResults.Registry
+import CslibFrontier.Foundations.Computability.PostTheorem
 import CslibFrontier.Computability.PCP.TwoProverGame.GameAlgebraPerfect
 import CslibFrontier.Computability.PCP.TwoProverGame.LinearSystem
 import CslibFrontier.Computability.PCP.TwoProverGame.Synchronous
@@ -9303,6 +9304,23 @@ register_result "kleene-post-below-jump" where
     many-one reduction of the one-step extension question Halts to halting. Constructs total \
     Δ⁰₂ sets below ∅′; no c.e. property is proved. Friedberg–Muchnik, Sacks splitting/density \
     and Spector's minimal degree remain open (#3379)."
+
+register_result "post-theorem-oracle-codes" where
+  title := "Post’s theorem at finite successor levels for oracle recursive codes"
+  topic := "computability"
+  sources := [
+    { paper := KellyArithmeticalHierarchy, theorem := "Corollary 13.5(1)–(2)",
+      locator := "§13.3, pp. 104–105" }
+  ]
+  theorems := [
+    Cslib.Computability.mem_arithmeticSigma_succ_iff,
+    Cslib.Computability.mem_arithmeticPi_succ_iff,
+    Cslib.Computability.mem_arithmeticDelta_succ_iff
+  ]
+  scope := "Subsets of ℕ with empty base oracle. At level k + 1, Sigma sets are enumerable in \
+    the kth jump, Pi sets are their complements, and Delta sets are decidable in it. \
+    Relative computation is expressed via oracle recursive codes. Equivalence with an explicit \
+    oracle Turing machine remains open (#6650)."
 
 register_result "w-hierarchy-subset-xp" where
   title := "WeightedCircuitSAT, W[P] and every level W[t] of the W-hierarchy lie in XP"
