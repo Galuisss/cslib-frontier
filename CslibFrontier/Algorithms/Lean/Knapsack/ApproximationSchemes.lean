@@ -29,8 +29,11 @@ namespace Cslib.Algorithms.Lean.Knapsack
 open Cslib.Complexity Turing.MultiTapeTM ComputableInPolyTime
 open scoped List
 
-local notation "encItems" => encList (encPair encNat encNat)
-local notation "encInstance" => encPair encItems encNat
+/-- A list of binary weight–value pairs. -/
+abbrev encItems : List (ℕ × ℕ) ↪ List Bool := encList (encPair encNat encNat)
+
+/-- The items followed by a binary capacity. -/
+abbrev encInstance : (List (ℕ × ℕ) × ℕ) ↪ List Bool := encPair encItems encNat
 
 /-- The 0–1 knapsack maximization problem, with a list of selected items as a solution. -/
 @[expose] def optimizationProblem : NPOptimizationProblem encInstance encItems where
