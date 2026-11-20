@@ -56,12 +56,12 @@ theorem commutingWinProb_branch_symmetrize {n : ℕ}
     (S : QuantumStrategy (Question F (n + 1)) (Question F (n + 1))
       (Answer F (n + 1)) (Answer F (n + 1)) ι κ)
     (d D : ℕ) (b : Branch) :
-    (branchGameAtDegrees (F := F) n d D b).commutingWinProb S.symmetrize.toCommuting =
-      (branchGameAtDegrees (F := F) n d D b).commutingWinProb S.toCommuting := by
+    (branchGameWithDiagonalCap (F := F) n d D b).commutingWinProb S.symmetrize.toCommuting =
+      (branchGameWithDiagonalCap (F := F) n d D b).commutingWinProb S.toCommuting := by
   rw [TwoProverGame.commutingWinProb_toCommuting, TwoProverGame.commutingWinProb_toCommuting]
   apply TwoProverGame.quantumWinProb_symmetrize _ _ _ S
   · intro x y
-    rw [branchGameAtDegrees_questions]
+    rw [branchGameWithDiagonalCap_questions]
     have he := map_equiv_apply (branchQuestions (F := F) n b)
       (Equiv.prodComm (Question F (n + 1)) (Question F (n + 1))) (x, y)
     change (branchQuestions (F := F) n b).map Prod.swap (x, y) =
@@ -69,8 +69,8 @@ theorem commutingWinProb_branch_symmetrize {n : ℕ}
     rw [branchQuestions_swap] at he
     exact he.symm
   · intro x y a c
-    rw [branchGameAtDegrees_accepts]
-    exact acceptsAtDegrees_swap d D y x c a
+    rw [branchGameWithDiagonalCap_accepts]
+    exact acceptsWithDiagonalCap_swap d D y x c a
 
 variable {n d : ℕ}
 
@@ -89,7 +89,8 @@ theorem exists_local_polynomial_POVMs_of_projective {k : ℕ} (D : ℕ)
     let C := S.toCommuting
     let ε := 1 - (branchGame (F := F) n d .axis).commutingWinProb C
     let δ := 1 - (branchGame (F := F) n d .consistency).commutingWinProb C
-    let γ := 1 - (branchGameAtDegrees (F := F) n d D .diagonal).commutingWinProb C
+    let γ :=
+      1 - (branchGameWithDiagonalCap (F := F) n d D .diagonal).commutingWinProb C
     let r := (d : ℝ) / Fintype.card F
     ∃ (Gₐ : POVM Poly ι) (Gᵦ : POVM Poly κ),
       let bound := 320000 * dimensionInductionError (n + 1) k ε δ γ r
@@ -108,7 +109,7 @@ theorem exists_local_polynomial_POVMs_of_projective {k : ℕ} (D : ℕ)
   have hscore (b : Branch) :
       (branchGame (F := F) n d b).commutingWinProb T.toCommuting =
         (branchGame (F := F) n d b).commutingWinProb C := by
-    rw [branchGame_eq_atDegrees]
+    rw [branchGame_eq_withDiagonalCap]
     exact commutingWinProb_branch_symmetrize S d ((n + 1) * d) b
   have hd := commutingWinProb_branch_symmetrize S d D .diagonal
   simp only [T] at hscore
