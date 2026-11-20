@@ -6841,6 +6841,7 @@ public import CslibFrontier.Foundations.Data.Nat.SqrtRatio
 public import CslibFrontier.Foundations.Data.Nat.Subexponential
 public import CslibFrontier.Foundations.Data.Nat.SummationByParts
 public import CslibFrontier.Foundations.Data.Nat.Totient
+public import CslibFrontier.Foundations.Data.Nat.TwoAdicInterval
 public import CslibFrontier.Foundations.Data.Option
 public import CslibFrontier.Foundations.Data.Option.Rel
 public import CslibFrontier.Foundations.Data.Polynomial.BinaryDigits
