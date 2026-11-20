@@ -51,7 +51,8 @@ noncomputable def distance (r : α → α → Prop) (s v : α) : ℕ := by
   classical
   exact if h : ∃ n, RelatesInSteps r s v n then Nat.find h else 0
 
-private theorem distance_spec (h : v ∈ reachableWithin r s k) :
+/-- A reached vertex has a walk whose length is its distance, bounded by the round index. -/
+theorem distance_spec (h : v ∈ reachableWithin r s k) :
     RelatesInSteps r s v (distance r s v) ∧ distance r s v ≤ k := by
   classical
   obtain ⟨n, hn, hp⟩ := h
@@ -100,7 +101,7 @@ structure Tally where
   lengthSum : ℕ
 
 /-- Expected count and distance sum, supplied to the scan. -/
-noncomputable def expected (r : α → α → Prop) (s : α) (k : ℕ) : Tally :=
+@[expose] noncomputable def expected (r : α → α → Prop) (s : α) (k : ℕ) : Tally :=
   ⟨(round r s k).card, ∑ v ∈ round r s k, distance r s v⟩
 
 /-- Terminal count and length sum of the chosen walks. -/

@@ -300,6 +300,7 @@ public import CslibFrontier.Algorithms.MatrixMultiplication.Strassen.Phases
 public import CslibFrontier.Algorithms.Quantum.PeriodFinding
 public import CslibFrontier.Algorithms.Reachability.BreadthFirst
 public import CslibFrontier.Algorithms.Reachability.DoubleCounting
+public import CslibFrontier.Algorithms.Reachability.DoubleCounting.Round
 public import CslibFrontier.Algorithms.Reachability.InductiveCounting
 public import CslibFrontier.Algorithms.Reachability.InductiveCounting.Bounds
 public import CslibFrontier.Algorithms.Reachability.InductiveCounting.Completeness
