@@ -10,7 +10,7 @@ module
 public import CslibFrontier.Computability.Complexity.Classes.NPMV.Machine
 import CslibFrontier.Computability.Complexity.Classes.NP.Closure
 import CslibFrontier.Computability.Complexity.Classes.NP.Witness
-import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat.Eq
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.EqualityPrimitives
 
 /-!
 # Nondeterministic machines with decisive and inconclusive branches

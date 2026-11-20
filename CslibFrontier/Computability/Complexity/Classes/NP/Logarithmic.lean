@@ -7,63 +7,55 @@ Authors: Christian Reitwiessner
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Complexity.Classes.P
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Nat.Bits
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
+public import CslibFrontier.Computability.Complexity.Reduction
+public import CslibFrontier.Logics.FirstOrder.Ordered.Query
+public import Mathlib.ModelTheory.Complexity
 
 /-!
 # Logarithmically restricted NP
 
-`LOGNP` guesses a logarithmic-size subset of input indices. For every polynomially
-bounded universal index there is a polynomially bounded response that works for
-all chosen indices. The test sees the instance, the chosen element, the universal
-index, the response and the position of that element in the chosen subset.
+A `LOGNP0` query chooses an increasing tuple of logarithmically many universe elements.
+For every fixed-length tuple of challenges, there must be a fixed-length tuple of responses
+for which a quantifier-free first-order formula holds at every chosen element and its rank.
+The logarithmic bound uses the size of the universe, independent of the length of its
+encoded relation table. `LOGNP` is the polynomial-time many-one reduction closure of
+single-relation `LOGNP0` queries on finite structures.
 
-## References
-
-* [C. Papadimitriou and M. Yannakakis, *On Limited Nondeterminism and the Complexity of the V-C
-  Dimension*](https://doi.org/10.1006/jcss.1996.0058)
-* [Complexity Zoo, LOGNP](https://complexityzoo.net/Complexity_Zoo:L#lognp)
+The quantifier pattern and the closure follow [Cai–Chen, §5, pp. 745–746]
+(https://doi.org/10.1137/S0097539793258295), following [Papadimitriou–Yannakakis]
+(https://doi.org/10.1006/jcss.1996.0058). The universe and rank use zero-based indices.
+We use explicit relation tables and the library's ordered structures of size at least two.
 -/
 
-@[expose] public section
+public section
 
 namespace Cslib.Complexity
 
-open Turing.MultiTapeTM
+open FirstOrder Cslib.Logic Cslib.Logic.FO Turing.MultiTapeTM
 
-variable {α : Type}
+/-- The local LOGNP pattern. The first two formula variables are the selected element
+and its rank. The other variables hold the challenge and response tuples. -/
+@[expose] def LOGNP0 {L : Language.{0, 0}} (K : Ordered.Query L) : Prop :=
+  ∃ (p q : ℕ) (φ : L.Formula (Fin 2 ⊕ (Fin p ⊕ Fin q))), φ.IsQF ∧
+    ∀ M : Ordered.Structure L, M ∈ K ↔
+      ∃ chosen : Fin (Nat.log2 M.size) → Fin M.size, StrictMono chosen ∧
+        ∀ challenge : Fin p → Fin M.size, ∃ response : Fin q → Fin M.size,
+          ∀ rank : Fin (Nat.log2 M.size),
+            φ.Realize (Sum.elim
+              ![chosen rank, Fin.castLE (Nat.log2_le_self M.size) rank]
+              (Sum.elim challenge response))
 
-/-- One evaluation of the local predicate of `LOGNP`. -/
-structure LOGNPQuery (α : Type) where
-  /-- The input instance. -/
-  instanceData : α
-  /-- The selected input position. -/
-  selected : ℕ
-  /-- The universal challenge. -/
-  challenge : ℕ
-  /-- The existential response. -/
-  response : ℕ
-  /-- The rank of the selected position in the subset. -/
-  rank : ℕ
+/-- The languages polynomial-time many-one reducible to the encoded language of a
+single-relation `LOGNP0` query. -/
+@[expose] def LOGNP {α : Type} (enc : α ↪ List Bool) : Set (Set α) :=
+  {A | ∃ (L : Language.{0, 0}) (_ : L.IsRelational) (v : Vocabulary L) (K : Ordered.Query L),
+     v.count = 1 ∧ LOGNP0 K ∧ PolyTimeReducible enc encStructure A (K.encodedLanguage v)}
 
-/-- Frame the instance and the first three binary parameters, then append the binary rank. -/
-enc_structure encLOGNPQuery (enc : α ↪ List Bool) : LOGNPQuery α where
-  instanceData : enc,
-  selected : encNat,
-  challenge : encNat,
-  response : encNat,
-  rank : encNat
-
-/-- Logarithmically restricted NP. The indices of the chosen subset are enumerated in increasing
-order. The universal challenge and existential response each range over polynomially many
-values, so either can be represented with logarithmically many bits. The finitely many
-instances encoded by strings of length zero or one are unrestricted. -/
-def LOGNP (enc : α ↪ List Bool) : Set (Set α) :=
-  {A | ∃ (p q : ℕ) (R : Set (LOGNPQuery α)), R ∈ P (encLOGNPQuery enc) ∧
-    ∀ a, let n := (enc a).length
-      2 ≤ n → (a ∈ A ↔ ∃ s : Fin (Nat.log2 n) → Fin n, StrictMono s ∧
-        ∀ u : Fin ((n + 1) ^ p), ∃ v : Fin ((n + 1) ^ q),
-          ∀ j : Fin (Nat.log2 n), ⟨a, (s j).val, u.val, v.val, j.val⟩ ∈ R)}
+/-- The defining polynomial-time many-one reduction closure of LOGNP. -/
+theorem LOGNP.of_reduces {α β : Type} {encA : α ↪ List Bool} {encB : β ↪ List Bool}
+    {A : Set α} {B : Set β} (hB : B ∈ LOGNP encB) (hAB : PolyTimeReducible encA encB A B) :
+    A ∈ LOGNP encA := by
+  obtain ⟨L, hL, v, K, hc, hK, hB⟩ := hB
+  exact ⟨L, hL, v, K, hc, hK, hAB.trans hB⟩
 
 end Cslib.Complexity

@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Christian Reitwiessner
 -/
 
+import CslibFrontier.Computability.Complexity.Classes.BQP.Search
+import CslibFrontier.Computability.Complexity.Classes.FBPP
 import CslibFrontier.Computability.Complexity.Classes.BQP.SBQP
 import CslibFrontier.Computability.Complexity.Classes.BQP.ZQP
 import CslibFrontier.Computability.Complexity.Classes.QMA.QCMA
@@ -80,5 +82,24 @@ example : readFlaggedAnswer.answerProb [true, false] true = 0 := by
     (patternAt 4 [(0, true), (1, true)]) = 0
   rw [Circuit.run, Circuit.eval_nil, measureProb_ket,
     ite_eq_right (by decide)]
+
+/-- The relation admits multiple outputs, and always returning the empty word succeeds. -/
+example : (fun (_ : List Bool) w => w = [] ∨ w = [true]) ∈ FBPP encBits encBits := by
+  refine ⟨fun _ => ⟨[], Or.inl rfl⟩, fun _ => pure [],
+    (ComputableInPolyTime.const ([] : List Bool)).isPPTOn, ?_⟩
+  intro ε hε
+  refine ⟨0, fun a _ => ?_⟩
+  simp [ProbComp.eval_pure, PMF.toOuterMeasure_pure_apply]
+  linarith
+
+/-- A decoder returning the empty word finds one of the valid outputs on every measurement. -/
+example : (fun (_ : List Bool) w => w = [] ∨ w = [true]) ∈ FBQP encBits := by
+  refine ⟨fun _ => ⟨[], Or.inl rfl⟩, readFirst, fun _ => some [],
+    ComputableInPolyTime.const _, ?_⟩
+  intro ε hε
+  refine ⟨0, fun a _ => ?_⟩
+  simp only [quantumSearchSuccess, eq_self, true_or, Set.ofPred_true,
+    PMF.toOuterMeasure_apply, Set.indicator_univ, PMF.tsum_coe, ENNReal.toReal_one]
+  linarith
 
 end CslibFrontierTests.QuantumZoo

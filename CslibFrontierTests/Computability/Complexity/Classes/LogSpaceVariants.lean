@@ -11,6 +11,7 @@ import CslibFrontier.Computability.Complexity.Classes.LogSpace.Counting
 import CslibFrontier.Computability.Complexity.Classes.LogSpace.Function
 import CslibFrontier.Computability.Complexity.Classes.LogSpace.NondeterministicOracle
 import CslibFrontier.Computability.Complexity.Classes.NP.Logarithmic
+import CslibFrontierTests.CountingAmbiguity
 
 open Cslib.Complexity Turing Turing.MultiTapeTM
 
@@ -22,16 +23,38 @@ example {α : Type} {enc : α ↪ List Bool} {A : Set α} (hA : A ∈ UL enc) :
   have h : f a = 0 ∨ f a = 1 := by have := hle a; omega
   obtain h | h := h <;> rw [h] <;> decide
 
+-- Two occurrences of the same accepting action violate weak unambiguity.
+example : ¬ (CslibFrontierTests.CountingAmbiguity.machine 2).WeaklyUnambiguousFrom
+    (Cfg.init () [true]) := by
+  intro h
+  have collision := h (first := [0]) (second := [1]) rfl rfl rfl rfl
+  cases collision
+
+-- The global one-branch bound implies the terminal configuration condition.
+example {α : Type} {enc : α ↪ List Bool} {A : Set α} (hA : A ∈ UL enc) :
+    A ∈ LogFewNL enc :=
+  UL_subset_LogFewNL hA
+
+-- A constant gap of one has nonzero residue modulo two, so this witness accepts every input.
+example {α : Type} {enc : α ↪ List Bool}
+    (hf : (fun _ : α => (1 : ℤ)) ∈ GapL enc)
+    (hg : ComputableInLogSpace (fun _ : α => [false, false]) enc encBits) :
+    (Set.univ : Set α) ∈ ModL enc := by
+  refine ⟨_, hf, _, hg, fun a => ⟨⟨2, 1, Nat.prime_two, by decide, rfl⟩, ?_⟩⟩
+  exact iff_of_true (Set.mem_univ a) (by decide)
+
 -- The verifier can feed a tagged end marker to the NL bit-graph machine.
 example (x : List Bool) (i : ℕ) :
     encFNLQuery encBits ⟨x, i, none⟩ = encPair encBits (encPair encNat (encOption encBool))
       (x, i, none) := rfl
 
--- Each ordered LOGNP field has its own binary frame, apart from the final rank.
-example (x : List Bool) (s u v j : ℕ) :
-    encLOGNPQuery encBits ⟨x, s, u, v, j⟩ =
-      encPair encBits (encPair encNat (encPair encNat (encPair encNat encNat))) (x, s, u, v, j) :=
-  rfl
+-- The always-true first-order matrix satisfies the local LOGNP pattern.
+example {L : FirstOrder.Language.{0, 0}} :
+    LOGNP0 (Set.univ : Set (Cslib.Logic.FO.Ordered.Structure L)) := by
+  refine ⟨0, 0, ⊤, FirstOrder.Language.BoundedFormula.IsQF.top, fun M => ?_⟩
+  refine iff_of_true trivial ⟨Fin.castLE (Nat.log2_le_self M.size), ?_, ?_⟩
+  · exact fun _ _ h => h
+  · exact fun _ => ⟨Fin.elim0, fun _ => by simp⟩
 
 -- Two nondeterministic choices on the same input write different oracle query bits.
 example (A : Set (List Bool)) (x : List Bool) :
