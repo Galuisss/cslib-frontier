@@ -11,6 +11,8 @@ public import CslibFrontier.Computability.Complexity.Classes.TFNP
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.NondeterministicOutput
 import CslibFrontier.Computability.Complexity.Classes.NP.Nondeterministic
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Basic
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.EqualityPrimitives
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Internal.PolyTimeListPrimitives
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.HaltedReplay
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.ReplayInput
 
@@ -178,25 +180,20 @@ private noncomputable def verifyGraph (ntm : MultiTapeNTM k Bool State) (enc : �
   decide ((graphReplay ntm true).runClosedCoins x.2 (enc x.1.1) = [true] ∧
     (graphReplay ntm false).runClosedCoins x.2 (enc x.1.1) = true :: x.1.2)
 
+open ComputableInPolyTime in
 private theorem computableInPolyTime_verifyGraph :
     ComputableInPolyTime (verifyGraph ntm enc) (encPair (encPair enc encBits) encBits) encBool := by
   let encGraph := encPair enc encBits
   let encVerifier := encPair encGraph encBits
-  have ha := (ComputableTidilyInPolyTime.encode enc).comp
-    ((ComputableTidilyInPolyTime.fst enc encBits).comp
-      (ComputableTidilyInPolyTime.fst encGraph encBits))
-  have hcoins := ComputableTidilyInPolyTime.snd encGraph encBits
+  have hEncode : ComputableInPolyTime (fun a => enc a) enc encBits := of_eq fun _ => rfl
+  have ha := hEncode.comp ((fst enc encBits).comp (fst encGraph encBits))
+  have hcoins := snd encGraph encBits
   have hrun (verdict : Bool) := ((graphReplay ntm verdict).computableInPolyTime_runClosedCoins).comp
-    (hcoins.prod ha).computableInPolyTime
-  have hw := (ComputableTidilyInPolyTime.snd enc encBits).comp
-    (ComputableTidilyInPolyTime.fst encGraph encBits)
-  have hword : ComputableTidilyInPolyTime (fun x : (α × List Bool) × List Bool => true :: x.1.2)
-      encVerifier encBits :=
-    (ComputableTidilyInPolyTime.const (encIn := encVerifier) (encMid := encBits) [true]).append hw
-      (fun _ => rfl)
-  have hhalt := (hrun true).tidy.decide_eq' (ComputableTidilyInPolyTime.const [true])
-  have hout := (hrun false).tidy.decide_eq' hword
-  exact (ComputableTidilyInPolyTime.decide_and hhalt hout).computableInPolyTime
+    (hcoins.prod ha)
+  have hw := (snd enc encBits).comp (fst encGraph encBits)
+  have hword : ComputableInPolyTime (fun x : (α × List Bool) × List Bool => true :: x.1.2)
+      encVerifier encBits := bitsCons (const true) hw
+  exact decide_and ((hrun true).decide_eq' (const [true])) ((hrun false).decide_eq' hword)
 
 /-- A finite binary machine with polynomially bounded running time has a polynomially balanced
 successful output relation whose graph is in NP. A successful branch halts with output

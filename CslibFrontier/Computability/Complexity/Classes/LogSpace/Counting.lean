@@ -96,7 +96,8 @@ def LogFewNL (enc : α ↪ List Bool) : Set (Set α) :=
   {A | ∃ f ∈ WeaklyUnambiguousSharpL enc, ∀ a, a ∈ A ↔ 0 < f a}
 
 /-- Test a weakly unambiguous accepting branch count by a deterministic logspace predicate
-on the instance paired with the binary count. See [Allender–Reinhardt–Zhou, §5.1.1][AllenderReinhardtZhou1999]. -/
+on the instance paired with the binary count. See
+[Allender–Reinhardt–Zhou, §5.1.1][AllenderReinhardtZhou1999]. -/
 def LogFew (enc : α ↪ List Bool) : Set (Set α) :=
   {A | ∃ f ∈ WeaklyUnambiguousSharpL enc,
     ∃ R : α × ℕ → Bool, ComputableInLogSpace R (encPair enc encNat) encBool ∧
