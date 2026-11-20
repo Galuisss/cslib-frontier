@@ -69,7 +69,7 @@ theorem sandwichedPolynomial_point_bounds_of_verifier (S : CommutingStrategy Q Q
     (Measurement.commute_map_map _ _ (S.commute (.point v) (.point u)) decodePoint decodePoint
       b a).symm
   have hLT (u : Point F (n + 1)) g (b : F) : Commute ((L u).effect b) (T.effect g) :=
-    (commute_decodedPoint S.bob u _ (hT (.point u) g) b).symm
+    (Measurement.commute_map_right (S.bob (.point u)) decodePoint _ (hT (.point u) g) b).symm
   have hvar : weightedPointVariance S.state L T ≤ ξ := by
     apply weightedPointVariance_le_verifier S d T haxis
     intro u i g f
@@ -127,11 +127,12 @@ theorem successfulMass_sub_sandwichedAgreement_le_of_verifier
     (Measurement.commute_map_map _ _ (S.commute (.point v) (.point u)) decodePoint decodePoint
       b a).symm
   have hLT (u : Point F (n + 1)) g (a : F) : Commute ((L u).effect a) (T.effect g) :=
-    (commute_decodedPoint S.bob u _ (hT (.point u) g) a).symm
+    (Measurement.commute_map_right (S.bob (.point u)) decodePoint _ (hT (.point u) g) a).symm
   have hUR (g) (u : Point F (n + 1)) (b : F) : Commute (U.effect g) ((R u).effect b) :=
-    commute_decodedPoint S.alice u _ (hU (.point u) g) b
+    Measurement.commute_map_right (S.alice (.point u)) decodePoint _ (hU (.point u) g) b
   have hLZ (u : Point F (n + 1)) (a : F) : Commute ((L u).effect a) Z :=
-    (commute_decodedPoint S.bob u Z (fun b => (hZ (.point u) b).symm) a).symm
+    (Measurement.commute_map_right (S.bob (.point u)) decodePoint Z
+      (fun b => (hZ (.point u) b).symm) a).symm
   have hvarL : weightedPointVariance S.state L T ≤ ξ S := by
     apply weightedPointVariance_le_verifier S d T hLaxis
     intro u i g f

@@ -108,7 +108,8 @@ theorem exists_consistent_polynomial_POVMs_of_projective {k : ℕ} (D : ℕ)
     let C := S.toCommuting
     let ε := 1 - (branchGame (F := F) n d .axis).commutingWinProb C
     let δ := 1 - (branchGame (F := F) n d .consistency).commutingWinProb C
-    let γ := 1 - (branchGameAtDegrees (F := F) n d D .diagonal).commutingWinProb C
+    let γ :=
+      1 - (branchGameWithDiagonalCap (F := F) n d D .diagonal).commutingWinProb C
     let r := (d : ℝ) / Fintype.card F
     let σ := 320000 * dimensionInductionError (n + 1) k ε δ γ r
     ∃ (Gₐ : POVM Poly ι) (Gᵦ : POVM Poly κ),

@@ -46,7 +46,8 @@ theorem exists_projective_polynomial_POVMs {k : ℕ} (D : ℕ)
     let C := S.toCommuting
     let ε := 1 - (branchGame (F := F) n d .axis).commutingWinProb C
     let δ := 1 - (branchGame (F := F) n d .consistency).commutingWinProb C
-    let γ := 1 - (branchGameAtDegrees (F := F) n d D .diagonal).commutingWinProb C
+    let γ :=
+      1 - (branchGameWithDiagonalCap (F := F) n d D .diagonal).commutingWinProb C
     let r := (d : ℝ) / Fintype.card F
     let σ := 320000 * dimensionInductionError (n + 1) k ε δ γ r
     let ζ := σ + √(4 * (σ + δ)) + (n + 1) * r
@@ -179,7 +180,7 @@ theorem exists_projective_polynomial_POVMs_of_winProb {k : ℕ}
     exact hloss .consistency
   obtain ⟨Pₐ, Pᵦ, hPₐ, hPᵦ, hpointB, hpointA, hpoly⟩ :=
     exists_projective_polynomial_POVMs ((n + 1) * d) hk S hA hB
-  rw [← branchGame_eq_atDegrees] at hpointB hpointA hpoly
+  rw [← branchGame_eq_withDiagonalCap] at hpointB hpointA hpoly
   have h₁ : σ₀ + √(8 * ζ₀ + 4 * √(18 * ζ₀)) ≤ errors.point := by
     change _ ≤ σ + √(8 * ζ + 4 * √(18 * ζ))
     gcongr

@@ -207,7 +207,7 @@ theorem abs_average_failure_pointOrder_sub_le_atDegrees {n : ℕ}
             (P u).effect none *
               ((decodedPoint S.alice v).effect b * (decodedPoint S.alice u).effect a))).re))| ≤
       √(64 * (n + 1 : ℝ) *
-        (1 - (branchGameAtDegrees (F := F) n degree D .diagonal).commutingWinProb S)) :=
+        (1 - (branchGameWithDiagonalCap (F := F) n degree D .diagonal).commutingWinProb S)) :=
   let f (u v : Point F (n + 1)) :=
     Measurement.pairCommutatorDefect S.state (decodedPoint S.alice u) (decodedPoint S.alice v)
   calc
@@ -243,7 +243,7 @@ theorem abs_average_failure_pointOrder_sub_le {n : ℕ}
               ((decodedPoint S.alice v).effect b * (decodedPoint S.alice u).effect a))).re))| ≤
       √(64 * (n + 1 : ℝ) *
         (1 - (branchGame (F := F) n degree .diagonal).commutingWinProb S)) := by
-  rw [branchGame_eq_atDegrees]
+  rw [branchGame_eq_withDiagonalCap]
   exact abs_average_failure_pointOrder_sub_le_atDegrees S hPoint hLine degree ((n + 1) * degree)
     P hP
 
@@ -267,7 +267,7 @@ theorem abs_average_evaluated_failure_pointProduct_le_atDegrees
       (S.state ((P u).effect (some a) * (P v).effect (some b) * (P u).effect none *
         ((decodedPoint S.alice u).effect a * (decodedPoint S.alice v).effect b))).re| ≤
       √(64 * (m + 1 : ℝ) *
-        (1 - (branchGameAtDegrees (F := F) m degree D .diagonal).commutingWinProb S)) +
+        (1 - (branchGameWithDiagonalCap (F := F) m degree D .diagonal).commutingWinProb S)) +
         √ζ := by
   intro P
   let Q (u : Point F (m + 1)) := decodedPoint S.alice u
@@ -336,7 +336,7 @@ theorem abs_average_evaluated_failure_pointProduct_le
       √(64 * (m + 1 : ℝ) *
         (1 - (branchGame (F := F) m degree .diagonal).commutingWinProb S)) +
         √ζ := by
-  rw [branchGame_eq_atDegrees]
+  rw [branchGame_eq_withDiagonalCap]
   exact abs_average_evaluated_failure_pointProduct_le_atDegrees S hPoint hLine degree ((m + 1)
     * degree)
     M hM Z hZ hbound hMP hMZ hfail
