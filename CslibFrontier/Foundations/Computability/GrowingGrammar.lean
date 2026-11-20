@@ -20,6 +20,9 @@ language consists of the terminal words derivable from the start symbol.
 
 This is the growing-grammar model of [Dahlhaus and Warmuth][DahlhausWarmuth1986], with the
 start-rule convention of [Buntrock and Otto][BuntrockOtto1998].
+
+The checked examples in `CslibFrontierTests/GrowingGrammar.lean` exercise the start-rule exception
+and a derivation with a strictly growing non-start rule.
 -/
 
 public section
