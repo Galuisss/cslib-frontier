@@ -153,7 +153,8 @@ private theorem norm_sub_normalize_le {E : Type*} [NormedAddCommGroup E] [Normed
     norm_sub_rev (NormedSpace.normalize u), hrem, norm_smul, Real.norm_eq_abs] at h
   exact h.trans (by
     rw [div_eq_inv_mul ‖f v - u‖]
-    exact add_le_add le_rfl (mul_le_of_le_one_right (abs_nonneg _) (NormedSpace.norm_normalize_le_one u)))
+    exact add_le_add le_rfl
+      (mul_le_of_le_one_right (abs_nonneg _) (NormedSpace.norm_normalize_le_one u)))
 
 /-- The state obtained by applying the two local unitaries to the normalized doubly
 anchored branch is close to the normalized branch at the selected questions.
