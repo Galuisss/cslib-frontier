@@ -5,7 +5,7 @@ Authors: Christian Reitwiessner
 -/
 
 import CslibFrontier.Algorithms.Reachability.MinIsolation.Generator
-import CslibFrontier.Algorithms.Reachability.DoubleCounting.Controller
+import CslibFrontier.Algorithms.Reachability.DoubleCounting.ControllerReplay
 
 /-! A diamond with two distinct paths of different internal weights. -/
 
@@ -144,23 +144,24 @@ set_option linter.hashCommand false in
 
 private abbrev emptyEdge : Fin 2 → Fin 2 → Prop := fun _ _ => False
 
--- Instantiate the successful-replay law for a graph whose round is already stable at zero.
+-- Supply the actual typed scan to the controller on a graph stable at round zero.
 example (target : Fin 2) : ∃ verdict,
-    runController (fun _ _ => [false]) isolatedScan target = [some verdict] ∧
+    runController (fun _ _ => [false]) (replayMembership (fun _ _ => false) 0) target =
+      [some verdict] ∧
     match verdict with
     | .bad _ => False
     | .decided b => (b = true ↔ ReflTransGen emptyEdge 0 target) := by
   classical
+  have hedge : (fun _ _ : Fin 2 => false = true) = emptyEdge := by
+    funext u v
+    simp
   have hround (k : ℕ) : reachableWithin emptyEdge 0 k = {0} := by
     induction k with
     | zero => exact reachableWithin_zero
     | succ k ih => simp [reachableWithin_succ, ih, emptyEdge]
-  obtain ⟨verdict, hrun, hspec⟩ :=
-    runController_correct (r := emptyEdge) (s := 0) (target := target)
-      (edge := fun _ _ => [false]) (member := isolatedScan)
-      (fun _ _ => by simp [emptyEdge, pure]) (fun k _ v => by
-        by_cases hv : v = 0 <;> simp [isolatedScan, mem_round, hround k, pure, hv])
+  obtain ⟨verdict, hrun, hspec⟩ := runController_replay_correct (fun _ _ : Fin 2 => false) 0 target
   refine ⟨verdict, hrun, ?_⟩
+  rw [hedge] at hspec
   cases verdict with
   | bad j =>
     apply hspec.2
