@@ -271,7 +271,7 @@ private theorem exists_roundedSymmetricSelfImprovement
       evaluatePolynomialMeasurement_successfulEffect]
   have hA (N : POVM (Option Poly) ι) (a : Option Poly) (u : Point F (n + 1)) (b : F) :
       Commute ((A u).effect b) ((QuantumStrategy.rightMeasurement (ι := ι) N).effect a) :=
-    (commute_decodedPoint C.alice u _ (fun c =>
+    (Measurement.commute_map_right (C.alice (.point u)) decodePoint _ (fun c =>
       (commute_kroneckerOne_oneKronecker ((S.alice (.point u)).effect c) (N.effect a)).symm) b).symm
   have hmatch : 1 - (2 * ζ + 2 * s) ≤ Measurement.agreement C.state PL PR := by
     have h1 := (Measurement.abs_agreement_sub_right_le C.state HL HR PR).trans
@@ -467,7 +467,7 @@ theorem exists_projectiveSymmetricSelfImprovement
         _ ≤ ∑ g : Poly, (C.state (G'.effect (some g))).re := by
           refine sum_le_sum fun g _ => C.state.re_apply_mono ?_
           have hc : Commute (G'.effect (some g)) (A.effect (MvPolynomial.eval u g.val)) :=
-            commute_decodedPoint C.alice u _ (fun a =>
+            Measurement.commute_map_right (C.alice (.point u)) decodePoint _ (fun a =>
               (commute_kroneckerOne_oneKronecker ((S.alice (.point u)).effect a)
                 (G.effect (some g))).symm) _
           have h := ((Commute.one_right _).sub_right hc).mul_nonneg (G'.nonneg _)
