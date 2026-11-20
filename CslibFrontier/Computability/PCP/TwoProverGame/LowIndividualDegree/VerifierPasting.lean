@@ -52,7 +52,7 @@ local notation "RawStrategy" => CommutingStrategy (Question F (n + 1)) (Question
     CommutingStrategy F (Point F n) (Option (BoundedPolynomial F n d))
       (PolynomialFunction F d) A :=
   sliceLineStrategy S.state M (decodedVertical S.bob d) fun t u a b =>
-    commute_decodedVertical S.bob d u ((M t).effect a) (hComm t u a) b
+    Measurement.commute_map_right _ (decodeVertical d u) _ (hComm t u a) b
 
 /-- The isolated slice mismatch for the decoded vertical line is bounded by the slice
 mismatch for Bob's point answer and the verifier's two branch losses. -/
@@ -185,9 +185,8 @@ private theorem completedPaste_disagreement_le (k : ℕ) [Nonempty (Fin k ↪ F)
   have hc : Commute ((evaluatePolynomialMeasurement P w).effect none)
       ((decodedPoint S.bob w).effect z) := by
     rw [evaluatePolynomialMeasurement_effect_none]
-    apply commute_decodedPoint
-    intro a
-    exact commute_pasteSlices k M hM _ (fun x q => hComm x (.point w) q a) none
+    exact Measurement.commute_map_right (S.bob (.point w)) decodePoint _
+      (fun a => commute_pasteSlices k M hM _ (fun x q => hComm x (.point w) q a) none) z
   rw [he, ← evaluatePolynomialMeasurement_effect_none P w]
   exact Measurement.one_sub_agreement_map_getD_le _ _ _ _ hc
 
@@ -282,7 +281,9 @@ theorem average_completedPaste_disagreement_le_of_slice_majorants
   have hpair : (𝔼 x : F, 𝔼 y : F, Measurement.successfulPairDefect S.state (M x) (M y)) ≤
       commutatorError :=
     polynomialSlice_successfulPairDefect_le S.swap hPoint hLine d M R hM hR hCopies
-      Z hZ hbound (fun x w g _ => commute_decodedPoint _ _ _ (fun b => hComm x (.point w) g b) _)
+      Z hZ hbound (fun x w g a =>
+        Measurement.commute_map_right (S.bob (.point w)) decodePoint _
+          (fun b => hComm x (.point w) g b) a)
       hMZ hcopy hfail hpoint'
   exact average_completedPaste_disagreement_le_of_verifier k hk S M R hM hR hComm hCopies
     fallback hθ₀ hθ₁ hsize hmass hpair hcopy hpoint
