@@ -45,7 +45,7 @@ inductive State (SI : Type) (SP : Bool → Type) (SF : Type) where
   | choose
   /-- The selected deterministic pass is running. -/
   | pass (choice : Bool) (q : SP choice)
-  /-- Read the continuation tape after a pass. -/
+  /-- Read the continuation tape after initialization or a pass. -/
   | check
   /-- The finalizer is running. -/
   | finish (q : SF)
