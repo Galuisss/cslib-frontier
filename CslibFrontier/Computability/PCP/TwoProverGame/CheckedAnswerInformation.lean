@@ -211,10 +211,7 @@ theorem exists_checkedWin_coordinateInformation_le
         exact lt_irrefl _ hp'
       rw [hnorm _ hz]
       simp only [blocks, hw, ite_true]
-      rw [normalizeDensity_apply, normalizeDensity_apply, trace_smul, Complex.real_smul,
-        Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, zero_mul, sub_zero, smul_smul,
-        _root_.mul_inv_rev, mul_assoc, inv_mul_cancel₀ (mul_pos (inv_pos.mpr h) hPrior).ne',
-        mul_one]
+      exact normalizeDensity_smul (mul_pos (inv_pos.mpr h) hPrior).ne' _
     · exact (lt_irrefl _ hp').elim
   · have hbound := sum_weighted_coordinate_mutualInformation_le_relativeEntropy V P hρ T
       (fun t => s t.1) hσ

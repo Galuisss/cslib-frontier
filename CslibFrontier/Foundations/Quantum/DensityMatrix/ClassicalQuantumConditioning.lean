@@ -57,6 +57,30 @@ private theorem reindex_classicalQuantumState_prod
   · simp [hx]
   · simp [hx]
 
+/-- Relative entropy is unchanged when the joint classical label is grouped into a
+transcript and a conditional label. -/
+theorem relativeEntropy_classicalQuantumState_prod_eq_grouped
+    (p : PMF (X × Y)) {ρ : X × Y → Matrix ι ι ℂ} (hρ : ∀ z, IsDensityMatrix (ρ z))
+    (q : PMF X) (r : X → PMF Y) {σ : X → Matrix ι ι ℂ} (hσ : ∀ x, IsDensityMatrix (σ x)) :
+    relativeEntropy (classicalQuantumState p ρ)
+      (classicalQuantumState (q.bind fun x => (r x).map (x, ·)) (σ ∘ Prod.fst)) =
+      relativeEntropy
+        (classicalQuantumState (p.map Prod.fst)
+          (fun x => classicalQuantumState (conditionalSnd p x) (fun y => ρ (x, y))))
+        (classicalQuantumState q (fun x => classicalQuantumState (r x) (fun _ => σ x))) := by
+  let qprod := q.bind fun x => (r x).map (x, ·)
+  have hq (z : X × Y) : IsDensityMatrix ((σ ∘ Prod.fst) z) := hσ z.1
+  change relativeEntropy (classicalQuantumState p ρ)
+    (classicalQuantumState qprod (σ ∘ Prod.fst)) = _
+  rw [← relativeEntropy_reindex (groupFirstLabel (ι := ι) (X := X) (Y := Y))
+    (isDensityMatrix_classicalQuantumState p hρ).posSemidef.isHermitian
+    (isDensityMatrix_classicalQuantumState qprod hq).posSemidef,
+    reindex_classicalQuantumState_prod p ρ (p.map Prod.fst) (conditionalSnd p)
+      (fun x y => (marginal_mul_conditionalSnd p x y).symm),
+    reindex_classicalQuantumState_prod qprod (σ ∘ Prod.fst) q r
+      (fun x y => bind_map_prodMk_apply q r (x, y))]
+  rfl
+
 /-- The classical–quantum chain rule grouped by a transcript. The reference samples its
 transcript from `q`, its second classical label from `r`, and uses the density `σ`
 specified by that transcript. -/
@@ -70,17 +94,7 @@ theorem relativeEntropy_classicalQuantumState_prod [MeasurableSpace X] [Measurab
         ∑ x, (((p.map Prod.fst) x).toReal : WithTop ℝ) *
           relativeEntropy (classicalQuantumState (conditionalSnd p x) (fun y => ρ (x, y)))
             (classicalQuantumState (r x) (fun _ => σ x)) := by
-  let qprod := q.bind fun x => (r x).map (x, ·)
-  have hq (z : X × Y) : IsDensityMatrix ((σ ∘ Prod.fst) z) := hσ z.1
-  change relativeEntropy (classicalQuantumState p ρ)
-    (classicalQuantumState qprod (σ ∘ Prod.fst)) = _
-  rw [← relativeEntropy_reindex (groupFirstLabel (ι := ι) (X := X) (Y := Y))
-    (isDensityMatrix_classicalQuantumState p hρ).posSemidef.isHermitian
-    (isDensityMatrix_classicalQuantumState qprod hq).posSemidef,
-    reindex_classicalQuantumState_prod p ρ (p.map Prod.fst) (conditionalSnd p)
-      (fun x y => (marginal_mul_conditionalSnd p x y).symm),
-    reindex_classicalQuantumState_prod qprod (σ ∘ Prod.fst) q r
-      (fun x y => bind_map_prodMk_apply q r (x, y))]
+  rw [relativeEntropy_classicalQuantumState_prod_eq_grouped p hρ q r hσ]
   exact relativeEntropy_classicalQuantumState _ _
     (fun x => isDensityMatrix_classicalQuantumState _ (fun y => hρ (x, y)))
     (fun x => isDensityMatrix_classicalQuantumState _ (fun _ => hσ x))
