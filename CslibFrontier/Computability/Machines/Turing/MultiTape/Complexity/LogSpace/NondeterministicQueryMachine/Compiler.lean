@@ -41,8 +41,8 @@ variable {α σ : Type} {M : NondeterministicQueryMachine σ} {start : α → σ
 noncomputable abbrev machine : MultiTapeNTM R.k Bool (Native.State R.SI R.SP R.SF) :=
   Native.machine R.I R.P R.F R.C
 
-/-- The boundary invariant includes both possible continuation flags. Only the post-pass flag
-is used to choose whether to continue. Initialization enters the first pass unconditionally. -/
+/-- The boundary invariant includes both possible continuation flags. Initialization and each
+completed pass set the flag used by the deterministic continuation check. -/
 def Inv (a : α) (ws : Fin R.k → List Bool) : Prop :=
   ∃ s flag, (M.withInit (start a)).Reachable (enc a) s ∧ ws = R.boundary s flag
 
@@ -263,8 +263,9 @@ private theorem halted_realizes (a : α) (s : σ)
   exact ⟨p.smash q (hplast.trans hqhead.symm), by simpa using hphead,
     by simpa using hqhalt, by simpa using hqout⟩
 
-/-- Every finite abstract branch ending halted is realized by a native branch. The initially
-halted case uses one harmless self-loop pass, matching the unconditional native first pass. -/
+/-- Every finite abstract branch ending halted is realized by a native branch. A supplied choice
+boundary whose source is already halted uses one self-loop pass. Initialization instead checks
+the halt flag before entering any choice boundary. -/
 theorem choose_realizes (a : α) (choices : List Bool) (s : σ)
     (hs : (M.withInit (start a)).Reachable (enc a) s)
     (hh : M.halted (M.replay (enc a) choices s) = true)
@@ -290,6 +291,61 @@ theorem choose_realizes (a : α) (choices : List Bool) (s : σ)
       exact ⟨p.smash q hconnect, by simpa using hphead,
         by simpa using hqhalt, by simpa only [RelSeries.last_smash, replay_cons] using hqout⟩
 
+private theorem check_output (a : α) (p : R.machine.RunPath (enc a)) (s : σ)
+    (hs : (M.withInit (start a)).Reachable (enc a) s) (out : List Bool)
+    (hhead : p.head = wordsCfg (enc a) (some .check) (R.boundary s (!M.halted s)) out)
+    (hhalt : p.last.Halted) :
+    ∃ s', (M.withInit (start a)).Reachable (enc a) s' ∧ M.halted s' = true ∧
+      p.last.output = out ++ [M.accept s'] := by
+  have hpos : 0 < p.length := by
+    by_contra! hzero
+    have hsame : p.last = p.head := by
+      change p ⟨p.length, _⟩ = p ⟨0, _⟩
+      congr 1
+      apply Fin.ext
+      omega
+    rw [hsame, hhead] at hhalt
+    cases hhalt
+  have hstep := p.step ⟨0, hpos⟩
+  change R.machine.Step p.head (p ⟨1, by omega⟩) at hstep
+  rw [hhead] at hstep
+  obtain ⟨coin, hcoin⟩ := (Native.step_iff R.I R.P R.F R.C).mp hstep
+  rw [Native.step_check_words R.I R.P R.F R.C coin, R.boundary_flag] at hcoin
+  cases hh : M.halted s with
+  | false =>
+    simpa only [RelSeries.last_drop] using R.choose_output a (p.drop ⟨1, by omega⟩) s hs
+      true out (by simpa [hh, flagWord] using hcoin.symm) (by simpa using hhalt)
+  | true =>
+    refine ⟨s, hs, hh, ?_⟩
+    simpa only [RelSeries.last_drop] using R.finish_output a s hs false out
+      (p.drop ⟨1, by omega⟩) (by simpa [hh, flagWord] using hcoin.symm)
+      (by simpa using hhalt)
+
+private theorem check_realizes (a : α) (choices : List Bool) (s : σ)
+    (hs : (M.withInit (start a)).Reachable (enc a) s)
+    (hh : M.halted (M.replay (enc a) choices s) = true) (out : List Bool) :
+    ∃ p : R.machine.RunPath (enc a),
+      p.head = wordsCfg (enc a) (some .check) (R.boundary s (!M.halted s)) out ∧
+      p.last.Halted ∧ p.last.output = out ++ [M.accept (M.replay (enc a) choices s)] := by
+  obtain ⟨p, hphead, hphalt, hpout⟩ : ∃ p : R.machine.RunPath (enc a),
+      p.head = wordsCfg (enc a)
+        (some (if M.halted s then .finish R.F.q₀ else .choose))
+        (R.boundary s (!M.halted s)) out ∧ p.last.Halted ∧
+          p.last.output = out ++ [M.accept (M.replay (enc a) choices s)] := by
+    cases hn : M.halted s with
+    | false => simpa [hn] using R.choose_realizes a choices s hs hh true out
+    | true =>
+      simpa [hn, M.replay_of_halted (enc a) hn] using R.exists_finish_path a s hs false out
+  let initial := wordsCfg (enc a) (some (.check : Native.State R.SI R.SP R.SF))
+    (R.boundary s (!M.halted s)) out
+  have hstep : R.machine.Step initial p.head := by
+    rw [hphead]
+    apply (Native.step_iff R.I R.P R.F R.C).mpr
+    refine ⟨false, ?_⟩
+    rw [Native.step_check_words R.I R.P R.F R.C false, R.boundary_flag]
+    cases M.halted s <;> simp [flagWord]
+  exact ⟨p.cons initial hstep, rfl, by simpa using hphalt, by simpa using hpout⟩
+
 /-- Native acceptance is exactly existential halted acceptance of the query machine. -/
 theorem accepts_iff (a : α) :
     R.machine.Accepts (enc a) ↔ (M.withInit (start a)).Accepts (enc a) := by
@@ -312,14 +368,14 @@ theorem accepts_iff (a : α) :
       change some _ = none at hh
       cases hh
     have hcfg : p.toRunPath ⟨q.length, hlong⟩ =
-        wordsCfg (enc a) (some .choose) (R.boundary (start a) false) [] := by
+        wordsCfg (enc a) (some .check) (R.boundary (start a) (!M.halted (start a))) [] := by
       have h := Native.follows_init R.I R.P R.F R.C p.toRunPath q hmap q.length hlong
         (Nat.lt_succ_self _)
       change p.toRunPath ⟨q.length, hlong⟩ = q.last.mapState Native.initState at h
       simpa [hlast', hqlast, Native.initState, hws, he] using h
     obtain ⟨s, ⟨choices, hchoices⟩, hhalt', hout'⟩ :=
-      R.choose_output a (p.toRunPath.drop ⟨q.length, hlong⟩) (start a)
-        ((M.withInit (start a)).reachable_init _) false [] (by simpa using hcfg)
+      R.check_output a (p.toRunPath.drop ⟨q.length, hlong⟩) (start a)
+        ((M.withInit (start a)).reachable_init _) [] (by simpa using hcfg)
         (by simpa using hhalt)
     refine ⟨choices, hchoices ▸ hhalt', ?_⟩
     have hbit : [M.accept s] = [true] := by simpa [hout] using hout'.symm
@@ -333,10 +389,10 @@ theorem accepts_iff (a : α) :
       rw [RelSeries.head_map]
       simp [hhead', hqhead, Native.initState, wordsCfg, Cfg.mapState]
     have hplast : p.last =
-        wordsCfg (enc a) (some .choose) (R.boundary (start a) false) [] := by
+        wordsCfg (enc a) (some .check) (R.boundary (start a) (!M.halted (start a))) [] := by
       simp [p, hlast', hqlast, Native.initState, hws, he]
     obtain ⟨p', hp'head, hp'halt, hp'out⟩ :=
-      R.choose_realizes a choices (start a) ((M.withInit (start a)).reachable_init _) hhalt false []
+      R.check_realizes a choices (start a) ((M.withInit (start a)).reachable_init _) hhalt []
     change M.accept (M.replay (enc a) choices (start a)) = true at haccept
     let p'' := p.smash p' (hplast.trans hp'head.symm)
     exact ⟨⟨p'', by simpa [p''] using hphead⟩,

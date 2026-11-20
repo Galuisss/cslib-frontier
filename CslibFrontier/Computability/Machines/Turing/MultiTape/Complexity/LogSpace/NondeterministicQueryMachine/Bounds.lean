@@ -174,6 +174,42 @@ theorem choose_inWindow {input : List Bool} (Inv : (Fin k → List Bool) → Pro
         (fun j hj i => hbefore j j.isLt (by dsimp [cut] at hj; omega) i) htail
   exact aux p.length p rfl ws out hInv hhead
 
+/-- The initial continuation check either enters the finalizer or the choice loop without
+moving any tape head, so it preserves their common workspace window. -/
+private theorem check_inWindow {input : List Bool} (Inv : (Fin k → List Bool) → Prop) {s : ℕ}
+    (hP : ∀ b ws, Inv ws → ∃ t, MultiTapeTM.TransformsTapes (P b)
+      (fun inp w => inp = input ∧ w = ws) (fun _ _ w' _ => Inv w') t s)
+    (hF : ∀ ws, Inv ws → ∃ t, MultiTapeTM.TransformsTapes F
+      (fun inp w => inp = input ∧ w = ws) (fun _ _ _ _ => True) t s)
+    (p : (machine I P F C).RunPath input) {ws : Fin k → List Bool} {out : List Bool}
+    (hInv : Inv ws) (hhead : p.head = wordsCfg input (some .check) ws out) : p.InWindow s := by
+  by_cases hzero : p.length = 0
+  · rintro _ ⟨j, rfl⟩ i
+    have : j = 0 := by omega
+    subst j
+    change p.head.workTapePos i ∈ _
+    simp [hhead, mem_window]
+  have hstep := p.step ⟨0, by omega⟩
+  change (machine I P F C).Step p.head (p ⟨1, by omega⟩) at hstep
+  rw [hhead] at hstep
+  obtain ⟨coin, hcoin⟩ := (step_iff I P F C).mp hstep
+  rw [step_check_words I P F C coin] at hcoin
+  have htail : MultiTapeNTM.RunPath.InWindow (p.drop ⟨1, by omega⟩) s := by
+    by_cases hblank : ws C = []
+    · obtain ⟨tF, htF⟩ := hF ws hInv
+      exact finish_inWindow I P F C htF _ (by simpa [hblank] using hcoin.symm)
+    · exact choose_inWindow I P F C Inv hP hF _ hInv (by simpa [hblank] using hcoin.symm)
+  apply inWindow_of_drop p ⟨1, by omega⟩ _ htail
+  intro j hj i
+  have : j = 0 := by
+    apply Fin.ext
+    change j.val < 1 at hj
+    simp only [Fin.val_zero]
+    omega
+  subst j
+  change p.head.workTapePos i ∈ _
+  simp [hhead, mem_window]
+
 /-- **The complete native loop uses one common window on every computation prefix.** Tidy
 initialization establishes the word invariant, the selected passes preserve it, and finalization
 terminates tidily. The number of iterations and their runtimes do not occur in the space bound.
@@ -204,12 +240,12 @@ theorem runsInSpace_of_transforms {input : List Bool}
   have hpwin : MultiTapeNTM.RunPath.InWindow p.toRunPath s := by
     by_cases hq : q.length < p.length + 1
     · let cut : Fin (p.length + 1) := ⟨q.length, hq⟩
-      have hcfg : p.toRunPath cut = wordsCfg input (some .choose) ws e := by
+      have hcfg : p.toRunPath cut = wordsCfg input (some .check) ws e := by
         have h := follows_init I P F C p.toRunPath q hmap q.length hq (Nat.lt_succ_self _)
         change p.toRunPath cut = q.last.mapState initState at h
         simpa [hlast', hqlast, initState] using h
       exact inWindow_of_drop p.toRunPath cut (fun j hj => hpre j hj.le)
-        (choose_inWindow I P F C Inv hP hF (p.toRunPath.drop cut) hInv (by simpa using hcfg))
+        (check_inWindow I P F C Inv hP hF (p.toRunPath.drop cut) hInv (by simpa using hcfg))
     · rintro _ ⟨j, rfl⟩
       exact hpre j (by omega)
   exact MultiTapeNTM.RunPath.InWindow.space_le hpwin
