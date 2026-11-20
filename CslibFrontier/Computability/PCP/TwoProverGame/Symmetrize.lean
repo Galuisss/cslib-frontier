@@ -9,7 +9,7 @@ module
 
 public import CslibFrontier.Computability.PCP.TwoProverGame.Commuting
 public import CslibFrontier.Foundations.Quantum.POVM.Restriction
-import Mathlib.Data.Matrix.Block
+import CslibFrontier.Foundations.LinearAlgebra.Matrix.BlockDiagonalOrder
 
 /-!
 # Symmetrizing a tensor strategy
@@ -33,24 +33,9 @@ open scoped BigOperators ComplexOrder Kronecker MatrixOrder
 variable {Q A B ι κ : Type*} [Fintype A] [Fintype B]
   [Fintype ι] [Fintype κ] [DecidableEq ι] [DecidableEq κ]
 
-private theorem fromBlocks_posSemidef {ι κ : Type*} [Finite ι] [Finite κ]
-    (X : Matrix ι ι ℂ) (Y : Matrix κ κ ℂ)
-    (hX : X.PosSemidef) (hY : Y.PosSemidef) : (fromBlocks X 0 0 Y).PosSemidef := by
-  let _ := Fintype.ofFinite ι
-  let _ := Fintype.ofFinite κ
-  apply PosSemidef.of_dotProduct_mulVec_nonneg
-  · change (fromBlocks X 0 0 Y)ᴴ = _
-    rw [fromBlocks_conjTranspose, hX.isHermitian.eq, hY.isHermitian.eq, conjTranspose_zero,
-      conjTranspose_zero]
-  · intro v
-    simp only [fromBlocks_mulVec, zero_mulVec, add_zero, zero_add, dotProduct,
-      Fintype.sum_sum_type, Pi.star_apply, Sum.elim_inl, Sum.elim_inr]
-    exact add_nonneg (hX.dotProduct_mulVec_nonneg (v ∘ Sum.inl))
-      (hY.dotProduct_mulVec_nonneg (v ∘ Sum.inr))
-
 private def roleMeasurement (M : POVM A ι) (N : POVM A κ) : POVM A (ι ⊕ κ) where
   effect a := fromBlocks (M.effect a) 0 0 (N.effect a)
-  posSemidef a := fromBlocks_posSemidef _ _ (M.posSemidef a) (N.posSemidef a)
+  posSemidef a := fromBlocks_posSemidef_diagonal _ _ (M.posSemidef a) (N.posSemidef a)
   sum_effect := by
     rw [← fromBlocks_one]
     ext (i | i) (j | j)
