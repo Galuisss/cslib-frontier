@@ -1765,6 +1765,7 @@ public import CslibFrontier.Computability.Circuit.Quantum.PathSum
 public import CslibFrontier.Computability.Circuit.Quantum.PhaseCode
 public import CslibFrontier.Computability.Circuit.Quantum.PhaseCode.Relabel
 public import CslibFrontier.Computability.Circuit.Quantum.PhaseOracle
+public import CslibFrontier.Computability.Circuit.Quantum.Quantified
 public import CslibFrontier.Computability.Circuit.Quantum.RealEncoding
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible
 public import CslibFrontier.Computability.Circuit.Quantum.Reversible.Circuit
@@ -2288,6 +2289,7 @@ public import CslibFrontier.Computability.Complexity.Classes.QMA.Amplification
 public import CslibFrontier.Computability.Complexity.Classes.QMA.Counting
 public import CslibFrontier.Computability.Complexity.Classes.QMA.MA
 public import CslibFrontier.Computability.Complexity.Classes.QMA.NP
+public import CslibFrontier.Computability.Complexity.Classes.QPH
 public import CslibFrontier.Computability.Complexity.Classes.RP
 public import CslibFrontier.Computability.Complexity.Classes.RP.Closure
 public import CslibFrontier.Computability.Complexity.Classes.RP.Reduction
@@ -7208,6 +7210,7 @@ public import CslibFrontier.Foundations.Quantum.DensityMatrix.Isometry
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Linear
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Normalize
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.PartialTracePairing
+public import CslibFrontier.Foundations.Quantum.DensityMatrix.Product
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Pure
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.PurificationOverlap
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.QuantumPinsker
