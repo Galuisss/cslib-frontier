@@ -163,7 +163,6 @@ private theorem mulXMod_inSpace :
 private structure Registers where
   shift : List Bool
   product : List Bool
-  deriving Inhabited
 
 private enc_structure encRegisters : Registers where
   shift : encCoefficients, product : encCoefficients
