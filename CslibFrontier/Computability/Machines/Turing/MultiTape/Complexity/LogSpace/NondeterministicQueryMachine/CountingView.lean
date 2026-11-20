@@ -129,6 +129,76 @@ theorem map_snd_replayChoices {input : List Bool} (cfg : Cfg k Bool (State SI SP
       | none => rfl
       | some pair => cases pair; rfl
 
+/-- Concatenating occurrence traces concatenates their genuine choice sequences. -/
+theorem replayChoices_append {input : List Bool} (cfg : Cfg k Bool (State SI SP SF) input)
+    (first second : List ℕ) :
+    replayChoices I P F C cfg (first ++ second) =
+      (replayChoices I P F C cfg first).bind fun (firstBits, middle) =>
+        (replayChoices I P F C middle second).map fun (suffix, final) =>
+          (firstBits ++ suffix, final) := by
+  induction first generalizing cfg with
+  | nil =>
+    simp [replayChoices, Option.bind]
+  | cons i first ih =>
+    simp only [List.cons_append, replayChoices]
+    cases (countingMachine I P F C).step? cfg i with
+    | none => rfl
+    | some next =>
+      simp only [Option.bind]
+      rw [ih next]
+      cases replayChoices I P F C next first with
+      | none => rfl
+      | some result =>
+        obtain ⟨firstBits, middle⟩ := result
+        simp only [Option.bind, Option.map_some, Option.map_map]
+        cases atChoice cfg <;> rfl
+
+/-- Crossing a choice boundary adds precisely the bit that selects the next pass. -/
+theorem replayChoices_choose {input : List Bool} (cfg : Cfg k Bool (State SI SP SF) input)
+    (hcfg : cfg.state = some .choose) (b : Bool) (rest : List ℕ) :
+    replayChoices I P F C cfg (b.toNat :: rest) =
+      (replayChoices I P F C (cfg.withState (some (.pass b (P b).q₀))) rest).map
+        fun (bits, final) => (b :: bits, final) := by
+  have hstep : (countingMachine I P F C).step? cfg b.toNat =
+      some (cfg.withState (some (.pass b (P b).q₀))) := by
+    cases b <;> simp [MultiTapeCTM.step?, MultiTapeCTM.actions, hcfg, countingMachine,
+      choiceBits, instruction, apply_routeAction]
+  rw [replayChoices, hstep]
+  cases b <;> simp [Option.bind, atChoice, hcfg]
+
+/-- A running path through deterministic routines has a replay with no recorded choice bits. -/
+theorem replayChoices_replicate_zero {input : List Bool}
+    (p : RelSeries ((machine I P F C).runningStepRel input))
+    (h : ∀ i : Fin p.length, (p i.castSucc).state ≠ some .choose) :
+    replayChoices I P F C p.head (List.replicate p.length 0) = some ([], p.last) := by
+  induction p using RelSeries.inductionOn' with
+  | singleton cfg => rfl
+  | snoc p next hs ih =>
+    have hbefore : ∀ i : Fin p.length, (p i.castSucc).state ≠ some .choose := by
+      intro i
+      have hi := h ⟨i.val, by simp⟩
+      change (p.snoc next hs i.castSucc.castSucc).state ≠ some .choose at hi
+      exact (RelSeries.snoc_castSucc p next hs i.castSucc) ▸ hi
+    have hlast : p.last.state ≠ some .choose := by
+      have hi := h ⟨p.length, by simp⟩
+      change (p.snoc next hs (Fin.last p.length).castSucc).state ≠ some .choose at hi
+      change (p (Fin.last p.length)).state ≠ some .choose
+      exact (RelSeries.snoc_castSucc p next hs (Fin.last p.length)) ▸ hi
+    have hat : atChoice p.last = false := by
+      cases hstate : p.last.state with
+      | none => simp [atChoice, hstate]
+      | some q => cases q <;> simp_all [atChoice]
+    have hstep : (countingMachine I P F C).toNTM.Step p.last next := by
+      rw [toNTM_countingMachine]
+      exact hs.2
+    obtain ⟨j, hj⟩ := ((countingMachine I P F C).step_toNTM_iff hs.1).mp hstep
+    have hj' := step_index_lt I P F C hj
+    have hz : j = 0 := by simpa [hat, Nat.lt_one_iff] using hj'
+    subst j
+    rw [RelSeries.snoc_length, List.replicate_succ', RelSeries.head_snoc,
+      replayChoices_append, ih hbefore]
+    simp [replayChoices, hj, hat, Option.bind]
+
 /-- Two first-halting occurrence traces with the same genuine choice bits coincide. -/
 theorem eq_occurrences_of_replayChoices {input : List Bool}
     {cfg final₁ final₂ : Cfg k Bool (State SI SP SF) input} {bits : List Bool}
