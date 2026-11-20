@@ -304,6 +304,7 @@ public import CslibFrontier.Algorithms.Reachability.InductiveCounting.Bounds
 public import CslibFrontier.Algorithms.Reachability.InductiveCounting.Completeness
 public import CslibFrontier.Algorithms.Reachability.InductiveCounting.Progress
 public import CslibFrontier.Algorithms.Reachability.InductiveCounting.Semantics
+public import CslibFrontier.Algorithms.Reachability.MinIsolation.Collisions
 public import CslibFrontier.Algorithms.Reachability.MinIsolation.Weights
 public import CslibFrontier.Algorithms.Reachability.Reingold
 public import CslibFrontier.Algorithms.Reachability.ReingoldEval

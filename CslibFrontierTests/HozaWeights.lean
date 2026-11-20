@@ -6,9 +6,9 @@ Authors: Christian Reitwiessner
 
 module
 
-import CslibFrontier.Algorithms.Reachability.MinIsolation.Weights
+import CslibFrontier.Algorithms.Reachability.MinIsolation.Collisions
 
-/-! # Checked indexing of Hoza's base-six coefficients -/
+/-! # Hoza's base-six weights and collision bound -/
 
 set_option linter.privateModule false
 
@@ -30,5 +30,25 @@ example : coefficient 4 (1 : Fin 2) = 36 := by
   decide
 
 example : vertexWeight (ℓ := 2) (fun (_ : Unit) _ => true) (fun _ => true) 0 () = 0 := rfl
+
+open Finset in
+-- In a one-layer interval, two complementary codewords can tie for at most one seed.
+example :
+    let layers := Icc 1 1
+    let code (v : Bool) (_ : Fin 2) := v
+    let column (v : Bool) (_ : ℕ) := v
+    let f seed := minIntervalWeight code seed layers column {false} (singleton_nonempty _)
+    let g seed := minIntervalWeight code seed layers column {true} (singleton_nonempty _)
+    (univ.filter fun seed => f seed = g seed).card ≤ 1 := by
+  intro layers code column f g
+  have hmax : ∀ i ∈ layers, multiplicity 2 i ≤ multiplicity 2 1 := by
+    intro i hi
+    have hi' : i = 1 := by simpa [layers] using hi
+    subst i
+    rfl
+  have h := card_tyingSeeds_le code (by decide) (by decide) hmax column
+    (singleton_nonempty false) (singleton_nonempty true) false true
+    (fun p hp => mem_singleton.mp hp) (fun p hp => mem_singleton.mp hp)
+  simpa [f, g, layers, show hammingDist (code false) (code true) = 2 by decide] using h
 
 end CslibFrontierTests.HozaWeights
