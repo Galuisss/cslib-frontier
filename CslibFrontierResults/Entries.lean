@@ -11362,9 +11362,12 @@ register_result "knapsack-fptas" where
   title := "0–1 knapsack has a fully polynomial-time approximation scheme"
   topic := "approximation algorithms"
   sources := [
-    { paper := WilliamsonShmoys2011, theorem := "Theorem 3.5", locator := "§3.2" }
+    { paper := WilliamsonShmoys2011, theorem := "Theorem 3.5",
+      locator := "authors' electronic web edition, §3.1, printed p. 68" }
   ]
   theorems := [Cslib.Algorithms.Lean.Knapsack.optimizationProblem_fptas]
-  scope := "Natural weights, values and capacity in binary. The solver returns a feasible \
-    item subsequence of value at least 1 − 1/k times optimal, with one native polynomial-time \
-    algorithm on the instance and positive unary k. Items exceeding the capacity are discarded."
+  scope := "Binary natural weights, values and capacity, including zero. A feasible item \
+    subsequence selects positions in the input list and can therefore include multiple equal \
+    items at different positions. One native polynomial-time algorithm on the instance and \
+    positive unary k returns a feasible subsequence worth at least 1 − 1/k times optimal. \
+    Items exceeding capacity are discarded."
