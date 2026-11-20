@@ -111,6 +111,10 @@ noncomputable def replayChoices {input : List Bool} :
     (replayChoices next rest).map fun (bits, final) =>
       ((if atChoice cfg then (i == 1) :: bits else bits), final)
 
+@[simp]
+theorem replayChoices_nil {input : List Bool} (cfg : Cfg k Bool (State SI SP SF) input) :
+    replayChoices I P F C cfg [] = some ([], cfg) := by simp only [replayChoices]
+
 /-- The final configuration of the bit-recording replay is the ordinary replay result. -/
 theorem map_snd_replayChoices {input : List Bool} (cfg : Cfg k Bool (State SI SP SF) input)
     (indices : List ℕ) :
