@@ -76,6 +76,17 @@ def actions (machine : MultiTapeCTM k Symbol State) (cfg : Cfg k Symbol State in
     (machine.tr state cfg.inputSymbol cfg.workTapeSymbols Empty.elim).map
       MultiTapeMachine.Action.emptyOracleEquiv
 
+/-- Forget the multiplicity of transition occurrences for reasoning about reachable configurations.
+Use the original counting machine when counting branches. -/
+def toNTM (M : MultiTapeCTM k Symbol State) : MultiTapeNTM k Symbol State where
+  q₀ := M.initial
+  Tr state symbol work action :=
+    MultiTapeMachine.Action.emptyOracleEquiv.symm action ∈ M.tr state symbol work Empty.elim
+
+/-- Forgetting transition multiplicity preserves the initial configuration. -/
+theorem initCfg_toNTM (machine : MultiTapeCTM k Symbol State) (input : List Symbol) :
+    machine.toNTM.initCfg input = (machine.initialConfig input).tapes := rfl
+
 /-- Every running local view has a transition occurrence. This excludes stuck states even on
 unreachable configurations; a native `HaltsWithin` hypothesis only needs the reachable ones. -/
 def Nonblocking (machine : MultiTapeCTM k Symbol State) : Prop :=
