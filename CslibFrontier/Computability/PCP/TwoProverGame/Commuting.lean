@@ -14,6 +14,7 @@ public import CslibFrontier.Foundations.Quantum.Algebra.SuccessfulAgreement
 import CslibFrontier.Probability.PMF.Event
 public import CslibFrontier.Foundations.Quantum.Algebra.Tsirelson
 import CslibFrontier.Foundations.Analysis.SpecialFunctions.Trigonometric.Basic
+import CslibFrontier.Foundations.Quantum.Algebra.MaxEntangled
 import CslibFrontier.Foundations.Quantum.Algebra.TensorState
 
 /-!
@@ -308,7 +309,8 @@ noncomputable def rightMeasurement (N : POVM B κ) : Measurement B (Matrix (ι �
 theorem commute_liftedEffects (L : POVM A ι) (R : POVM B κ) (a : A) (b : B) :
     Commute ((leftMeasurement (κ := κ) L).effect a) ((rightMeasurement (ι := ι) R).effect b) := by
   change Commute (L.effect a ⊗ₖ (1 : Matrix κ κ ℂ)) ((1 : Matrix ι ι ℂ) ⊗ₖ R.effect b)
-  simp only [Commute, SemiconjBy, ← mul_kronecker_mul, Matrix.mul_one, Matrix.one_mul]
+  simpa only [kroneckerOne_apply, oneKronecker_apply] using
+    commute_kroneckerOne_oneKronecker (L.effect a) (R.effect b)
 
 /-- A projective local measurement stays projective on the first tensor factor. -/
 theorem leftMeasurement_isProjective (M : POVM A ι) (h : M.toMeasurement.IsProjective) :
