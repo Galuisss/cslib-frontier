@@ -2006,6 +2006,7 @@ public import CslibFrontier.Computability.Complexity.Classes.BQP.Sampling.Resour
 public import CslibFrontier.Computability.Complexity.Classes.BQP.Sampling.Seeded
 public import CslibFrontier.Computability.Complexity.Classes.BQP.TensorContraction
 public import CslibFrontier.Computability.Complexity.Classes.BQP.Time
+public import CslibFrontier.Computability.Complexity.Classes.BQP.TruthTable
 public import CslibFrontier.Computability.Complexity.Classes.BooleanHierarchy
 public import CslibFrontier.Computability.Complexity.Classes.BooleanHierarchy.Closure
 public import CslibFrontier.Computability.Complexity.Classes.BooleanHierarchy.Kadin
@@ -6044,6 +6045,7 @@ public import CslibFrontier.Foundations.AlgebraicGeometry.EllipticCurve.Montgome
 public import CslibFrontier.Foundations.AlgebraicGeometry.EllipticCurve.PointCount
 public import CslibFrontier.Foundations.AlgebraicGeometry.EllipticCurve.QuadraticTwist
 public import CslibFrontier.Foundations.AlgebraicGeometry.EllipticCurve.VariableChange
+public import CslibFrontier.Foundations.AlgebraicGeometry.Semialgebraic
 public import CslibFrontier.Foundations.Analysis.Asymptotics.CostBound
 public import CslibFrontier.Foundations.Analysis.Asymptotics.Exponential
 public import CslibFrontier.Foundations.Analysis.Asymptotics.PolyErr
@@ -6135,6 +6137,7 @@ public import CslibFrontier.Foundations.BooleanAnalysis.CoordinateSampling
 public import CslibFrontier.Foundations.BooleanAnalysis.CoveringProduct
 public import CslibFrontier.Foundations.BooleanAnalysis.Decomposition
 public import CslibFrontier.Foundations.BooleanAnalysis.Degree
+public import CslibFrontier.Foundations.BooleanAnalysis.EdgeIsoperimetry
 public import CslibFrontier.Foundations.BooleanAnalysis.FiberWeight
 public import CslibFrontier.Foundations.BooleanAnalysis.Fibers
 public import CslibFrontier.Foundations.BooleanAnalysis.Fourier
@@ -7312,6 +7315,7 @@ public import CslibFrontier.GameTheory.Strategic.Mixed
 public import CslibFrontier.GameTheory.Strategic.Nash
 public import CslibFrontier.GameTheory.Strategic.NoRegret
 public import CslibFrontier.GameTheory.Strategic.Potential
+public import CslibFrontier.GameTheory.Strategic.Semialgebraic
 public import CslibFrontier.GameTheory.Strategic.Smooth
 public import CslibFrontier.GameTheory.Strategic.Stability
 public import CslibFrontier.GameTheory.Strategic.StrongNash
