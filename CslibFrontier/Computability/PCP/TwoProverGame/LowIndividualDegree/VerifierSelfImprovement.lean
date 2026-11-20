@@ -67,7 +67,7 @@ theorem sandwichedPolynomial_point_bounds_of_verifier (S : CommutingStrategy Q Q
     (Measurement.commute_map_map _ _ (S.commute (.point v) (.point u)) decodePoint decodePoint
       b a).symm
   have hLT (u : Point F (n + 1)) g (b : F) : Commute ((L u).effect b) (T.effect g) :=
-    (commute_decodedPoint S.bob u _ (hT (.point u) g) b).symm
+    (Measurement.commute_map_right (S.bob (.point u)) decodePoint _ (hT (.point u) g) b).symm
   have hvar : weightedPointVariance S.state L T ≤ ξ := by
     apply weightedPointVariance_le_verifier S d T haxis
     intro u i g f
