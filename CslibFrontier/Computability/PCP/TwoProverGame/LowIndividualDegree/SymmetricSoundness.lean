@@ -64,7 +64,7 @@ private theorem exists_matchingMass_of_complete {n d : ℕ}
 private theorem loss_mem_Icc {n : ℕ}
     (S : CommutingStrategy (Question F (n + 1)) (Question F (n + 1))
       (Answer F (n + 1)) (Answer F (n + 1)) Joint) (d D : ℕ) (b : Branch) :
-    1 - (branchGameAtDegrees (F := F) n d D b).commutingWinProb S ∈ Set.Icc (0 : ℝ) 1 := by
+    1 - (branchGameWithDiagonalCap (F := F) n d D b).commutingWinProb S ∈ Set.Icc (0 : ℝ) 1 := by
   exact ⟨sub_nonneg.mpr (TwoProverGame.commutingWinProb_le_one _ _),
     sub_le_self _ (TwoProverGame.commutingWinProb_nonneg _ _)⟩
 
@@ -82,7 +82,8 @@ private theorem exists_polynomial_POVM_of_symmetric_in_range
     let C := S.toCommuting
     let ε := 1 - (branchGame (F := F) n d .axis).commutingWinProb C
     let δ := 1 - (branchGame (F := F) n d .consistency).commutingWinProb C
-    let γ := 1 - (branchGameAtDegrees (F := F) n d D .diagonal).commutingWinProb C
+    let γ :=
+      1 - (branchGameWithDiagonalCap (F := F) n d D .diagonal).commutingWinProb C
     let r := (d : ℝ) / Fintype.card F
     ∃ G : POVM (Option (BoundedPolynomial F (n + 1) d)) ι,
       1 - dimensionInductionError (n + 1) k ε δ γ r ≤
@@ -156,7 +157,7 @@ private theorem exists_polynomial_POVM_of_symmetric_in_range
     let T (x : F) := restrictSliceTensor S x
     let e (x : F) := 1 - (branchGame (F := F) n d .axis).commutingWinProb (T x).toCommuting
     let f (x : F) := 1 - (branchGame (F := F) n d .consistency).commutingWinProb (T x).toCommuting
-    let g (x : F) := 1 - (branchGameAtDegrees (F := F) n d D .diagonal).commutingWinProb
+    let g (x : F) := 1 - (branchGameWithDiagonalCap (F := F) n d D .diagonal).commutingWinProb
       (T x).toCommuting
     let σ (x : F) := dimensionInductionError m k (e x) (f x) (g x) r
     have hs' : 400 * (n + 1) * d ≤ k :=
@@ -165,7 +166,8 @@ private theorem exists_polynomial_POVM_of_symmetric_in_range
       (by simpa only [T, restrictSliceTensor_state] using hψ)
       (restrictSliceTensor_alice_isProjective S x hP)
     choose G hG using hex
-    have ht (x : F) : (T x).toCommuting = restrictSlice C x := restrictSliceTensor_toCommuting S x
+    have ht (x : F) : (T x).toCommuting = restrictStrategy x C :=
+      restrictSliceTensor_toCommuting S x
     have hstate (x : F) : (T x).toCommuting.state = C.state := restrictSliceTensor_joint_state S x
     have hpt (x : F) (u : Point F (n + 1)) :
         decodedPoint (T x).toCommuting.alice u = decodedPoint C.alice (Fin.snoc u x) := by
@@ -252,7 +254,7 @@ private theorem exists_complete_of_matchingMass {n d : ℕ}
         Commute (R.effect none) ((C.alice (.point u)).effect a) :=
       (commute_kroneckerOne_oneKronecker ((S.alice (.point u)).effect a) (G.effect none)).symm
     exact Commute.mul_nonneg (R.nonneg none) ((decodedPoint C.alice u).nonneg _)
-      (commute_decodedPoint C.alice u _ hc _)
+      (Measurement.commute_map_right (C.alice (.point u)) decodePoint _ hc _)
   have hg := h.trans (expect_le_expect fun u _ => hm u)
   refine ⟨H, ?_⟩
   simp only [expect_sub_distrib, Fintype.expect_const]
@@ -277,7 +279,8 @@ theorem exists_polynomial_POVM_of_symmetric
     let C := S.toCommuting
     let ε := 1 - (branchGame (F := F) n d .axis).commutingWinProb C
     let δ := 1 - (branchGame (F := F) n d .consistency).commutingWinProb C
-    let γ := 1 - (branchGameAtDegrees (F := F) n d D .diagonal).commutingWinProb C
+    let γ :=
+      1 - (branchGameWithDiagonalCap (F := F) n d D .diagonal).commutingWinProb C
     let r := (d : ℝ) / Fintype.card F
     ∃ H : POVM (BoundedPolynomial F (n + 1) d) ι,
       (𝔼 u : Point F (n + 1), (1 - Measurement.agreement C.state

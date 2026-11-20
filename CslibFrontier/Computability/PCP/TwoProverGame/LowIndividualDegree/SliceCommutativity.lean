@@ -240,7 +240,7 @@ theorem evaluatedSlice_successfulPairDefect_le_atDegrees
     (𝔼 w, Measurement.successfulMismatch S.state (P w) (decodedPoint S.alice w)) ≤ η →
     (𝔼 u, 𝔼 v, Measurement.successfulPairDefect S.state (P u) (P v)) ≤
       2 * (4 * √(2 * η) + 2 * √(64 * (m + 1 : ℝ) *
-        (1 - (branchGameAtDegrees (F := F) m degree D .diagonal).commutingWinProb S)) +
+        (1 - (branchGameWithDiagonalCap (F := F) m degree D .diagonal).commutingWinProb S)) +
           2 * √ζ + 2 * √ξ) := by
   intro P hη
   let R (w : Point F (m + 1)) :=
@@ -263,7 +263,7 @@ theorem evaluatedSlice_successfulPairDefect_le_atDegrees
   let b (u : Point F (m + 1)) (a : F) := (Q u).effect a
   let G (u : Point F (m + 1)) := (P u).successfulEffect
   let δ := 64 * (m + 1 : ℝ) *
-    (1 - (branchGameAtDegrees (F := F) m degree D .diagonal).commutingWinProb S)
+    (1 - (branchGameWithDiagonalCap (F := F) m degree D .diagonal).commutingWinProb S)
   let defect (u : Point F (m + 1)) := ∑ a : F, S.state.norm (p u a - G u * b u a) ^ 2
   let score (f : Point F (m + 1) → Point F (m + 1) → F → F → A) :=
     𝔼 u, 𝔼 v, ∑ a : F, ∑ c : F, (S.state (f u v a c)).re
@@ -433,7 +433,7 @@ theorem evaluatedSlice_successfulPairDefect_le
       2 * (4 * √(2 * η) + 2 * √(64 * (m + 1 : ℝ) *
         (1 - (branchGame (F := F) m degree .diagonal).commutingWinProb S)) +
           2 * √ζ + 2 * √ξ) := by
-  rw [branchGame_eq_atDegrees]
+  rw [branchGame_eq_withDiagonalCap]
   exact evaluatedSlice_successfulPairDefect_le_atDegrees S hPoint hLine degree ((m + 1) * degree)
     M hM Z hZ hbound hMP hMZ N hN hMN hcopy hfail
 

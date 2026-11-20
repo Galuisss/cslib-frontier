@@ -154,7 +154,8 @@ theorem exists_paste_of_slice_agreement
     let C := S.toCommuting
     let ε := 1 - (branchGame (F := F) (n + 1) d .axis).commutingWinProb C
     let δ := 1 - (branchGame (F := F) (n + 1) d .consistency).commutingWinProb C
-    let γ := 1 - (branchGameAtDegrees (F := F) (n + 1) d D .diagonal).commutingWinProb C
+    let γ :=
+      1 - (branchGameWithDiagonalCap (F := F) (n + 1) d D .diagonal).commutingWinProb C
     let r := (d : ℝ) / Fintype.card F
     ∃ H : POVM Result ι,
       (𝔼 w : Point F (n + 2), (1 - Measurement.agreement C.state
