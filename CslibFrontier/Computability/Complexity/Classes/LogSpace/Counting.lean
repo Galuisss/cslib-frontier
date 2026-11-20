@@ -20,7 +20,7 @@ public import Mathlib.Data.Nat.Prime.Defs
 halt early are counted once, and distinct transition occurrences may lead to the same
 configuration. The nondeterministic view is used only to bound workspace.
 
-`GapL` takes differences of two such counts. `UL`, `LogFewNL`, `LogFew`, `ParityL`,
+`GapL` takes differences of two such counts. `UL`, `FewL`, `LFew`, `ParityL`,
 `ModkL`, `ModL`, `PL`, and `SPL` restrict or test these counts and differences.
 
 ## References
@@ -60,13 +60,13 @@ def UL (enc : α ↪ List Bool) : Set (Set α) :=
   {A | ∃ f ∈ SharpL enc, (∀ a, f a ≤ 1) ∧ ∀ a, a ∈ A ↔ 0 < f a}
 
 /-- FewP with logarithmic workspace. The number of accepting branches has a polynomial bound. -/
-def LogFewNL (enc : α ↪ List Bool) : Set (Set α) :=
+def FewL (enc : α ↪ List Bool) : Set (Set α) :=
   {A | ∃ f ∈ SharpL enc, ∃ p : Polynomial ℕ,
     (∀ a, f a ≤ p.eval (enc a).length) ∧ ∀ a, a ∈ A ↔ 0 < f a}
 
 /-- Test a polynomially bounded logspace accepting count by a deterministic logspace predicate
 on the instance paired with the binary count. -/
-def LogFew (enc : α ↪ List Bool) : Set (Set α) :=
+def LFew (enc : α ↪ List Bool) : Set (Set α) :=
   {A | ∃ f ∈ SharpL enc, ∃ p : Polynomial ℕ,
     (∀ a, f a ≤ p.eval (enc a).length) ∧
     ∃ R : α × ℕ → Bool, ComputableInLogSpace R (encPair enc encNat) encBool ∧
@@ -82,15 +82,17 @@ def ModkL (m : ℕ) (enc : α ↪ List Bool) : Set (Set α) :=
   {A | 2 ≤ m ∧ ∃ f ∈ SharpL enc, ∀ a, a ∈ A ↔ f a % m ≠ 0}
 
 /-- Variable-modulus logspace counting. The modulus is the length of a unary string output in
-deterministic logarithmic space and must be a power of a prime. Membership
-uses zero residue of a `GapL` function. -/
+deterministic logarithmic space and must be a positive power of a prime. Membership
+uses nonzero residue of a `GapL` function, as in [Vijayaraghavan, Definition 2.6]
+(https://eccc.weizmann.ac.il/report/2009/082/download/#page=4). -/
 def ModL (enc : α ↪ List Bool) : Set (Set α) :=
   {A | ∃ f ∈ GapL enc, ∃ g : α → List Bool, ComputableInLogSpace g enc encBits ∧
-    ∀ a, (∃ p e : ℕ, Nat.Prime p ∧ g a = List.replicate (p ^ e) false) ∧
-      (a ∈ A ↔ f a % (g a).length = 0)}
+    ∀ a, (∃ p e : ℕ, Nat.Prime p ∧ 0 < e ∧ g a = List.replicate (p ^ e) false) ∧
+      (a ∈ A ↔ f a % (g a).length ≠ 0)}
 
 /-- Unbounded-error probabilistic logarithmic space in its equivalent positive-gap
-characterization [Allender and Ogihara, Theorem 1]
+characterization [Allender and Ogihara, Proposition 3(1), (3),
+and Theorem 6]
 (https://archive.numdam.org/item/ITA_1996__30_1_1_0/). -/
 def PL (enc : α ↪ List Bool) : Set (Set α) :=
   {A | ∃ f ∈ GapL enc, ∀ a, a ∈ A ↔ 0 < f a}
@@ -100,7 +102,7 @@ def SPL (enc : α ↪ List Bool) : Set (Set α) :=
   {A | ∃ f ∈ GapL enc, (∀ a, f a = 0 ∨ f a = 1) ∧ ∀ a, a ∈ A ↔ f a = 1}
 
 /-- Unambiguous machines satisfy the fewness bound with the constant polynomial one. -/
-theorem UL_subset_LogFewNL {enc : α ↪ List Bool} : UL enc ⊆ LogFewNL enc := by
+theorem UL_subset_FewL {enc : α ↪ List Bool} : UL enc ⊆ FewL enc := by
   rintro A ⟨f, hf, hle, hA⟩
   exact ⟨f, hf, 1, fun a => by simpa using hle a, hA⟩
 

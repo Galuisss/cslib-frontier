@@ -23,7 +23,7 @@ and in how advice is selected. In each case `n` denotes the original input lengt
 * `BPPLog`: the decider has bounded error on every pair, including pairs with incorrect advice.
 * `BPPMLog`: only the selected advice must give bounded error.
 * `BPPRLog`: advice is drawn from a length-dependent distribution independently of the verifier's
-  coins [Aaronson2005Limitations].
+  coins [Aaronson, §2.1 and footnote 3][Aaronson2006DeMerlinizing].
 * `BPPDoubleSlashLog`: advice depends on the length and the very coins used by the verifier
   [TrevisanVadhan2002].
 -/
@@ -39,7 +39,8 @@ open Turing.MultiTapeTM
   ⋃ (c : ℕ), WithAdvice (BPP (encPair encBits encBits)) fun n => c * (Nat.log2 n + 1)
 
 /-- The verifier reads the framed advice/input pair and a separate word of private coins. -/
-@[expose] def IsPolyTimeAdviceVerifier (V : (List Bool × List Bool) × List Bool → Bool) : Prop :=
+@[expose] def IsPolyTimeAdviceVerifier (V : (List Bool × List Bool) × List Bool → Bool) :
+    Prop :=
   ComputableInPolyTime V (encPair (encPair encBits encBits) encBits) encBool
 
 /-- Syntactic BPP with logarithmic advice. Only the selected advice word must yield the correct
@@ -52,7 +53,8 @@ answer with probability at least two thirds. -/
         BoundedErrorAt encBits p (fun (y, r) => V ((advice y.length, y), r)) x b}
 
 /-- Logarithmic random advice, independent of the verifier's coins. The joint probability of a
-correct answer is at least two thirds on each input [Aaronson2005Limitations]. -/
+correct answer is at least two thirds on each input
+[Aaronson, §2.1 and footnote 3][Aaronson2006DeMerlinizing]. -/
 @[expose] def BPPRLog : Set (Set (List Bool)) :=
   {A | ∃ (c : ℕ) (p : Polynomial ℕ) (advice : ℕ → PMF (List Bool))
       (V : (List Bool × List Bool) × List Bool → Bool),

@@ -22,6 +22,14 @@ example {α : Type} {enc : α ↪ List Bool} {A : Set α} (hA : A ∈ UL enc) :
   have h : f a = 0 ∨ f a = 1 := by have := hle a; omega
   obtain h | h := h <;> rw [h] <;> decide
 
+-- A constant gap of one has nonzero residue modulo two, so this witness accepts every input.
+example {α : Type} {enc : α ↪ List Bool}
+    (hf : (fun _ : α => (1 : ℤ)) ∈ GapL enc)
+    (hg : ComputableInLogSpace (fun _ : α => [false, false]) enc encBits) :
+    (Set.univ : Set α) ∈ ModL enc := by
+  refine ⟨_, hf, _, hg, fun a => ⟨⟨2, 1, Nat.prime_two, by decide, rfl⟩, ?_⟩⟩
+  exact iff_of_true (Set.mem_univ a) (by decide)
+
 -- The verifier can feed a tagged end marker to the NL bit-graph machine.
 example (x : List Bool) (i : ℕ) :
     encFNLQuery encBits ⟨x, i, none⟩ = encPair encBits (encPair encNat (encOption encBool))

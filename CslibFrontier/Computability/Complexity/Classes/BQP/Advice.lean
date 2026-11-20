@@ -7,6 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: candidate
 
+public import CslibFrontier.Computability.Complexity.Classes.Advice
 public import CslibFrontier.Computability.Complexity.Classes.BQP
 
 /-!
@@ -20,7 +21,6 @@ depend on input length alone.
 
 ## Main definitions
 
-* `BQPWithAdvice`: bounded-error quantum polynomial time with a specified advice length.
 * `BQPLog`, `BQPPoly`: logarithmic and polynomial-length advice.
 -/
 
@@ -30,19 +30,13 @@ namespace Cslib.Complexity
 
 open Turing.MultiTapeTM
 
-/-- Bounded-error quantum polynomial time with an arbitrary advice string of exactly
-`length n` bits at input length `n`. The decider has bounded error on every advice/input pair. -/
-def BQPWithAdvice (length : ℕ → ℕ) : Set (Set (List Bool)) :=
-  {L | ∃ advice : ℕ → List Bool, (∀ n, (advice n).length = length n) ∧
-    ∃ A ∈ BQP (encPair encBits encBits), ∀ x, x ∈ L ↔ (advice x.length, x) ∈ A}
-
 /-- BQP with logarithmic-length Karp–Lipton advice. -/
 def BQPLog : Set (Set (List Bool)) :=
-  {L | ∃ c : ℕ, L ∈ BQPWithAdvice (fun n => c * (Nat.log 2 n + 1))}
+  {L | ∃ c : ℕ,
+    L ∈ WithAdvice (BQP (encPair encBits encBits)) (fun n => c * (Nat.log 2 n + 1))}
 
 /-- BQP with polynomial-length Karp–Lipton advice. -/
 def BQPPoly : Set (Set (List Bool)) :=
-  {L | ∃ p : Polynomial ℕ, L ∈ BQPWithAdvice p.eval}
-
+  {L | ∃ p : Polynomial ℕ, L ∈ WithAdvice (BQP (encPair encBits encBits)) p.eval}
 
 end Cslib.Complexity
