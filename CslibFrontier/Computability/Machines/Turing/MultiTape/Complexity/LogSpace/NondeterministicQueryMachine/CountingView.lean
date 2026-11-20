@@ -199,6 +199,68 @@ theorem replayChoices_replicate_zero {input : List Bool}
       replayChoices_append, ih hbefore]
     simp [replayChoices, hj, hat, Option.bind]
 
+/-- Among successful replays from the same configuration, a shorter replay whose
+choice bits are a prefix of the longer replay's bits is an occurrence prefix. -/
+theorem prefix_occurrences_of_replayChoices {input : List Bool}
+    {cfg final₁ final₂ : Cfg k Bool (State SI SP SF) input} {bits₁ bits₂ : List Bool}
+    {indices₁ indices₂ : List ℕ}
+    (h₁ : replayChoices I P F C cfg indices₁ = some (bits₁, final₁))
+    (h₂ : replayChoices I P F C cfg indices₂ = some (bits₂, final₂))
+    (hlen : indices₁.length ≤ indices₂.length) (hprefix : bits₁ <+: bits₂) :
+    indices₁ <+: indices₂ := by
+  induction indices₁ generalizing cfg bits₁ bits₂ indices₂ with
+  | nil => exact List.nil_prefix
+  | cons i rest ih =>
+    cases indices₂ with
+    | nil => simp at hlen
+    | cons j tail =>
+      simp only [replayChoices, Option.bind_eq_some_iff, Option.map_eq_some_iff] at h₁ h₂
+      obtain ⟨x, hx, ⟨bs, f₁⟩, hxs, hbits₁⟩ := h₁
+      obtain ⟨y, hy, ⟨cs, f₂⟩, hys, hbits₂⟩ := h₂
+      have hb₁ := congrArg Prod.fst hbits₁
+      have hb₂ := congrArg Prod.fst hbits₂
+      dsimp only at hb₁ hb₂
+      rw [← hb₁, ← hb₂] at hprefix
+      have hi := step_index_lt I P F C hx
+      have hj := step_index_lt I P F C hy
+      have hsame : i = j ∧ bs <+: cs := by
+        cases hc : atChoice cfg
+        · simp only [hc, Bool.false_eq_true, ↓reduceIte] at hi hj hprefix
+          exact ⟨by omega, hprefix⟩
+        · simp only [hc, ↓reduceIte, List.cons_prefix_cons] at hi hj hprefix
+          refine ⟨?_, hprefix.2⟩
+          by_contra hne
+          have hcases : (i = 0 ∧ j = 1) ∨ (i = 1 ∧ j = 0) := by omega
+          rcases hcases with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;> simp at hprefix
+      obtain ⟨rfl, htail⟩ := hsame
+      obtain rfl : x = y := Option.some.inj (hx.symm.trans hy)
+      have hf₁ : f₁ = final₁ := congrArg Prod.snd hbits₁
+      have hf₂ : f₂ = final₂ := congrArg Prod.snd hbits₂
+      rw [hf₁] at hxs
+      rw [hf₂] at hys
+      obtain ⟨suffix, hs⟩ := ih hxs hys (by simpa using hlen) htail
+      exact ⟨suffix, congrArg (i :: ·) hs⟩
+
+/-- A successful replay can be split after any known occurrence prefix whose recorded bits
+agree with the corresponding prefix of its trace. -/
+theorem exists_suffix_of_replayChoices {input : List Bool}
+    {cfg middle final : Cfg k Bool (State SI SP SF) input}
+    {first indices : List ℕ} {firstBits lastBits : List Bool}
+    (hfirst : replayChoices I P F C cfg first = some (firstBits, middle))
+    (hfull : replayChoices I P F C cfg indices = some (firstBits ++ lastBits, final))
+    (hlen : first.length ≤ indices.length) :
+    ∃ rest, indices = first ++ rest ∧
+      replayChoices I P F C middle rest = some (lastBits, final) := by
+  obtain ⟨rest, rfl⟩ := prefix_occurrences_of_replayChoices I P F C hfirst hfull hlen
+    (List.prefix_append _ _)
+  rw [replayChoices_append, hfirst] at hfull
+  change (replayChoices I P F C middle rest).map (fun p => (firstBits ++ p.1, p.2)) =
+    some (firstBits ++ lastBits, final) at hfull
+  obtain ⟨⟨bits, cfg'⟩, hrest, heq⟩ := Option.map_eq_some_iff.mp hfull
+  have hbits : firstBits ++ bits = firstBits ++ lastBits := congrArg Prod.fst heq
+  have hcfg : cfg' = final := congrArg Prod.snd heq
+  exact ⟨rest, rfl, by simpa [List.append_cancel_left hbits, hcfg] using hrest⟩
+
 /-- Two first-halting occurrence traces with the same genuine choice bits coincide. -/
 theorem eq_occurrences_of_replayChoices {input : List Bool}
     {cfg final₁ final₂ : Cfg k Bool (State SI SP SF) input} {bits : List Bool}
@@ -206,46 +268,25 @@ theorem eq_occurrences_of_replayChoices {input : List Bool}
     (h₁ : replayChoices I P F C cfg indices₁ = some (bits, final₁))
     (h₂ : replayChoices I P F C cfg indices₂ = some (bits, final₂))
     (hh₁ : final₁.Halted) (hh₂ : final₂.Halted) : indices₁ = indices₂ := by
-  induction indices₁ generalizing cfg bits indices₂ with
-  | nil =>
-    have heq : cfg = final₁ := congrArg Prod.snd (Option.some.inj h₁)
-    have h := congrArg (Option.map Prod.snd) h₂
-    rw [map_snd_replayChoices, MultiTapeCTM.runBranch_of_halted _ (heq.symm ▸ hh₁)] at h
-    by_contra hne
-    simp [Ne.symm hne] at h
-  | cons i rest ih =>
-    cases indices₂ with
-    | nil =>
-      have heq : cfg = final₂ := congrArg Prod.snd (Option.some.inj h₂)
-      have h := congrArg (Option.map Prod.snd) h₁
-      rw [map_snd_replayChoices, MultiTapeCTM.runBranch_of_halted _ (heq.symm ▸ hh₂)] at h
-      simp at h
-    | cons j tail =>
-      simp only [replayChoices, Option.bind_eq_some_iff, Option.map_eq_some_iff] at h₁ h₂
-      obtain ⟨x, hx, ⟨bs, f₁⟩, hxs, hbits₁⟩ := h₁
-      obtain ⟨y, hy, ⟨cs, f₂⟩, hys, hbits₂⟩ := h₂
-      have hb₁ := congrArg Prod.fst hbits₁
-      have hb₂ := congrArg Prod.fst hbits₂
-      have he : (if atChoice cfg then (i == 1) :: bs else bs) =
-          (if atChoice cfg then (j == 1) :: cs else cs) := hb₁.trans hb₂.symm
-      have hi := step_index_lt I P F C hx
-      have hj := step_index_lt I P F C hy
-      have hsame : i = j ∧ bs = cs := by
-        cases hc : atChoice cfg
-        · simp only [hc, Bool.false_eq_true, ↓reduceIte] at hi hj he
-          exact ⟨by omega, he⟩
-        · simp only [hc, ↓reduceIte, List.cons.injEq] at hi hj he
-          refine ⟨?_, he.2⟩
-          by_contra hne
-          have hcases : (i = 0 ∧ j = 1) ∨ (i = 1 ∧ j = 0) := by omega
-          rcases hcases with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;> simp at he
-      obtain ⟨rfl, rfl⟩ := hsame
-      obtain rfl : x = y := Option.some.inj (hx.symm.trans hy)
-      have hf₁ : f₁ = final₁ := congrArg Prod.snd hbits₁
-      have hf₂ : f₂ = final₂ := congrArg Prod.snd hbits₂
-      rw [hf₁] at hxs
-      rw [hf₂] at hys
-      exact congrArg (i :: ·) (ih hxs hys)
+  suffices claim : ∀ {a b : List ℕ} {x y : Cfg k Bool (State SI SP SF) input},
+      replayChoices I P F C cfg a = some (bits, x) →
+      replayChoices I P F C cfg b = some (bits, y) →
+      x.Halted → a.length ≤ b.length → a = b by
+    rcases Nat.le_total indices₁.length indices₂.length with hl | hl
+    · exact claim h₁ h₂ hh₁ hl
+    · exact (claim h₂ h₁ hh₂ hl).symm
+  intro a b x y ha hb hx hab
+  obtain ⟨suffix, rfl⟩ := prefix_occurrences_of_replayChoices I P F C ha hb hab (List.prefix_refl _)
+  have hra := congrArg (Option.map Prod.snd) ha
+  have hrb := congrArg (Option.map Prod.snd) hb
+  rw [map_snd_replayChoices] at hra hrb
+  change _ = some x at hra
+  rw [MultiTapeCTM.runBranch_append, hra] at hrb
+  cases suffix with
+  | nil => simp
+  | cons j suffix =>
+    change (countingMachine I P F C).runBranch x (j :: suffix) = some y at hrb
+    simp [MultiTapeCTM.runBranch_of_halted _ hx] at hrb
 
 /-- If a verdict determines the genuine choice sequence on every terminal replay, it has
 at most one counted branch. -/
