@@ -68,8 +68,9 @@ private theorem acceptScore_swap_of_symmetric {m : ℕ}
   classical
   rw [acceptScore_eq_sum, acceptScore_eq_sum, sum_comm]
   refine sum_congr rfl fun a _ => sum_congr rfl fun b _ => ?_
-  simp only [accepts_eq_atDegrees, acceptsAtDegrees_swap d (m * d) y x b a,
+  simp only [accepts_eq_withDiagonalCap, acceptsWithDiagonalCap_swap d (m * d) y x b a,
     S.prob_toCommuting_swap_of_symmetric hM hψ x y a b]
+  split <;> simp_all
 
 private theorem exists_polynomial_POVM_of_decoding {n d : ℕ}
     (S : QuantumStrategy (Question F (n + 1)) (Question F (n + 1))
