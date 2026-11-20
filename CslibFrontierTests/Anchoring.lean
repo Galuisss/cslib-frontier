@@ -621,7 +621,8 @@ example (S : Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option
   have h₁ : (1 - (noise half : ℝ))⁻¹ = 4 / 3 := by rw [coe_noise]; norm_num [half]
   simpa only [one_kronecker_one, map_one, one_apply_eq_self, h₀, h₁] using h
 
-/-- A single unchecked coordinate gives a supported shared transcript with a unit prepared state. -/
+/-- A single unchecked coordinate supplies a unit prepared state on support and the
+mean preparation bound under the same winning two-anchor law. -/
 example (S : Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option Bool)
     (Fin 2 → Bool) (Fin 2 → Bool) (Fin 2) (Fin 3))
     {τ η ξ : ℝ} (hτ : 0 < τ) (hη : 0 < η) (hξ : 0 < ξ)
@@ -632,11 +633,19 @@ example (S : Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option
     let j := e 0
     let K := restKernel acceptingGame half C S j (none, none)
     let W := winsOnRest acceptingGame half C j
-    ∃ (hwin : ∃ r ∈ W, r ∈ K.support) (r : _)
-      (U : Matrix (Fin 2) (Fin 2) ℂ) (V : Matrix (Fin 3) (Fin 3) ℂ),
+    let Rest := Cslib.PCP.ParallelRepetition.Shared (Option Bool) (Option Bool) Bool Bool C j
+    ∃ (hwin : ∃ r ∈ W, r ∈ K.support) (r : Rest)
+      (U : Rest → Option Bool → Matrix (Fin 2) (Fin 2) ℂ)
+      (V : Rest → Option Bool → Matrix (Fin 3) (Fin 3) ℂ),
       r ∈ (K.filter W hwin).support ∧
-        ‖preparedCheckedVector acceptingGame half C S j r U V‖ = 1 := by
-  intro C e j K W
+        ‖preparedCheckedVector acceptingGame half C S j r (U r (some true)) (V r (some false))‖ =
+          1 ∧
+        anchoredPairRestScore C acceptingGame half j (K.filter W hwin) (fun q r =>
+          ‖preparedCheckedVector acceptingGame half C S j r (U r q.1) (V r q.2) -
+            NormedSpace.normalize (checkedVectorGivenRest acceptingGame half C S j
+              (restQuestions C j r) q (Prod.fst ∘ r.answers) (Prod.snd ∘ r.answers))‖) ≤
+          anchorPreparationErrorBound half (τ + 2 * ξ) η := by
+  intro C e j K W Rest
   have hα : 0 < (half : ℝ) := by norm_num [half]
   obtain ⟨U, V, good, hU, hV, hprob, hgood⟩ :=
     exists_good_prepared_state_coordinates acceptingGame half C S e (acceptingGame_win_supported S)
@@ -644,12 +653,12 @@ example (S : Cslib.PCP.QuantumStrategy (Fin 2 → Option Bool) (Fin 2 → Option
   have hc : Fintype.card (({0} : Finset (Fin 2)) → Bool × Bool) = 4 := by decide
   simp only [C, hc, acceptingGame_win_mass, ENNReal.toReal_one] at hprob
   have h0 := zero_mem_of_uniform_failure_lt_one good (hprob.trans_lt hsmall)
-  obtain ⟨hwin, _⟩ := hgood 0 h0
+  obtain ⟨hwin, hmean⟩ := hgood 0 h0
   have hex := hwin
   obtain ⟨r, hrW, hrK⟩ := hex
   have hr : r ∈ (K.filter W hwin).support := by
     rw [PMF.support_filter]
     exact ⟨hrW, hrK⟩
-  exact ⟨hwin, r, U 0 r (some true), V 0 r (some false), hr,
+  exact ⟨hwin, r, U 0, V 0, hr,
     norm_preparedCheckedVector acceptingGame half C S j hwin r hr
-      (hU 0 r (some true)) (hV 0 r (some false))⟩
+      (hU 0 r (some true)) (hV 0 r (some false)), hmean⟩
