@@ -20,7 +20,7 @@ the sum of its coordinate mutual informations bounded by its relative entropy to
 any independent product of classical reference laws and a constant quantum reference.
 
 We split the first label off from the tail. Its conditional block retains the tail
-register, allowing the product-reference identity to separate the tail divergence.
+register, allowing the product-reference bound to separate the tail divergence.
 Discarding the tail from the first-label information gives the term needed for the
 induction. This proves [Bavarian, Vidick and Yuen, Lemma 5.10][BavarianVidickYuen2022]
 (arXiv:1509.07466v2, printed p. 21), with natural logarithms.
@@ -104,10 +104,12 @@ private theorem head_information_add_tail_divergence_le
   let : MeasurableSpace X := ⊤
   let : MeasurableSingletonClass X := ⟨fun _ => trivial⟩
   rw [show (fun _ : X × Y => σ) = (fun _ : X => σ) ∘ Prod.fst from rfl,
-    relativeEntropy_classicalQuantumState_prod p hρ q (fun _ => r) (fun _ => hσ)]
-  change _ ≤ _ + ∑ x, ((μ x).toReal : WithTop ℝ) * relativeEntropy (A x) B
-  rw [sum_weighted_relativeEntropy_eq_mutualInformation_add μ hA, htail]
-  exact (add_le_add_left hhead _).trans (le_add_of_nonneg_left (extended_klDiv_nonneg μ q))
+    relativeEntropy_classicalQuantumState_prod_eq_grouped p hρ q (fun _ => r) (fun _ => hσ)]
+  change _ ≤ relativeEntropy (classicalQuantumState μ A) (classicalQuantumState q (fun _ => B))
+  have h := mutualInformation_add_relativeEntropy_le_relativeEntropy_classicalQuantumState_const
+    μ q hA (isDensityMatrix_classicalQuantumState r (fun _ => hσ))
+  rw [htail] at h
+  exact (add_le_add_left hhead _).trans h
 
 omit [Fintype ι] [DecidableEq ι] [Fintype X] in
 private theorem reindex_classicalQuantumState {Z : Type*} [DecidableEq Z] (e : X ≃ Z)
