@@ -35,11 +35,13 @@ example (x : List Bool) (i : ℕ) :
     encFNLQuery encBits ⟨x, i, none⟩ = encPair encBits (encPair encNat (encOption encBool))
       (x, i, none) := rfl
 
--- Each ordered LOGNP field has its own binary frame, apart from the final rank.
-example (x : List Bool) (s u v j : ℕ) :
-    encLOGNPQuery encBits ⟨x, s, u, v, j⟩ =
-      encPair encBits (encPair encNat (encPair encNat (encPair encNat encNat))) (x, s, u, v, j) :=
-  rfl
+-- The always-true first-order matrix satisfies the local LOGNP pattern.
+example {L : FirstOrder.Language.{0, 0}} :
+    LOGNP0 (Set.univ : Set (Cslib.Logic.FO.Ordered.Structure L)) := by
+  refine ⟨0, 0, ⊤, FirstOrder.Language.BoundedFormula.IsQF.top, fun M => ?_⟩
+  refine iff_of_true trivial ⟨Fin.castLE (Nat.log2_le_self M.size), ?_, ?_⟩
+  · exact fun _ _ h => h
+  · exact fun _ => ⟨Fin.elim0, fun _ => by simp⟩
 
 -- Two nondeterministic choices on the same input write different oracle query bits.
 example (A : Set (List Bool)) (x : List Bool) :
