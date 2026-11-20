@@ -9,6 +9,7 @@ module
 
 import CslibFrontier.Algorithms.Reachability.DoubleCounting.SeedSearch.OriginalRoots
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.Subdivision.FlatQuery
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.Subdivision.HozaSize
 
 /-! Checked agreement between the ordered source enumeration and flat adjacency requests. -/
 
@@ -18,28 +19,55 @@ namespace CslibFrontierTests.SubdivisionFlatRootIntegration
 
 open Cslib.Reachability.Hoza Cslib.LayeredDigraph.Subdivision Turing.QueryMachine.Subdivision
 
-private def rectangularIndex (h w bound : ℕ) :
-    Vertex (Fin (h + 1) × Fin w) bound ≃ Fin (((h + 1) * w) * (bound + 1)) :=
-  ((equivProd _ bound).trans (finProdFinEquiv.prodCongr (Equiv.refl _))).trans finProdFinEquiv
+private def labelEquiv (w h : ℕ) : (Fin (h + 1) × Fin w) ≃
+    Fin (subdivisionSize w h).originalCount :=
+  finProdFinEquiv.trans (finCongr (by simp [subdivisionSize, Nat.mul_comm]))
 
--- The entire search source list has exactly the native root IDs in original-label order.
-example (h w bound : ℕ) :
-    (originalRootIDs (rectangularIndex h w bound)).map Fin.val =
-      List.ofFn (fun i : Fin ((h + 1) * w) => rootID i.val bound) := by
-  simp [originalRootIDs, rectangularIndex, rootID, List.map_ofFn, Function.comp_def,
-    Nat.mod_add_div]
+private abbrev relabel (w h : ℕ) :
+    Vertex (Fin (h + 1) × Fin w) (subdivisionSize w h).chainBound ≃
+      Vertex (Fin (subdivisionSize w h).originalCount) (subdivisionSize w h).chainBound :=
+  ((equivProd _ _).trans ((labelEquiv w h).prodCongr (Equiv.refl _))).trans (equivProd _ _).symm
 
--- The same index decodes directly to the callback's labels and offsets.
-example {h w : ℕ} (bound : ℕ) (ctx : Bool) (a b : Vertex (Fin (h + 1) × Fin w) bound) :
+private theorem relabel_apply {w h : ℕ}
+    (v : Vertex (Fin (h + 1) × Fin w) (subdivisionSize w h).chainBound) :
+    relabel w h v = ⟨labelEquiv w h v.vertex, v.offset⟩ := by
+  apply (equivProd _ _).injective
+  simp
+
+private def sizeIndex (w h : ℕ) :
+    Vertex (Fin (h + 1) × Fin w) (subdivisionSize w h).chainBound ≃
+      Fin (subdivisionSize w h).vertexCount :=
+  let p := subdivisionSize w h
+  ((relabel w h).trans (flatIndex p.originalCount p.chainBound)).trans (finCongr rfl)
+
+private theorem sizeIndex_val {w h : ℕ}
+    (v : Vertex (Fin (h + 1) × Fin w) (subdivisionSize w h).chainBound) :
+    (sizeIndex w h v).val =
+      (flatIndex (subdivisionSize w h).originalCount (subdivisionSize w h).chainBound
+        ⟨labelEquiv w h v.vertex, v.offset⟩).val := by
+  change (flatIndex _ _ (relabel w h v)).val = _
+  rw [relabel_apply]
+
+-- The native root ID list has the same ordering and values as the search's original sources.
+example (w h : ℕ) :
+    (originalRootIDs (sizeIndex w h)).map Fin.val =
+      List.ofFn (fun i : Fin ((h + 1) * w) => rootID i.val (subdivisionSize w h).chainBound) := by
+  simp only [originalRootIDs, List.map_ofFn]
+  congr 1
+  funext i
+  change (sizeIndex w h (root _ (finProdFinEquiv.symm i))).val = _
+  rw [sizeIndex_val, ← rootID_eq_flatIndex]
+  change rootID (finProdFinEquiv (finProdFinEquiv.symm i)).val _ = _
+  rw [Equiv.apply_symm_apply]
+
+-- The same numbering has the returned size and decodes both endpoints of the callback query.
+example {w h : ℕ} (ctx : Bool)
+    (a b : Vertex (Fin (h + 1) × Fin w) (subdivisionSize w h).chainBound) :
     decodeFlatQuery
-      ⟨ctx, bound, (rectangularIndex h w bound a).val, (rectangularIndex h w bound b).val⟩ =
-      ⟨ctx, (finProdFinEquiv a.vertex).val, (finProdFinEquiv b.vertex).val,
+      ⟨ctx, (subdivisionSize w h).chainBound, (sizeIndex w h a).val, (sizeIndex w h b).val⟩ =
+      ⟨ctx, (labelEquiv w h a.vertex).val, (labelEquiv w h b.vertex).val,
         a.offset.val, b.offset.val⟩ := by
-  have hi (v : Vertex (Fin (h + 1) × Fin w) bound) :
-      rectangularIndex h w bound v = flatIndex ((h + 1) * w) bound
-        ⟨finProdFinEquiv v.vertex, v.offset⟩ := by
-    simp [rectangularIndex, flatIndex]
-  rw [hi a, hi b]
-  exact decodeFlatQuery_flatIndex ctx bound _ _
+  rw [sizeIndex_val a, sizeIndex_val b]
+  exact decodeFlatQuery_flatIndex ctx _ _ _
 
 end CslibFrontierTests.SubdivisionFlatRootIntegration
