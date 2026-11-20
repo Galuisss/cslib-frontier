@@ -9,15 +9,14 @@ module
 public import CslibFrontier.Init
 public import CslibFrontier.Foundations.Data.MvPolynomial.CoeffNorm1
 public import CslibFrontier.Foundations.Data.Polynomial.CoeffNorm1
-public import Mathlib.Algebra.MvPolynomial.PDeriv
 import CslibFrontier.Foundations.Data.MvPolynomial.CoeffSumBounds
 
 /-!
 # Coefficient norm with one integer polynomial parameter
 
 Sum the ordinary integer polynomial coefficient norms over the outer monomials. This gives
-bounds for arithmetic and for derivatives in the outer variables, as used in residue and
-Jacobian estimates. Constant promotion preserves the integer multivariate coefficient norm.
+arithmetic bounds used in the pure-power residue estimate. Constant promotion preserves the
+integer multivariate coefficient norm.
 
 Adapted from `LeanCanny.CountingHierarchy.ParameterMass` at lean-canny commit
 `970f28a5ecefc1327402ade16c068aa4b1b2c183`.
@@ -106,22 +105,5 @@ theorem pow_le (p : MvPolynomial ι (Polynomial ℤ)) (n : ℕ) : norm (p ^ n) �
 theorem prod_le {J : Type*} (s : Finset J) (p : J → MvPolynomial ι (Polynomial ℤ)) :
     norm (∏ j ∈ s, p j) ≤ ∏ j ∈ s, norm (p j) :=
   Finset.le_prod_of_submultiplicative norm one.le mul_le s p
-
-/-- An outer partial derivative increases the norm by at most the outer total degree. -/
-theorem pderiv_le (p : MvPolynomial ι (Polynomial ℤ)) (i : ι) :
-    norm (pderiv i p) ≤ p.totalDegree * norm p := by
-  classical
-  conv_lhs => rw [p.as_sum, map_sum]
-  apply (sum_le _ _).trans
-  rw [norm, Finset.mul_sum]
-  apply Finset.sum_le_sum
-  intro m hm
-  rw [pderiv_monomial, monomial]
-  have hc (j : ℕ) : Polynomial.coeffNorm1 (j : Polynomial ℤ) = j := by
-    rw [← Polynomial.C_eq_natCast, Polynomial.coeffNorm1_C, Int.natAbs_natCast]
-  apply (Polynomial.coeffNorm1_mul_le _ _).trans
-  rw [hc, Nat.mul_comm (Polynomial.coeffNorm1 (p.coeff m))]
-  exact Nat.mul_le_mul_right _
-    ((Finsupp.single_eval_le_sum m rfl (fun _ => Nat.zero_le _) i).trans (le_totalDegree hm))
 
 end MvPolynomial.ParameterCoeffNorm
