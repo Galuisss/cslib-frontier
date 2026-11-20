@@ -2174,6 +2174,7 @@ public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Randomized
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Randomized.TimeLayer
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.Savitch
 public import CslibFrontier.Computability.Complexity.Classes.LogSpace.USTCON
+public import CslibFrontier.Computability.Complexity.Classes.LogarithmicTimeHierarchy
 public import CslibFrontier.Computability.Complexity.Classes.MIP
 public import CslibFrontier.Computability.Complexity.Classes.MIP.Defs
 public import CslibFrontier.Computability.Complexity.Classes.MIP.NEXP
@@ -2302,6 +2303,7 @@ public import CslibFrontier.Computability.Complexity.Classes.SBP
 public import CslibFrontier.Computability.Complexity.Classes.SBP.Amplification
 public import CslibFrontier.Computability.Complexity.Classes.SPP
 public import CslibFrontier.Computability.Complexity.Classes.SPP.FewP
+public import CslibFrontier.Computability.Complexity.Classes.SZK
 public import CslibFrontier.Computability.Complexity.Classes.Selective
 public import CslibFrontier.Computability.Complexity.Classes.Selective.Ko
 public import CslibFrontier.Computability.Complexity.Classes.Selective.LeftCut
@@ -3766,6 +3768,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Halting.Comp
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Halting.Computable.Defs
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Halting.Countable
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Halting.Hardwire
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Halting.OraclePartrec
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Halting.Partialize
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Halting.Partrec
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Halting.Reduction
@@ -4013,6 +4016,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Lo
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Machine
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Nondeterministic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.NondeterministicBudget
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Oracle
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.PolyTime
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.ResourceBound
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.Space
@@ -7911,6 +7915,7 @@ public import CslibFrontier.Logics.Propositional.Tseitin
 public import CslibFrontier.Logics.Propositional.TseitinCNF
 public import CslibFrontier.Logics.Propositional.TseitinCNF.Numbered
 public import CslibFrontier.Logics.Propositional.TseitinCNF.Refutation
+public import CslibFrontier.Logics.SecondOrder.Basic
 public import CslibFrontier.Logics.SecondOrder.Coloring
 public import CslibFrontier.Logics.SecondOrder.Encoding
 public import CslibFrontier.Logics.SecondOrder.Existential

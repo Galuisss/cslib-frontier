@@ -6,8 +6,8 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 
 -- upstream: local-only (result registry collection)
 import CslibFrontierResults.Registry
-import CslibFrontier.Computability.Complexity.Reduction.LinearApproximation
 import CslibFrontier.Algorithms.Lean.Knapsack.ApproximationSchemes
+import CslibFrontier.Computability.Complexity.Reduction.LinearApproximation
 import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
 import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
