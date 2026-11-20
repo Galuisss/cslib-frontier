@@ -306,6 +306,7 @@ public import CslibFrontier.Algorithms.Reachability.InductiveCounting.Progress
 public import CslibFrontier.Algorithms.Reachability.InductiveCounting.Semantics
 public import CslibFrontier.Algorithms.Reachability.MinIsolation.AllPairs
 public import CslibFrontier.Algorithms.Reachability.MinIsolation.Collisions
+public import CslibFrontier.Algorithms.Reachability.MinIsolation.Generator
 public import CslibFrontier.Algorithms.Reachability.MinIsolation.Weights
 public import CslibFrontier.Algorithms.Reachability.Reingold
 public import CslibFrontier.Algorithms.Reachability.ReingoldEval
@@ -6561,6 +6562,7 @@ public import CslibFrontier.Foundations.Data.Code.HammingBound
 public import CslibFrontier.Foundations.Data.Code.HintDecoding
 public import CslibFrontier.Foundations.Data.Code.Johnson
 public import CslibFrontier.Foundations.Data.Code.Justesen
+public import CslibFrontier.Foundations.Data.Code.JustesenFamily
 public import CslibFrontier.Foundations.Data.Code.Linear
 public import CslibFrontier.Foundations.Data.Code.ListDecoding
 public import CslibFrontier.Foundations.Data.Code.LocalDecoding

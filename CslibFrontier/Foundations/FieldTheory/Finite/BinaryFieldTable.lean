@@ -106,6 +106,11 @@ theorem fieldOfBits_basis (hw : w ≠ 0) (a : List Bool) :
       (BinaryField.equivBits hw).symm fun j => a.getD j false := by
   rw [fieldOfBits, ofBits, BinaryField.equivBits_symm_apply]
 
+/-- The element with the bits of `v` as coordinates. -/
+theorem fieldOfBits_ofFn (hw : w ≠ 0) (v : BitString w) :
+    fieldOfBits (BinaryField.basis hw) (List.ofFn v) = (equivBits hw).symm v := by
+  simp [fieldOfBits_basis]
+
 /-- The bits of the element with given coordinates. -/
 theorem equivBits_fieldOfBits (hw : w ≠ 0) (a : List Bool) (j : Fin w) :
     BinaryField.equivBits hw (fieldOfBits (BinaryField.basis hw) a) j = a.getD j false := by
