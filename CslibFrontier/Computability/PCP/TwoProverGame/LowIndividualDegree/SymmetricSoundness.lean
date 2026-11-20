@@ -31,14 +31,6 @@ variable {F ι : Type*} [Field F] [Fintype F] [DecidableEq F] [Fintype ι] [Deci
 
 local notation "Joint" => Matrix (ι × ι) (ι × ι) ℂ
 
-private theorem agreement_map_left {α β : Type*} [Fintype α] [Fintype β] [DecidableEq β]
-    (φ : AlgState Joint) (P : Measurement α Joint) (Q : Measurement β Joint) (f : α → β) :
-    Measurement.agreement φ (P.map f) Q = ∑ a, (φ (P.effect a * Q.effect (f a))).re := by
-  simp only [Measurement.agreement, Measurement.map_effect, sum_mul, map_sum, Complex.re_sum]
-  rw [← sum_fiberwise univ f]
-  refine sum_congr rfl fun b _ => sum_congr rfl fun a ha => ?_
-  rw [(mem_filter.mp ha).2]
-
 private theorem exists_matchingMass_of_complete {n d : ℕ}
     (S : QuantumStrategy (Question F (n + 1)) (Question F (n + 1))
       (Answer F (n + 1)) (Answer F (n + 1)) ι ι)
@@ -60,7 +52,7 @@ private theorem exists_matchingMass_of_complete {n d : ℕ}
       simp [G, Measurement.toPOVM_effect, Measurement.map_effect, sum_filter]
     change (1 : Matrix ι ι ℂ) ⊗ₖ G.effect (some g) = _ ⊗ₖ H.effect g
     rw [he]
-  have hread (u : Point F (n + 1)) := agreement_map_left S.toCommuting.state R (P u)
+  have hread (u : Point F (n + 1)) := Measurement.agreement_map_left S.toCommuting.state R (P u)
     (fun g => MvPolynomial.eval u g.val)
   change (𝔼 u : Point F (n + 1), (1 - Measurement.agreement S.toCommuting.state
     (R.map fun g => MvPolynomial.eval u g.val) (P u))) ≤ s at h
@@ -253,7 +245,7 @@ private theorem exists_complete_of_matchingMass {n d : ℕ}
         Measurement.agreement C.state
           ((QuantumStrategy.rightMeasurement H).map fun g => MvPolynomial.eval u g.val)
           (decodedPoint C.alice u) := by
-    rw [hH, Measurement.map_map, agreement_map_left, Fintype.sum_option]
+    rw [hH, Measurement.map_map, Measurement.agreement_map_left, Fintype.sum_option]
     apply le_add_of_nonneg_left
     apply C.state.re_apply_nonneg
     have hc (a : Answer F (n + 1)) :
@@ -266,15 +258,16 @@ private theorem exists_complete_of_matchingMass {n d : ℕ}
   simp only [expect_sub_distrib, Fintype.expect_const]
   linarith only [hg]
 
-/-- Symmetric projective tensor soundness for the low-individual-degree test, with
-the dimension induction of [JNVWY2020LowIndividualDegree, Theorem 6.1].
+/-- A quantitative variant of [JNVWY2020LowIndividualDegree, Theorem 6.1]
+for symmetric projective tensor strategies. It follows the same dimension induction
+with a different explicit error bound.
 
 Every sampling parameter `k ≥ (n + 1) * d` yields a complete local polynomial
 measurement. Its mean disagreement with Alice's decoded point answers is
 bounded by the sum of a polynomial in the dimension and sample count times
-the fractional powers of the branch losses and degree ratio, and an exponential
-sampling error. The estimate uses explicit constants and works with an
-independent diagonal cutoff `D`. The verifier in Figure 2 uses `D = (n + 1) * d`. -/
+the `1/128` powers of the branch losses and degree ratio, and an exponential
+sampling error. The estimate works with an independent diagonal cutoff `D`. The verifier
+in Figure 2 uses `D = (n + 1) * d`. -/
 theorem exists_polynomial_POVM_of_symmetric
     {n d k : ℕ} (D : ℕ) (hk : (n + 1) * d ≤ k)
     (S : QuantumStrategy (Question F (n + 1)) (Question F (n + 1))
