@@ -52,6 +52,7 @@ public import CslibFrontier.Algorithms.Lean.DFS.SCC
 public import CslibFrontier.Algorithms.Lean.DFS.TopologicalSort
 public import CslibFrontier.Algorithms.Lean.DPLL
 public import CslibFrontier.Algorithms.Lean.DPLL.RefutationSize
+public import CslibFrontier.Algorithms.Lean.DPLL.Trail
 public import CslibFrontier.Algorithms.Lean.Dijkstra.Client
 public import CslibFrontier.Algorithms.Lean.Dijkstra.Cost
 public import CslibFrontier.Algorithms.Lean.Dijkstra.Memory
@@ -335,6 +336,10 @@ public import CslibFrontier.Algorithms.WordRAM.AKS.PolyArray
 public import CslibFrontier.Algorithms.WordRAM.AKS.PolyMul
 public import CslibFrontier.Algorithms.WordRAM.AKS.PolyPow
 public import CslibFrontier.Algorithms.WordRAM.ClauseCode
+public import CslibFrontier.Algorithms.WordRAM.DPLL.Program
+public import CslibFrontier.Algorithms.WordRAM.DPLL.Scan
+public import CslibFrontier.Algorithms.WordRAM.DPLL.Solver
+public import CslibFrontier.Algorithms.WordRAM.DPLL.Steps
 public import CslibFrontier.Algorithms.WordRAM.Deduplicate.Count
 public import CslibFrontier.Algorithms.WordRAM.Deduplicate.Model
 public import CslibFrontier.Algorithms.WordRAM.Deduplicate.Program
@@ -4124,6 +4129,7 @@ public import CslibFrontier.Computability.PCP.TwoProverGame
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditionalStates
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredConditioning
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredDependency
+public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredNoisyStates
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredTranscript
 public import CslibFrontier.Computability.PCP.TwoProverGame.AnchoredTranscriptDistance
 public import CslibFrontier.Computability.PCP.TwoProverGame.Anchoring
@@ -4142,9 +4148,14 @@ public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.AxisScore
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.OneCoordinate
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.Pasting
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PastingCompleteness
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PastingConsistency
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PointCommutativity
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.PolynomialAnswer
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.RestrictedStrategy
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.SliceBoundedness
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.Slices
+public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerifierPasting
 public import CslibFrontier.Computability.PCP.TwoProverGame.LowIndividualDegree.VerticalAxis
 public import CslibFrontier.Computability.PCP.TwoProverGame.MagicSquare
 public import CslibFrontier.Computability.PCP.TwoProverGame.Naimark
@@ -7155,9 +7166,13 @@ public import CslibFrontier.Foundations.Probability.SpectralPayment
 public import CslibFrontier.Foundations.Probability.TwoStage
 public import CslibFrontier.Foundations.Quantum.Algebra.AlgState
 public import CslibFrontier.Foundations.Quantum.Algebra.Approx
+public import CslibFrontier.Foundations.Quantum.Algebra.BinomialTail
 public import CslibFrontier.Foundations.Quantum.Algebra.CHSHRigidity
 public import CslibFrontier.Foundations.Quantum.Algebra.CStar
+public import CslibFrontier.Foundations.Quantum.Algebra.CommutatorTransfer
+public import CslibFrontier.Foundations.Quantum.Algebra.CompletedMeasurement
 public import CslibFrontier.Foundations.Quantum.Algebra.Consistency
+public import CslibFrontier.Foundations.Quantum.Algebra.GatedAgreement
 public import CslibFrontier.Foundations.Quantum.Algebra.Involution
 public import CslibFrontier.Foundations.Quantum.Algebra.JointMeasurement
 public import CslibFrontier.Foundations.Quantum.Algebra.MaxEntangled
@@ -7165,6 +7180,8 @@ public import CslibFrontier.Foundations.Quantum.Algebra.Measurement
 public import CslibFrontier.Foundations.Quantum.Algebra.MeasurementMixture
 public import CslibFrontier.Foundations.Quantum.Algebra.Orthogonalization
 public import CslibFrontier.Foundations.Quantum.Algebra.PrefixCommutator
+public import CslibFrontier.Foundations.Quantum.Algebra.SequentialBinomial
+public import CslibFrontier.Foundations.Quantum.Algebra.SequentialCopy
 public import CslibFrontier.Foundations.Quantum.Algebra.SequentialDisturbance
 public import CslibFrontier.Foundations.Quantum.Algebra.SequentialMeasurement
 public import CslibFrontier.Foundations.Quantum.Algebra.SuccessfulAgreement
@@ -7181,9 +7198,11 @@ public import CslibFrontier.Foundations.Quantum.DensityMatrix.Normalize
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.PartialTracePairing
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.Pure
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.PurificationOverlap
+public import CslibFrontier.Foundations.Quantum.DensityMatrix.QuantumPinsker
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropy
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropyConvexity
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropyDataProcessing
+public import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropyDomination
 public import CslibFrontier.Foundations.Quantum.DensityMatrix.RelativeEntropyResolvent
 public import CslibFrontier.Foundations.Quantum.Fourier
 public import CslibFrontier.Foundations.Quantum.HadamardTransform
@@ -7838,6 +7857,9 @@ public import CslibFrontier.Logics.Propositional.ParitySystem.Tseitin
 public import CslibFrontier.Logics.Propositional.Pigeonhole
 public import CslibFrontier.Logics.Propositional.Pigeonhole.Extension
 public import CslibFrontier.Logics.Propositional.PlaistedGreenbaumCNF
+public import CslibFrontier.Logics.Propositional.PseudoBoolean
+public import CslibFrontier.Logics.Propositional.PseudoBoolean.CuttingPlanes
+public import CslibFrontier.Logics.Propositional.PseudoBoolean.VeriPB
 public import CslibFrontier.Logics.Propositional.QBF
 public import CslibFrontier.Logics.Propositional.QBF.Arithmetization
 public import CslibFrontier.Logics.Propositional.QBF.Assignment
