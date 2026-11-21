@@ -52,6 +52,15 @@ set_option linter.hashCommand false in
   let final := scheduler.run [false, false, true] [false, false, true]
   scheduler.halted final && (reply final).isNone
 
+-- A manually constructed active state can retain a frame whose root would be skipped.
+-- Its missing verdict still goes through the shared transition.
+set_option linter.hashCommand false in
+#guard
+  let frame := seedSchedulerFrame setup 0 (some (0, false)) setup.sourceID
+  match scheduler.step [] (.inl (.inr (frame, .inr none))) false with
+  | .inl (.inr (next, .inl 2)) => next.cursor == 1 && next.answer == some false
+  | _ => false
+
 -- A zero seed limit exhausts the search without entering the scanner.
 set_option linter.hashCommand false in
 #guard
@@ -68,7 +77,7 @@ example (w : List Bool) (frame : SeedSchedulerFrame) (pos : ℕ) (bit : Bool) :
 
 /-- A skipped root and a positive indexed scan leave their exact suffix to the scheduler.
 The eventual terminal answer is the designated negative answer. -/
-example (skipped indexed : SeedSchedulerFrame)
+example (skipped indexed : SeedSchedulerFrame) (hneedsScan : indexed.needsScan = true)
     (henter : resume (σ := ℕ ⊕ Option Bool) (fun r => .inl r.sourceID) skipped none =
       .inl (.inr (indexed, .inl 2))) :
     let w := [false, false, true]
@@ -86,7 +95,7 @@ example (skipped indexed : SeedSchedulerFrame)
   have hskip := firstHalting_skip_iff setup scan start verdict w skipped
     [false, false, false] answer
   have hscan := firstHalting_scan_iff setup scan start verdict w indexed (.inl 2)
-    [false, false] answer
+    [false, false] answer hneedsScan
   dsimp only at hskip hscan
   rw [hskip]
   simp only [List.cons.injEq, true_and, exists_eq_left']
