@@ -353,38 +353,133 @@ theorem firstHalting_walk_return {τ : Type} (ctx : Context)
       · exact (walk.firstHalting_cons_iff input choice bits t).mpr ⟨hlive, hfirst⟩
       · rwa [walk.replay_cons]
 
+private def renderSelection {N : ℕ} (selectors : List (Fin N) → List Bool) :
+    Option (List (Fin N)) → List Bool
+  | none => [false]
+  | some tail => true :: (selectors tail ++ [false])
+
+private def renderFrom {N : ℕ} (selectors : List (Fin N) → List Bool)
+    (branch : Scan.Branch N) (n : ℕ) : ℕ → List Bool
+  | 0 => [false]
+  | fuel + 1 =>
+    if h : n < N then
+      renderSelection selectors (branch ⟨n, h⟩) ++ renderFrom selectors branch (n + 1) fuel
+    else [false]
+
+private def renderPrefix {N : ℕ} (walkSelectors : List (Fin N) → List Bool)
+    (branch : Scan.Branch N) : ℕ → List Bool
+  | 0 => []
+  | n + 1 => renderPrefix walkSelectors branch n ++
+    if h : n < N then renderSelection walkSelectors (branch ⟨n, h⟩) else []
+
+private theorem render_split {N : ℕ} (walkSelectors : List (Fin N) → List Bool)
+    (branch : Scan.Branch N) (n : ℕ) (hn : n ≤ N) :
+    renderFrom walkSelectors branch 0 N =
+      renderPrefix walkSelectors branch n ++ renderFrom walkSelectors branch n (N - n) := by
+  induction n with
+  | zero => simp [renderPrefix]
+  | succ n ih =>
+    have hlt : n < N := hn
+    have hsub : N - n = (N - (n + 1)) + 1 := by omega
+    rw [ih hlt.le, hsub]
+    simp only [renderFrom, dite_eq_left hlt, renderPrefix, List.append_assoc]
+
+/-- Serialize the candidate selections, the selected walk traces and the terminal tally check. -/
+def selectors {N : ℕ} (walkSelectors : List (Fin N) → List Bool)
+    (branch : Scan.Branch N) : List Bool :=
+  renderFrom walkSelectors branch 0 N
+
+/-- A walk serialization with no ambiguous prefix yields distinct traces for distinct
+candidate selections. -/
+theorem selectors_injective {N : ℕ} (walkSelectors : List (Fin N) → List Bool)
+    (hwalk : ∀ {a b}, walkSelectors a <+: walkSelectors b → a = b) :
+    Function.Injective (selectors walkSelectors) := by
+  intro a b heq
+  have h {n fuel : ℕ} (hsize : n + fuel = N)
+      (hbits : renderFrom walkSelectors a n fuel = renderFrom walkSelectors b n fuel) :
+      ∀ v : Fin N, n ≤ v.val → a v = b v := by
+    induction fuel generalizing n with
+    | zero =>
+      intro v hv
+      have := v.isLt
+      omega
+    | succ fuel ih =>
+      have hn : n < N := by omega
+      let current : Fin N := ⟨n, hn⟩
+      simp only [renderFrom, dite_eq_left hn] at hbits
+      have hselection : a current = b current := by
+        change renderSelection walkSelectors (a current) ++ _ =
+          renderSelection walkSelectors (b current) ++ _ at hbits
+        cases ha : a current <;> cases hb : b current
+        · rfl
+        · simp [ha, hb, renderSelection] at hbits
+        · simp [ha, hb, renderSelection] at hbits
+        · rename_i left right
+          have hwalkBits := List.cons.inj (by simpa only [ha, hb, renderSelection,
+            List.cons_append, List.append_assoc] using hbits :
+              true :: (walkSelectors left ++ [false] ++
+                renderFrom walkSelectors a (n + 1) fuel) =
+              true :: (walkSelectors right ++ [false] ++
+                renderFrom walkSelectors b (n + 1) fuel))
+          have hpLeft : walkSelectors left <+:
+              walkSelectors left ++ [false] ++ renderFrom walkSelectors a (n + 1) fuel :=
+            ⟨[false] ++ renderFrom walkSelectors a (n + 1) fuel, (List.append_assoc _ _ _).symm⟩
+          have hpRight : walkSelectors right <+:
+              walkSelectors left ++ [false] ++ renderFrom walkSelectors a (n + 1) fuel :=
+            ⟨[false] ++ renderFrom walkSelectors b (n + 1) fuel, by
+              rw [← List.append_assoc]
+              exact hwalkBits.2.symm⟩
+          rcases List.prefix_or_prefix_of_prefix hpLeft hpRight with hp | hp
+          · exact congrArg some (hwalk hp)
+          · exact congrArg some (hwalk hp).symm
+      change renderSelection walkSelectors (a current) ++ _ =
+        renderSelection walkSelectors (b current) ++ _ at hbits
+      rw [hselection] at hbits
+      intro v hv
+      by_cases he : v.val = n
+      · have hh : v = current := Fin.ext he
+        subst v
+        exact hselection
+      · exact ih (by omega) (List.append_cancel_left hbits) v (by omega)
+  funext v
+  exact h (n := 0) (fuel := N) (by simp) heq v (Nat.zero_le _)
+
 /-- A successful typed scan prefix reaches the corresponding binary selection boundary,
 provided the selected walks have exact same-input replays with the returned fuel. -/
-private theorem exists_replay_of_tallyPrefix {τ : Type} {N : ℕ}
+private theorem replay_of_tallyPrefix {τ : Type} {N : ℕ}
     (walk : NondeterministicQueryMachine τ) (enter : Registers → τ) (result : τ → Option ℕ)
     (input : List Bool) (edge : Fin N → Fin N → Bool) (source target : Fin N)
     (radius : ℕ) (expected : Tally) (branch : Scan.Branch N)
+    (walkSelectors : List (Fin N) → List Bool)
     (hwalk : ∀ (v : Fin N) (acc : Scan.Result) (tail : List (Fin N)) (remaining : ℕ),
       (Scan.walkM Scan.readNext (fun u v => pure (edge u v)) v radius source tail).1 =
         some remaining →
       let r : Registers := ⟨⟨N, source.val, target.val, radius, expected⟩, v.val, acc⟩
-      ∃ bits, walk.FirstHalting input bits (enter r) ∧
-        result (walk.replay input bits (enter r)) = some remaining)
+      walk.FirstHalting input (walkSelectors tail) (enter r) ∧
+        result (walk.replay input (walkSelectors tail) (enter r)) = some remaining)
     {n : ℕ} (hn : n ≤ N) (acc : Scan.Result)
     (hacc : Scan.tallyPrefix edge source target radius branch hn = some acc) :
     let ctx : Context := ⟨N, source.val, target.val, radius, expected⟩
-    ∃ bits, (machine ctx walk enter result).run input bits = .inl ⟨ctx, n, acc⟩ := by
+    (machine ctx walk enter result).run input (renderPrefix walkSelectors branch n) =
+      .inl ⟨ctx, n, acc⟩ := by
   let ctx : Context := ⟨N, source.val, target.val, radius, expected⟩
   let M := machine ctx walk enter result
-  change ∃ bits, M.run input bits = .inl ⟨ctx, n, acc⟩
+  change M.run input (renderPrefix walkSelectors branch n) = .inl ⟨ctx, n, acc⟩
   induction n generalizing acc with
   | zero =>
     rw [Scan.tallyPrefix_zero] at hacc
     cases hacc
-    exact ⟨[], rfl⟩
+    rfl
   | succ n ih =>
     have hlt : n < N := hn
     rw [Scan.tallyPrefix_succ edge source target radius branch hlt] at hacc
     obtain ⟨prior, hp, hlast⟩ := Option.bind_eq_some_iff.mp hacc
-    obtain ⟨priorBits, hprefix⟩ := ih hlt.le prior hp
+    have hprefix := ih hlt.le prior hp
+    dsimp only [renderPrefix]
+    rw [dite_eq_left hlt]
     let v : Fin N := ⟨n, hlt⟩
     let r : Registers := ⟨ctx, n, prior⟩
-    change M.run input priorBits = .inl r at hprefix
+    change M.run input (renderPrefix walkSelectors branch n) = .inl r at hprefix
     change (match branch v with
       | none => some prior
       | some tail => (Scan.walkM Scan.readNext (fun u v => pure (edge u v))
@@ -394,17 +489,15 @@ private theorem exists_replay_of_tallyPrefix {τ : Type} {N : ℕ}
     | none =>
       rw [hbranch] at hlast
       cases hlast
-      refine ⟨priorBits ++ [false], ?_⟩
-      rw [M.run_append, hprefix, M.replay_cons, M.replay_nil]
+      rw [renderSelection, M.run_append, hprefix, M.replay_cons, M.replay_nil]
       simp [M, NondeterministicQueryMachine.step, machine, ctx, r, Registers.skip, hlt]
     | some tail =>
       rw [hbranch] at hlast
       obtain ⟨left, hleft, rfl⟩ := Option.map_eq_some_iff.mp hlast
-      obtain ⟨bits, hbits, hresult⟩ := hwalk v prior tail left hleft
-      refine ⟨priorBits ++ (true :: (bits ++ [false])), ?_⟩
-      rw [M.run_append, hprefix]
+      obtain ⟨hbits, hresult⟩ := hwalk v prior tail left hleft
+      rw [renderSelection, M.run_append, hprefix]
       have hstep := replay_checked_walk ctx walk enter result input r
-        (show r.cursor < r.context.size from hlt) bits left hbits hresult
+        (show r.cursor < r.context.size from hlt) (walkSelectors tail) left hbits hresult
       rw [hstep]
       rfl
 
@@ -445,43 +538,48 @@ theorem firstHalting_finish {τ : Type} (ctx : Context)
 
 /-- Replay a successful typed scan as a first-halting membership tally, using the supplied
 same-input replay of each successful typed walk. -/
-theorem exists_firstHalting_of_scan {τ : Type} {N : ℕ}
+theorem firstHalting_of_scan {τ : Type} {N : ℕ}
     (walk : NondeterministicQueryMachine τ) (enter : Registers → τ) (result : τ → Option ℕ)
     (input : List Bool) (edge : Fin N → Fin N → Bool) (source target : Fin N)
     (radius : ℕ) (expected : Tally) (branch : Scan.Branch N) (hit : Bool)
+    (walkSelectors : List (Fin N) → List Bool)
     (hwalk : ∀ (v : Fin N) (acc : Scan.Result) (tail : List (Fin N)) (remaining : ℕ),
       (Scan.walkM Scan.readNext (fun u v => pure (edge u v)) v radius source tail).1 =
         some remaining →
       let r : Registers := ⟨⟨N, source.val, target.val, radius, expected⟩, v.val, acc⟩
-      ∃ bits, walk.FirstHalting input bits (enter r) ∧
-        result (walk.replay input bits (enter r)) = some remaining)
+      walk.FirstHalting input (walkSelectors tail) (enter r) ∧
+        result (walk.replay input (walkSelectors tail) (enter r)) = some remaining)
     (h : Scan.run edge source target radius expected branch = some hit) :
     let M := machine ⟨N, source.val, target.val, radius, expected⟩ walk enter result
-    ∃ bits, M.FirstHalting input bits M.init ∧ M.run input bits = .inr (.inr (some hit)) := by
+    M.FirstHalting input (selectors walkSelectors branch) M.init ∧
+      M.run input (selectors walkSelectors branch) = .inr (.inr (some hit)) := by
   rw [Scan.run_eq_finish] at h
   obtain ⟨acc, hacc, hfinish⟩ := Option.bind_eq_some_iff.mp h
-  obtain ⟨priorBits, hprior⟩ := exists_replay_of_tallyPrefix walk enter result input edge
-    source target radius expected branch hwalk le_rfl acc hacc
-  exact ⟨priorBits ++ [false], firstHalting_finish _ walk enter result input priorBits
-    acc hit hprior hfinish⟩
+  have hprior := replay_of_tallyPrefix walk enter result input edge
+    source target radius expected branch walkSelectors hwalk le_rfl acc hacc
+  simpa [selectors, render_split walkSelectors branch N le_rfl, renderFrom] using
+    firstHalting_finish _ walk enter result input (renderPrefix walkSelectors branch N)
+      acc hit hprior hfinish
 
 /-- Decode the selected candidates of a successful first-halting tally, given a decoder for
 each successful first-halting walk. The typed scan performs the same terminal tally check. -/
 theorem exists_scan_of_firstHalting {τ : Type} {N : ℕ}
     (walk : NondeterministicQueryMachine τ) (enter : Registers → τ) (result : τ → Option ℕ)
     (input : List Bool) (edge : Fin N → Fin N → Bool) (source target : Fin N)
-    (radius : ℕ) (expected : Tally)
+    (radius : ℕ) (expected : Tally) (walkSelectors : List (Fin N) → List Bool)
     (hwalk : ∀ (v : Fin N) (acc : Scan.Result) (bits : List Bool) (remaining : ℕ),
       let r : Registers := ⟨⟨N, source.val, target.val, radius, expected⟩, v.val, acc⟩
       walk.FirstHalting input bits (enter r) →
       result (walk.replay input bits (enter r)) = some remaining →
-      ∃ tail, (Scan.walkM Scan.readNext (fun u v => pure (edge u v)) v radius source tail).1 =
+      ∃ tail, bits = walkSelectors tail ∧
+        (Scan.walkM Scan.readNext (fun u v => pure (edge u v)) v radius source tail).1 =
         some remaining)
     (bits : List Bool) (hit : Bool) :
     let M := machine ⟨N, source.val, target.val, radius, expected⟩ walk enter result
     M.FirstHalting input bits M.init →
     M.run input bits = .inr (.inr (some hit)) →
-    ∃ branch, Scan.run edge source target radius expected branch = some hit := by
+    ∃ branch, bits = selectors walkSelectors branch ∧
+      Scan.run edge source target radius expected branch = some hit := by
   classical
   let ctx : Context := ⟨N, source.val, target.val, radius, expected⟩
   let M := machine ctx walk enter result
@@ -490,7 +588,9 @@ theorem exists_scan_of_firstHalting {τ : Type} {N : ℕ}
       (htally : Scan.tallyPrefix edge source target radius branch hn = some acc)
       (hfirst : M.FirstHalting input choices (.inl ⟨ctx, n, acc⟩))
       (hend : M.replay input choices (.inl ⟨ctx, n, acc⟩) = .inr (.inr (some hit))) :
-      ∃ branch', Scan.run edge source target radius expected branch' = some hit := by
+      ∃ branch', (∀ v : Fin N, v.val < n → branch' v = branch v) ∧
+        choices = renderFrom walkSelectors branch' n (N - n) ∧
+        Scan.run edge source target radius expected branch' = some hit := by
     induction hm : N - n using Nat.strongRecOn generalizing choices n acc branch with
     | ind m ih =>
       cases choices with
@@ -525,37 +625,76 @@ theorem exists_scan_of_firstHalting {τ : Type} {N : ℕ}
                   v radius source tail).1.map
                     (fun left => acc.recordWalk radius left (v == target))) = some acc'
             rwa [Function.update_self]
+          have keep (selection : Option (List (Fin N))) (branch' : Scan.Branch N)
+              (h : ∀ u : Fin N, u.val < n + 1 → branch' u = Function.update branch v selection u) :
+              (∀ u : Fin N, u.val < n → branch' u = branch u) ∧
+                branch' v = selection := by
+            refine ⟨?_, (h v (Nat.lt_succ_self n)).trans (Function.update_self v selection branch)⟩
+            intro u hu
+            rw [h u (by omega), Function.update_of_ne (show u ≠ v from
+              fun he => (Nat.ne_of_lt hu) (congrArg Fin.val he))]
+          have hsub : m = (N - (n + 1)) + 1 := by omega
           cases choice
           · have hstep : M.step input (.inl r) false = .inl r.skip := by
               simp [M, NondeterministicQueryMachine.step, machine, r, ctx, hlive]
             rw [hstep] at htail hend
-            exact ih (N - (n + 1)) (by omega) choices (n + 1) (Nat.succ_le_of_lt hlive) acc _
-              (extend none acc rfl) htail hend rfl
+            obtain ⟨branch', hp, hbits, hdone⟩ :=
+              ih (N - (n + 1)) (by omega) choices (n + 1) (Nat.succ_le_of_lt hlive) acc _
+                (extend none acc rfl) htail hend rfl
+            obtain ⟨hprior, hselect⟩ := keep none branch' hp
+            exact ⟨branch', hprior, by
+              simp only [hsub, renderFrom, dite_eq_left hlive,
+                show branch' ⟨n, hlive⟩ = none from hselect, renderSelection,
+                List.singleton_append, hbits], hdone⟩
           · have hstep : M.step input (.inl r) true = .inr (.inl (r, enter r)) := by
               simp [M, NondeterministicQueryMachine.step, machine, r, ctx, hlive]
             rw [hstep] at htail hend
-            obtain ⟨walkBits, rest, left, _, hwalkFirst, hfuel, hrest, hdone⟩ :=
+            obtain ⟨walkBits, rest, left, hsplit, hwalkFirst, hfuel, hrest, hdone⟩ :=
               firstHalting_walk_return ctx walk enter result input r choices (enter r) hit
                 htail hend
-            obtain ⟨tail, hcheck⟩ := hwalk v acc walkBits left hwalkFirst hfuel
+            obtain ⟨tail, hwalkBits, hcheck⟩ := hwalk v acc walkBits left hwalkFirst hfuel
             have hacc : (r.record left).observed = acc.recordWalk radius left (v == target) := rfl
-            exact ih (N - (n + 1)) (by omega) rest (n + 1) (Nat.succ_le_of_lt hlive)
-              (r.record left).observed _ (extend (some tail) _ (by simp [hacc, hcheck]))
-              hrest hdone rfl
+            obtain ⟨branch', hp, hbits, hdone⟩ :=
+              ih (N - (n + 1)) (by omega) rest (n + 1) (Nat.succ_le_of_lt hlive)
+                (r.record left).observed _ (extend (some tail) _ (by simp [hacc, hcheck]))
+                hrest hdone rfl
+            obtain ⟨hprior, hselect⟩ := keep (some tail) branch' hp
+            exact ⟨branch', hprior, by
+              simp only [hsub, renderFrom, dite_eq_left hlive,
+                show branch' ⟨n, hlive⟩ = some tail from hselect, renderSelection,
+                List.cons_append, List.append_assoc, List.nil_append, hsplit,
+                hwalkBits, hbits], hdone⟩
         · have hN : n = N := by omega
           have hstep : M.step input (.inl r) choice =
               .inr (.inr (if choice then none else acc.finish expected)) := by
             simp [M, NondeterministicQueryMachine.step, machine, r, ctx, hlive]
-          rw [hstep, M.replay_of_halted input (by rfl)] at hend
-          have hfinish : acc.finish expected = some hit := by
-            cases choice <;> simp_all
-          subst n
-          exact ⟨branch, by rw [Scan.run_eq_finish, htally]; exact hfinish⟩
+          rw [hstep] at htail
+          have halt : M.halted (.inr (.inr (if choice then none else acc.finish expected))) =
+              true := rfl
+          have hnil : choices = [] := by
+            cases choices with
+            | nil => rfl
+            | cons head rest =>
+              have hlive := ((M.firstHalting_cons_iff input head rest _).mp htail).1
+              rw [halt] at hlive
+              cases hlive
+          rw [hstep, M.replay_of_halted input halt] at hend
+          cases choice
+          · have hfinish : acc.finish expected = some hit := by simpa using hend
+            subst n
+            refine ⟨branch, fun _ _ => rfl, ?_, ?_⟩
+            · have hm0 : m = 0 := by omega
+              simp [hnil, hm0, renderFrom]
+            · rw [Scan.run_eq_finish, htally]
+              exact hfinish
+          · cases hend
   change M.FirstHalting input bits M.init → M.run input bits = .inr (.inr (some hit)) →
-    ∃ branch, Scan.run edge source target radius expected branch = some hit
+    ∃ branch, bits = selectors walkSelectors branch ∧
+      Scan.run edge source target radius expected branch = some hit
   intro hfirst hend
-  exact decode bits 0 (Nat.zero_le N) Scan.Result.zero (fun _ => none)
-    (Scan.tallyPrefix_zero edge source target radius _) hfirst hend
+  obtain ⟨branch, _, hbits, hscan⟩ := decode bits 0 (Nat.zero_le N) Scan.Result.zero
+    (fun _ => none) (Scan.tallyPrefix_zero edge source target radius _) hfirst hend
+  exact ⟨branch, by simpa [selectors] using hbits, hscan⟩
 
 private def Invariant {τ : Type} (ctx : Context) (walk : NondeterministicQueryMachine τ)
     (enter : Registers → τ) (input : List Bool) : State τ → Prop

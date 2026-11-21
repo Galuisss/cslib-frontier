@@ -46,14 +46,25 @@ example : run 1 [true, false, false] = .inr (.inr (some true)) := rfl
 -- Decode the selected zero-step walk and check the same result in the typed scanner.
 example : ∃ branch : Cslib.DoubleCounting.Scan.Branch 1,
     Cslib.DoubleCounting.Scan.run (fun _ _ => false) 0 0 0 ⟨1, 0⟩ branch = some true := by
+  suffices ∃ branch : Cslib.DoubleCounting.Scan.Branch 1,
+      [true, false, false] = selectors (fun _ => []) branch ∧
+        Cslib.DoubleCounting.Scan.run (fun _ _ => false) 0 0 0 ⟨1, 0⟩ branch = some true by
+    obtain ⟨branch, _, h⟩ := this
+    exact ⟨branch, h⟩
   refine exists_scan_of_firstHalting unusedWalk (fun _ => ()) (fun _ => some 0)
-    [] (fun _ _ => false) 0 0 0 ⟨1, 0⟩ ?_ [true, false, false] true ?_ ?_
-  · intro v _ _ remaining _ _ hfuel
+    [] (fun _ _ => false) 0 0 0 ⟨1, 0⟩ (fun _ => []) ?_ [true, false, false] true ?_ ?_
+  · intro v _ bits remaining _ hfirst hfuel
     change some 0 = some remaining at hfuel
     cases hfuel
     have hv : v = 0 := Fin.eq_zero v
     subst v
-    exact ⟨[], Cslib.DoubleCounting.Scan.walkM_replay_eq_some.mpr
+    have hbits : bits = [] := by
+      cases bits with
+      | nil => rfl
+      | cons b bs =>
+        have ht := ((unusedWalk.firstHalting_cons_iff [] b bs ()).mp hfirst).1
+        cases ht
+    exact ⟨[], hbits, Cslib.DoubleCounting.Scan.walkM_replay_eq_some.mpr
       ⟨List.isChainFromTo_singleton, rfl⟩⟩
   · exact (firstHalting_finish ⟨1, 0, 0, 0, ⟨1, 0⟩⟩ unusedWalk (fun _ => ())
       (fun _ => some 0) [] [true, false] ⟨⟨1, 0⟩, true⟩ true rfl rfl).1
