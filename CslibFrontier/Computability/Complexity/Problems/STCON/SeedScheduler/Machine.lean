@@ -34,6 +34,7 @@ skipped designated root.
 * `SeedSchedulerMachine.firstHalting_scan_iff`: split a successful scan and the resumed trace.
 * `SeedSchedulerMachine.firstHalting_skip_iff`: split a skipped root's false selector and suffix.
 * `SeedSchedulerMachine.haltsWithin`: one clock for all branches given the scanner clock.
+* `SeedSchedulerMachine.exists_successful_firstHalting`: assemble successful scan traces.
 -/
 
 public section
@@ -364,5 +365,72 @@ theorem haltsWithin {σ : Type} (setup : SeedSearchSetup) (scan : Nondeterminist
     simp only [remaining, hs, hz, Nat.sub_zero]
     rw [hlen, Nat.add_comm 1, ← Nat.mul_assoc]
     exact Nat.mul_le_mul_right _ (Nat.sub_le _ _)
+
+/-- If each requested scan from a valid frame has a first-halting replay with a verdict,
+the initialized scheduler has a first-halting replay with a result. The result can be a
+selected seed with either decision, or exhaustion. -/
+theorem exists_successful_firstHalting {σ : Type} (setup : SeedSearchSetup)
+    (scan : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
+    (verdict : σ → Option ControllerVerdict) (input : List Bool)
+    (hscan : ∀ f : SeedSchedulerFrame,
+      f.request.setup = setup → f.Valid → f.needsScan = true →
+      ∃ bits, scan.FirstHalting input bits (start f.request) ∧
+        (verdict (scan.replay input bits (start f.request))).isSome) :
+    let M := machine setup scan start verdict
+    ∃ bits, M.FirstHalting input bits M.init ∧ (reply (M.run input bits)).isSome := by
+  let M := machine setup scan start verdict
+  have terminal (answer : Option Answer) :
+      M.FirstHalting input [] (.inr (some answer)) ∧
+        M.replay input [] (.inr (some answer)) = .inr (some answer) :=
+    ⟨(M.firstHalting_iff_nil_of_halted input [] _ (by rfl)).mpr rfl,
+      M.replay_nil input _⟩
+  have fromFrame (f : SeedSchedulerFrame) (hsetup : f.request.setup = setup) (hf : f.Valid) :
+      ∃ bits answer, M.FirstHalting input bits (enter start f) ∧
+        M.replay input bits (enter start f) = .inr (some answer) := by
+    induction hr : remaining f using Nat.strongRecOn generalizing f with
+    | ind fuel ih =>
+      have afterStep (returned : Option ControllerVerdict)
+          (hreturned : f.needsScan = true → returned.isSome) :
+          ∃ rest answer, M.FirstHalting input rest (resume start f returned) ∧
+            M.replay input rest (resume start f returned) = .inr (some answer) := by
+        obtain ⟨result, hstep⟩ :=
+          Option.isSome_iff_exists.mp (seedSchedulerStep_isSome f returned hreturned)
+        rw [resume, hstep]
+        cases result with
+        | inr answer => exact ⟨[], _, terminal _⟩
+        | inl next =>
+          obtain ⟨hvalid, hsame, _⟩ := seedSchedulerStep_progress hf hstep
+          exact ih (remaining next) (hr ▸ remaining_lt hf hstep) next
+            (hsame.trans hsetup) hvalid rfl
+      by_cases hneeds : f.needsScan = true
+      · obtain ⟨prefixBits, hfirst, hpresent⟩ := hscan f hsetup hf hneeds
+        obtain ⟨value, hvalue⟩ := Option.isSome_iff_exists.mp hpresent
+        obtain ⟨rest, answer, hsuffix⟩ := afterStep (some value) (fun _ => rfl)
+        refine ⟨prefixBits ++ false :: rest, answer, ?_⟩
+        rw [enter, ite_eq_left hneeds]
+        exact (firstHalting_scan_iff setup scan start verdict input f (start f.request)
+          _ answer hneeds).mpr ⟨value, rest, (scan.readReply_iff verdict input _ _ _ _).mpr
+            ⟨prefixBits, rfl, hfirst, hvalue⟩, hsuffix⟩
+      · obtain ⟨rest, answer, hsuffix⟩ := afterStep none (fun h => (hneeds h).elim)
+        refine ⟨false :: rest, answer, ?_⟩
+        rw [enter, ite_eq_right hneeds]
+        exact (firstHalting_skip_iff setup scan start verdict input f _ answer).mpr
+          ⟨rest, rfl, hsuffix⟩
+  suffices ∃ bits answer, M.FirstHalting input bits M.init ∧
+      M.replay input bits M.init = .inr (some answer) by
+    obtain ⟨bits, answer, hfirst, hreply⟩ := this
+    refine ⟨bits, hfirst, ?_⟩
+    change (reply (M.replay input bits M.init)).isSome
+    rw [hreply]
+    rfl
+  change ∃ bits answer, M.FirstHalting input bits
+      ((seedSchedulerCandidate setup 0).elim (.inr (some none)) (enter start)) ∧
+    M.replay input bits ((seedSchedulerCandidate setup 0).elim (.inr (some none)) (enter start)) =
+      .inr (some answer)
+  cases hentry : seedSchedulerCandidate setup 0 with
+  | none => exact ⟨[], none, terminal none⟩
+  | some frame =>
+    obtain ⟨hvalid, hsetup, _⟩ := seedSchedulerCandidate_valid hentry
+    exact fromFrame frame hsetup hvalid
 
 end Cslib.Complexity.STCON.SeedSchedulerMachine
