@@ -342,23 +342,6 @@ theorem firstHalting_iff_replayRounds (bits : List Bool) (verdict : ControllerVe
     roundReply (round.replay input bits (roundStart r)) = some a →
     a.bad = false → a.tally.count ≠ r.tally.count → P (r.advance a.tally)
 
-private theorem readReply_commonPrefix {β γ : Type} (callee : NondeterministicQueryMachine β)
-    (ret : β → Option γ) (input : List Bool) (s : β)
-    (hu : {bits : List Bool | callee.FirstHalting input bits s ∧
-      (ret (callee.replay input bits s)).isSome}.Subsingleton)
-    {left right rest rest' : List Bool} {a a' : γ}
-    (ha : readReply callee ret input s left = some (a, rest))
-    (ha' : readReply callee ret input s right = some (a', rest')) :
-    ∃ callBits, left = callBits ++ false :: rest ∧ right = callBits ++ false :: rest' ∧
-      ret (callee.replay input callBits s) = some a ∧ a = a' := by
-  obtain ⟨callBits, hleft, hf, hret⟩ :=
-    (NondeterministicQueryMachine.readReply_iff _ _ _ _ _ _ _).mp ha
-  obtain ⟨other, hright, hf', hret'⟩ :=
-    (NondeterministicQueryMachine.readReply_iff _ _ _ _ _ _ _).mp ha'
-  have he : callBits = other := hu ⟨hf, by simp [hret]⟩ ⟨hf', by simp [hret']⟩
-  subst other
-  exact ⟨callBits, hleft, hright, hret, Option.some.inj (hret.symm.trans hret')⟩
-
 /-- The source loop has at most one successful first-halting selector list if each round and
 final membership invocation at an admissible register state has at most one successful list.
 The invariant is needed only at the initial state and after a round that continues the loop. -/
@@ -395,7 +378,7 @@ theorem subsingleton_successful_firstHalting (P : Registers κ → Prop) (hp : P
             obtain ⟨a, suffix⟩ := l
             obtain ⟨a', suffix'⟩ := r'
             obtain ⟨callBits, hlBits, hrBits, hret, rfl⟩ :=
-              readReply_commonPrefix round roundReply input (roundStart r) (hround r hr hpos) hl hr'
+              round.readReply_commonPrefix roundReply input (roundStart r) (hround r hr hpos) hl hr'
             simp only [hl] at hleft
             simp only [hr'] at hright
             rw [hlBits, hrBits]
@@ -412,7 +395,7 @@ theorem subsingleton_successful_firstHalting (P : Registers κ → Prop) (hp : P
                 have htail : tail = [] := congrArg Prod.snd hout
                 have htail' : tail' = [] := congrArg Prod.snd hout'
                 obtain ⟨memberBits, hl', hr', _, _⟩ :=
-                  readReply_commonPrefix member memberReply input (memberStart r)
+                  member.readReply_commonPrefix memberReply input (memberStart r)
                     (hmember r hr hpos) hread hread'
                 rw [hl', hr', htail, htail']
               · rw [ite_eq_right hc] at hleft hright

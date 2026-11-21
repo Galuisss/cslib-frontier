@@ -127,6 +127,25 @@ theorem readReply_iff {β γ : Type} (callee : NondeterministicQueryMachine β)
       · rintro ⟨rfl, rfl, hret⟩
         exact ⟨[], rfl, ⟨hhalt, by simp⟩, hret⟩
 
+/-- If successful callback traces are unique, two successful parses consume the same callback
+prefix and false return selector, and return the same reply. -/
+theorem readReply_commonPrefix {β γ : Type} (callee : NondeterministicQueryMachine β)
+    (ret : β → Option γ) (input : List Bool) (s : β)
+    (hu : {bits : List Bool | callee.FirstHalting input bits s ∧
+      (ret (callee.replay input bits s)).isSome}.Subsingleton)
+    {left right rest rest' : List Bool} {a a' : γ}
+    (ha : readReply callee ret input s left = some (a, rest))
+    (ha' : readReply callee ret input s right = some (a', rest')) :
+    ∃ callBits, left = callBits ++ false :: rest ∧ right = callBits ++ false :: rest' ∧
+      ret (callee.replay input callBits s) = some a ∧ a = a' := by
+  obtain ⟨callBits, hleft, hf, hret⟩ :=
+    (readReply_iff _ _ _ _ _ _ _).mp ha
+  obtain ⟨other, hright, hf', hret'⟩ :=
+    (readReply_iff _ _ _ _ _ _ _).mp ha'
+  have he : callBits = other := hu ⟨hf, by simp [hret]⟩ ⟨hf', by simp [hret']⟩
+  subst other
+  exact ⟨callBits, hleft, hright, hret, Option.some.inj (hret.symm.trans hret')⟩
+
 /-- A successful first halt of a caller suspended at a same-input callback decomposes into
 the callback's successful reply and a successful first halt of the resumed caller. -/
 theorem successful_call_iff {α β γ : Type}
