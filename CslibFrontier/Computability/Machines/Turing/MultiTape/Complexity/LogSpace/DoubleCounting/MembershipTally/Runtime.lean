@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Algorithms.Reachability.DoubleCounting.Scan.BoundedWalk.Runtime
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.MembershipTally
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.FunPropFinite
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
 
 /-!
@@ -37,7 +38,8 @@ tally also loads the adjacency context from its own entry state.
   clock and encoded-state bound for all branches starting from a valid source.
 * `Turing.DoubleCounting.MembershipTally.retainedMachine_replay`: every selector prefix agrees
   with the tally for the retained adjacency context.
-* The retained entry, query, halt, and reply operations have linear-space certificates.
+* The retained entry, transition, query, halt, and reply operations have linear-space
+  certificates.
 -/
 
 public section
@@ -330,6 +332,74 @@ theorem retainedReply_inSpace :
     ComputableInSpace retainedReply E (encOption encBool) (fun s => (E s).length) :=
   (budget_comp_linear (reply_inSpace (Runtime.encState encK encCallee))
     (tally_inSpace encK encCallee)).of_enc_eq fun _ => rfl
+
+private theorem enterRuntimeWalk_inSpace :
+    let encIn := encPair encK encRegisters
+    ComputableInSpace (fun p : κ × Registers => enterRuntimeWalk edge start verdict clock p.1 p.2)
+      encIn (Runtime.encState encK encCallee) (fun p => (encIn p).length) := by
+  let encIn := encPair encK encRegisters
+  let dimension (p : κ × Registers) :=
+    if 0 < p.2.context.size then p.2.context.size else 1
+  have hdpos (p : κ × Registers) : 0 < dimension p := by
+    unfold dimension
+    split <;> omega
+  have hcontext := fst encK encRegisters
+  have hregisters := snd encK encRegisters
+  have hquery := encRegisters_context_budget hregisters
+  have hsize := encContext_size_budget hquery
+  have hsource := encContext_source_budget hquery
+  have hcursor := encRegisters_cursor_budget hregisters
+  have hfuel := encContext_radius_budget hquery
+  have hzero := budget_const (encIn := encIn) (encB := encNat) 0 (.refl _)
+  have hone := budget_const (encIn := encIn) (encB := encNat) 1 (.refl _)
+  have hdimension : ComputableInSpace dimension encIn encNat (fun p => (encIn p).length) :=
+    (budget_ite (budget_natLt hzero hsize) hsize hone).of_enc_eq fun p => by
+      simp only [dimension, decide_eq_true_eq]
+  have hentry := Runtime.entryRanks_budget edge start verdict clock encK encCallee
+    hdpos hcontext hdimension hsource hcursor hfuel
+  have hreject := Runtime.state_budget encK encCallee
+    (walk := fun _ => .done none) (positive := fun _ => Nat.zero_lt_one) hcontext hone
+    (budget_const (encB := encBits)
+      (BoundedWalk.encState (N := 1) encCallee (.done none)) (.refl _))
+  have hvalid := budget_boolAnd (budget_natLt hsource hsize) (budget_natLt hcursor hsize)
+  refine (budget_ite hvalid hentry hreject).of_enc_eq ?_
+  rintro ⟨context, r⟩
+  simp only [Bool.and_eq_true, decide_eq_true_eq, enterRuntimeWalk]
+  by_cases h : r.context.source < r.context.size ∧ r.cursor < r.context.size
+  · have hpos := Nat.zero_lt_of_lt h.1
+    rw [dite_eq_left h, ite_eq_left h]
+    simp only [dimension, ite_eq_left hpos]
+    rw [Runtime.entryRanks_eq_entry edge start verdict clock context hpos
+      ⟨⟨r.context.source, h.1⟩, ⟨r.cursor, h.2⟩, r.context.radius⟩]
+  · rw [dite_eq_right h, ite_eq_right h]
+
+open NondeterministicQueryMachine (encReadChoice) in
+/-- Step the retained tally in linear workspace from the adjacency callback certificates. -/
+theorem retainedMachine_next_inSpace (ctx : Context)
+    (hstart : ComputableInSpace (fun (k, u, v) => start k u v)
+      (BoundedWalk.encStartRequest encK) encCallee
+      (fun p => (BoundedWalk.encStartRequest encK p).length))
+    (hnext : ComputableInSpace edge.next (QueryMachine.encStateRead encCallee) encCallee
+      (fun p => (QueryMachine.encStateRead encCallee p).length))
+    (hhalted : ComputableInSpace edge.halted encCallee encBool (fun s => (encCallee s).length))
+    (hverdict : ComputableInSpace verdict encCallee encBool (fun s => (encCallee s).length)) :
+    let encStep := encPair E encReadChoice
+    ComputableInSpace (retainedMachine edge start verdict clock initialWalk context ctx).next
+      encStep E (fun p => (encStep p).length) := by
+  let W := Runtime.machine edge start verdict clock initialWalk
+  have hstep := next_withParameter_inSpace encK (Runtime.encState encK encCallee)
+    ctx W (enterRuntimeWalk edge start verdict clock) Runtime.remainingFuel
+    (enterRuntimeWalk_inSpace edge start verdict clock encK encCallee)
+    (Runtime.next_inSpace edge start verdict clock initialWalk encK encCallee hstart hnext
+      hhalted hverdict)
+    (Runtime.halted_inSpace edge start verdict clock initialWalk encK encCallee)
+    (Runtime.remainingFuel_inSpace encK encCallee)
+  have hs := fst E encReadChoice
+  have hk := encRetainedState_walkContext_budget encK encCallee hs
+  have ht := encRetainedState_tally_budget encK encCallee hs
+  have hp := budget_prod ht (budget_prod hk (snd E encReadChoice))
+  exact (encRetainedState_mk_budget encK encCallee hk
+    (budget_comp_linear hstep hp)).of_enc_eq fun _ => rfl
 
 end RetainedSpace
 
