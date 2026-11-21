@@ -7,8 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenRoundCallback
-import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision.Replay
+import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenRoundCallback.Resource
 
 /-! Re-enter the Justesen tally at a variable seed and check replay and encoded length. -/
 
@@ -312,5 +311,29 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
       initial round roundStart roundReply (justesenSourceMembershipMachine ntm c)
       justesenSourceMembershipStart MembershipTally.retainedReply
       hstart justesenSourceMembershipStart_inSpace hreply hr hhalt hh hnext hn⟩
+
+/-- The concrete tagged callback supplies the round's query and transition certificates
+once the caller certifies entry construction. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (adjacency : JustesenSubdivisionContext) (initial : SourceRound.Context)
+    (hentry : ComputableInSpace
+      (fun r : SourceRound.State =>
+        justesenRoundCallbackStart adjacency r.context (SourceRound.request r))
+      SourceRound.encState encJustesenRoundCallbackState
+      (fun r => (SourceRound.encState r).length)) :
+    let E := SourceRound.encMachineState JustesenRoundCallbackState encJustesenRoundCallbackState
+    let encStep := encPair E encReadChoice
+    let round := SourceRound.machine initial (justesenRoundCallback ntm c)
+      (justesenRoundCallbackStart adjacency) justesenRoundCallbackReply
+    ComputableInSpace round.query E encNat (fun s => (E s).length) ∧
+      ComputableInSpace round.next encStep E (fun p => (encStep p).length) := by
+  intro E encStep round
+  obtain ⟨hq, hn, hh, hr⟩ := justesenRoundCallback_parts_inSpace ntm c
+  exact ⟨SourceRound.machine_query_inSpace encJustesenRoundCallbackState initial
+      (justesenRoundCallback ntm c) (justesenRoundCallbackStart adjacency)
+      justesenRoundCallbackReply hq,
+    SourceRound.machine_next_inSpace encJustesenRoundCallbackState initial
+      (justesenRoundCallback ntm c) (justesenRoundCallbackStart adjacency)
+      justesenRoundCallbackReply hentry hr hh hn⟩
 
 end CslibFrontierTests.STCONJustesenTally
