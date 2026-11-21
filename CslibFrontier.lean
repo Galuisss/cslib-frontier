@@ -3010,6 +3010,7 @@ public import CslibFrontier.Computability.Complexity.Problems.STCON.Completeness
 public import CslibFrontier.Computability.Complexity.Problems.STCON.Header
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenBoundedWalk
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision
+public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision.Replay
 public import CslibFrontier.Computability.Complexity.Problems.STCON.Layered
 public import CslibFrontier.Computability.Complexity.Problems.STCON.LayeredCallback
 public import CslibFrontier.Computability.Complexity.Problems.STCON.LayeredParameters
@@ -3679,6 +3680,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.L
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.CounterProgram.Words
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.MembershipTally
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.MembershipTally.Runtime
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.Predecessor
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.Predecessor.Native
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.Predecessor.Runtime
@@ -3700,6 +3702,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.L
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.CallReplay
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Compiler
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.CountingView
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.DeterministicCall
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Dispatch
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Native
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Recompute
@@ -6255,10 +6258,12 @@ public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicVal
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BitBounds
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.CoeffNormBound
+public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ConjugateProduct
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.Isolation
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ParameterExclusion
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.RatPoly
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.RootBound
+public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ShiftedLabel
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseIntegerRootLabel
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.Sturm
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
@@ -6292,6 +6297,7 @@ public import CslibFrontier.Foundations.Analysis.Calculus.LipschitzDeriv
 public import CslibFrontier.Foundations.Analysis.Calculus.LipschitzSmoothing
 public import CslibFrontier.Foundations.Analysis.Calculus.ParametricIntegralExp
 public import CslibFrontier.Foundations.Analysis.Calculus.Taylor
+public import CslibFrontier.Foundations.Analysis.Complex.ConjugateProduct
 public import CslibFrontier.Foundations.Analysis.Convex.Ellipsoid
 public import CslibFrontier.Foundations.Analysis.Convex.ExtendedFormulation
 public import CslibFrontier.Foundations.Analysis.Convex.ExtendedFormulation.CorrDigraph
