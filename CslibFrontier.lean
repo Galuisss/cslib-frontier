@@ -6063,6 +6063,7 @@ public import CslibFrontier.Foundations.Analysis.MarkovBrothersInequality
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CoordinateDerivative
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalCoercive
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalMinimumValue
+public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalValueCutoff
 public import CslibFrontier.Foundations.Analysis.Normed.Ring.PowSub
 public import CslibFrontier.Foundations.Analysis.Normed.UnitSphere
 public import CslibFrontier.Foundations.Analysis.RateExponent
