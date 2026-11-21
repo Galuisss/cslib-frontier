@@ -536,13 +536,13 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   · rintro other ⟨result, hother, hret, _, _, _⟩
     exact hunique other ⟨result, htally ▸ hother, htally ▸ hret⟩
 
--- An accepting native replay yields the mathematical verdict on the source subdivision.
+-- The compiled loop has an accepting occurrence with a mathematical source verdict.
 example {k : ℕ} {State : Type} [Fintype State] {α : Type} {enc : α ↪ List Bool} {S : α → ℕ}
     (ntm : MultiTapeNTM k Bool State) (c : ℕ) (baseline : JustesenSourceContext) (fuel : ℕ)
     (contextOf : α → JustesenSourceContext) (limitOf : α → ℕ)
     (R : Routines (justesenSourceLoop ntm c baseline fuel)
       (fun a => (justesenSourceLoop ntm c (contextOf a) (limitOf a)).init) enc S)
-    (a : α) (bits : List Bool) :
+    (a : α) :
     let w := enc a
     let I := configurationInstance ntm c w
     let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
@@ -550,12 +550,12 @@ example {k : ℕ} {State : Type} [Fintype State] {α : Type} {enc : α ↪ List 
       contextOf a =
         ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩ →
       limitOf a = n →
-      (∃! indices, ∃ final,
-        Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg w) indices =
-          some (bits, final) ∧ final.Halted ∧ final.output = [true]) →
       let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
       let M := justesenSourceLoop ntm c (contextOf a) n
-      ∃ verdict, M.run w bits = .inr (some verdict) ∧
+      ∃ bits verdict, M.run w bits = .inr (some verdict) ∧
+        (∃! indices, ∃ final,
+          Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg w) indices =
+            some (bits, final) ∧ final.Halted ∧ final.output = [true]) ∧
         match verdict with
         | .bad radius =>
           (∀ j < radius, ∃! transcript, Passes edge source j transcript) ∧
@@ -563,13 +563,19 @@ example {k : ℕ} {State : Type} [Fintype State] {α : Type} {enc : α ↪ List 
         | .decided hit =>
           (∀ radius, ∃! transcript, Passes edge source radius transcript) ∧
             (hit = true ↔ Relation.ReflTransGen edge source target) := by
-  intro w I n seed source target hcontext hlimit hnative edge M
-  obtain ⟨verdict, hfirst, hresult⟩ :=
-    (justesenSourceLoop_native_firstHalting_accept_iff ntm c R a bits).mp hnative
-  rw [hlimit] at hfirst hresult
-  refine ⟨verdict, hresult, ?_⟩
-  rw [hcontext] at hfirst hresult
-  exact configurationJustesenSourceLoop_correct ntm c w seed source target
+  intro w I n seed source target hcontext hlimit edge M
+  obtain ⟨bits, verdict, hfirst, hresult⟩ :=
+    configurationJustesenSourceLoop_exists_firstHalting ntm c w seed source target
+  have hspec := configurationJustesenSourceLoop_correct ntm c w seed source target
     bits verdict hfirst hresult
+  have hfirst' : M.FirstHalting w bits M.init := by
+    simpa only [M, hcontext] using hfirst
+  have hresult' : M.run w bits = .inr (some verdict) := by
+    simpa only [M, hcontext] using hresult
+  refine ⟨bits, verdict, hresult', ?_, hspec⟩
+  apply (justesenSourceLoop_native_firstHalting_accept_iff ntm c R a bits).mpr
+  refine ⟨verdict, ?_⟩
+  rw [hlimit]
+  exact ⟨hfirst', hresult'⟩
 
 end CslibFrontierTests.STCONJustesenTally
