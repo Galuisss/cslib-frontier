@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.MembershipTally
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.MembershipTally.Runtime
 
 /-! Checks for the membership tally's passing negative answer and rejecting terminal check. -/
 
@@ -123,6 +123,32 @@ example :
   dsimp only
   rw [← run_withInit, withBoundedWalk_withInit, reply_eq_some_iff]
   exact negativeReplay.2
+
+open Turing.DoubleCounting in
+/-- The same tally re-enters at a larger dimension and selects a walk to a vertex outside
+the original carrier. The queried vertex is skipped, so the tally returns `some false`. -/
+example :
+    let start := fun (_ : Unit) (_ _ : ℕ) => ()
+    let acceptEdge := fun (_ : Unit) => true
+    let entry := BoundedWalk.Runtime.entry edge start acceptEdge 0 () (N := 1) ⟨0, 0, 0⟩
+    let single := withRuntimeWalk edge start acceptEdge 0 entry () ⟨1, 0, 0, 0, ⟨0, 0⟩⟩
+    let double := single.withInit (initial ⟨2, 0, 0, 1, ⟨1, 1⟩⟩)
+    let branch : Scan.Branch 2 := fun v => if v = 1 then some [1] else none
+    let bits := MembershipTally.selectors (BoundedWalk.selectors 0) branch
+    double.FirstHalting [true] bits double.init ∧ reply (double.run [true] bits) = some false := by
+  intro start acceptEdge entry single double branch bits
+  let allEdges (_ _ : Fin 2) := true
+  have hscan : Scan.run allEdges 0 0 1 ⟨1, 1⟩ branch = some false := by
+    rw [Scan.run_eq_finish, Scan.tallyPrefix_succ allEdges 0 0 1 branch (n := 1) (by decide),
+      Scan.tallyPrefix_succ allEdges 0 0 1 branch (n := 0) (by decide), Scan.tallyPrefix_zero]
+    simp [branch, allEdges, Scan.walkM, Scan.readNext, bind, StateT.bind, pure, StateT.pure,
+      Scan.Result.finish, Scan.Result.recordWalk, Scan.Result.zero, Tally.matches_iff]
+  dsimp only [double, single]
+  rw [withRuntimeWalk_withInit]
+  exact (withRuntimeWalk_firstHalting_iff edge start acceptEdge 0 entry () [true]
+    allEdges 0 0 1 ⟨1, 1⟩ (fun _ _ => rfl) (fun _ _ => rfl) bits false).mpr
+    ⟨branch, ⟨rfl, hscan⟩, fun other h =>
+      selectors_injective _ (BoundedWalk.eq_of_selectors_prefix 0) h.1.symm⟩
 
 example :
     let E := encState (Turing.DoubleCounting.BoundedWalk.encState (N := 2) encUnit)
