@@ -357,8 +357,7 @@ private theorem enterRuntimeWalk_inSpace :
   have hzero := budget_const (encIn := encIn) (encB := encNat) 0 (.refl _)
   have hone := budget_const (encIn := encIn) (encB := encNat) 1 (.refl _)
   have hdimension : ComputableInSpace dimension encIn encNat (fun p => (encIn p).length) :=
-    (budget_ite (budget_natLt hzero hsize) hsize hone).of_enc_eq fun p => by
-      simp only [dimension, decide_eq_true_eq]
+    budget_iteProp (budget_natLt hzero hsize) hsize hone
   have hentry := Runtime.entryRanks_budget edge start verdict clock encK encCallee
     hdpos hcontext hdimension hsource hcursor hfuel
   have hreject := Runtime.state_budget encK encCallee
