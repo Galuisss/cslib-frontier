@@ -31,6 +31,8 @@ skipped designated root.
 
 * `SeedSchedulerMachine.enter_inSpace` and `SeedSchedulerMachine.init_budget`: enter a
   supplied scan or skip phase within the caller's workspace budget.
+* `SeedSchedulerMachine.resume_inSpace`: process the scheduler's control result in space
+  linear in the paired frame and verdict encoding.
 * `SeedSchedulerMachine.observations_inSpace`: query, halt, terminal reply, and acceptance
   use space linear in the encoded state.
 * `SeedSchedulerMachine.step_liveScan`: a live scan takes the callback's step on the same input.
@@ -143,6 +145,41 @@ theorem init_budget {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ}
   have hcandidate := seedSchedulerCandidate_budget hsetup hzero
   have hentry := optionElim (.inr (some none)) (enter_inSpace encScan start hstart)
   exact (budget_comp_linear hentry hcandidate).of_enc_eq fun _ => rfl
+
+open _root_.Turing.MultiTapeTM.ComputableInSpace in
+/-- Resume the scheduler in workspace linear in the paired frame and optional verdict.
+A completed answer keeps the seed rank from the retained frame. -/
+theorem resume_inSpace {σ : Type} (encScan : σ ↪ List Bool) (start : SeedScanRequest → σ)
+    (hstart : ComputableInSpace start encSeedScanRequest encScan
+      (fun r => (encSeedScanRequest r).length)) :
+    let E := encPair encSeedSchedulerFrame
+      (encOption _root_.Turing.DoubleCounting.SourceRoundLoop.encVerdict)
+    ComputableInSpace (fun p => resume start p.1 p.2) E (encState encScan)
+      (fun p => (E p).length) := by
+  let F := encSeedSchedulerFrame
+  let R := encState encScan
+  let live := encSum F (encPair F encScan)
+  let terminal := encOption (encOption encAnswer)
+  let verdict := encOption _root_.Turing.DoubleCounting.SourceRoundLoop.encVerdict
+  have hcontinue := budget_comp_linear (enter_inSpace encScan start hstart) (snd F F)
+  have hframeWithBit := fst F encBool
+  have hrank := encSeedScanRequest_seed_budget (encSeedSchedulerFrame_request_budget hframeWithBit)
+  have hresult := encAnswer_mk_budget hrank (snd F encBool)
+  have hnoAnswer := budget_const (encIn := F) (encB := encOption encAnswer) none (.refl _)
+  have hanswer := optionElimSnd hnoAnswer (budget_optionSome hresult)
+  have hfinish := budget_comp_linear (of_inO (ComputableInO.inr live terminal))
+    (budget_optionSome hanswer)
+  have hreject := budget_const (encIn := F) (encB := R) (.inr none) (.refl _)
+  have hdispatch := optionElimSnd hreject (sumElimSnd hcontinue hfinish)
+  have hinput := budget_prod (fst F verdict) seedSchedulerStep_inSpace
+  exact (budget_comp_linear hdispatch hinput).of_enc_eq fun p => by
+    unfold resume
+    cases seedSchedulerStep p.1 p.2 with
+    | none => rfl
+    | some result =>
+      cases result with
+      | inl next => rfl
+      | inr answer => cases answer <;> rfl
 
 open _root_.Turing.MultiTapeTM.ComputableInSpace in
 /-- Query, read the phase tag or terminal reply, and test acceptance in space linear in
