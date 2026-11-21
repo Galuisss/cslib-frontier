@@ -343,15 +343,9 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
       justesenSourceMembershipStart MembershipTally.retainedReply
       hstart justesenSourceMembershipStart_inSpace hreply hr hhalt hh hnext hn⟩
 
-/-- The concrete tagged callback supplies the round's query and transition certificates
-once the caller certifies entry construction. -/
+/-- A round with retained Justesen adjacency has native query and transition certificates. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
-    (c : ℕ) (adjacency : JustesenSubdivisionContext) (initial : SourceRound.Context)
-    (hentry : ComputableInSpace
-      (fun r : SourceRound.State =>
-        justesenRoundCallbackStart adjacency r.context (SourceRound.request r))
-      SourceRound.encState encJustesenRoundCallbackState
-      (fun r => (SourceRound.encState r).length)) :
+    (c : ℕ) (adjacency : JustesenSubdivisionContext) (initial : SourceRound.Context) :
     let E := SourceRound.encMachineState JustesenRoundCallbackState encJustesenRoundCallbackState
     let encStep := encPair E encReadChoice
     let round := SourceRound.machine initial (justesenRoundCallback ntm c)
@@ -360,6 +354,10 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
       ComputableInSpace round.next encStep E (fun p => (encStep p).length) := by
   intro E encStep round
   obtain ⟨hq, hn, hh, hr⟩ := justesenRoundCallback_parts_inSpace ntm c
+  have hadj := budget_const (encIn := SourceRound.encState)
+    (encB := encJustesenSubdivisionContext) adjacency (.refl _)
+  have hid := budget_id (enc := SourceRound.encState) (.refl _)
+  have hentry := budget_comp_linear justesenRoundCallbackStart_inSpace (budget_prod hadj hid)
   exact ⟨SourceRound.machine_query_inSpace encJustesenRoundCallbackState initial
       (justesenRoundCallback ntm c) (justesenRoundCallbackStart adjacency)
       justesenRoundCallbackReply hq,
