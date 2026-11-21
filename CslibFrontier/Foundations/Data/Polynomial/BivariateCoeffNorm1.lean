@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Init
 public import CslibFrontier.Foundations.Data.Polynomial.CoeffNorm1
 public import Mathlib.Algebra.Polynomial.Bivariate
+import CslibFrontier.Foundations.Algebra.Polynomial.BivariateSwap
 import CslibFrontier.Foundations.Data.Polynomial.CoeffSumBounds
 import Mathlib.Data.Finset.Sum
 
@@ -79,23 +80,14 @@ theorem coeffNorm1_coeff_le_bivariateCoeffNorm1 (P : Polynomial (Polynomial ℤ)
 /-- Each coefficient in the other variable also has norm bounded by the total bivariate norm. -/
 theorem coeffNorm1_coeff_swap_le (P : Polynomial (Polynomial ℤ)) (i : ℕ) :
     ((Bivariate.swap P).coeff i).coeffNorm1 ≤ P.bivariateCoeffNorm1 := by
-  have hswap (Q : Polynomial (Polynomial ℤ)) (j : ℕ) :
-      ((Bivariate.swap Q).coeff i).coeff j = (Q.coeff j).coeff i := by
-    induction Q using Polynomial.induction_on' with
-    | add p q hp hq => simp only [map_add, coeff_add, hp, hq]
-    | monomial k a =>
-      rw [Bivariate.swap_monomial, coeff_mul_C, coeff_map, C_mul_X_pow_eq_monomial]
-      by_cases h : j = k
-      · subst j
-        simp
-      · simp [coeff_monomial, h]
   have hs : ((Bivariate.swap P).coeff i).support ⊆ P.support := by
     intro j hj
-    rw [mem_support_iff, hswap] at hj
+    rw [mem_support_iff, Bivariate.coeff_coeff_swap] at hj
     exact mem_support_iff.mpr (fun h => hj (by rw [h, coeff_zero]))
   rw [coeffNorm1_eq_sum_of_support_subset hs, bivariateCoeffNorm1]
-  exact sum_le_sum fun j _ => (congrArg Int.natAbs (hswap P j)).le.trans
-    (natAbs_coeff_le_coeffNorm1 (P.coeff j) i)
+  refine sum_le_sum fun j _ => ?_
+  rw [Bivariate.coeff_coeff_swap]
+  exact natAbs_coeff_le_coeffNorm1 (P.coeff j) i
 
 /-- If `P.support ⊆ S`, then `P.bivariateCoeffNorm1 = ∑ s ∈ S, (P.coeff s).coeffNorm1`. -/
 theorem bivariateCoeffNorm1_eq_sum_of_support_subset {P : Polynomial (Polynomial ℤ)}

@@ -9,6 +9,7 @@ module
 public import CslibFrontier.Init
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ParameterExclusion
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalMinimumValue
+import CslibFrontier.Foundations.Algebra.Polynomial.BivariateSwap
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 import CslibFrontier.Foundations.Data.MvPolynomial.Degrees
 
@@ -43,15 +44,6 @@ private theorem eval₂_swap (P : Polynomial (Polynomial ℤ)) (x y : ℝ) :
     rfl
   rw [happ, happ, Bivariate.aevalAeval_swap]
 
-private theorem map_evalRingHom_swap (P : Polynomial (Polynomial ℤ)) (a : ℤ) :
-    (Bivariate.swap P).map (evalRingHom a) = P.eval (Polynomial.C a) := by
-  have heval : ((Polynomial.aeval a : Polynomial ℤ →ₐ[ℤ] ℤ) : Polynomial ℤ →+* ℤ) =
-      evalRingHom a := by
-    ext <;> simp
-  simpa only [Polynomial.coe_mapAlgHom, heval, Polynomial.aeval_def, Polynomial.algebraMap_def,
-    Algebra.algebraMap_self, Polynomial.mapRingHom_id, Polynomial.eval₂_id] using
-    (Bivariate.aeval_eq_map_swap a P).symm
-
 /-- A nonnegative integer input has a real zero exactly when the actual critical minimum
 is below the value cutoff at the chosen deformation parameter. -/
 theorem exists_zero_iff_criticalMinimumValue_lt_at_parameterExclusion {n ell H : ℕ}
@@ -84,7 +76,7 @@ theorem exists_zero_iff_criticalMinimumValue_lt_at_parameterExclusion {n ell H :
     dsimp only [R]
     exact_mod_cast hbound
   have hU : ((P.map (evalRingHom R)).coeffNorm1 : ℝ) + 1 ≤ U := by
-    rw [show P = Bivariate.swap q from rfl, map_evalRingHom_swap]
+    rw [show P = Bivariate.swap q from rfl, ← Bivariate.eval_C_eq_map_swap]
     have hD : q.natDegree ≤ ell ^ n := (parametricValuePolynomial_natDegree hell F hF).le
     dsimp only [R, U]
     exact_mod_cast coeffNorm1_eval_C_add_one_le_parameterExclusion hD hH
