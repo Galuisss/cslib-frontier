@@ -29,6 +29,8 @@ tagged edge and membership callbacks use the original input and the current roun
   query, transition, halt and reply on the encoded round state.
 * `Cslib.Complexity.STCON.configurationJustesenRetainedSourceRound_correct`: a successful
   round at exact totals returns the next tally and the tie flag.
+* `Cslib.Complexity.STCON.configurationJustesenRetainedSourceRound_existsUnique_firstHalting`:
+  at exact totals, a unique membership transcript gives one complete successful round trace.
 -/
 
 public section
@@ -140,6 +142,18 @@ theorem justesenRetainedSourceRound_firstHalting_iff_replayScan
   exact SourceRound.firstHalting_iff_replayScan ctx N (start r.context)
     justesenRoundCallbackReply w bits update
 
+private theorem initializedRoundContext {k : ℕ} {State : Type} [Fintype State]
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool)
+    (seed source target fuel radius : ℕ) (tally : Tally) :
+    let ctx : JustesenSourceContext :=
+      ⟨configurationJustesenSubdivisionContext ntm c w seed, source, target⟩
+    SourceRoundLoop.roundContext JustesenSourceContext.size JustesenSourceContext.sourceID
+      ⟨ctx, fuel, radius, tally⟩ =
+      ⟨(configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount,
+        source, radius, tally⟩ := by
+  intro ctx
+  simp only [SourceRoundLoop.roundContext, ctx, configurationJustesenSourceContext_size]
+
 /-- At exact totals with a unique passing transcript, every successful retained round returns
 the next tally and reports whether the next transcript is unique. -/
 theorem configurationJustesenRetainedSourceRound_correct
@@ -165,13 +179,9 @@ theorem configurationJustesenRetainedSourceRound_correct
     ⟨hfirst, hreply⟩
   let adj := configurationJustesenSubdivisionContext ntm c w seed.val
   let ctx : SourceRound.Context := ⟨n, source.val, radius, expected edge source radius⟩
-  have hsize : context.size = n :=
-    configurationJustesenSourceContext_size ntm c w seed.val source.val target.val
-  have hctx :
-      SourceRoundLoop.roundContext JustesenSourceContext.size JustesenSourceContext.sourceID r =
-        ctx := by
-    simp only [SourceRoundLoop.roundContext, r, hsize, ctx]
-    rfl
+  have hctx : SourceRoundLoop.roundContext JustesenSourceContext.size
+      JustesenSourceContext.sourceID r = ctx :=
+    initializedRoundContext ntm c w seed.val source.val target.val fuel radius _
   rw [hctx] at hscan
   refine SourceRound.replayScan_correct ctx source edge (justesenRoundCallback ntm c)
     (justesenRoundCallbackStart adj) justesenRoundCallbackReply w rfl hpass ?_ ?_ hscan
@@ -183,5 +193,58 @@ theorem configurationJustesenRetainedSourceRound_correct
   · intro v call hit rest hcall
     exact (configurationJustesenRoundCallback_readReply_correct ntm c w seed source radius
       (.member v.val) v.isLt call hit rest hcall).trans mem_round.symm
+
+/-- At exact totals, a unique passing membership transcript gives exactly one selector list
+that first halts and returns an update from the retained round. A tied update is a return. -/
+theorem configurationJustesenRetainedSourceRound_existsUnique_firstHalting
+    {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n) (fuel radius : ℕ),
+      let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
+      (∃! transcript, Passes edge source radius transcript) →
+      let context : JustesenSourceContext :=
+        ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+      let r : SourceRoundLoop.Registers JustesenSourceContext :=
+        ⟨context, fuel, radius, expected edge source radius⟩
+      let M := justesenRetainedSourceRound ntm c r
+      ∃! bits, ∃ update, M.FirstHalting w bits M.init ∧
+        justesenRetainedSourceRoundReply (M.run w bits) = some update := by
+  intro I n seed source target fuel radius edge hpass context r M
+  let ctx : SourceRound.Context := ⟨n, source.val, radius, expected edge source radius⟩
+  let N := justesenRoundCallback ntm c
+  let start := justesenRoundCallbackStart context.adjacency
+  let scalar := SourceRound.machine ctx N start justesenRoundCallbackReply
+  have hreq (req : SourceRound.Request) (hv : req.InRange ctx.size) :
+      ∃! bits, N.FirstHalting w bits (start ctx req) ∧
+        (justesenRoundCallbackReply (N.replay w bits (start ctx req))).isSome :=
+    configurationJustesenRoundCallback_existsUnique_firstHalting ntm c w
+      seed source radius hpass req hv
+  have hunique := SourceRound.subsingleton_successful_firstHalting ctx N start
+    justesenRoundCallbackReply w (fun req hv _ hl _ hr => (hreq req hv).unique hl hr)
+  obtain ⟨bits, update, hfirst, hanswer⟩ := SourceRound.exists_successful_firstHalting ctx N start
+    justesenRoundCallbackReply w (fun req hv => by
+      obtain ⟨choices, ⟨hfirst, hsome⟩, _⟩ := hreq req hv
+      obtain ⟨hit, hhit⟩ := Option.isSome_iff_exists.mp hsome
+      exact ⟨choices, hit, hfirst, hhit⟩)
+  have hctx : SourceRoundLoop.roundContext JustesenSourceContext.size
+      JustesenSourceContext.sourceID r = ctx :=
+    initializedRoundContext ntm c w seed.val source.val target.val fuel radius _
+  have htransfer (selectors : List Bool) (result : RoundUpdate) :
+      M.FirstHalting w selectors M.init ∧
+        justesenRetainedSourceRoundReply (M.run w selectors) = some result ↔
+      scalar.FirstHalting w selectors scalar.init ∧
+        SourceRound.answer (scalar.run w selectors) = some result := by
+    have h := justesenRetainedSourceRound_firstHalting_iff_replayScan ntm c r w selectors result
+    rw [hctx] at h
+    exact h.trans
+      (SourceRound.firstHalting_iff_replayScan ctx N start justesenRoundCallbackReply w
+        selectors result).symm
+  refine ⟨bits, ⟨update, (htransfer bits update).mpr ⟨hfirst, hanswer⟩⟩, ?_⟩
+  rintro other ⟨result, hresult⟩
+  obtain ⟨hfirst', hanswer'⟩ := (htransfer other result).mp hresult
+  exact hunique ⟨hfirst', Option.isSome_iff_exists.mpr ⟨result, hanswer'⟩⟩
+    ⟨hfirst, Option.isSome_iff_exists.mpr ⟨update, hanswer⟩⟩
 
 end Cslib.Complexity.STCON
