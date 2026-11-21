@@ -120,10 +120,10 @@ theorem justesenSourceMembershipStart_inSpace :
   intro E
   have hr := budget_id (enc := E) (.refl _)
   have hctx := SourceRoundLoop.encRegisters_context_budget encJustesenSourceContext hr
-  have hround := SourceRound.encContext_mk_budget
-    (encJustesenSourceContext_size_budget hctx) (encJustesenSourceContext_sourceID_budget hctx)
-    (SourceRoundLoop.encRegisters_radius_budget encJustesenSourceContext hr)
-    (SourceRoundLoop.encRegisters_tally_budget encJustesenSourceContext hr)
+  have hid := budget_id (enc := encJustesenSourceContext) (.refl _)
+  have hround := SourceRoundLoop.roundContext_inSpace
+    JustesenSourceContext.size JustesenSourceContext.sourceID encJustesenSourceContext
+    (encJustesenSourceContext_size_budget hid) (encJustesenSourceContext_sourceID_budget hid)
   exact justesenRoundMembershipStart_budget (encJustesenSourceContext_adjacency_budget hctx)
     hround (encJustesenSourceContext_targetID_budget hctx)
 
