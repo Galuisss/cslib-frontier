@@ -37,6 +37,7 @@ import CslibFrontier.Foundations.Data.List.Lookup
 import CslibFrontier.Foundations.Data.List.OfFn
 import CslibFrontier.Foundations.Data.Nat.BinarySize
 import Mathlib.Data.List.GetD
+import Mathlib.Data.List.Sort
 
 /-!
 # Two-player Nash equilibrium is in PPAD
@@ -1128,18 +1129,11 @@ private lemma card_finsetOfList {m n : ℕ} {L : List ℕ} (hnd : L.Nodup)
     simp only [Equiv.apply_symm_apply] at h1
     exact Subtype.ext h1
 
-private lemma eq_of_pairwise_lt_of_mem_iff {L₁ L₂ : List ℕ}
-    (hs₁ : L₁.Pairwise (· < ·)) (hs₂ : L₂.Pairwise (· < ·))
-    (hmem : ∀ k, k ∈ L₁ ↔ k ∈ L₂) : L₁ = L₂ :=
-  (List.perm_of_nodup_nodup_toFinset_eq hs₁.nodup hs₂.nodup (by
-    ext k; simp only [List.mem_toFinset]; exact hmem k)).eq_of_pairwise
-    (fun _ _ _ _ h1 h2 => False.elim (Nat.lt_asymm h1 h2)) hs₁ hs₂
-
 private lemma eq_of_finsetOfList_eq {m n : ℕ} {L₁ L₂ : List ℕ}
     (hs₁ : L₁.Pairwise (· < ·)) (hs₂ : L₂.Pairwise (· < ·))
     (hlt₁ : ∀ k ∈ L₁, k < m + n) (hlt₂ : ∀ k ∈ L₂, k < m + n)
     (heq : finsetOfList m n L₁ = finsetOfList m n L₂) : L₁ = L₂ :=
-  eq_of_pairwise_lt_of_mem_iff hs₁ hs₂ fun k => by
+  hs₁.eq_of_mem_iff hs₂ fun k => by
     by_cases hk : k < m + n
     · simpa only [mem_finsetOfList, Equiv.apply_symm_apply] using
         Finset.ext_iff.1 heq (finSumFinEquiv.symm ⟨k, hk⟩)
@@ -1186,7 +1180,7 @@ private lemma orderIsoOfFin_finsetOfList {m n k : ℕ} {L : List ℕ} (hsort : L
     intro a b ha hb hab
     simp only [List.getElem_ofFn]
     exact hf_mono (Fin.mk_lt_mk.2 hab)
-  have heq : List.ofFn f = L := eq_of_pairwise_lt_of_mem_iff hsort_ofFn hsort fun x => by
+  have heq : List.ofFn f = L := hsort_ofFn.eq_of_mem_iff hsort fun x => by
     rw [List.mem_ofFn]
     constructor
     · rintro ⟨j, rfl⟩
@@ -1473,7 +1467,7 @@ private lemma decodeT₂_encodeNodes {c : BimatrixCode} (T₁ T₂ : List ℕ) {
 
 private lemma decodeT₁_zeroVertex (c : BimatrixCode) :
     decodeT₁ c (zeroVertex (2 * (c.rows + c.cols))) = List.range c.rows :=
-  eq_of_pairwise_lt_of_mem_iff (decodeT₁_sorted c _) List.pairwise_lt_range fun k => by
+  (decodeT₁_sorted c _).eq_of_mem_iff List.pairwise_lt_range fun k => by
     simp only [List.mem_range, decodeT₁, List.mem_filter, zeroVertex]
     refine ⟨?_, fun hk => by simp [show k < c.rows + c.cols by omega, hk]⟩
     rintro ⟨hk, hne⟩
@@ -1484,7 +1478,7 @@ private lemma decodeT₂_zeroVertex (c : BimatrixCode) :
     decodeT₂ c (zeroVertex (2 * (c.rows + c.cols))) = (List.range c.cols).map (· + c.rows) := by
   have hsort : ((List.range c.cols).map (· + c.rows)).Pairwise (· < ·) :=
     List.pairwise_lt_range.map _ fun _ _ h => by omega
-  refine eq_of_pairwise_lt_of_mem_iff (decodeT₂_sorted c _) hsort fun k => ?_
+  refine (decodeT₂_sorted c _).eq_of_mem_iff hsort fun k => ?_
   simp only [List.mem_map, List.mem_range, decodeT₂, List.mem_filter, zeroVertex]
   constructor
   · rintro ⟨hk, hne⟩
@@ -3056,14 +3050,14 @@ private abbrev pertRhsQQ (c : BimatrixCode) : Fin c.rows ⊕ Fin c.cols → ℚ 
 private lemma decodeT₁_encodeNodes_eq {c : BimatrixCode} {v : List Bool} {L₁ L₂ : List ℕ}
     (hv : v = encodeNodes c L₁ L₂) (hsort : L₁.Pairwise (· < ·))
     (hlt : ∀ k ∈ L₁, k < c.rows + c.cols) : decodeT₁ c v = L₁ :=
-  eq_of_pairwise_lt_of_mem_iff (decodeT₁_sorted c v) hsort fun k =>
+  (decodeT₁_sorted c v).eq_of_mem_iff hsort fun k =>
     ⟨fun hk => (decodeT₁_encodeNodes L₁ L₂ (decodeT₁_lt c v hk)).1 (hv ▸ hk),
      fun hk => hv ▸ (decodeT₁_encodeNodes L₁ L₂ (hlt k hk)).2 hk⟩
 
 private lemma decodeT₂_encodeNodes_eq {c : BimatrixCode} {v : List Bool} {L₁ L₂ : List ℕ}
     (hv : v = encodeNodes c L₁ L₂) (hsort : L₂.Pairwise (· < ·))
     (hlt : ∀ k ∈ L₂, k < c.rows + c.cols) : decodeT₂ c v = L₂ :=
-  eq_of_pairwise_lt_of_mem_iff (decodeT₂_sorted c v) hsort fun k =>
+  (decodeT₂_sorted c v).eq_of_mem_iff hsort fun k =>
     ⟨fun hk => (decodeT₂_encodeNodes L₁ L₂ (decodeT₂_lt c v hk)).1 (hv ▸ hk),
      fun hk => hv ▸ (decodeT₂_encodeNodes L₁ L₂ (hlt k hk)).2 hk⟩
 
