@@ -534,7 +534,7 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   · rintro other ⟨result, hother, hret, _, _, _⟩
     exact hunique other ⟨result, htally ▸ hother, htally ▸ hret⟩
 
--- The compiled loop has an accepting occurrence with a mathematical source verdict.
+-- Only one selector list can yield an accepting native occurrence and source verdict.
 example {k : ℕ} {State : Type} [Fintype State] {α : Type} {enc : α ↪ List Bool} {S : α → ℕ}
     (ntm : MultiTapeNTM k Bool State) (c : ℕ) (baseline : JustesenSourceContext) (fuel : ℕ)
     (contextOf : α → JustesenSourceContext) (limitOf : α → ℕ)
@@ -550,7 +550,7 @@ example {k : ℕ} {State : Type} [Fintype State] {α : Type} {enc : α ↪ List 
       limitOf a = n →
       let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
       let M := justesenSourceLoop ntm c (contextOf a) n
-      ∃ bits verdict, M.run w bits = .inr (some verdict) ∧
+      ∃! bits, ∃ verdict, M.run w bits = .inr (some verdict) ∧
         (∃! indices, ∃ final,
           Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg w) indices =
             some (bits, final) ∧ final.Halted ∧ final.output = [true]) ∧
@@ -562,18 +562,23 @@ example {k : ℕ} {State : Type} [Fintype State] {α : Type} {enc : α ↪ List 
           (∀ radius, ∃! transcript, Passes edge source radius transcript) ∧
             (hit = true ↔ Relation.ReflTransGen edge source target) := by
   intro w I n seed source target hcontext hlimit edge M
-  obtain ⟨bits, verdict, hfirst, hresult⟩ :=
-    configurationJustesenSourceLoop_exists_firstHalting ntm c w seed source target
+  obtain ⟨bits, ⟨verdict, hfirst, hresult⟩, hunique⟩ :=
+    configurationJustesenSourceLoop_existsUnique_firstHalting ntm c w seed source target
   have hspec := configurationJustesenSourceLoop_correct ntm c w seed source target
     bits verdict hfirst hresult
   have hfirst' : M.FirstHalting w bits M.init := by
     simpa only [M, hcontext] using hfirst
   have hresult' : M.run w bits = .inr (some verdict) := by
     simpa only [M, hcontext] using hresult
-  refine ⟨bits, verdict, hresult', ?_, hspec⟩
-  apply (justesenSourceLoop_native_firstHalting_accept_iff ntm c R a bits).mpr
-  refine ⟨verdict, ?_⟩
-  rw [hlimit]
-  exact ⟨hfirst', hresult'⟩
+  refine ⟨bits, ⟨verdict, hresult', ?_, hspec⟩, ?_⟩
+  · apply (justesenSourceLoop_native_firstHalting_accept_iff ntm c R a bits).mpr
+    refine ⟨verdict, ?_⟩
+    rw [hlimit]
+    exact ⟨hfirst', hresult'⟩
+  · rintro other ⟨_, _, hother, _⟩
+    obtain ⟨v, hf, hr⟩ :=
+      (justesenSourceLoop_native_firstHalting_accept_iff ntm c R a other).mp hother
+    rw [hlimit, hcontext] at hf hr
+    exact hunique other ⟨v, hf, hr⟩
 
 end CslibFrontierTests.STCONJustesenTally
