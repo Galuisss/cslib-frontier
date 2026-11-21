@@ -40,6 +40,8 @@ prepared field in its state and uses it to start each scan on the original input
   a valid requested scan has exactly one first-halting selector list returning a verdict.
 * `Cslib.Complexity.STCON.configurationJustesenSeedSchedulerScan_readReply_correct`:
   parsed scanner replies give the first tie or the reachability verdict for the requested source.
+* `Cslib.Complexity.STCON.configurationJustesenSeedSchedulerEntry_inSpace`:
+  construct the original-word entry within the logarithmic workspace budget.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_haltsWithin_clock`:
   a common polynomial selector clock for every branch.
 -/
@@ -148,6 +150,36 @@ noncomputable def configurationJustesenSeedSchedulerEntry {k : ℕ} {State : Typ
     JustesenSeedSchedulerState :=
   let field := configurationFieldContext ntm c w
   (field, (justesenSeedSchedulerFor ntm c (configurationSeedSearchSetup ntm c w) field).init)
+
+private theorem inSpace_of_logSpace_and_length {β : Type} {enc : β ↪ List Bool}
+    {f : List Bool → β} (h : ComputableInLogSpace f encBits enc)
+    (hlen : ∃ C, ∀ w, (enc (f w)).length ≤ C * (Nat.log2 w.length + 1)) :
+    ComputableInSpace f encBits enc (fun w => Nat.log2 w.length + 1) := by
+  obtain ⟨time, A, hwork⟩ := h
+  obtain ⟨B, hlen⟩ := hlen
+  refine ⟨time, max A B, hwork.mono (fun _ => le_rfl) (fun w => ?_), fun w => ?_⟩
+  · simp only [encBits_apply]
+    exact (Nat.mul_le_mul_right _ (le_max_left _ _)).trans
+      (Nat.mul_le_mul_left _ (Nat.le_succ _))
+  · exact (hlen w).trans ((Nat.mul_le_mul_right _ (le_max_right _ _)).trans
+      (Nat.mul_le_mul_left _ (Nat.le_succ _)))
+
+/-- The fixed scheduler's original-word entry uses logarithmic workspace and charges its
+encoded output, including the retained field. -/
+theorem configurationJustesenSeedSchedulerEntry_inSpace {k : ℕ} {State : Type}
+    [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ComputableInSpace (configurationJustesenSeedSchedulerEntry ntm c)
+      encBits encJustesenSeedSchedulerState (fun w => Nat.log2 w.length + 1) := by
+  have hsetup := inSpace_of_logSpace_and_length (configurationSeedSearchSetup_inLogSpace ntm c)
+    (length_configurationSeedSearchSetup_le_log ntm c)
+  have hfield := inSpace_of_logSpace_and_length (configurationFieldContext_inLogSpace ntm c)
+    (length_configurationFieldContext_le_log ntm c)
+  have hstart := justesenSourceLoopEntryOfRequest_budget
+    (fst encSeedScanRequest encFieldContext) (snd encSeedScanRequest encFieldContext)
+  have hinit := SeedSchedulerMachine.init_withContext_budget encFieldContext
+    encJustesenSourceLoopState (justesenSeedSchedulerScan ntm c)
+    (fun p => justesenSourceLoopEntryOfRequest p.1 p.2) SourceRoundLoop.reply hstart hsetup hfield
+  exact budget_prod hfield hinit
 
 /-- Every selector replay from an original-word entry retains the field and agrees with
 the scheduler initialized directly for that word, including rejected replays. -/

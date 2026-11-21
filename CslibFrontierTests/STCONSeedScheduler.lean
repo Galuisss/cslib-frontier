@@ -316,4 +316,10 @@ example {k : ℕ} {State α : Type} [Fintype State] (ntm : MultiTapeNTM k Bool S
   exact ⟨ComputableInSpace.budget_comp_linear hq hs,
     ComputableInSpace.budget_comp_linear hh hs, ComputableInSpace.budget_comp_linear ha hs⟩
 
+/-- The original word produces the full retained entry within the compiler's budget. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ComputableInSpace (configurationJustesenSeedSchedulerEntry ntm c)
+      encBits encJustesenSeedSchedulerState (fun w => Nat.log2 w.length + 1) :=
+  configurationJustesenSeedSchedulerEntry_inSpace ntm c
+
 end CslibFrontierTests.STCONSeedScheduler

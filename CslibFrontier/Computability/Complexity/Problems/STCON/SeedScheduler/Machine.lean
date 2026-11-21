@@ -131,26 +131,65 @@ theorem observations_eq {σ : Type} (setup next : SeedSearchSetup)
   ⟨rfl, rfl, rfl⟩
 
 open _root_.Turing.MultiTapeTM.ComputableInSpace in
+/-- Enter the skip or active phase using a shared budget for the frame and its scanner entry. -/
+theorem enter_budget {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ}
+    (encScan : σ ↪ List Bool) (start : α → SeedScanRequest → σ)
+    {current : α → SeedSchedulerFrame} (hframe : ComputableInSpace current enc
+      encSeedSchedulerFrame S)
+    (hentry : ComputableInSpace (fun a => start a (current a).request) enc encScan S) :
+    ComputableInSpace (fun a => enter (start a) (current a)) enc (encState encScan) S := by
+  let scanState := encPair encSeedSchedulerFrame encScan
+  let live := encSum encSeedSchedulerFrame scanState
+  let terminal := encOption (encOption encAnswer)
+  have hscan := budget_comp_linear (of_inO (ComputableInO.inr encSeedSchedulerFrame scanState))
+    (budget_prod hframe hentry)
+  have hskip := budget_comp_linear
+    (of_inO (ComputableInO.inl encSeedSchedulerFrame scanState)) hframe
+  have hlive := budget_ite (SeedSchedulerFrame.needsScan_budget hframe) hscan hskip
+  exact (budget_comp_linear (of_inO (ComputableInO.inl live terminal)) hlive).of_enc_eq fun a => by
+    change encState encScan (enter (start a) (current a)) = encState encScan
+      (.inl (if (current a).needsScan then .inr (current a, start a (current a).request)
+        else .inl (current a)))
+    unfold enter
+    split <;> rfl
+
+open _root_.Turing.MultiTapeTM.ComputableInSpace in
 /-- Enter a skipped root or an active scan within space linear in the encoded frame. -/
 theorem enter_inSpace {σ : Type} (encScan : σ ↪ List Bool) (start : SeedScanRequest → σ)
     (hstart : ComputableInSpace start encSeedScanRequest encScan
       (fun r => (encSeedScanRequest r).length)) :
     ComputableInSpace (enter start) encSeedSchedulerFrame (encState encScan)
       (fun f => (encSeedSchedulerFrame f).length) := by
-  let scanState := encPair encSeedSchedulerFrame encScan
-  let live := encSum encSeedSchedulerFrame scanState
-  let terminal := encOption (encOption encAnswer)
   have hframe := budget_id (enc := encSeedSchedulerFrame) (.refl _)
-  have hentry := budget_comp_linear hstart (encSeedSchedulerFrame_request_budget hframe)
-  have hscan := budget_comp_linear (of_inO (ComputableInO.inr encSeedSchedulerFrame scanState))
-    (budget_prod hframe hentry)
-  have hskip := of_inO (ComputableInO.inl encSeedSchedulerFrame scanState)
-  have hlive := budget_ite (SeedSchedulerFrame.needsScan_budget hframe) hscan hskip
-  exact (budget_comp_linear (of_inO (ComputableInO.inl live terminal)) hlive).of_enc_eq fun f => by
-    change encState encScan (enter start f) = encState encScan
-      (.inl (if f.needsScan then .inr (f, start f.request) else .inl f))
-    unfold enter
-    split <;> rfl
+  exact enter_budget encScan (fun _ => start) hframe
+    (budget_comp_linear hstart (encSeedSchedulerFrame_request_budget hframe))
+
+open _root_.Turing.MultiTapeTM.ComputableInSpace in
+/-- Initialize the scheduler within the budget of the setup and context producers.
+The scan entry uses both the pending request and the prepared context. -/
+theorem init_withContext_budget {α κ σ : Type} {enc : α ↪ List Bool} {S : α → ℕ}
+    (encContext : κ ↪ List Bool) (encScan : σ ↪ List Bool) (scan : NondeterministicQueryMachine σ)
+    (start : SeedScanRequest × κ → σ) (verdict : σ → Option ControllerVerdict)
+    (hstart : ComputableInSpace start (encPair encSeedScanRequest encContext) encScan
+      (fun p => (encPair encSeedScanRequest encContext p).length))
+    {setup : α → SeedSearchSetup} {context : α → κ}
+    (hsetup : ComputableInSpace setup enc encSeedSearchSetup S)
+    (hcontext : ComputableInSpace context enc encContext S) :
+    ComputableInSpace (fun a => (machine (setup a) scan (fun r => start (r, context a))
+      verdict).init) enc (encState encScan) S := by
+  have hzero := (constZero (encIn := enc) (encB := encNat) 0).mono_le (fun a => Nat.zero_le (S a))
+  have hcandidate := seedSchedulerCandidate_budget hsetup hzero
+  have hframe := snd encContext encSeedSchedulerFrame
+  have hreadContext := fst encContext encSeedSchedulerFrame
+  have hrequest := encSeedSchedulerFrame_request_budget hframe
+  have henter := enter_budget encScan (fun p r => start (r, p.1)) hframe
+    (budget_comp_linear hstart (budget_prod hrequest hreadContext))
+  have hexhaust :=
+    budget_const (encIn := encContext) (encB := encState encScan) (.inr (some none)) (.refl _)
+  exact (budget_comp_linear (optionElimSnd hexhaust henter)
+    (budget_prod hcontext hcandidate)).of_enc_eq fun a => by
+      unfold machine
+      cases seedSchedulerCandidate (setup a) 0 <;> rfl
 
 open _root_.Turing.MultiTapeTM.ComputableInSpace in
 /-- Construct the scheduler's initial state under the setup producer's workspace budget. -/
@@ -162,10 +201,9 @@ theorem init_budget {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ}
     {setup : α → SeedSearchSetup} (hsetup : ComputableInSpace setup enc encSeedSearchSetup S) :
     ComputableInSpace (fun a => (machine (setup a) scan start verdict).init)
       enc (encState encScan) S := by
-  have hzero := (constZero (encIn := enc) (encB := encNat) 0).mono_le (fun a => Nat.zero_le (S a))
-  have hcandidate := seedSchedulerCandidate_budget hsetup hzero
-  have hentry := optionElim (.inr (some none)) (enter_inSpace encScan start hstart)
-  exact (budget_comp_linear hentry hcandidate).of_enc_eq fun _ => rfl
+  have hunit := (constZero (encIn := enc) (encB := encUnit) ()).mono_le (fun a => Nat.zero_le (S a))
+  exact init_withContext_budget encUnit encScan scan (fun p => start p.1) verdict
+    (budget_comp_linear hstart (fst encSeedScanRequest encUnit)) hsetup hunit
 
 open _root_.Turing.MultiTapeTM.ComputableInSpace in
 /-- Resume the scheduler in workspace linear in the paired frame and optional verdict.
