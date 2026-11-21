@@ -837,8 +837,6 @@ local notation "C" => NondeterministicChoice.machine N
 
 private abbrev encAnswer := encPair (encOption encBool) encBool
 
-set_option maxHeartbeats 800000 in
--- The generated register projections and branching budget terms require additional elaboration.
 private theorem chooseNext_inSpace (encCallee : τ ↪ List Bool)
     (hstart : ComputableInSpace (fun p : Fin N × Fin N => start p.1 p.2)
       (encPair (encVertex N) (encVertex N)) encCallee
@@ -963,8 +961,6 @@ private theorem accept_inSpace (encCallee : τ ↪ List Bool) :
       (budget_optionIsSome hid))
   exact (h.of_encIn_eq (stateView N τ) (fun _ => rfl)).of_enc_eq fun s => by cases s <;> rfl
 
-set_option maxHeartbeats 800000 in
--- Transport across both tagged sums unfolds the generated encodings during elaboration.
 private theorem next_inSpace (encCallee : τ ↪ List Bool)
     (hstart : ComputableInSpace (fun p : Fin N × Fin N => start p.1 p.2)
       (encPair (encVertex N) (encVertex N)) encCallee
