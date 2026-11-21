@@ -13,6 +13,7 @@ import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProduct
 import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProductBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicValueBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
+import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseIntegerRootLabel
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
 import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomial
 import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomialBounds
@@ -591,5 +592,33 @@ example (k : ℕ) :
   exact Polynomial.eval₂_eq_zero_or_dyadic_bounds hp hD
     ((Polynomial.natDegree_iterate_derivative p k).trans ((Nat.sub_le _ _).trans hD)) hb hk
     (by simp [p])
+
+-- With both roots eligible, one derivative test labels just one root of X² − 1.
+example :
+    let p : Polynomial ℤ := Polynomial.X ^ 2 - 1
+    ∃ L : List (Fin 2 × SignType), L.length ≤ 1 ∧ ∃ x : ℝ, x ^ 2 = 1 ∧
+      let label := Polynomial.sparseIntegerRootLabel p 1 1 1 L
+      0 < label.eval₂ (Int.castRingHom ℝ) x ∧ label.eval₂ (Int.castRingHom ℝ) (-x) < 0 := by
+  intro p
+  have hp : p ≠ 0 := by
+    intro h
+    have he := congrArg (fun f : Polynomial ℤ => f.eval 0) h
+    simp [p] at he
+  have hD : p.natDegree ≤ 2 := (Polynomial.natDegree_sub_le _ _).trans (by simp)
+  have hxnorm : (Polynomial.X ^ 2 : Polynomial ℤ).coeffNorm1 ≤ 1 := by
+    simpa only [one_mul, Polynomial.coeffNorm1_one] using
+      Polynomial.coeffNorm1_mul_X_pow_le (1 : Polynomial ℤ) 2
+  have hnorm : p.coeffNorm1 ≤ 2 ^ 1 := (Polynomial.coeffNorm1_sub_le _ _).trans
+    (by simpa only [Polynomial.coeffNorm1_one, pow_one, Nat.reduceAdd] using
+      Nat.add_le_add_right hxnorm 1)
+  obtain ⟨L, hL, x, hx, _, hpos, hneg⟩ := Polynomial.exists_sparseIntegerRootLabel
+    (q := 1) hp hD (by decide : 2 ≤ 2 ^ 1) (by simp) hnorm (by simp)
+    ⟨1, by simp [p], by simp⟩
+  have hx₂ : x ^ 2 = 1 := by simpa [p, sub_eq_zero] using hx
+  have hne : -x ≠ x := by
+    intro h
+    have hx₀ : x = 0 := by linarith
+    simp [hx₀] at hx₂
+  exact ⟨L, hL, x, hx₂, hpos, hneg (-x) (by simp [p, hx₂]) hne⟩
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
