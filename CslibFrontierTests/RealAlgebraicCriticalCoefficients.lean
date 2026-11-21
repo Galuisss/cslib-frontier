@@ -7,8 +7,7 @@ module
 -- upstream: local-only (tests)
 
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
-import all CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValuePolynomial
-import all CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.MultiplicationMatrix
+import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValuePolynomial
 import CslibFrontier.Foundations.Data.MvPolynomial.Degrees
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.ResidueCoeffNorm
 import Mathlib.Tactic.NormNum
@@ -207,9 +206,9 @@ example :
     rw [hdef, pow_succ G 2, map_sub, map_mul, hproj, one_mul, sub_self]
   have hdeg : G.totalDegree ≤ 2 := by simp [G]
   have hchar : valuePolynomial (by decide : 1 ≤ 2) a 1 G hdeg = Polynomial.X ^ 2 := by
-    unfold valuePolynomial multiplicationMatrix
-    change (Algebra.leftMulMatrix _ (π (deformedPolynomial 2 a 1 G))).charpoly = _
-    rw [hzero, map_zero, Matrix.charpoly_zero]
+    have heq : π (deformedPolynomial 2 a 1 G) = π 0 := hzero.trans (map_zero π).symm
+    rw [valuePolynomial, multiplicationMatrix_eq_of_projection_eq _ r _ heq,
+      map_zero, Matrix.charpoly_zero]
     simp [NormalIndex]
   simpa only [F, G, a, map_X] using hchar
 

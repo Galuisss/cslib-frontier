@@ -39,7 +39,7 @@ variable {S T : Type*} [CommRing S] [CommRing T] {n ell : ℕ}
 /-- The characteristic polynomial of multiplication by the deformed potential in the
 quotient by the normalized equations `X i ^ ell - criticalLower ell a u F i`.
 The gradient generates this ideal when the scalar `ell + 1` is a unit. -/
-noncomputable def valuePolynomial (hell : 1 ≤ ell) (a : Fin n → S) (u : S)
+@[expose] noncomputable def valuePolynomial (hell : 1 ≤ ell) (a : Fin n → S) (u : S)
     (F : MvPolynomial (Fin n) S) (hF : F.totalDegree ≤ ell) : Polynomial S :=
   (multiplicationMatrix hell (criticalLower ell a u F) (criticalLower_degree ell hell a u F hF)
     (deformedPolynomial ell a u F)).charpoly

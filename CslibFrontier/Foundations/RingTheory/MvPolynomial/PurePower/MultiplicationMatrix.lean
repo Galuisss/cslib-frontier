@@ -42,6 +42,13 @@ noncomputable def multiplicationMatrix (hell : 1 ≤ ell)
     MvPolynomial (Fin n) S →ₐ[S] Matrix (NormalIndex n ell) (NormalIndex n ell) S :=
   (Algebra.leftMulMatrix (normalBasis hell r hr)).comp (projection ell r)
 
+/-- Polynomials that represent the same quotient element give the same multiplication matrix. -/
+theorem multiplicationMatrix_eq_of_projection_eq (hell : 1 ≤ ell)
+    (r : Fin n → MvPolynomial (Fin n) S) (hr : ∀ i, (r i).totalDegree < ell)
+    {v w : MvPolynomial (Fin n) S} (h : projection ell r v = projection ell r w) :
+    multiplicationMatrix hell r hr v = multiplicationMatrix hell r hr w :=
+  congrArg (Algebra.leftMulMatrix (normalBasis hell r hr)) h
+
 /-- The normal monomial coordinates of multiplication commute with every coefficient map. -/
 theorem multiplicationMatrix_map (φ : S →+* T) (hell : 1 ≤ ell)
     (r : Fin n → MvPolynomial (Fin n) S) (hr : ∀ i, (r i).totalDegree < ell)
