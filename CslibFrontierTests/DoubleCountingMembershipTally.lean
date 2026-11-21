@@ -16,6 +16,8 @@ set_option linter.privateModule false
 namespace CslibFrontierTests.DoubleCountingMembershipTally
 
 open Turing Turing.DoubleCounting.MembershipTally
+open MultiTapeTM ComputableInSpace NondeterministicQueryMachine
+open Cslib.DoubleCounting
 
 private def unusedWalk : NondeterministicQueryMachine Unit where
   init := ()
@@ -78,33 +80,73 @@ private def edge : QueryMachine Unit where
   emit := fun _ => []
   finish := fun _ => []
 
+private def adjacent : Fin 2 → Fin 2 → Bool := fun _ _ => false
+
+private def start (_ _ : Fin 2) : Unit := ()
+
+private def verdict (_ : Unit) : Bool := false
+
+private def negativeContext : Context := ⟨2, 0, 1, 0, ⟨1, 0⟩⟩
+
+private def negativeBranch : Scan.Branch 2 := fun v =>
+  if v = 0 then some [] else none
+
+private def negativeSelectors : List Bool :=
+  selectors (Turing.DoubleCounting.BoundedWalk.selectors 0) negativeBranch
+
+private theorem negativeScan : Scan.run adjacent 0 1 0 ⟨1, 0⟩ negativeBranch = some false := by
+  rw [Scan.run_eq_finish, Scan.tallyPrefix_succ adjacent 0 1 0 negativeBranch (n := 1) (by decide),
+    Scan.tallyPrefix_succ adjacent 0 1 0 negativeBranch (n := 0) (by decide), Scan.tallyPrefix_zero]
+  simp [negativeBranch, Scan.walkM, Scan.readNext, bind, StateT.bind, pure, StateT.pure,
+    Scan.Result.finish, Scan.Result.recordWalk, Scan.Result.zero, Tally.matches_iff]
+
+private theorem negativeBranch_unique (other : Scan.Branch 2)
+    (h : negativeSelectors = selectors (Turing.DoubleCounting.BoundedWalk.selectors 0) other) :
+    other = negativeBranch :=
+  selectors_injective _ (Turing.DoubleCounting.BoundedWalk.eq_of_selectors_prefix 0) h.symm
+
 -- A checked zero-step walk is selected, but the queried vertex is skipped.
 example :
-    let branch : Cslib.DoubleCounting.Scan.Branch 2 := fun v =>
-      if v = 0 then some [] else none
-    let bits := selectors (Turing.DoubleCounting.BoundedWalk.selectors 0) branch
-    let M := withBoundedWalk edge (fun (_ _ : Fin 2) => ()) (fun _ => false)
-      0 0 ⟨2, 0, 1, 0, ⟨1, 0⟩⟩
-    M.FirstHalting [] bits M.init ∧ M.run [] bits = .inr (.inr (some false)) := by
-  let branch : Cslib.DoubleCounting.Scan.Branch 2 := fun v =>
-    if v = 0 then some [] else none
-  let bits := selectors (Turing.DoubleCounting.BoundedWalk.selectors 0) branch
-  let adjacent : Fin 2 → Fin 2 → Bool := fun _ _ => false
-  have hrun : Cslib.DoubleCounting.Scan.run adjacent 0 1 0 ⟨1, 0⟩ branch = some false := by
-    rw [Cslib.DoubleCounting.Scan.run_eq_finish,
-      Cslib.DoubleCounting.Scan.tallyPrefix_succ adjacent 0 1 0 branch (n := 1) (by decide),
-      Cslib.DoubleCounting.Scan.tallyPrefix_succ adjacent 0 1 0 branch (n := 0) (by decide),
-      Cslib.DoubleCounting.Scan.tallyPrefix_zero]
-    simp [branch, Cslib.DoubleCounting.Scan.walkM, Cslib.DoubleCounting.Scan.readNext,
-      bind, StateT.bind, pure, StateT.pure, Cslib.DoubleCounting.Scan.Result.finish,
-      Cslib.DoubleCounting.Scan.Result.recordWalk, Cslib.DoubleCounting.Scan.Result.zero,
-      Cslib.DoubleCounting.Tally.matches_iff]
-  apply (withBoundedWalk_firstHalting_iff edge (fun _ _ => ()) (fun _ => false) 0 0 []
-    adjacent 0 1 0 ⟨1, 0⟩ bits false (fun _ _ => rfl) (fun _ _ => rfl)).mpr
-  refine ⟨branch, ⟨rfl, hrun⟩, ?_⟩
-  intro other hother
-  -- The serializer has a fixed-width, prefix-free payload at each selected candidate.
-  exact selectors_injective _ (Turing.DoubleCounting.BoundedWalk.eq_of_selectors_prefix 0)
-    hother.1.symm
+    let M := withBoundedWalk edge start verdict 0 0 negativeContext
+    M.FirstHalting [] negativeSelectors M.init ∧
+      M.run [] negativeSelectors = .inr (.inr (some false)) :=
+  (withBoundedWalk_firstHalting_iff edge start verdict 0 0 []
+    adjacent 0 1 0 ⟨1, 0⟩ negativeSelectors false (fun _ _ => rfl) (fun _ _ => rfl)).mpr
+    ⟨negativeBranch, ⟨rfl, negativeScan⟩, fun other h => negativeBranch_unique other h.1⟩
+
+private def budget (input : List Bool) : ℕ :=
+  Nat.log2 input.length + boundedWalkStateBound 2 0 negativeContext 0 + 1
+
+private theorem routines : Nonempty
+    (Routines (withBoundedWalk edge start verdict 0 0 negativeContext)
+      (fun _ : List Bool => initial negativeContext) encBits budget) := by
+  refine withBoundedWalk_exists_routines edge start verdict 0 0 encBits budget
+    negativeContext (fun _ => negativeContext) encUnit ?_ ?_
+    (budget_const () (.refl _)) (budget_const 0 (.refl _)) (budget_const () (.refl _))
+    (budget_const true (.refl _)) (budget_const false (.refl _)) (fun _ => 0) ?_ ?_
+  · exact (ComputableInSpace.constZero negativeContext).mono_le fun _ => Nat.zero_le _
+  · intro input
+    rw [encBits_apply]
+    unfold budget
+    omega
+  · intro input u v t ht
+    rw [encUnit_apply]
+    rfl
+  · intro input
+    unfold budget
+    omega
+
+/-- A passing negative result is one accepting native callback occurrence. -/
+example : ∃ R : Routines (withBoundedWalk edge start verdict 0 0 negativeContext)
+    (fun _ : List Bool => initial negativeContext) encBits budget,
+    ∃! indices, ∃ final,
+      Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg []) indices =
+        some (negativeSelectors, final) ∧ final.Halted ∧ final.output = [true] := by
+  obtain ⟨R⟩ := routines
+  refine ⟨R, (withBoundedWalk_native_firstHalting_iff edge start verdict 0 0 negativeContext
+    (fun _ => negativeContext) R [] adjacent 0 1 0 ⟨1, 0⟩ negativeSelectors rfl
+    (fun _ _ => rfl) (fun _ _ => rfl)).mpr ?_⟩
+  exact ⟨negativeBranch, ⟨rfl, false, negativeScan⟩,
+    fun other h => negativeBranch_unique other h.1⟩
 
 end CslibFrontierTests.DoubleCountingMembershipTally

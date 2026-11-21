@@ -528,23 +528,13 @@ theorem firstHalting_finish {τ : Type} (ctx : Context)
   have hlast : M.run input (bits ++ [false]) = .inr (.inr (some hit)) := by
     rw [M.run_append, hboundary, M.replay_cons, M.replay_nil]
     simp [M, NondeterministicQueryMachine.step, machine, hfinish]
-  refine ⟨⟨?_, ?_⟩, hlast⟩
+  refine ⟨M.firstHalting_append_singleton input bits false (s := M.init) ?_ ?_, hlast⟩
+  · change M.halted (M.run input bits) = false
+    rw [hboundary]
+    rfl
   · change M.halted (M.run input (bits ++ [false])) = true
     rw [hlast]
     rfl
-  · intro n hn
-    have hlen : n ≤ bits.length := by
-      simp only [List.length_append, List.length_singleton] at hn
-      omega
-    change M.halted (M.run input ((bits ++ [false]).take n)) = false
-    rw [List.take_append_of_le_length hlen]
-    cases h : M.halted (M.run input (bits.take n))
-    · rfl
-    · have heq : M.run input bits = M.run input (bits.take n) := by
-        conv_lhs => rw [← List.take_append_drop n bits]
-        exact M.run_append_of_halted input h _
-      rw [← heq, hboundary] at h
-      cases h
 
 /-- Replay a successful typed scan as a first-halting membership tally, using the supplied
 same-input replay of each successful typed walk. -/
