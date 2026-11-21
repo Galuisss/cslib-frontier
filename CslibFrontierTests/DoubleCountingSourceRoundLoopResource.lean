@@ -16,6 +16,7 @@ set_option linter.privateModule false
 namespace CslibFrontierTests.DoubleCountingSourceRoundLoopResource
 
 open Turing MultiTapeTM ComputableInSpace
+open Turing.DoubleCounting
 open Turing.DoubleCounting.SourceRoundLoop
 
 private def callback : NondeterministicQueryMachine Unit where
@@ -50,20 +51,20 @@ example : (scan.run [] [false, false, false, false]) = .inr (some (.decided fals
 
 -- The same concrete machine has the composed clock on every branch and every input.
 example (input : List Bool) : scan.HaltsWithin input 15 := by
-  simpa only [scan, oneVertex, roundClock] using
+  simpa only [scan, oneVertex, SourceRound.roundClock] using
     withSourceRound_haltsWithin oneVertex source callback entry (fun _ => some true) () 1
       callback memberEntry (fun _ => some false) input 0 0
-      (fun _ _ _ _ _ => rfl) (fun _ _ _ _ => rfl)
+      (fun _ _ _ _ _ _ => rfl) (fun _ _ _ _ => rfl)
 
 -- The bound includes the actual suspended single-round state and the outer registers.
 example (input choices : List Bool) :
-    (encState encUnit (Turing.DoubleCounting.SourceRound.encMachineState Unit encUnit)
+    (encState encUnit (SourceRound.encMachineState Unit encUnit)
       encUnit (scan.run input choices)).length ≤
-      2 * registerStateBound encUnit () 1 1 + roundStateBound ⟨1, 0, 1, ⟨2, 1⟩⟩ 0 +
-        (encNat 1).length + 4 := by
-  simpa only [scan, oneVertex, source, Nat.one_mul, Nat.mul_one, max_zero] using
-    withSourceRound_length_run_le oneVertex source callback entry (fun _ => some true) () 1
-      encUnit encUnit encUnit callback memberEntry (fun _ => some false) input 0 0
-      (fun _ _ _ _ => Nat.zero_le 0) (fun _ _ _ => Nat.zero_le 0) choices
+      2 * registerStateBound encUnit () (oneVertex ()) 1 +
+        max (SourceRound.roundStateBound ⟨oneVertex (), source (), 1,
+          ⟨1 + 1 * oneVertex (), oneVertex () * 1 * 1⟩⟩ 0) 0 + (encNat 1).length + 4 :=
+  withSourceRound_length_run_le oneVertex source callback entry (fun _ => some true) () 1
+    encUnit encUnit encUnit callback memberEntry (fun _ => some false) input 0 0
+    (fun _ _ _ _ _ => Nat.zero_le 0) (fun _ _ _ => Nat.zero_le 0) choices
 
 end CslibFrontierTests.DoubleCountingSourceRoundLoopResource

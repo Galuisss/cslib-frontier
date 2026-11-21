@@ -144,44 +144,34 @@ theorem admissible_closed (input : List Bool) :
   · simp only [Registers.advance]
     nlinarith
 
-/-- The common single-round clock given a common clock for its supplied callbacks. -/
-@[expose] def roundClock (size callbackClock : ℕ) : ℕ :=
-  (size + 1) * (2 * size + 1) * (callbackClock + 2) + (callbackClock + 1)
-
-/-- Compose the concrete source-round clock with the final membership clock on all branches. -/
+/-- Compose the concrete source-round clock with the final membership clock on all branches.
+The round callback only receives requests in range for the retained dimension. -/
 theorem withSourceRound_haltsWithin (member : NondeterministicQueryMachine μ)
     (memberStart : Registers κ → μ) (memberReply : μ → Option Bool) (input : List Bool)
     (callbackClock memberClock : ℕ)
     (hcall : ∀ r, Admissible context (size context) limit r → ∀ req,
+      req.InRange (size r.context) →
       callee.HaltsFrom input (calleeStart (roundContext size source r) req) callbackClock)
     (hmember : ∀ r, Admissible context (size context) limit r →
       (member.withInit (memberStart r)).HaltsWithin input memberClock) :
     (withSourceRound size source callee calleeStart calleeReply context limit
       member memberStart memberReply).HaltsWithin input
-      (limit * (roundClock (size context) callbackClock + 1) + memberClock + 1) := by
+      (limit * (SourceRound.roundClock (size context) callbackClock + 1) + memberClock + 1) := by
   apply haltsWithin _ _ _ _ _ _ _ _
     (Admissible context (size context) limit)
     (start_admissible context (size context) limit)
     (admissible_closed size source callee calleeStart calleeReply context limit input)
-    (roundClock (size context) callbackClock) memberClock _ hmember
+    (SourceRound.roundClock (size context) callbackClock) memberClock _ hmember
   intro r hr
   rw [singleRound_withInit]
   have h := SourceRound.haltsWithin (roundContext size source r) callee calleeStart calleeReply
     input callbackClock (hcall r hr)
-  simpa only [roundClock, roundContext, hr.1] using h
-
-/-- Complete encoded-state envelope from the single-round workspace theorem. -/
-def roundStateBound (ctx : SourceRound.Context) (calleeBound : ℕ) : ℕ :=
-  let B := Nat.log2 ctx.size + 1
-  let V := max (ctx.expected.count + ctx.size)
-    (ctx.expected.lengthSum + ctx.size * (ctx.radius + 1))
-  2 * (6 * (SourceRound.encContext ctx).length + 18 * B +
-    12 * (Nat.log2 (V * V) + 1) + 33) + calleeBound + 2
+  simpa only [roundContext, hr.1] using h
 
 private theorem roundStateBound_le (r : Registers κ)
     (hr : Admissible context (size context) limit r) (calleeBound : ℕ) :
-    roundStateBound (roundContext size source r) calleeBound ≤
-      roundStateBound ⟨size context, source context, limit,
+    SourceRound.roundStateBound (roundContext size source r) calleeBound ≤
+      SourceRound.roundStateBound ⟨size context, source context, limit,
         ⟨1 + limit * size context, size context * limit * limit⟩⟩ calleeBound := by
   obtain ⟨_, hk, hc, hs⟩ := admissible_caps hr
   let n := size context
@@ -194,16 +184,19 @@ private theorem roundStateBound_le (r : Registers κ)
       (Nat.add_le_add hs (Nat.mul_le_mul_left _ (Nat.add_le_add_right hk _)))
   have hl := Nat.log_mono_right (b := 2) (Nat.mul_le_mul hv hv)
   simp only [n, ← Nat.log2_eq_log_two] at hl
-  simp only [roundStateBound, roundContext, hr.1, SourceRound.encContext_apply,
-    SourceRound.encContextFields, encTally_apply, encTallyFields, length_encPair]
+  simp only [SourceRound.roundStateBound, SourceRound.callerStateBound, roundContext, hr.1,
+    SourceRound.encContext_apply, SourceRound.encContextFields, encTally_apply, encTallyFields,
+    length_encPair]
   omega
 
-/-- Compose the single-round state envelope with the retained loop and membership states. -/
+/-- Compose the single-round state envelope with the retained loop and membership states.
+The round callback workspace bound is needed only for in-range requests. -/
 theorem withSourceRound_length_run_le (encContext : κ ↪ List Bool) (encCallee : τ ↪ List Bool)
     (encMember : μ ↪ List Bool) (member : NondeterministicQueryMachine μ)
     (memberStart : Registers κ → μ) (memberReply : μ → Option Bool) (input : List Bool)
     (calleeBound memberBound : ℕ)
-    (hcallee : ∀ r, Admissible context (size context) limit r → ∀ req bits,
+    (hcallee : ∀ r, Admissible context (size context) limit r → ∀ req,
+      req.InRange (size r.context) → ∀ bits,
       (encCallee (callee.replay input bits (calleeStart (roundContext size source r) req))).length ≤
         calleeBound)
     (hmember : ∀ r, Admissible context (size context) limit r → ∀ bits,
@@ -213,7 +206,7 @@ theorem withSourceRound_length_run_le (encContext : κ ↪ List Bool) (encCallee
       ((withSourceRound size source callee calleeStart calleeReply context limit
         member memberStart memberReply).run input bits)).length ≤
       2 * registerStateBound encContext context (size context) limit +
-        max (roundStateBound ⟨size context, source context, limit,
+        max (SourceRound.roundStateBound ⟨size context, source context, limit,
           ⟨1 + limit * size context, size context * limit * limit⟩⟩ calleeBound) memberBound +
         (encNat limit).length + 4 := by
   apply length_run_le _ _ _ _ _ _ _ _ _ _ _
