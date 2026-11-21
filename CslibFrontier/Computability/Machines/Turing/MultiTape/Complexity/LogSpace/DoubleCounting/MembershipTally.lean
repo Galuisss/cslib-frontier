@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: candidate
 
-public import CslibFrontier.Algorithms.Reachability.DoubleCounting.Scan
+public import CslibFrontier.Algorithms.Reachability.DoubleCounting.Scan.BoundedWalk
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Sum
@@ -881,5 +881,245 @@ theorem haltsWithin {τ : Type} (ctx : Context) (walk : NondeterministicQueryMac
     rw [Nat.succ_mul] at hle
     omega
   · rfl
+
+section BoundedWalk
+
+variable {N : ℕ} {τ : Type}
+
+private def rankOr (fallback : Fin N) (rank : ℕ) : Fin N :=
+  if h : rank < N then ⟨rank, h⟩ else fallback
+
+private def walkRegisters (fallback : Fin N) (r : Registers) : BoundedWalk.Registers N :=
+  ⟨rankOr fallback r.context.source, rankOr fallback r.cursor, r.context.radius⟩
+
+private theorem walkRegisters_mk (fallback source target v : Fin N)
+    (radius : ℕ) (expected : Tally) (acc : Scan.Result) :
+    walkRegisters fallback ⟨⟨N, source.val, target.val, radius, expected⟩, v.val, acc⟩ =
+      ⟨source, v, radius⟩ := by
+  simp [walkRegisters, rankOr, source.isLt, v.isLt]
+
+variable (edge : QueryMachine τ) (start : Fin N → Fin N → τ) (verdict : τ → Bool)
+  (clock : ℕ) (fallback : Fin N)
+
+private def fixedWalk := BoundedWalk.machine edge start verdict clock ⟨fallback, fallback, 0⟩
+
+private def enterBoundedWalk (r : Registers) : BoundedWalk.State N τ :=
+  (BoundedWalk.machine edge start verdict clock (walkRegisters fallback r)).init
+
+local notation "W" => fixedWalk edge start verdict clock fallback
+local notation "enterWalk" => enterBoundedWalk edge start verdict clock fallback
+
+/-- The tally using the canonical bounded walk and a fixed same-input adjacency callback. -/
+def withBoundedWalk (ctx : Context) :
+    NondeterministicQueryMachine (State (BoundedWalk.State N τ)) :=
+  machine ctx W enterWalk BoundedWalk.remainingFuel
+
+private theorem boundedWalk_replay (input : List Bool)
+    (adjacent : Fin N → Fin N → Bool) (source target v : Fin N)
+    (radius : ℕ) (expected : Tally) (acc : Scan.Result) (bits : List Bool) (left : ℕ)
+    (hclock : ∀ u v, edge.halted (edge.runFrom input (start u v) clock) = true)
+    (hedge : ∀ u v, verdict (edge.runFrom input (start u v) clock) = adjacent u v) :
+    let r : Registers := ⟨⟨N, source.val, target.val, radius, expected⟩, v.val, acc⟩
+    (W).FirstHalting input bits (enterWalk r) ∧
+        BoundedWalk.remainingFuel ((W).replay input bits (enterWalk r)) = some left ↔
+      ∃ tail, bits = BoundedWalk.selectors clock tail ∧
+        (Scan.walkM Scan.readNext (fun u v => pure (adjacent u v)) v radius source tail).1 =
+          some left := by
+  let regs : BoundedWalk.Registers N := ⟨source, v, radius⟩
+  dsimp only [enterBoundedWalk]
+  rw [walkRegisters_mk]
+  have hreentry := BoundedWalk.machine_withInit edge start verdict clock
+    ⟨fallback, fallback, 0⟩ regs
+  have h := BoundedWalk.firstHalting_remainingFuel_iff edge start verdict clock regs
+    input adjacent hclock hedge bits left
+  rw [← hreentry, NondeterministicQueryMachine.run_withInit] at h
+  simpa only [fixedWalk, NondeterministicQueryMachine.firstHalting_withInit,
+    NondeterministicQueryMachine.init_withInit, regs] using h
+
+/-- A successful first-halting tally uses exactly the selectors of a successful typed scan.
+The returned membership bit distinguishes successful negative replies from rejected traces. -/
+theorem withBoundedWalk_firstHalting_iff (input : List Bool)
+    (adjacent : Fin N → Fin N → Bool) (source target : Fin N) (radius : ℕ)
+    (expected : Tally) (bits : List Bool) (hit : Bool)
+    (hclock : ∀ u v, edge.halted (edge.runFrom input (start u v) clock) = true)
+    (hedge : ∀ u v, verdict (edge.runFrom input (start u v) clock) = adjacent u v) :
+    let M := withBoundedWalk edge start verdict clock fallback
+      ⟨N, source.val, target.val, radius, expected⟩
+    M.FirstHalting input bits M.init ∧ M.run input bits = .inr (.inr (some hit)) ↔
+      ∃ branch, bits = selectors (BoundedWalk.selectors clock) branch ∧
+        Scan.run adjacent source target radius expected branch = some hit := by
+  dsimp only [withBoundedWalk]
+  constructor
+  · rintro ⟨hfirst, hend⟩
+    refine exists_scan_of_firstHalting W enterWalk BoundedWalk.remainingFuel input adjacent
+      source target radius expected (BoundedWalk.selectors clock) ?_ bits hit hfirst hend
+    intro v acc ws left r hf hr
+    exact (boundedWalk_replay edge start verdict clock fallback input adjacent source target v
+      radius expected acc ws left hclock hedge).mp ⟨hf, hr⟩
+  · rintro ⟨branch, rfl, hrun⟩
+    refine firstHalting_of_scan W enterWalk BoundedWalk.remainingFuel input adjacent
+      source target radius expected branch hit (BoundedWalk.selectors clock) ?_ hrun
+    intro v acc tail left hw r
+    exact (boundedWalk_replay edge start verdict clock fallback input adjacent source target v
+      radius expected acc (BoundedWalk.selectors clock tail) left hclock hedge).mpr ⟨tail, rfl, hw⟩
+
+/-- Charge the full candidate scan clock, including all rejecting walk and tally choices. -/
+theorem withBoundedWalk_haltsWithin (ctx : Context) (input : List Bool) :
+    (withBoundedWalk edge start verdict clock fallback ctx).HaltsWithin input
+      (ctx.size * (ctx.radius * (N.size + clock + 3) + (N.size + 2) + 2) + 1) := by
+  apply haltsWithin
+  intro r hr _ _
+  unfold fixedWalk enterBoundedWalk
+  rw [BoundedWalk.machine_withInit]
+  simpa only [walkRegisters, hr] using
+    BoundedWalk.haltsWithin edge start verdict clock (walkRegisters fallback r) input
+
+/-- Encoded tally and walk registers plus one adjacency callback state. -/
+def boundedWalkStateBound (N clock : ℕ) (ctx : Context) (calleeBound : ℕ) : ℕ :=
+  4 * (encContext ctx).length + 12 * (Nat.log2 ctx.size + 1) +
+    4 * (Nat.log2 (ctx.size * ctx.radius) + 1) +
+    (12 * (encNat N).length + 4 * (Nat.log2 N.size + 1) +
+      4 * (encNat ctx.radius).length + 2 * (encNat clock).length + calleeBound + 21) + 15
+
+/-- Charge both the suspended tally and the entire bounded walk on all branch prefixes. -/
+theorem withBoundedWalk_length_run_le (encCallee : τ ↪ List Bool)
+    (ctx : Context) (input : List Bool) (calleeBound : ℕ)
+    (hcallee : ∀ (u v : Fin N) t, t ≤ clock →
+      (encCallee (edge.runFrom input (start u v) t)).length ≤ calleeBound)
+    (bits : List Bool) :
+    (encState (BoundedWalk.encState encCallee)
+      ((withBoundedWalk edge start verdict clock fallback ctx).run input bits)).length ≤
+      boundedWalkStateBound N clock ctx calleeBound := by
+  unfold boundedWalkStateBound
+  apply length_replay_le
+  intro r hr _ _ choices
+  rw [← NondeterministicQueryMachine.run_withInit, fixedWalk, enterBoundedWalk,
+    BoundedWalk.machine_withInit]
+  simpa only [walkRegisters, hr] using
+    BoundedWalk.length_run_le edge start verdict clock (walkRegisters fallback r)
+      input encCallee calleeBound hcallee choices
+
+private theorem rankOr_budget {α : Type} {enc : α ↪ List Bool} {budget : α → ℕ}
+    (fallback : Fin N) {rank : α → ℕ} (hr : ComputableInSpace rank enc encNat budget) :
+    ComputableInSpace (fun a => rankOr fallback (rank a)) enc
+      (Fin.valEmbedding.trans encNat) budget := by
+  have hN : ComputableInSpace (fun _ => N) enc encNat budget :=
+    (ComputableInSpace.constZero N).mono_le fun _ => Nat.zero_le _
+  have hfallback : ComputableInSpace (fun _ => fallback.val) enc encNat budget :=
+    (ComputableInSpace.constZero fallback.val).mono_le fun _ => Nat.zero_le _
+  refine (budget_ite (budget_natLt hr hN) hr hfallback).of_enc_eq ?_
+  intro a
+  by_cases h : rank a < N <;> simp [rankOr, h]
+
+private theorem enterWalk_inSpace (encCallee : τ ↪ List Bool) :
+    ComputableInSpace enterWalk encRegisters (BoundedWalk.encState encCallee)
+      (fun r => (encRegisters r).length) := by
+  have hr := budget_id (enc := encRegisters) (.refl _)
+  have hc := encRegisters_context_budget hr
+  have hregisters := BoundedWalk.encRegisters_mk_budget N
+    (rankOr_budget fallback (encContext_source_budget hc))
+    (rankOr_budget fallback (encRegisters_cursor_budget hr))
+    (encContext_radius_budget hc)
+  exact BoundedWalk.init_budget edge start verdict clock hregisters
+
+open NondeterministicQueryMachine in
+/-- Compile a tally for fixed graph dimension and adjacency clock. The query parameters come
+from the original input. The space budget covers all tally, walk and adjacency branches. -/
+theorem withBoundedWalk_exists_routines {α : Type} (enc : α ↪ List Bool) (S : α → ℕ)
+    (ctx : Context) (context : α → Context) (encCallee : τ ↪ List Bool)
+    (hcontext : ComputableInSpace context enc encContext S)
+    (hlog : ∀ a, Nat.log2 (enc a).length + 1 ≤ S a)
+    (hstart : ComputableInSpace (fun p : Fin N × Fin N => start p.1 p.2)
+      (encPair (Fin.valEmbedding.trans encNat) (Fin.valEmbedding.trans encNat)) encCallee
+      (fun p => (encPair (Fin.valEmbedding.trans encNat) (Fin.valEmbedding.trans encNat) p).length))
+    (hq : ComputableInSpace edge.query encCallee encNat (fun s => (encCallee s).length))
+    (hn : ComputableInSpace edge.next (QueryMachine.encStateRead encCallee) encCallee
+      (fun p => (QueryMachine.encStateRead encCallee p).length))
+    (hh : ComputableInSpace edge.halted encCallee encBool (fun s => (encCallee s).length))
+    (hv : ComputableInSpace verdict encCallee encBool (fun s => (encCallee s).length))
+    (calleeBound : α → ℕ)
+    (hcallee : ∀ a (u v : Fin N) t, t ≤ clock →
+      (encCallee (edge.runFrom (enc a) (start u v) t)).length ≤ calleeBound a)
+    (hstate : ∀ a, boundedWalkStateBound N clock (context a) (calleeBound a) ≤ S a) :
+    Nonempty (Routines (withBoundedWalk edge start verdict clock fallback ctx)
+      (fun a => initial (context a)) enc S) := by
+  let E := BoundedWalk.encState (N := N) encCallee
+  have hinit := budget_comp_linear (initial_inSpace E) hcontext
+  have hqw := BoundedWalk.query_inSpace edge start verdict clock
+    ⟨fallback, fallback, 0⟩ encCallee hq
+  have hnw := BoundedWalk.next_inSpace edge start verdict clock
+    ⟨fallback, fallback, 0⟩ encCallee hstart hn hh hv
+  have hhw := BoundedWalk.halted_inSpace edge start verdict clock
+    ⟨fallback, fallback, 0⟩ encCallee
+  have hresult := BoundedWalk.remainingFuel_inSpace (N := N) encCallee
+  have he := enterWalk_inSpace edge start verdict clock fallback encCallee
+  refine (withBoundedWalk edge start verdict clock fallback ctx).exists_routines
+    (query_inSpace E ctx W enterWalk _ hqw)
+    (next_inSpace E ctx W enterWalk _ he hnw hhw hresult)
+    (halted_inSpace E ctx W enterWalk _)
+    (accept_inSpace E ctx W enterWalk _) _ S hlog hinit ⟨1, ?_⟩
+  intro a bits
+  have hM : (withBoundedWalk edge start verdict clock fallback ctx).withInit
+      (initial (context a)) = withBoundedWalk edge start verdict clock fallback (context a) := by
+    unfold withBoundedWalk NondeterministicQueryMachine.withInit
+    rfl
+  rw [hM, Nat.one_mul]
+  exact (withBoundedWalk_length_run_le edge start verdict clock fallback encCallee
+    (context a) (enc a) (calleeBound a) (hcallee a) bits).trans (hstate a)
+
+open NondeterministicQueryMachine in
+/-- Native accepting occurrence lists exist exactly for the canonical selectors of
+passing typed scans, with one occurrence list per selector list. -/
+theorem withBoundedWalk_native_firstHalting_iff {α : Type} {enc : α ↪ List Bool} {S : α → ℕ}
+    (ctx : Context) (context : α → Context)
+    (R : Routines (withBoundedWalk edge start verdict clock fallback ctx)
+      (fun a => initial (context a)) enc S)
+    (a : α) (adjacent : Fin N → Fin N → Bool) (source target : Fin N) (radius : ℕ)
+    (expected : Tally) (bits : List Bool)
+    (hcontext : context a = ⟨N, source.val, target.val, radius, expected⟩)
+    (hclock : ∀ u v, edge.halted (edge.runFrom (enc a) (start u v) clock) = true)
+    (hedge : ∀ u v, verdict (edge.runFrom (enc a) (start u v) clock) = adjacent u v) :
+    (∃! indices, ∃ final,
+      Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg (enc a)) indices =
+        some (bits, final) ∧ final.Halted ∧ final.output = [true]) ↔
+      ∃ branch hit, bits = selectors (BoundedWalk.selectors clock) branch ∧
+        Scan.run adjacent source target radius expected branch = some hit := by
+  let M := withBoundedWalk edge start verdict clock fallback ctx
+  let startState : State (BoundedWalk.State N τ) := initial (context a)
+  have hM : M.withInit startState = withBoundedWalk edge start verdict clock fallback
+      ⟨N, source.val, target.val, radius, expected⟩ := by
+    dsimp only [M, startState]
+    rw [hcontext]
+    unfold withBoundedWalk NondeterministicQueryMachine.withInit
+    rfl
+  have hspec (hit : Bool) :=
+    withBoundedWalk_firstHalting_iff edge start verdict clock fallback (enc a) adjacent
+      source target radius expected bits hit hclock hedge
+  have hiff (hit : Bool) :
+      M.FirstHalting (enc a) bits startState ∧
+          M.replay (enc a) bits startState = .inr (.inr (some hit)) ↔
+        ∃ branch, bits = selectors (BoundedWalk.selectors clock) branch ∧
+          Scan.run adjacent source target radius expected branch = some hit := by
+    simpa only [← hM, init_withInit, firstHalting_withInit, run_withInit] using hspec hit
+  have accept_iff (s : State (BoundedWalk.State N τ)) :
+      M.accept s = true ↔ ∃ hit, s = .inr (.inr (some hit)) := by
+    rcases s with r | (pending | (hit | _)) <;> simp [M, withBoundedWalk, machine]
+  constructor
+  · rintro ⟨_, ⟨final, hreplay, hhalt, hout⟩, _⟩
+    obtain ⟨hfirst, houtput⟩ := R.replay_correct a hreplay hhalt
+    have haccept := List.cons.inj (houtput.symm.trans hout) |>.1
+    obtain ⟨hit, hresult⟩ := (accept_iff _).mp haccept
+    obtain ⟨branch, hbits, hscan⟩ := (hiff hit).mp ⟨hfirst, hresult⟩
+    exact ⟨branch, hit, hbits, hscan⟩
+  · rintro ⟨branch, hit, hbits, hscan⟩
+    obtain ⟨hfirst, hresult⟩ := (hiff hit).mpr ⟨branch, hbits, hscan⟩
+    obtain ⟨indices, ⟨final, hreplay, hhalt⟩, hunique⟩ :=
+      (R.existsUnique_replay_iff a bits).mpr hfirst
+    have hout := (R.replay_correct a hreplay hhalt).2
+    have haccept := (accept_iff _).mpr ⟨hit, hresult⟩
+    exact ⟨indices, ⟨final, hreplay, hhalt, by rwa [haccept] at hout⟩,
+      fun other ⟨finish, hr, hh, _⟩ => hunique other ⟨finish, hr, hh⟩⟩
+
+end BoundedWalk
 
 end Turing.DoubleCounting.MembershipTally
