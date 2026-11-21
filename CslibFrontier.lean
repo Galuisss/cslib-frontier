@@ -5318,6 +5318,10 @@ public import CslibFrontier.Crypto.Computational.MLDSA.RejNTTProgramming
 public import CslibFrontier.Crypto.Computational.MLDSA.RejectedCommitmentWrites
 public import CslibFrontier.Crypto.Computational.MLDSA.ResponseBinding
 public import CslibFrontier.Crypto.Computational.MLDSA.SecretExpansionLaw
+public import CslibFrontier.Crypto.Computational.MLDSA.SecretRowPrediction
+public import CslibFrontier.Crypto.Computational.MLDSA.SecretRowServices
+public import CslibFrontier.Crypto.Computational.MLDSA.SharedKeyGame
+public import CslibFrontier.Crypto.Computational.MLDSA.SharedSecretExpansion
 public import CslibFrontier.Crypto.Computational.MLDSA.SignedExtraction
 public import CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
 public import CslibFrontier.Crypto.Computational.MLDSA.Signing
@@ -5568,6 +5572,7 @@ public import CslibFrontier.Crypto.Primitives.BlockCipher.LengthPrependedCBCMAC
 public import CslibFrontier.Crypto.Primitives.BlockCipher.Modes
 public import CslibFrontier.Crypto.Primitives.ByteString
 public import CslibFrontier.Crypto.Primitives.ByteString.Blocks
+public import CslibFrontier.Crypto.Primitives.ByteString.Uniform
 public import CslibFrontier.Crypto.Primitives.CorrelationRobust
 public import CslibFrontier.Crypto.Primitives.Garbling.Adaptive
 public import CslibFrontier.Crypto.Primitives.Garbling.Arithmetic.AffineLabel
@@ -6370,6 +6375,7 @@ public import CslibFrontier.Foundations.Analysis.LpNormMeasure
 public import CslibFrontier.Foundations.Analysis.MarkovBrothersInequality
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CoordinateDerivative
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalCoercive
+public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalDeterminantFeasibility
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalMinimumValue
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalRootFeasibility
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalValueCutoff
