@@ -38,6 +38,8 @@ tagged edge and membership callbacks use the original input and the current roun
   uniform state envelope hold at every admissible round entry.
 * `Cslib.Complexity.STCON.configurationJustesenRetainedSourceRound_envelopes_le_log`:
   the round and loop register envelopes are logarithmic apart from the charged callback.
+* `Cslib.Complexity.STCON.configurationJustesenRetainedSourceRound_exact_advance`:
+  a completed, untied growing round preserves the exact tally and positive fuel.
 -/
 
 public section
@@ -253,6 +255,7 @@ theorem configurationJustesenRetainedSourceRound_existsUnique_firstHalting
   obtain ⟨hfirst', hanswer'⟩ := (htransfer other result).mp hresult
   exact hunique ⟨hfirst', Option.isSome_iff_exists.mpr ⟨result, hanswer'⟩⟩
     ⟨hfirst, Option.isSome_iff_exists.mpr ⟨update, hanswer⟩⟩
+
 open Cslib.Code.JustesenFamily
 
 variable {k : ℕ} {State : Type} [Fintype State]
@@ -426,5 +429,69 @@ theorem configurationJustesenRetainedSourceRound_envelopes_le_log
     change 2 * (encJustesenSourceContext context).length + 1 +
       SourceRound.roundStateBound round D ≤ budget + D
     omega
+
+/-- A full-fuel source scan retains its context, exact totals and transcript uniqueness
+through the current radius. A round may start only while fuel remains. -/
+@[expose] def JustesenSourceRoundExact {n : ℕ} (context : JustesenSourceContext)
+    (edge : Fin n → Fin n → Prop) (source : Fin n)
+    (r : SourceRoundLoop.Registers JustesenSourceContext) : Prop :=
+  r.context = context ∧ r.fuel + r.radius = n ∧ 0 < r.fuel ∧
+    r.tally = expected edge source r.radius ∧
+    ∀ j ≤ r.radius, ∃! transcript, Passes edge source j transcript
+
+/-- Full subdivision fuel starts with the exact radius-zero tally and positive fuel. -/
+theorem justesenSourceRoundExact_start {n : ℕ} (context : JustesenSourceContext)
+    (edge : Fin n → Fin n → Prop) (source : Fin n) :
+    JustesenSourceRoundExact context edge source (SourceRoundLoop.start context n) := by
+  refine ⟨rfl, Nat.add_zero _, Nat.zero_lt_of_lt source.isLt, (expected_zero edge source).symm, ?_⟩
+  intro j hj
+  have hz : j = 0 := Nat.eq_zero_of_le_zero hj
+  exact hz.symm ▸ existsUnique_passes_zero edge source
+
+/-- When the round returns a larger untied set, the next round is exact and still has fuel.
+A change in count can occur only before the last radius of the full-fuel scan. -/
+theorem configurationJustesenRetainedSourceRound_exact_advance
+    {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n),
+      let context : JustesenSourceContext :=
+        ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+      let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
+      ∀ r, JustesenSourceRoundExact context edge source r →
+        let M := justesenRetainedSourceRound ntm c r
+        ∀ (bits : List Bool) (update : RoundUpdate), M.FirstHalting w bits M.init →
+          justesenRetainedSourceRoundReply (M.run w bits) = some update →
+          update.bad = false → update.tally.count ≠ r.tally.count →
+          JustesenSourceRoundExact context edge source (r.advance update.tally) := by
+  intro I n seed source target context edge r hexact M bits update hfirst hreply hgoodUpdate hgrew
+  obtain ⟨hcontext, hfuel, hpos, htally, hgood⟩ := hexact
+  rcases r with ⟨actual, fuel, radius, tally⟩
+  change actual = context at hcontext
+  change fuel + radius = n at hfuel
+  change 0 < fuel at hpos
+  change tally = expected edge source radius at htally
+  change ∀ j ≤ radius, ∃! transcript, Passes edge source j transcript at hgood
+  subst actual
+  subst tally
+  obtain ⟨hnext, hpass⟩ := configurationJustesenRetainedSourceRound_correct ntm c w
+    seed source target fuel radius (hgood radius le_rfl) bits update hfirst hreply
+  have hradius : radius + 1 < n := by
+    by_contra! h
+    apply hgrew
+    rw [hnext]
+    simp only [expected, round_stable_of_size_le h]
+    rfl
+  refine ⟨rfl, ?_, ?_, hnext, ?_⟩
+  · change fuel - 1 + (radius + 1) = n
+    omega
+  · change 0 < fuel - 1
+    omega
+  · intro j hj
+    change j ≤ radius + 1 at hj
+    rcases Nat.eq_or_lt_of_le hj with rfl | hj
+    · exact hpass.mp hgoodUpdate
+    · exact hgood j (Nat.lt_succ_iff.mp hj)
 
 end Cslib.Complexity.STCON
