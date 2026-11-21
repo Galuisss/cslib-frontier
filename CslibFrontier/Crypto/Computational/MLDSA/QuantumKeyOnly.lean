@@ -42,24 +42,21 @@ open SharedDigest (GridPoint gridAddress)
 
 variable (s : Level)
 
-/-- One raw Algorithm 8 query word, returning all bits of its digest. -/
-abbrev DigestTable := BitString s.commitmentInputBits → BitString (digestBytes s * 8)
-
-/-- The bit register uses consecutive bytes, least significant bit first within each byte. -/
-@[expose] def registerBytes (n : ℕ) : BitString (n * 8) ≃ FixedBytes n :=
-  (Equiv.arrowCongr finProdFinEquiv.symm (Equiv.refl Bool)).trans
-    ((Equiv.curry (Fin n) (Fin 8) Bool).trans (Equiv.piCongrRight fun _ => BitString.equivFin 8))
+/-- One raw Algorithm 8 query word, returning all bits of its digest in little-endian order. -/
+abbrev DigestTable := BitString s.commitmentInputBits → BitString (8 * digestBytes s)
 
 /-- Read the digest at the literal FIPS word corresponding to a module product. An input
 whose message representative has the wrong width is outside the verifier's interface. -/
 def pointReply (H : DigestTable s) (p : ModuleSIS.SelfTarget.Point s.params.k 256 8380417) :
     FixedBytes (digestBytes s) :=
   if p.1.length = 512 then
-    registerBytes _ (H (BitString.ofList _ (commitmentInput s (highBitsVec s.params p.2) p.1)))
+    (Keccak.fixedBytesEquivBitsLE _).symm
+      (H (BitString.ofList _ (commitmentInput s (highBitsVec s.params p.2) p.1)))
   else 0
 
 private theorem pointReply_grid (H : DigestTable s) (p : GridPoint s) :
-    pointReply s H (List.ofFn p.1, p.2.val) = registerBytes _ (H (gridAddress s p)) := by
+    pointReply s H (List.ofFn p.1, p.2.val) =
+      (Keccak.fixedBytesEquivBitsLE _).symm (H (gridAddress s p)) := by
   simp only [pointReply, List.length_ofFn, ite_true]
   rfl
 
@@ -72,12 +69,14 @@ theorem expanded_grid_table_law :
         PMF.pi (fun _ : GridPoint s =>
           (PMF.uniformOfFintype (FixedBytes (digestBytes s))).map (expandDigest s)) := by
   classical
-  let convertBytes := Equiv.piCongrRight fun _ : GridPoint s => registerBytes (digestBytes s)
+  let convertBytes := Equiv.piCongrRight fun _ : GridPoint s =>
+    (Keccak.fixedBytesEquivBitsLE (digestBytes s)).symm
   have restriction := PMF.uniformOfFintype_pi_map_comp_embedding
-    (α := BitString (digestBytes s * 8)) (gridAddress s)
+    (α := BitString (8 * digestBytes s)) (gridAddress s)
   calc
     _ = (PMF.uniformOfFintype (DigestTable s)).map
-        (fun H (p : GridPoint s) => expandDigest s (registerBytes _ (H (gridAddress s p)))) := by
+        (fun H (p : GridPoint s) =>
+          expandDigest s ((Keccak.fixedBytesEquivBitsLE _).symm (H (gridAddress s p)))) := by
       apply congrArg (fun f : DigestTable s → GridPoint s → Option Poly =>
         (PMF.uniformOfFintype (DigestTable s)).map f)
       funext H p
@@ -92,8 +91,8 @@ private def shakeBytes (word : List Bool) : FixedBytes (digestBytes s) := fun i 
     (i.cast (Keccak.length_bitSponge ..).symm)
 
 /-- SHAKE256 as a fixed-width Boolean oracle for the FIPS commitment operation. -/
-def shakeTable (x : BitString s.commitmentInputBits) : BitString (digestBytes s * 8) :=
-  (registerBytes _).symm (shakeBytes s (List.ofFn x))
+def shakeTable (x : BitString s.commitmentInputBits) : BitString (8 * digestBytes s) :=
+  Keccak.fixedBytesEquivBitsLE _ (shakeBytes s (List.ofFn x))
 
 /-- The oracle word involves neither truncation nor padding on a verifier input. Substituting
 the SHAKE table yields FIPS 204 byte verification at the supplied matrix `A`. -/
@@ -106,7 +105,7 @@ theorem verify_shakeTable_iff (bytes : List Byte) (A : PublicMatrix s) (f : Forg
   · exact SharedDigest.verify_shakeReply_iff s bytes A f
   · intro p hp _
     funext i
-    simp only [pointReply, hp, ite_true, shakeTable, Equiv.apply_symm_apply,
+    simp only [pointReply, hp, ite_true, shakeTable, Equiv.symm_apply_apply,
       BitString.ofFn_ofList (commitmentInput_length s _ hp), shakeBytes,
       SharedDigest.shakeReply, commitmentDigest, Xofs.commitmentDigest, shake_h256_read,
       List.get_eq_getElem, Fin.val_cast]
@@ -141,7 +140,8 @@ private noncomputable def handler {m : ℕ} (H : DigestTable s)
       StateT (DeviceState m Unit Unit) PMF (List Bool)
   | (.inl op, word) => deviceWordHandler H
       (fun p : Empty × List Bool => p.1.elim (C := StateT Unit PMF (Fin 0 → Bool))) (.inl op, word)
-  | (.inr op, word) => deviceWordHandler (fun x => matrixRegister s (E (registerBytes 32 x)))
+  | (.inr op, word) => deviceWordHandler
+      (fun x => matrixRegister s (E ((Keccak.fixedBytesEquivBitsLE 32).symm x)))
       (fun p : Empty × List Bool => p.1.elim (C := StateT Unit PMF (Fin 0 → Bool))) (.inl op, word)
 
 private noncomputable def initial (m : ℕ) : DeviceState m Unit Unit :=
