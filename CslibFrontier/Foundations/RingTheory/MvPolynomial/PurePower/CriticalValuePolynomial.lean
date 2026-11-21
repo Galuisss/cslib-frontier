@@ -67,7 +67,7 @@ theorem valuePolynomial_map (φ : S →+* T) (hell : 1 ≤ ell) (a : Fin n → S
 
 /-- The separated critical-value polynomial with a symbolic deformation parameter.
 The outer indeterminate is the critical value, and the inner indeterminate is the parameter. -/
-noncomputable def parametricValuePolynomial (hell : 1 ≤ ell) (F : MvPolynomial (Fin n) ℤ)
+@[expose] noncomputable def parametricValuePolynomial (hell : 1 ≤ ell) (F : MvPolynomial (Fin n) ℤ)
     (hF : F.totalDegree ≤ ell) : Polynomial (Polynomial ℤ) :=
   valuePolynomial hell (fun i => Polynomial.C (separatedCenters ell i : ℤ)) Polynomial.X
     (F.map Polynomial.C) ((totalDegree_map_le Polynomial.C F).trans hF)
