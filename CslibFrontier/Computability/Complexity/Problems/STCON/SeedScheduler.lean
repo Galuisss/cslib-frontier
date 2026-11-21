@@ -353,6 +353,24 @@ theorem seedSchedulerStep_noReply_of_needsScan (f : SeedSchedulerFrame)
     (hscan : f.needsScan = true) : seedSchedulerStep f none = none := by
   cases ha : f.answer <;> simp [seedSchedulerStep, ha, hscan]
 
+/-- A scheduled step returns a continuation or a terminal result if every requested scan
+supplies a verdict. An indexed skip does not require one. -/
+theorem seedSchedulerStep_isSome (f : SeedSchedulerFrame) (verdict : Option ControllerVerdict)
+    (h : f.needsScan = true → verdict.isSome) :
+    (seedSchedulerStep f verdict).isSome := by
+  cases verdict with
+  | some value =>
+    cases ha : f.answer with
+    | none => cases value <;> simp [seedSchedulerStep, ha]
+    | some _ =>
+      cases hneeds : f.needsScan <;> cases value <;> simp [seedSchedulerStep, ha, hneeds]
+  | none =>
+    have hskip : f.needsScan = false :=
+      Bool.eq_false_of_not_eq_true (fun hneeds => by simpa using h hneeds)
+    cases ha : f.answer with
+    | none => simp [SeedSchedulerFrame.needsScan, ha] at hskip
+    | some _ => simp [seedSchedulerStep, ha, hskip]
+
 /-- Run the binary scheduler on the initialized carrier. The frame exposes the retained
 registers for resource accounting. A scanner can use just its request field. -/
 def runSeedSchedulerFor {m : Type → Type} [AlternativeMonad m] (s : SeedSearchSetup)

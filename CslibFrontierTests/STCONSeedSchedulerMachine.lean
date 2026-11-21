@@ -34,6 +34,21 @@ private def verdict : ℕ ⊕ Option Bool → Option ControllerVerdict :=
 
 private def scheduler := machine setup scan (fun r => .inl r.sourceID) verdict
 
+private def totalScan : NondeterministicQueryMachine (ℕ ⊕ Option Bool) :=
+  { scan with next := fun
+      | (_, read, choice) => .inr (if choice then none else some (read.getD false)) }
+
+-- A false selector returns a verdict for every request, even past the end of the input.
+example (w : List Bool) :
+    let M := machine setup totalScan (fun r => .inl r.sourceID) verdict
+    ∃ bits, M.FirstHalting w bits M.init ∧ (reply (M.run w bits)).isSome := by
+  refine exists_successful_firstHalting setup totalScan (fun r => .inl r.sourceID) verdict w ?_
+  intro f _ _ _
+  exact ⟨[false], ⟨rfl, fun n hn => by
+    have hn0 : n = 0 := by simpa using hn
+    subst n
+    rfl⟩, rfl⟩
+
 -- The common clock also covers a rejecting selector or a read past the input.
 example (w : List Bool) : scheduler.HaltsWithin w 24 := by
   refine Cslib.Complexity.STCON.SeedSchedulerMachine.haltsWithin setup scan
