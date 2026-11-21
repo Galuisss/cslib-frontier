@@ -9,6 +9,8 @@ module
 
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenRoundCallback.Resource
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.SourceRoundLoop.Retained
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LinearSpaceArith
+import CslibFrontier.Foundations.Data.Nat.BinarySize
 
 /-!
 # Retained Justesen source round
@@ -34,6 +36,8 @@ tagged edge and membership callbacks use the original input and the current roun
   at exact totals, a unique membership transcript gives one complete successful round trace.
 * `Cslib.Complexity.STCON.configurationJustesenRetainedSourceRound_bounds`: the clock and
   uniform state envelope hold at every admissible round entry.
+* `Cslib.Complexity.STCON.configurationJustesenRetainedSourceRound_envelopes_le_log`:
+  the round and loop register envelopes are logarithmic apart from the charged callback.
 -/
 
 public section
@@ -333,5 +337,94 @@ theorem configurationJustesenRetainedSourceRound_bounds
       JustesenSourceContext.sourceID context limit r hr D
     simpa only [SourceRoundLoop.retainedRoundStateBound, hr.1, hsize] using
       Nat.add_le_add_left hscalar (2 * (encJustesenSourceContext context).length + 1)
+
+/-- The round and register envelopes are logarithmic in the input length, with a separate
+charge for the suspended callback's encoded state. -/
+theorem configurationJustesenRetainedSourceRound_envelopes_le_log
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ∃ C, ∀ w : List Bool,
+      let I := configurationInstance ntm c w
+      let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+      ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n)
+        (limit : ℕ), limit ≤ n →
+        let context : JustesenSourceContext :=
+          ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+        let budget := C * (Nat.log2 w.length + 1)
+        SourceRoundLoop.registerStateBound encJustesenSourceContext context n limit ≤ budget ∧
+          ∀ D, 2 * (encJustesenSourceContext context).length + 1 +
+            SourceRound.roundStateBound ⟨n, source.val, limit, ⟨1 + limit * n, n * limit * limit⟩⟩
+              D ≤ budget + D := by
+  obtain ⟨A, hA⟩ := length_configurationJustesenSourceContext_le_log ntm c
+  obtain ⟨B, hB⟩ := length_configurationSubdivisionVertexCount_le_log ntm c
+  refine ⟨2 * A + 432 * B + 369, fun w => ?_⟩
+  intro I n seed source target limit hl context budget
+  let b := Nat.log2 w.length + 1
+  let width := (encNat n).length
+  have hctx : (encJustesenSourceContext context).length ≤ A * b := hA w seed source target
+  have hn : width ≤ B * b := hB w
+  have hs : (encNat source.val).length ≤ width := length_encNat_mono source.isLt.le
+  have hk : (encNat limit).length ≤ width := length_encNat_mono hl
+  have hone : (encNat 1).length = 1 := rfl
+  have hcount : (encNat (1 + limit * n)).length ≤ 2 * width + 2 := by
+    have hmul := length_encNat_mul_le limit n
+    have hadd := length_encNat_add_le_add 1 (limit * n)
+    dsimp only [width] at hk ⊢
+    omega
+  have hsum : (encNat (n * limit * limit)).length ≤ 3 * width := by
+    have hmul := length_encNat_mul_le n limit
+    have hmul' := length_encNat_mul_le (n * limit) limit
+    dsimp only [width] at hk ⊢
+    omega
+  have hreg : SourceRoundLoop.registerStateBound encJustesenSourceContext context n limit ≤
+      2 * (encJustesenSourceContext context).length + 11 * width + 8 := by
+    rw [SourceRoundLoop.registerStateBound]
+    omega
+  let round : SourceRound.Context := ⟨n, source.val, limit, ⟨1 + limit * n, n * limit * limit⟩⟩
+  have hround : (SourceRound.encContext round).length ≤ 13 * width + 8 := by
+    simp only [round, SourceRound.encContext_apply, SourceRound.encContextFields,
+      encTally_apply, encTallyFields, length_encPair]
+    dsimp only [width] at hs hk hcount hsum ⊢
+    omega
+  let count := 1 + limit * n + n
+  let total := n * limit * limit + n * (limit + 1)
+  let V := max count total
+  have hcountWidth : (encNat count).length ≤ 3 * width + 3 := by
+    have hadd := length_encNat_add_le_add (1 + limit * n) n
+    dsimp only [width, count] at hcount ⊢
+    omega
+  have htotalWidth : (encNat total).length ≤ 5 * width + 3 := by
+    have hadd := length_encNat_add_le_add limit 1
+    have hmul := length_encNat_mul_le n (limit + 1)
+    have htotal := length_encNat_add_le_add (n * limit * limit) (n * (limit + 1))
+    dsimp only [width, total] at hk hsum ⊢
+    omega
+  have hV : (encNat V).length ≤ 5 * width + 3 := by
+    rcases le_total count total with h | h
+    · simpa only [V, max_eq_right h] using htotalWidth
+    · dsimp only [V]
+      rw [max_eq_left h]
+      omega
+  have hlogN : Nat.log2 n ≤ width := by
+    change Nat.log2 n ≤ (encNat n).length
+    rw [length_encNat_eq_size]
+    exact Nat.log2_le_size n
+  have hlogV : Nat.log2 (V * V) ≤ 10 * width + 6 := by
+    have hlog := Nat.log2_le_size (V * V)
+    rw [← length_encNat_eq_size] at hlog
+    have hmul := length_encNat_mul_le V V
+    omega
+  have hscalar (D : ℕ) : SourceRound.roundStateBound round D ≤ 432 * width + 368 + D := by
+    change 2 * (6 * (SourceRound.encContext round).length + 18 * (Nat.log2 n + 1) +
+      12 * (Nat.log2 (V * V) + 1) + 33) + D + 2 ≤ _
+    omega
+  have hb : 1 ≤ b := Nat.succ_le_succ (Nat.zero_le _)
+  have hbudget : budget = 2 * (A * b) + 432 * (B * b) + 369 * b := by
+    simp only [budget, b, Nat.add_mul, Nat.mul_assoc]
+  refine ⟨hreg.trans ?_, fun D => ?_⟩
+  · omega
+  · have hstate := hscalar D
+    change 2 * (encJustesenSourceContext context).length + 1 +
+      SourceRound.roundStateBound round D ≤ budget + D
+    omega
 
 end Cslib.Complexity.STCON
