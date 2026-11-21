@@ -67,15 +67,8 @@ theorem configurationJustesenBoundedWalk_init_inSpace (ntm : MultiTapeNTM k Bool
       (fun a => Nat.log2 (encIn a).length) := by
   let ctx (a : α) := configurationJustesenSubdivisionContext ntm c (encIn a) (rank a)
   let budget (a : α) := Nat.log2 (encIn a).length
-  have hword : ComputableInLogSpace (fun a => encIn a) encIn encBits :=
-    ComputableInLogSpace.of_eq fun _ => rfl
-  obtain ⟨t, C, hspace⟩ := configurationJustesenSubdivisionContext_inLogSpace ntm c hword hrank
-  obtain ⟨D, hlen⟩ := length_configurationJustesenSubdivisionContext_le_log ntm c
   have hctx : ComputableInSpace ctx encIn encJustesenSubdivisionContext budget :=
-    ⟨t, max C D,
-      hspace.mono (fun _ => le_rfl) fun _ => Nat.mul_le_mul_right _ (le_max_left C D),
-      fun a => (hlen (encIn a) (rank a) (hrank_lt a)).trans
-        (Nat.mul_le_mul_right _ (le_max_right C D))⟩
+    configurationJustesenSubdivisionContext_inSpace ntm c hrank hrank_lt
   have hsize := encJustesenSubdivisionContext_subdivision_budget hctx
   have hdim : ComputableInSpace
       (fun a =>

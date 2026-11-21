@@ -27,6 +27,8 @@ to every bounded walk, so the typed scan uses the subdivision adjacency for the 
   logarithmic encoded length on every prefix of a bounded tally query.
 * `Cslib.Complexity.STCON.configurationJustesenMembershipTally_haltsWithin_clock`:
   a common polynomial selector clock for those queries.
+* `Cslib.Complexity.STCON.configurationJustesenMembershipTally_exists_routines`:
+  native compilation with logarithmic workspace from valid rank and tally producers.
 -/
 
 public section
@@ -34,7 +36,7 @@ public section
 namespace Cslib.Complexity.STCON
 
 open Cslib.Code.JustesenFamily Cslib.DoubleCounting
-open _root_.Turing _root_.Turing.MultiTapeTM
+open _root_.Turing _root_.Turing.MultiTapeTM _root_.Turing.MultiTapeTM.ComputableInSpace
 open _root_.Turing.DoubleCounting _root_.Turing.QueryMachine.Subdivision
 
 variable {k : ℕ} {State : Type} [Fintype State]
@@ -222,5 +224,79 @@ theorem configurationJustesenMembershipTally_haltsWithin_clock
   simp only [MembershipTally.runtimeWalkClock, params, configurationJustesenMembershipTallyClock,
     configurationJustesenBoundedWalkClock, Nat.add_assoc, Nat.reduceAdd]
   gcongr
+
+open NondeterministicQueryMachine in
+/-- Compile one native tally on the original encoded input. The valid rank and tally
+producers provide the retained entry, and the weighted callback is fixed across inputs. -/
+theorem configurationJustesenMembershipTally_exists_routines
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) {α : Type} {enc : α ↪ List Bool}
+    {rank : α → ℕ} {params : α → MembershipTally.Context}
+    (hrank : ComputableInLogSpace rank enc encNat)
+    (hrank_lt : ∀ a, rank a < (configurationSeedSearchParameters ntm c (enc a)).search.seedLimit)
+    (hparams : ComputableInSpace params enc MembershipTally.encContext
+      (fun a => Nat.log2 (enc a).length))
+    (hvalid : ∀ a,
+      let setup := configurationSeedSearchSetup ntm c (enc a)
+      let n := setup.parameters.search.subdivision.vertexCount
+      (params a).size = n ∧ (params a).source < n ∧ (params a).target < n ∧
+        (params a).radius ≤ n ∧ (params a).expected.count ≤ n ∧
+        (params a).expected.lengthSum ≤ n * n) :
+    let baseline : MembershipTally.Context := ⟨0, 0, 0, 0, ⟨0, 0⟩⟩
+    let M := configurationJustesenMembershipTally ntm c [] 0 baseline
+    let init a := MembershipTally.retainedInitial
+      (configurationJustesenSubdivisionContext ntm c (enc a) (rank a)) (params a)
+    ∃ K, Nonempty (Routines M init enc (fun a => K * (Nat.log2 (enc a).length + 1))) := by
+  let edge := justesenWeightedSubdivisionCallback ntm
+  let start := fun ctx u v => justesenSubdivisionEdgeStart (ctx, u, v)
+  let ctx a := configurationJustesenSubdivisionContext ntm c (enc a) (rank a)
+  let seed (a : α) :
+      Fin (2 ^ codeLength (configurationInstance ntm c (enc a)).n
+        ((configurationInstance ntm c (enc a)).n - 1)) :=
+    ⟨rank a, hrank_lt a⟩
+  let n a := (configurationSeedSearchSetup ntm c (enc a)).parameters.search.subdivision.vertexCount
+  let b a := Nat.log2 (enc a).length + 1
+  obtain ⟨A, hcall⟩ := configurationJustesenSubdivisionEdge_contract ntm c
+  obtain ⟨C, hbound⟩ := configurationJustesenMembershipTally_stateBound_le_log ntm c
+  let S a := (C + A + 1) * b a
+  have hlog (a : α) : b a ≤ S a := by
+    simp only [S, Nat.add_mul, Nat.one_mul]
+    exact Nat.le_add_left _ _
+  have hsmall (a : α) : Nat.log2 (enc a).length ≤ S a := (Nat.le_succ _).trans (hlog a)
+  have hctx : ComputableInSpace ctx enc encJustesenSubdivisionContext S :=
+    (configurationJustesenSubdivisionContext_inSpace ntm c hrank hrank_lt).mono_le hsmall
+  have hsource (a : α) : (params a).source < (params a).size := by
+    rw [(hvalid a).1]
+    exact (hvalid a).2.1
+  have hcallee (a : α) (u v : Fin (params a).size) (t : ℕ) (ht : t ≤ 3) :
+      (encJustesenSubdivisionState (edge.runFrom (enc a) (start (ctx a) u.val v.val) t)).length ≤
+        A * b a := by
+    have hu : u.val < n a := by simpa only [(hvalid a).1] using u.isLt
+    have hv : v.val < n a := by simpa only [(hvalid a).1] using v.isLt
+    exact (hcall (enc a) (seed a) ⟨u.val, hu⟩ ⟨v.val, hv⟩).2.2.2 t ht
+  have hstate (a : α) :
+      MembershipTally.retainedStateBound 3 (params a) (encJustesenSubdivisionContext (ctx a)).length
+        (A * b a) ≤ S a := by
+    obtain ⟨hsize, hsrc, hdst, hr, hc, hs⟩ := hvalid a
+    let source : Fin (n a) := ⟨(params a).source, hsrc⟩
+    let target : Fin (n a) := ⟨(params a).target, hdst⟩
+    have hshape :
+        params a = ⟨n a, source.val, target.val, (params a).radius, (params a).expected⟩ := by
+      dsimp only [source, target]
+      cases h : params a
+      simp only [h] at hsize
+      simp only [hsize, n]
+    rw [hshape]
+    refine (hbound (enc a) (seed a) source target (params a).radius (params a).expected
+      (A * b a) hr hc hs).trans ?_
+    simp only [S, b, Nat.add_mul, Nat.one_mul]
+    exact Nat.le_add_right _ _
+  obtain ⟨hq, hn, hh, _, _⟩ := justesenWeightedSubdivisionCallback_parts_inSpace ntm
+  refine ⟨C + A + 1, ?_⟩
+  exact MembershipTally.retainedMachine_exists_routines edge start callbackVerdict 3
+    (tallyWalkInitial ntm c) (configurationJustesenSubdivisionContext ntm c [] 0)
+    encJustesenSubdivisionContext encJustesenSubdivisionState enc S ⟨0, 0, 0, 0, ⟨0, 0⟩⟩
+    ctx params hctx (hparams.mono_le hsmall) hlog
+    justesenSubdivisionEdgeStart_inSpace hq hn hh (callbackVerdict_inSpace _ _)
+    hsource (fun a => A * b a) hcallee hstate
 
 end Cslib.Complexity.STCON

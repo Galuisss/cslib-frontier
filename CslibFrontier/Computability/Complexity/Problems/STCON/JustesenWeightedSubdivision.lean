@@ -269,6 +269,23 @@ theorem configurationJustesenSubdivisionEdge_contract
         Nat.mul_le_mul_left C (Nat.add_le_add_right hctx _)
       _ = _ := by rw [Nat.mul_assoc, Nat.add_mul, Nat.one_mul]
 
+/-- Initialize the adjacency context from the encoded input and a valid binary rank,
+including the logarithmic bound on the encoded output. -/
+theorem configurationJustesenSubdivisionContext_inSpace
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) {α : Type} {enc : α ↪ List Bool} {rank : α → ℕ}
+    (hrank : ComputableInLogSpace rank enc encNat)
+    (hvalid : ∀ a, rank a < (configurationSeedSearchParameters ntm c (enc a)).search.seedLimit) :
+    ComputableInSpace (fun a => configurationJustesenSubdivisionContext ntm c (enc a) (rank a))
+      enc encJustesenSubdivisionContext (fun a => Nat.log2 (enc a).length) := by
+  have hword : ComputableInLogSpace (fun a => enc a) enc encBits :=
+    ComputableInLogSpace.of_eq fun _ => rfl
+  obtain ⟨t, C, hspace⟩ := configurationJustesenSubdivisionContext_inLogSpace ntm c hword hrank
+  obtain ⟨D, hlen⟩ := length_configurationJustesenSubdivisionContext_le_log ntm c
+  exact ⟨t, max C D,
+    hspace.mono (fun _ => le_rfl) fun _ => Nat.mul_le_mul_right _ (le_max_left C D),
+    fun a => (hlen (enc a) (rank a) (hvalid a)).trans
+      (Nat.mul_le_mul_right _ (le_max_right C D))⟩
+
 /-- The generated subdivision adjacency transported to its canonical finite vertex IDs. -/
 @[expose] noncomputable def configurationJustesenSubdivisionAdjacent
     (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) :
