@@ -139,6 +139,10 @@ abbrev encMachineState {τ : Type} (encT : τ ↪ List Bool) :=
 /-- Both numeric loop registers stay in their finite ranges, independently of reply truth. -/
 def Bounded (q : State) : Prop := q.count ≤ q.cursor ∧ q.cursor ≤ q.context.size
 
+/-- The initial predecessor state has tested zero vertices and counted none. -/
+theorem initial_bounded (ctx : Context) : Bounded (initial ctx) := by
+  simp [Bounded, initial]
+
 /-- Every reply, including rejection and ties, preserves the bounded scalar invariant. -/
 theorem advance_bounded {q : State} (hq : Bounded q) (hlive : halted q = false)
     (reply : Option Bool) : Bounded (advance q reply) := by
@@ -382,7 +386,7 @@ theorem Returns.bounded {τ : Type} {ctx : Context} {N : QueryMachine τ}
     {start : State → τ} {answer : τ → Option Bool} {w : List Bool} {q : State}
     (h : Returns ctx N start answer w q) : Bounded q := by
   induction h with
-  | initial => exact ⟨le_rfl, Nat.zero_le _⟩
+  | initial => exact initial_bounded ctx
   | call _ hlive _ _ _ ih => exact advance_bounded ih hlive _
 
 /-- All immutable callback arguments survive every return, including rejection. -/
@@ -407,10 +411,22 @@ theorem Returns.exists_run {τ : Type} {ctx : Context} {N : QueryMachine τ}
 
 /-- Pending callback phases remaining: two per untested predecessor, minus the completed
 edge test while membership is pending. -/
-private def remainingCalls (q : State) : ℕ :=
+def remainingCalls (q : State) : ℕ :=
   2 * (q.context.size - q.cursor) - if q.memberPhase then 1 else 0
 
-private theorem advance_progress {q : State} (hlive : halted q = false)
+/-- A live predecessor state has at least one callback phase remaining. -/
+theorem remainingCalls_pos {q : State} (h : halted q = false) : 0 < remainingCalls q := by
+  have hi : q.cursor < q.context.size := by
+    simp only [halted, Bool.or_eq_false_iff, decide_eq_false_iff_not, Nat.not_le] at h
+    exact h.2
+  cases hp : q.memberPhase <;> simp [remainingCalls, hp] <;> omega
+
+/-- At entry, each vertex has two possible callback phases. -/
+theorem remainingCalls_initial (ctx : Context) : remainingCalls (initial ctx) = 2 * ctx.size := by
+  simp [remainingCalls, initial]
+
+/-- A callback reply consumes one phase whenever the predecessor loop stays live. -/
+theorem advance_progress {q : State} (hlive : halted q = false)
     (reply : Option Bool) (hnext : halted (advance q reply) = false) :
     remainingCalls (advance q reply) < remainingCalls q := by
   have hi : q.cursor < q.context.size := by
