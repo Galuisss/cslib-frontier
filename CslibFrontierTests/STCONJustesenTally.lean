@@ -149,6 +149,27 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     ⟨rfl, ?_⟩
   simp only [configurationJustesenSubdivisionAdjacent, decide_eq_true_eq]
 
+-- Parsed replies can be used directly as adjacency and reachability facts.
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source u v : Fin n) (radius : ℕ),
+      let adjacent := configurationJustesenSubdivisionAdjacent ntm c w seed
+      let edge := fun i j => adjacent i j = true
+      let ctx : SourceRound.Context := ⟨n, source.val, radius, expected edge source radius⟩
+      let adjacency := configurationJustesenSubdivisionContext ntm c w seed.val
+      let parse := fun req => (justesenRoundCallback ntm c).readReply justesenRoundCallbackReply
+        w (justesenRoundCallbackStart adjacency ctx req)
+      ∀ (bits : List Bool) (hit : Bool) (suffix : List Bool),
+        (parse (.edge u.val v.val) bits = some (hit, suffix) → hit = adjacent u v) ∧
+        (parse (.member v.val) bits = some (hit, suffix) →
+          (hit ↔ v ∈ Relation.reachableWithin edge source radius)) := by
+  intro I n seed source u v radius adjacent edge ctx adjacency parse bits hit suffix
+  have h := configurationJustesenRoundCallback_readReply_correct ntm c w seed source radius
+  exact ⟨h (.edge u.val v.val) ⟨u.isLt, v.isLt⟩ bits hit suffix,
+    h (.member v.val) v.isLt bits hit suffix⟩
+
 /-- The final callback returns a passing negative reply and preserves the next selectors. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
     (c : ℕ) (w : List Bool) :
@@ -450,5 +471,69 @@ example {k : ℕ} {State : Type} [Fintype State] {α : Type} {enc : α ↪ List 
         Native.eq_occurrences_of_replayChoices R.I R.P R.F R.C hother hr hhalt hh⟩
   rw [justesenSourceLoop_run_zero] at hret
   cases hret
+
+-- The two request tags give at most one successful complete round at exact totals.
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source : Fin n) (radius : ℕ),
+      let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
+      (∃! transcript, Passes edge source radius transcript) →
+      let ctx : SourceRound.Context := ⟨n, source.val, radius, expected edge source radius⟩
+      let adjacency := configurationJustesenSubdivisionContext ntm c w seed.val
+      let M := SourceRound.machine ctx (justesenRoundCallback ntm c)
+        (justesenRoundCallbackStart adjacency) justesenRoundCallbackReply
+      {bits : List Bool | M.FirstHalting w bits M.init ∧
+        (SourceRound.answer (M.run w bits)).isSome}.Subsingleton := by
+  intro I n seed source radius edge hpass ctx adjacency M
+  apply SourceRound.subsingleton_successful_firstHalting
+  intro req hr left hleft right hright
+  exact (configurationJustesenRoundCallback_existsUnique_firstHalting ntm c w
+    seed source radius hpass req hr).unique hleft hright
+
+-- The first complete round either ends the scan or preserves its exact-tally invariant.
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (w : List Bool) (base : SourceRoundLoop.Registers JustesenSourceContext) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n),
+      let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
+      let ctx : JustesenSourceContext :=
+        ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+      let r := SourceRoundLoop.start ctx n
+      let M := (justesenRetainedSourceRound ntm c base).withInit
+        (justesenRetainedSourceRoundEntry r)
+      ∃! bits, ∃ update, M.FirstHalting w bits M.init ∧
+        justesenRetainedSourceRoundReply (M.run w bits) = some update ∧
+        update.tally = expected edge source 1 ∧
+        (update.bad = false ↔ ∃! transcript, Passes edge source 1 transcript) ∧
+        (update.bad = false → update.tally.count ≠ r.tally.count →
+          JustesenSourceRoundExact ctx edge source (r.advance update.tally)) := by
+  intro I n seed source target edge ctx r M
+  have hreentry : M = justesenRetainedSourceRound ntm c r :=
+    SourceRoundLoop.retainedRound_withInit JustesenSourceContext.size JustesenSourceContext.sourceID
+      (justesenRoundCallback ntm c) (fun ctx => justesenRoundCallbackStart ctx.adjacency)
+      justesenRoundCallbackReply base r
+  rw [hreentry]
+  have hpass := existsUnique_passes_zero edge source
+  have hinit : JustesenSourceRoundExact ctx edge source r :=
+    justesenSourceRoundExact_start ctx edge source
+  have htally : r = ⟨ctx, n, 0, expected edge source 0⟩ := by
+    simp only [r, SourceRoundLoop.start, expected_zero]
+  obtain ⟨bits, ⟨update, hfirst, hreply⟩, hunique⟩ :=
+    configurationJustesenRetainedSourceRound_existsUnique_firstHalting ntm c w
+      seed source target n 0 hpass
+  have hnext := configurationJustesenRetainedSourceRound_correct ntm c w
+    seed source target n 0 hpass bits update hfirst hreply
+  have hfirst' : (justesenRetainedSourceRound ntm c r).FirstHalting w bits
+      (justesenRetainedSourceRound ntm c r).init := htally.symm ▸ hfirst
+  have hreply' : justesenRetainedSourceRoundReply
+      ((justesenRetainedSourceRound ntm c r).run w bits) = some update := htally.symm ▸ hreply
+  refine ⟨bits, ⟨update, hfirst', hreply', hnext.1, hnext.2, ?_⟩, ?_⟩
+  · exact configurationJustesenRetainedSourceRound_exact_advance ntm c w
+      seed source target r hinit bits update hfirst' hreply'
+  · rintro other ⟨result, hother, hret, _, _, _⟩
+    exact hunique other ⟨result, htally ▸ hother, htally ▸ hret⟩
 
 end CslibFrontierTests.STCONJustesenTally

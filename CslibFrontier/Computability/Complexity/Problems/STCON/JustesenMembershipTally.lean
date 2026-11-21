@@ -19,6 +19,10 @@ import CslibFrontier.Foundations.Data.Nat.BinarySize
 The retained tally reads the original word. It supplies the same initialized Justesen context
 to every bounded walk, so the typed scan uses the subdivision adjacency for the chosen rank.
 
+## Main definitions
+
+* `Cslib.Complexity.STCON.justesenSourceMembershipMachine`: the fixed re-entrant tally.
+
 ## Main results
 
 * `Cslib.Complexity.STCON.justesenSourceMembershipMachine_parts_inSpace`: linear-space

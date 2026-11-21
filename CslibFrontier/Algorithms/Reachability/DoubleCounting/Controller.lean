@@ -233,7 +233,8 @@ private theorem stable_of_count_eq {n : ℕ} {r : Fin n → Fin n → Prop}
   ext v
   simp only [← mem_round, heq]
 
-private theorem round_stable_of_size_le {n : ℕ} {r : Fin n → Fin n → Prop}
+/-- Once the radius is at least the vertex count minus one, one more round adds no vertices. -/
+theorem round_stable_of_size_le {n : ℕ} {r : Fin n → Fin n → Prop}
     {s : Fin n} {k : ℕ} (h : n ≤ k + 1) :
     round r s (k + 1) = round r s k := by
   ext v
