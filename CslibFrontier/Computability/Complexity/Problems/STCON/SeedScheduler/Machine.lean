@@ -93,8 +93,7 @@ def machine {σ : Type} (setup : SeedSearchSetup) (scan : NondeterministicQueryM
       if choice then .inr none else resume start frame none
     | (.inl (.inr (frame, s)), read, choice) =>
       if scan.halted s then
-        if choice then .inr none
-        else (verdict s).elim (.inr none) (fun v => resume start frame (some v))
+        if choice then .inr none else resume start frame (verdict s)
       else .inl (.inr (frame, scan.next (s, read, choice)))
     | (.inr result, _, _) => .inr result
   halted
@@ -122,11 +121,13 @@ theorem step_liveScan {σ : Type} (setup : SeedSearchSetup) (scan : Nondetermini
   simp [NondeterministicQueryMachine.step, NondeterministicQueryMachine.read, machine, hlive]
 
 /-- A successful first halt from an active scan consumes its parsed verdict and then
-first halts from the resumed scheduler, using the parser's unmodified suffix. -/
+first halts from the resumed scheduler, using the parser's unmodified suffix.
+The frame must request a scan, as it does when `enter` selects the active phase. -/
 theorem firstHalting_scan_iff {σ : Type} (setup : SeedSearchSetup)
     (scan : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
     (verdict : σ → Option ControllerVerdict) (w : List Bool)
-    (frame : SeedSchedulerFrame) (state : σ) (bits : List Bool) (answer : Option Answer) :
+    (frame : SeedSchedulerFrame) (state : σ) (bits : List Bool) (answer : Option Answer)
+    (hscan : frame.needsScan = true) :
     let M := machine setup scan start verdict
     let active : State σ := .inl (.inr (frame, state))
     M.FirstHalting w bits active ∧ M.replay w bits active = .inr (some answer) ↔
@@ -139,7 +140,13 @@ theorem firstHalting_scan_iff {σ : Type} (setup : SeedSearchSetup)
     (.inr none) (.inr (some answer)) rfl (by simp) rfl (fun _ => rfl)
     (step_liveScan setup scan start verdict w frame) ?_ state bits
   intro s selector hhalt
-  simp [M, NondeterministicQueryMachine.step, machine, hhalt]
+  have hstep : M.step w (.inl (.inr (frame, s))) selector =
+      if selector then .inr none else resume start frame (verdict s) := by
+    simp [M, NondeterministicQueryMachine.step, machine, hhalt]
+  rw [hstep]
+  cases hv : verdict s with
+  | none => simp [resume, seedSchedulerStep_noReply_of_needsScan frame hscan]
+  | some v => rfl
 
 /-- A successful first halt from a skipped root consumes exactly one false selector
 before continuing the search. -/
