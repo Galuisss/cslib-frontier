@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.CallReplay
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.Sum
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.Cases
 
 /-!
@@ -28,6 +29,8 @@ skipped designated root.
 
 ## Main results
 
+* `SeedSchedulerMachine.enter_inSpace` and `SeedSchedulerMachine.init_budget`: enter a
+  supplied scan or skip phase within the caller's workspace budget.
 * `SeedSchedulerMachine.observations_inSpace`: query, halt, terminal reply, and acceptance
   use space linear in the encoded state.
 * `SeedSchedulerMachine.step_liveScan`: a live scan takes the callback's step on the same input.
@@ -104,6 +107,43 @@ def machine {σ : Type} (setup : SeedSearchSetup) (scan : NondeterministicQueryM
     | .inl _ => false
     | .inr _ => true
   accept s := ((reply s).join.map Answer.reachable).getD false
+
+open _root_.Turing.MultiTapeTM.ComputableInSpace in
+/-- Enter a skipped root or an active scan within space linear in the encoded frame. -/
+theorem enter_inSpace {σ : Type} (encScan : σ ↪ List Bool) (start : SeedScanRequest → σ)
+    (hstart : ComputableInSpace start encSeedScanRequest encScan
+      (fun r => (encSeedScanRequest r).length)) :
+    ComputableInSpace (enter start) encSeedSchedulerFrame (encState encScan)
+      (fun f => (encSeedSchedulerFrame f).length) := by
+  let scanState := encPair encSeedSchedulerFrame encScan
+  let live := encSum encSeedSchedulerFrame scanState
+  let terminal := encOption (encOption encAnswer)
+  have hframe := budget_id (enc := encSeedSchedulerFrame) (.refl _)
+  have hentry := budget_comp_linear hstart (encSeedSchedulerFrame_request_budget hframe)
+  have hscan := budget_comp_linear (of_inO (ComputableInO.inr encSeedSchedulerFrame scanState))
+    (budget_prod hframe hentry)
+  have hskip := of_inO (ComputableInO.inl encSeedSchedulerFrame scanState)
+  have hlive := budget_ite (SeedSchedulerFrame.needsScan_budget hframe) hscan hskip
+  exact (budget_comp_linear (of_inO (ComputableInO.inl live terminal)) hlive).of_enc_eq fun f => by
+    change encState encScan (enter start f) = encState encScan
+      (.inl (if f.needsScan then .inr (f, start f.request) else .inl f))
+    unfold enter
+    split <;> rfl
+
+open _root_.Turing.MultiTapeTM.ComputableInSpace in
+/-- Construct the scheduler's initial state under the setup producer's workspace budget. -/
+theorem init_budget {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ}
+    (encScan : σ ↪ List Bool) (scan : NondeterministicQueryMachine σ)
+    (start : SeedScanRequest → σ) (verdict : σ → Option ControllerVerdict)
+    (hstart : ComputableInSpace start encSeedScanRequest encScan
+      (fun r => (encSeedScanRequest r).length))
+    {setup : α → SeedSearchSetup} (hsetup : ComputableInSpace setup enc encSeedSearchSetup S) :
+    ComputableInSpace (fun a => (machine (setup a) scan start verdict).init)
+      enc (encState encScan) S := by
+  have hzero := (constZero (encIn := enc) (encB := encNat) 0).mono_le (fun a => Nat.zero_le (S a))
+  have hcandidate := seedSchedulerCandidate_budget hsetup hzero
+  have hentry := optionElim (.inr (some none)) (enter_inSpace encScan start hstart)
+  exact (budget_comp_linear hentry hcandidate).of_enc_eq fun _ => rfl
 
 open _root_.Turing.MultiTapeTM.ComputableInSpace in
 /-- Query, read the phase tag or terminal reply, and test acceptance in space linear in
