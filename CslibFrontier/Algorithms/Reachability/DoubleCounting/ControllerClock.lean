@@ -118,7 +118,7 @@ theorem runRounds_clock {σ : Type} {n : ℕ} (clock : σ → ℕ) (E M limit : 
   | zero => change clock s ≤ _; omega
   | succ fuel ih =>
     have hkl : k < limit := by omega
-    rw [runRounds]
+    rw [runRounds, runRoundsWith]
     calc
       _ ≤ clock s + (n * (M + n * (E + M)) +
           (fuel * (n * (M + n * (E + M))) + M)) := by
