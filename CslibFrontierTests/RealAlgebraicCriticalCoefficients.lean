@@ -9,6 +9,7 @@ module
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
 import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalParameterEvaluation
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
+import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalMinimumValue
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalRootFeasibility
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValuePolynomial
@@ -396,5 +397,20 @@ example : ∃ x : Fin 1 → ℝ, x 0 = 2 ∧ aeval x (X 0 : MvPolynomial (Fin 1)
   have hx₀ : x 0 = 2 := by
     simpa only [r, aeval_C, Algebra.algebraMap_self_apply, pow_one] using (hx 0).symm
   exact ⟨x, hx₀, hv⟩
+
+-- The two roots of x² − 1 have distinct positive-order derivative signs.
+example :
+    let p : Polynomial ℝ := Polynomial.X ^ 2 - 1
+    (fun i : Fin 2 => p.derivativeSign (-1) (i.val + 1)) ≠
+      (fun i : Fin 2 => p.derivativeSign 1 (i.val + 1)) := by
+  intro p hsign
+  have hc : p.coeff 2 = 1 := by
+    simp [p, Polynomial.coeff_X_pow, Polynomial.coeff_one]
+  have hp : p ≠ 0 := fun h => by simp [h] at hc
+  have hD : p.natDegree ≤ 2 := (Polynomial.natDegree_sub_le _ _).trans (by simp)
+  have hneg : p.IsRoot (-1) := by norm_num [p, Polynomial.IsRoot.def]
+  have hpos : p.IsRoot 1 := by norm_num [p, Polynomial.IsRoot.def]
+  have heq := p.injOn_derivativeSign_roots hp hD hneg hpos hsign
+  norm_num at heq
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
