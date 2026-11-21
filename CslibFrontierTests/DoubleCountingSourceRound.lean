@@ -142,7 +142,8 @@ private theorem nativeRoutines :
   · exact of_inO (ComputableInDegree.id' (enc := encOption encBool)).inO_one
   · exact (budget_const 0 (.refl _)).of_enc_eq fun _ => rfl
   · exact (budget_const true (.refl _)).of_enc_eq fun _ => rfl
-  · exact (fst (encOption encBool) (encPair (encOption encBool) encBool)).of_enc_eq fun _ => rfl
+  · exact (fst (encOption encBool) NondeterministicQueryMachine.encReadChoice).of_enc_eq
+      fun _ => rfl
   · refine ⟨roundStateBound context 2, fun a bits => ?_⟩
     rw [Nat.mul_one]
     apply length_encMachineState_run_le (D := 2)
