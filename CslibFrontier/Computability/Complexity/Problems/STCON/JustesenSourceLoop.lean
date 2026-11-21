@@ -36,6 +36,8 @@ membership tally at the designated target.
   first-halting selector list returning a verdict has one accepting native occurrence.
 * `Cslib.Complexity.STCON.configurationJustesenSourceLoop_correct`: a returned verdict
   gives the first nonunique radius or the correct subdivision reachability answer.
+* `Cslib.Complexity.STCON.configurationJustesenSourceLoop_exists_firstHalting`: a
+  full-fuel loop has a first-halting trace returning a verdict.
 -/
 
 public section
@@ -341,5 +343,55 @@ theorem configurationJustesenSourceLoop_correct
         fuel radius selectors hit rest hreply).trans mem_round.symm)
     hscan
   cases verdict <;> exact hspec
+
+/-- Every valid full-fuel source scan has a complete first-halting trace with a verdict. -/
+theorem configurationJustesenSourceLoop_exists_firstHalting
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n),
+      let context : JustesenSourceContext :=
+        ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+      let M := justesenSourceLoop ntm c context n
+      ∃ bits verdict, M.FirstHalting w bits M.init ∧ M.run w bits = .inr (some verdict) := by
+  intro I n seed source target context M
+  let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
+  let initial := SourceRoundLoop.start context n
+  let round := justesenRetainedSourceRound ntm c initial
+  let member := justesenSourceMembershipMachine ntm c
+  let P := JustesenSourceRoundExact context edge source
+  have hinit (r : SourceRoundLoop.Registers JustesenSourceContext) :
+      round.withInit (justesenRetainedSourceRoundEntry r) =
+        justesenRetainedSourceRound ntm c r :=
+    justesenRetainedSourceRound_withInit ntm c initial r
+  have hnormalized (r : SourceRoundLoop.Registers JustesenSourceContext) (hr : P r) :
+      r = ⟨context, r.fuel, r.radius, expected edge source r.radius⟩ := by
+    obtain ⟨hctx, _, _, htally, _⟩ := hr
+    rw [← hctx, ← htally]
+  refine SourceRoundLoop.exists_successful_firstHalting initial round
+    justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply member
+    justesenSourceMembershipStart MembershipTally.retainedReply w P
+    (justesenSourceRoundExact_start context edge source) (fun _ hr => hr.2.2.1) ?_ ?_ ?_
+  · intro r hr _ bits update hfirst hreply hbad hcount
+    rw [← firstHalting_withInit, hinit r] at hfirst
+    rw [← run_withInit, hinit r] at hreply
+    exact configurationJustesenRetainedSourceRound_exact_advance ntm c w
+      seed source target r hr bits update hfirst hreply hbad hcount
+  · intro r hr
+    have hpass := hr.2.2.2.2 r.radius le_rfl
+    obtain ⟨bits, ⟨update, hfirst, hreply⟩, _⟩ :=
+      configurationJustesenRetainedSourceRound_existsUnique_firstHalting ntm c w
+        seed source target r.fuel r.radius hpass
+    rw [← hnormalized r hr, ← hinit r, firstHalting_withInit] at hfirst
+    rw [← hnormalized r hr, ← hinit r, run_withInit] at hreply
+    exact ⟨bits, update, hfirst, hreply⟩
+  · intro r hr
+    have hpass := hr.2.2.2.2 r.radius le_rfl
+    obtain ⟨bits, ⟨hfirst, hsome⟩, _⟩ :=
+      justesenSourceMembership_existsUnique_firstHalting ntm c w
+        seed source target r.fuel r.radius hpass
+    obtain ⟨hit, hreply⟩ := Option.isSome_iff_exists.mp hsome
+    rw [← hnormalized r hr] at hfirst hreply
+    exact ⟨bits, hit, hfirst, hreply⟩
 
 end Cslib.Complexity.STCON
