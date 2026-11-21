@@ -6074,6 +6074,7 @@ public import CslibFrontier.Foundations.Analysis.Normed.Ring.PowSub
 public import CslibFrontier.Foundations.Analysis.Normed.UnitSphere
 public import CslibFrontier.Foundations.Analysis.RateExponent
 public import CslibFrontier.Foundations.Analysis.RootError
+public import CslibFrontier.Foundations.Analysis.SignLabelScore
 public import CslibFrontier.Foundations.Analysis.SignedDigitStream.Basic
 public import CslibFrontier.Foundations.Analysis.SignedDigitStream.Elementary
 public import CslibFrontier.Foundations.Analysis.SignedDigitStream.Multiplication

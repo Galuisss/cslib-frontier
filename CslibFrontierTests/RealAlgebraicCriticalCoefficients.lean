@@ -15,6 +15,7 @@ import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalMinimumValue
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalRootFeasibility
+import CslibFrontier.Foundations.Analysis.SignLabelScore
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValuePolynomial
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalIntegerSpecialization
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValueParameterDegree
@@ -489,5 +490,26 @@ example :
     (Or.inr ⟨by norm_num, by norm_num⟩)
   rw [sign_neg hx, SignType.coe_neg_one, sub_neg_eq_add] at h
   simpa only [Nat.mul_one, show (3 : ℝ) ^ 2 = 9 by norm_num, div_eq_mul_inv] using h
+
+-- One approximate negative test accepts the negative target and rejects the positive target.
+example :
+    let a : Fin 1 → ℝ := fun _ => Polynomial.dyadicSignApprox 1 2 (-(3 / 4))
+    (1 : ℝ) / 2 ≤ SignType.labelScore a (fun _ => -1) ∧
+      SignType.labelScore a (fun _ => 1) ≤ -(1 : ℝ) / 2 := by
+  intro a
+  let s : Fin 1 → SignType := fun _ => -1
+  have hx : (-(3 / 4) : ℝ) < 0 := by norm_num
+  have ha (i : Fin 1) : |a i - (s i : ℝ)| ≤ (4 * (((1 : ℕ) : ℝ) + 1))⁻¹ := by
+    have h := Polynomial.abs_dyadicSignApprox_sub_sign_le_inv_four_mul_succ 1 1
+      (x := -(3 / 4)) (Or.inr ⟨by norm_num, by norm_num⟩)
+    simpa only [sign_neg hx, a, s] using h
+  obtain ⟨hmatch, hpos⟩ := SignType.labelScore_margin a s s ha
+  obtain ⟨hmiss, hneg⟩ := SignType.labelScore_margin a s (fun _ => 1) ha
+  have h₁ := hpos.mpr (fun _ => rfl)
+  have h₂ : ¬ 0 < SignType.labelScore a (fun _ => 1) := by
+    intro h
+    have hsign := hneg.mp h (0 : Fin 1)
+    norm_num [s] at hsign
+  exact ⟨hmatch.resolve_right (by linarith), hmiss.resolve_left (by linarith)⟩
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients

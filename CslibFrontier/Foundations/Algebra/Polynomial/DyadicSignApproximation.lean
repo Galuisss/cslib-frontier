@@ -9,6 +9,8 @@ module
 public import CslibFrontier.Init
 public import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProduct
 public import Mathlib.Basic.Sign.Basic
+import Mathlib.Algebra.Order.Ring.Pow
+import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.NormNum
 import Mathlib.Tactic.Ring
 
@@ -86,5 +88,20 @@ theorem abs_dyadicSignApprox_sub_sign_le (B s : ℕ) {x : ℝ}
   · rw [abs_of_pos hp] at hlo hhi
     rw [sign_pos hp, SignType.coe_one]
     exact abs_dyadicSignApprox_sub_one_le B s hlo hhi
+
+/-- For a list of `m` tests, repetition `m + 1` brings the per-test error within
+the tolerance of the squared-error score. -/
+theorem abs_dyadicSignApprox_sub_sign_le_inv_four_mul_succ (B m : ℕ) {x : ℝ}
+    (hx : x = 0 ∨ (((2 : ℝ) ^ B)⁻¹ ≤ |x| ∧ |x| ≤ (2 : ℝ) ^ B)) :
+    |dyadicSignApprox B (m + 1) x - (SignType.sign x : ℝ)| ≤ (4 * ((m : ℝ) + 1))⁻¹ := by
+  apply (abs_dyadicSignApprox_sub_sign_le B (m + 1) hx).trans
+  have h : 8 * ((m : ℝ) + 1) ≤ (3 : ℝ) ^ (2 * (m + 1)) := by
+    rw [pow_mul]
+    have hbern := one_add_mul_le_pow (a := (8 : ℝ)) (by norm_num) (m + 1)
+    norm_num [Nat.cast_succ] at hbern ⊢
+    linarith
+  rw [← div_eq_mul_inv, ← one_div (4 * ((m : ℝ) + 1)),
+    div_le_div_iff₀ (by positivity) (by positivity)]
+  linarith
 
 end Polynomial
