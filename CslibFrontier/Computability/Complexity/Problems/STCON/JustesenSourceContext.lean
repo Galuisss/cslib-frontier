@@ -74,6 +74,28 @@ theorem configurationJustesenSourceContext_size {k : ℕ} {State : Type} [Fintyp
   simp only [JustesenSourceContext.size, configurationJustesenSubdivisionContext,
     (configurationSeedSearchSetup_endpoints ntm c w).1]
 
+/-- The retained subdivision and both valid endpoints have logarithmic encoded length. -/
+theorem length_configurationJustesenSourceContext_le_log {k : ℕ} {State : Type} [Fintype State]
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ∃ C, ∀ w : List Bool,
+      let I := configurationInstance ntm c w
+      let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+      ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n),
+        (encJustesenSourceContext
+          ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩).length
+            ≤ C * (Nat.log2 w.length + 1) := by
+  obtain ⟨A, hA⟩ := length_configurationJustesenSubdivisionContext_le_log ntm c
+  obtain ⟨B, hB⟩ := length_configurationSubdivisionVertexCount_le_log ntm c
+  refine ⟨2 * A + 3 * B + 2, fun w => ?_⟩
+  intro I n seed source target
+  have ha := hA w seed.val seed.isLt
+  have hn : (encNat n).length ≤ B * (Nat.log2 w.length + 1) := hB w
+  have hs := (length_encNat_mono source.isLt.le).trans hn
+  have ht := (length_encNat_mono target.isLt.le).trans hn
+  simp only [encJustesenSourceContext_apply, encJustesenSourceContextFields,
+    length_encPair, Nat.add_mul, Nat.mul_assoc]
+  omega
+
 /-- Read the subdivision size from the existing adjacency context encoding. -/
 theorem encJustesenSourceContext_size_budget {α : Type} {enc : α ↪ List Bool} {S : α → ℕ}
     {ctx : α → JustesenSourceContext}

@@ -78,7 +78,7 @@ theorem admissible_caps {context : κ} {size limit : ℕ} {r : Registers κ}
     hsum.trans (Nat.mul_le_mul (Nat.mul_le_mul_left _ hk) hk)⟩
 
 /-- Encoded workspace for the retained context, loop fuel, radius and current tally. -/
-def registerStateBound (encContext : κ ↪ List Bool) (context : κ) (size limit : ℕ) : ℕ :=
+@[expose] def registerStateBound (encContext : κ ↪ List Bool) (context : κ) (size limit : ℕ) : ℕ :=
   2 * (encContext context).length + 4 * (encNat limit).length +
     2 * (encNat (1 + limit * size)).length + (encNat (size * limit * limit)).length + 4
 

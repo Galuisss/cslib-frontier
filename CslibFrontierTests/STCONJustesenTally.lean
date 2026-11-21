@@ -355,7 +355,7 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     ⟨(hc (.edge source.val target.val) ⟨source.isLt, target.isLt⟩).2 bits,
       (hc (.member target.val) target.isLt).2 bits⟩⟩
 
--- Re-enter the same round at admissible loop registers without changing its clock or envelope.
+-- Re-enter the same round at admissible registers and bound every prefix logarithmically.
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
     (initial : SourceRoundLoop.Registers JustesenSourceContext) :
     ∃ C, ∀ w : List Bool,
@@ -369,14 +369,16 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
             (justesenRetainedSourceRoundEntry r)
           M.HaltsWithin w (configurationJustesenRetainedSourceRoundClock ntm c w) ∧
             ∀ bits, (encJustesenRetainedSourceRoundState (M.run w bits)).length ≤
-              2 * (encJustesenSourceContext context).length + 1 +
-                SourceRound.roundStateBound ⟨n, source.val, n, ⟨1 + n * n, n * n * n⟩⟩
-                  (C * (Nat.log2 w.length + 1)) := by
-  obtain ⟨C, h⟩ := configurationJustesenRetainedSourceRound_bounds ntm c
-  refine ⟨C, fun w => ?_⟩
+              C * (Nat.log2 w.length + 1) := by
+  obtain ⟨A, hround⟩ := configurationJustesenRetainedSourceRound_bounds ntm c
+  obtain ⟨B, hsize⟩ := configurationJustesenRetainedSourceRound_envelopes_le_log ntm c
+  refine ⟨B + A, fun w => ?_⟩
   intro I n seed source target context r hr M
   dsimp only [M]
   rw [justesenRetainedSourceRound_withInit]
-  exact h w seed source target n le_rfl r hr
+  obtain ⟨hhalt, hpref⟩ := hround w seed source target n le_rfl r hr
+  refine ⟨hhalt, fun bits => (hpref bits).trans ?_⟩
+  simpa only [Nat.add_mul] using
+    (hsize w seed source target n le_rfl).2 (A * (Nat.log2 w.length + 1))
 
 end CslibFrontierTests.STCONJustesenTally
