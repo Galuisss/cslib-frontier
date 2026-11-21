@@ -10,6 +10,7 @@ module
 public import CslibFrontier.Init
 public import Mathlib.Algebra.Polynomial.BigOperators
 public import Mathlib.Algebra.Polynomial.CoeffList
+public import Mathlib.Algebra.Polynomial.Reverse
 public import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import CslibFrontier.Foundations.Data.List.OfFn
 import CslibFrontier.Foundations.Data.Polynomial.CoeffSumBounds
@@ -72,6 +73,11 @@ theorem coeffNorm1_zero : coeffNorm1 0 = 0 := by
 theorem coeffNorm1_eq_sum_of_support_subset {p : ℤ[X]} {S : Finset ℕ} (hS : p.support ⊆ S) :
     coeffNorm1 p = ∑ i ∈ S, (p.coeff i).natAbs :=
   sum_eq_of_subset _ (fun _ => Int.natAbs_zero) hS
+
+/-- Reversing the coefficients preserves the coefficient norm. -/
+theorem coeffNorm1_reverse (p : ℤ[X]) : p.reverse.coeffNorm1 = p.coeffNorm1 := by
+  rw [coeffNorm1, reverse, reflect_support, sum_image (revAt _).injective.injOn]
+  simp only [coeff_reflect, revAt_invol, coeffNorm1]
 
 /-- Evaluation at a nonzero integer is bounded by the coefficient norm times the
 absolute value of the integer raised to the degree. -/

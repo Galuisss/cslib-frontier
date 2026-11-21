@@ -8,6 +8,7 @@ module
 
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
 import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalParameterEvaluation
+import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicValueBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalMinimumValue
@@ -434,5 +435,34 @@ example :
   obtain ⟨h₀, hd⟩ := Polynomial.valueResultant_ne_zero_and_natDegree hp g
   exact ⟨h₀, hd.trans hdeg, by
     simpa [g, show (1 : ℝ) + 2 = 3 by norm_num] using Polynomial.isRoot_valueResultant hp g ha⟩
+
+-- The identity test at the root of 2X − 1 falls in the nonzero dyadic interval.
+example :
+    let R := (2 : ℝ) ^ Polynomial.algebraicValuePrecision 1 1 2 0
+    R⁻¹ ≤ 1 / 2 ∧ 1 / 2 ≤ R := by
+  intro R
+  let p : Polynomial ℤ := Polynomial.C 2 * Polynomial.X - 1
+  let g : Polynomial ℤ := Polynomial.X
+  have hp₁ : p.coeff 1 = 2 := by
+    norm_num only [p, Polynomial.coeff_sub, Polynomial.coeff_C_mul, Polynomial.coeff_X,
+      Polynomial.coeff_one, ite_true, ite_false]
+  have hp : p ≠ 0 := fun h => by simp [h] at hp₁
+  have hD : p.natDegree ≤ 1 := (Polynomial.natDegree_sub_le _ _).trans (by simp)
+  have hE : g.natDegree ≤ 1 := by simp [g]
+  have hg : g.coeffNorm1 = 1 := by
+    simpa only [g, mul_one, Polynomial.coeffNorm1_one] using Polynomial.coeffNorm1_X_mul 1
+  have hb : p.coeffNorm1 ≤ 2 ^ 2 := by
+    change (Polynomial.C 2 * g - 1).coeffNorm1 ≤ 2 ^ 2
+    refine (Polynomial.coeffNorm1_sub_le _ _).trans ?_
+    have h := Polynomial.coeffNorm1_C_mul_le 2 g
+    rw [hg] at h
+    rw [Polynomial.coeffNorm1_one]
+    omega
+  have hx : p.eval₂ (Int.castRingHom ℝ) (1 / 2) = 0 := by norm_num [p]
+  have h := Polynomial.eval₂_eq_zero_or_dyadic_bounds hp hD hE hb (c := 0) (by simp [hg]) hx
+  rcases h with hzero | hbounds
+  · norm_num [g] at hzero
+  · simpa only [R, g, Polynomial.eval₂_X, abs_of_nonneg (by norm_num : (0 : ℝ) ≤ 1 / 2)]
+      using hbounds
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients

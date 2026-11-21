@@ -5992,6 +5992,7 @@ public import CslibFrontier.Foundations.Algebra.Order.Star.Pi
 public import CslibFrontier.Foundations.Algebra.Polynomial.Bivariate
 public import CslibFrontier.Foundations.Algebra.Polynomial.BivariateSwap
 public import CslibFrontier.Foundations.Algebra.Polynomial.LagrangeInversion
+public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicValueBounds
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BitBounds
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.CoeffNormBound
