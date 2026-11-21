@@ -16,6 +16,8 @@ Move one leaf of a two-edge star while keeping the other edge's whole route. The
 route meets the moving route at the center, so the client also exercises the mixed contact case.
 -/
 
+set_option linter.privateModule false
+
 namespace CslibFrontierTests.PolygonalSquareMove
 
 open Cslib Polygonal Cslib.Complexity Graph RotationSystem
@@ -33,7 +35,7 @@ example :
   have hmove : ‖(⟨9 / 8, 1⟩ : ℂ) - D.vertex 0‖ < (1 / 4 : ℝ) := by
     rw [hleaf]
     have hdiff : (⟨9 / 8, 1⟩ : ℂ) - ⟨1, 1⟩ = ((1 / 8 : ℝ) : ℂ) := by
-      ext <;> norm_num
+      apply Complex.ext <;> norm_num
     rw [hdiff, Complex.norm_real, Real.norm_eq_abs]
     norm_num
   have hroute : (D.route fixedEdge).support = segment ℝ (⟨2, 1⟩ : ℂ) 0 := by
