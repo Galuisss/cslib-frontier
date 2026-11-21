@@ -10,8 +10,10 @@ module
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolySpace.Plain
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Universal.SpaceBudget
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.BitString
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Int
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat.Max
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Plain
 import CslibFrontier.Foundations.Data.BitString.ShortWords
 import Mathlib.Data.List.GetD
@@ -65,126 +67,11 @@ certificates for `Turing.MultiTapeTM.Universal`:
 
 public section
 
-namespace Turing.MultiTapeTM
-
-/-- Positive part `z.toNat` of an integer `z`. -/
-@[expose] def intPosPart (z : ℤ) : ℕ := z.toNat
-
-/-- Negative part `(-z).toNat` of an integer `z`. -/
-@[expose] def intNegPart (z : ℤ) : ℕ := (-z).toNat
-
-namespace ComputableInPolyTime
-
-/-- Take the larger of two unary naturals. -/
-@[fun_prop]
-theorem unary_max :
-    ComputableInPolyTime (fun p : ℕ × ℕ => max p.1 p.2)
-      (encPair encUnary encUnary) encUnary :=
-  ComputableInPolyTime.of_tidy ComputableTidilyInPolyTime.unary_max
-
-/-- Take the larger of two computed unary naturals with the same full input context. -/
-@[fun_prop]
-theorem unary_max' {α : Type} {input : α ↪ List Bool} {left right : α → ℕ}
-    (hleft : ComputableInPolyTime left input encUnary)
-    (hright : ComputableInPolyTime right input encUnary) :
-    ComputableInPolyTime (fun a => max (left a) (right a)) input encUnary :=
-  unary_max.comp (hleft.prod hright)
-
-/-- Positive part `intPosPart z = z.toNat` of a unary integer `z`. -/
-@[fun_prop]
-theorem intPosPart_polyTime :
-    ComputableInPolyTime intPosPart encIntUnary encUnary := by
-  have hbits : ComputableInPolyTime (fun z : ℤ => encIntUnary z) encIntUnary encBits :=
-    .of_eq fun _ => rfl
-  have hf : ComputableInPolyTime
-      (fun w : List Bool => if w.getD 0 false then 0 else w.length - 1) encBits encUnary := by
-    fun_prop
-  refine (hf.comp hbits).of_enc_eq fun z => ?_
-  rcases z with n | n <;> simp [intPosPart]
-
-/-- Compositional rule for `intPosPart`. -/
-@[fun_prop]
-theorem intPosPart_comp {α : Type} {input : α ↪ List Bool} {f : α → ℤ}
-    (hf : ComputableInPolyTime f input encIntUnary) :
-    ComputableInPolyTime (fun a => intPosPart (f a)) input encUnary :=
-  intPosPart_polyTime.comp hf
-
-/-- Negative part `intNegPart z = (-z).toNat` of a unary integer `z`. -/
-@[fun_prop]
-theorem intNegPart_polyTime :
-    ComputableInPolyTime intNegPart encIntUnary encUnary := by
-  have hbits : ComputableInPolyTime (fun z : ℤ => encIntUnary z) encIntUnary encBits :=
-    .of_eq fun _ => rfl
-  have hf : ComputableInPolyTime
-      (fun w : List Bool => if w.getD 0 false then w.length else 0) encBits encUnary := by
-    fun_prop
-  refine (hf.comp hbits).of_enc_eq fun z => ?_
-  rcases z with n | n <;> simp [intNegPart]
-
-/-- Compositional rule for `intNegPart`. -/
-@[fun_prop]
-theorem intNegPart_comp {α : Type} {input : α ↪ List Bool} {f : α → ℤ}
-    (hf : ComputableInPolyTime f input encIntUnary) :
-    ComputableInPolyTime (fun a => intNegPart (f a)) input encUnary :=
-  intNegPart_polyTime.comp hf
-
-end ComputableInPolyTime
-
-end Turing.MultiTapeTM
-
 namespace Turing.MultiTapeTM.Universal
 
 open Cslib.BitString
 
 variable (d : Desc) (x : List ℕ) (b : ℕ)
-
-/-! ### Local simulation helpers -/
-
-private lemma headAt_mem (j i : ℕ) : headAt d x j i ∈ visited d x j i :=
-  Finset.mem_image.mpr ⟨j, by simp, rfl⟩
-
-private lemma visited_mono {j j' : ℕ} (h : j ≤ j') (i : ℕ) :
-    visited d x j i ⊆ visited d x j' i :=
-  Finset.image_subset_image fun a ha => by
-    simp only [Finset.mem_range] at ha ⊢
-    omega
-
-private lemma headAt_zero (i : ℕ) : headAt d x 0 i = 0 := by
-  rcases lt_or_ge i d.tapes with hi | hi <;>
-    simp [headAt, run, init, Tape.blank, List.getD_eq_getElem?_getD, hi]
-
-private lemma length_step_workTapes (c : SCfg) :
-    (step d x c).1.workTapes.length = c.workTapes.length := by
-  rw [step_eq_stepWith, stepWith]
-  repeat' split
-  all_goals first | rfl | exact length_applyTapes_eq _ _
-
-private lemma length_run_workTapes (j : ℕ) : (run d x j).workTapes.length = d.tapes := by
-  induction j with
-  | zero => simp [run, init]
-  | succ j ih => rw [run_succ, length_step_workTapes, ih]
-
-private lemma step_tape (c : SCfg) (i : ℕ) :
-    ∃ a, (step d x c).1.workTapes.getD i .blank = (c.workTapes.getD i .blank).apply a := by
-  simp only [step]
-  repeat' split
-  all_goals first
-    | exact Act.apply_tape _ x c i
-    | exact ⟨(none, 0), (Tape.apply_none_zero _).symm⟩
-
-private lemma head_apply (t : Tape) (a : TapeAct) :
-    (t.apply a).head = t.head - 1 ∨ (t.apply a).head = t.head ∨
-      (t.apply a).head = t.head + 1 := by
-  obtain ⟨w, m⟩ := a
-  have : (w.elim t t.write).head = t.head := by cases w <;> rfl
-  rcases m with _ | _ | _ <;> simp [Tape.apply, Tape.move, this]
-
-private lemma stepOut_iterate_succ (j : ℕ) :
-    (stepOut d x)^[j + 1] (init d, []) =
-      (run d x (j + 1), ((stepOut d x)^[j] (init d, [])).2 ++
-        (step d x (run d x j)).2.toList) := by
-  rw [Function.iterate_succ_apply', run_succ]
-  rfl
 
 /-! ### Halting and space stabilization for `run`, `universal`, and `simSpace` -/
 
@@ -251,6 +138,35 @@ theorem simSpace_eq_of_state_eq_none {t T : ℕ}
   refine Finset.sum_congr rfl fun i _ => ?_
   rw [visited_eq_of_state_eq_none d x hhalt hT i]
 
+private lemma le_two_pow_of_first_halt {t₀ : ℕ}
+    (ht₀ : (run d x t₀).state.isNone = true)
+    (hmin : ∀ m < t₀, (run d x m).state.isNone = true → False)
+    (hcfg_le : ∀ k < t₀, (eCfg (run d x (k + 1))).length ≤ b) :
+    t₀ ≤ 2 ^ (b + 1) := by
+  have hlt_false : ∀ {i j}, i < j → j < t₀ → run d x (i + 1) = run d x (j + 1) → False := by
+    intro i j hlt hj hcfg
+    have hshift : run d x (i + 1 + (t₀ - (j + 1))) = run d x t₀ := by
+      rw [← step_fst_iterate_run d x (i + 1), hcfg, step_fst_iterate_run d x (j + 1),
+        Nat.add_sub_of_le (by omega)]
+    refine hmin (i + 1 + (t₀ - (j + 1))) (by omega) ?_
+    rwa [hshift]
+  have hinj : Set.InjOn (fun k => eCfg (run d x (k + 1))) ↑(Finset.range t₀) := by
+    intro i hi j hj hij
+    simp only [Finset.coe_range, Set.mem_Iio] at hi hj
+    rcases lt_trichotomy i j with hlt | rfl | hgt
+    · exact False.elim (hlt_false hlt hj (eCfg.injective hij))
+    · rfl
+    · exact False.elim (hlt_false hgt hi (eCfg.injective hij.symm))
+  have hsub : (Finset.range t₀).image (fun k => eCfg (run d x (k + 1))) ⊆ shortWords b := by
+    intro w hw
+    obtain ⟨k, hk, rfl⟩ := Finset.mem_image.mp hw
+    exact mem_shortWords.mpr (hcfg_le k (Finset.mem_range.mp hk))
+  calc t₀ = (Finset.range t₀).card := (Finset.card_range t₀).symm
+    _ = ((Finset.range t₀).image (fun k => eCfg (run d x (k + 1)))).card :=
+      (Finset.card_image_of_injOn hinj).symm
+    _ ≤ (shortWords b).card := Finset.card_le_card hsub
+    _ ≤ 2 ^ (b + 1) := (card_shortWords_lt b).le
+
 /-- **Configuration-count clock for visited-space simulations:** if `universal (d, x, t)` halts at
 some step `t` with `simSpace d x t ≤ s`, then for any `b ≥ cfgSpaceBound (descLen d) x.length
 d.tapes s`, it already halts with the same output at some step `t₀ ≤ 2 ^ (b + 1)` with
@@ -275,34 +191,8 @@ theorem exists_simSpace_le_and_universal_le_two_pow {t s b : ℕ}
       unfold cfgSpaceBound
       gcongr
     exact hlen.trans (hbound.trans hb)
-  have hlt_false : ∀ {i j}, i < j → j < t₀ → run d x (i + 1) = run d x (j + 1) → False := by
-    intro i j hlt hj hcfg
-    have hshift : run d x (i + 1 + (t₀ - (j + 1))) = run d x t₀ := by
-      rw [← step_fst_iterate_run d x (i + 1), hcfg, step_fst_iterate_run d x (j + 1),
-        Nat.add_sub_of_le (by omega)]
-    have hlt_t₀ : i + 1 + (t₀ - (j + 1)) < t₀ := by omega
-    have hearly : (run d x (i + 1 + (t₀ - (j + 1)))).state.isNone = true := by
-      rw [hshift]
-      exact ht₀
-    exact Nat.find_min hex hlt_t₀ hearly
-  have hinj : Set.InjOn (fun k => eCfg (run d x (k + 1))) ↑(Finset.range t₀) := by
-    intro i hi j hj hij
-    simp only [Finset.coe_range, Set.mem_Iio] at hi hj
-    rcases lt_trichotomy i j with hlt | rfl | hgt
-    · exact False.elim (hlt_false hlt hj (eCfg.injective hij))
-    · rfl
-    · exact False.elim (hlt_false hgt hi (eCfg.injective hij.symm))
-  have hsub : (Finset.range t₀).image (fun k => eCfg (run d x (k + 1))) ⊆ shortWords b := by
-    intro w hw
-    obtain ⟨k, hk, rfl⟩ := Finset.mem_image.mp hw
-    exact mem_shortWords.mpr (hcfg_le k (Finset.mem_range.mp hk))
-  have hcard : t₀ ≤ 2 ^ (b + 1) := by
-    calc t₀ = (Finset.range t₀).card := (Finset.card_range t₀).symm
-      _ = ((Finset.range t₀).image (fun k => eCfg (run d x (k + 1)))).card :=
-        (Finset.card_image_of_injOn hinj).symm
-      _ ≤ (shortWords b).card := Finset.card_le_card hsub
-      _ ≤ 2 ^ (b + 1) := (card_shortWords_lt b).le
-  exact ⟨t₀, hcard, ht₀_sp, (universal_eq_of_snd d x ht₀ ht₀_le).symm⟩
+  exact ⟨t₀, le_two_pow_of_first_halt d x b ht₀ (fun _ hm => Nat.find_min hex hm) hcfg_le,
+    ht₀_sp, (universal_eq_of_snd d x ht₀ ht₀_le).symm⟩
 
 /-- **Clocked equivalence for visited-space simulations:** for any `b ≥ cfgSpaceBound (descLen d)
 x.length d.tapes s` and any step count `T ≥ 2 ^ (b + 1)`, there exists a step `t` with
@@ -402,35 +292,10 @@ theorem exists_budgetedUniversal_le_two_pow {t : ℕ}
     intro k hk
     have hle := hstep k hk
     rwa [hfst k hk.le, ← run_succ] at hle
-  have hlt_false : ∀ {i j}, i < j → j < t₀ → run d x (i + 1) = run d x (j + 1) → False := by
-    intro i j hlt hj hcfg
-    have hshift : run d x (i + 1 + (t₀ - (j + 1))) = run d x t₀ := by
-      rw [← step_fst_iterate_run d x (i + 1), hcfg, step_fst_iterate_run d x (j + 1),
-        Nat.add_sub_of_le (by omega)]
-    have hlt_t₀ : i + 1 + (t₀ - (j + 1)) < t₀ := by omega
-    have hearly : ((budgetStep d x b)^[i + 1 + (t₀ - (j + 1))] (init d, [])).1.state.isNone =
-        true := by
-      rw [hfst _ hlt_t₀.le, hshift, ← hfst t₀ le_rfl]
-      exact ht₀
-    exact Nat.find_min hex hlt_t₀ hearly
-  have hinj : Set.InjOn (fun k => eCfg (run d x (k + 1))) ↑(Finset.range t₀) := by
-    intro i hi j hj hij
-    simp only [Finset.coe_range, Set.mem_Iio] at hi hj
-    rcases lt_trichotomy i j with hlt | rfl | hgt
-    · exact False.elim (hlt_false hlt hj (eCfg.injective hij))
-    · rfl
-    · exact False.elim (hlt_false hgt hi (eCfg.injective hij.symm))
-  have hsub : (Finset.range t₀).image (fun k => eCfg (run d x (k + 1))) ⊆ shortWords b := by
-    intro w hw
-    obtain ⟨k, hk, rfl⟩ := Finset.mem_image.mp hw
-    exact mem_shortWords.mpr (hb k (Finset.mem_range.mp hk))
-  have hcard : t₀ ≤ 2 ^ (b + 1) := by
-    calc t₀ = (Finset.range t₀).card := (Finset.card_range t₀).symm
-      _ = ((Finset.range t₀).image (fun k => eCfg (run d x (k + 1)))).card :=
-        (Finset.card_image_of_injOn hinj).symm
-      _ ≤ (shortWords b).card := Finset.card_le_card hsub
-      _ ≤ 2 ^ (b + 1) := (card_shortWords_lt b).le
-  exact ⟨t₀, hcard, (budgetedUniversal_eq_of_le_of_snd d x b ht₀ ht₀_le).symm⟩
+  exact ⟨t₀,
+    le_two_pow_of_first_halt d x b (hfst t₀ le_rfl ▸ ht₀)
+      (fun m hm h => Nat.find_min hex hm (hfst m hm.le ▸ h)) hb,
+    (budgetedUniversal_eq_of_le_of_snd d x b ht₀ ht₀_le).symm⟩
 
 /-- **Clocked equivalence for `budgetedUniversal`:** for any step count `T ≥ 2 ^ (b + 1)`, there
 exists a step `t` at which `budgetedUniversal (d, x, t, b) = (out, true)` if and only if
@@ -483,7 +348,7 @@ positions. -/
 @[expose] def updateBounds (tapes : List Tape) (bounds : List (ℕ × ℕ)) : List (ℕ × ℕ) :=
   (tapes.zip bounds).map fun p =>
     let b := p.2
-    (max b.1 (intNegPart p.1.head), max b.2 (intPosPart p.1.head))
+    (max b.1 (-p.1.head).toNat, max b.2 p.1.head.toNat)
 
 /-- Total number of visited work-tape cells represented by per-tape excursion bounds
 `bounds : List (ℕ × ℕ)`, where an excursion interval `[ -l, r ]` covers `l + r + 1` cells. -/
@@ -522,8 +387,8 @@ theorem length_boundsAt (j : ℕ) : (boundsAt d x j).length = d.tapes := by
 private lemma getD_updateBounds (tapes : List Tape) (bounds : List (ℕ × ℕ)) {i : ℕ}
     (ht : i < tapes.length) (hb : i < bounds.length) :
     (updateBounds tapes bounds).getD i (0, 0) =
-      (max (bounds.getD i (0, 0)).1 (intNegPart (tapes.getD i .blank).head),
-        max (bounds.getD i (0, 0)).2 (intPosPart (tapes.getD i .blank).head)) := by
+      (max (bounds.getD i (0, 0)).1 (-(tapes.getD i .blank).head).toNat,
+        max (bounds.getD i (0, 0)).2 (tapes.getD i .blank).head.toNat) := by
   have hmap : i < (updateBounds tapes bounds).length := by simp [updateBounds, ht, hb]
   rw [List.getD_eq_getElem _ _ hmap, List.getD_eq_getElem _ _ ht, List.getD_eq_getElem _ _ hb]
   simp [updateBounds]
@@ -562,8 +427,8 @@ theorem visited_eq_Icc_boundsAt (j : ℕ) {i : ℕ} (hi : i < d.tapes) :
     have hi_tapes : i < (run d x (j + 1)).workTapes.length := hlen_tapes ▸ hi
     have hi_bounds : i < (boundsAt d x j).length := hlen_bounds ▸ hi
     have hget : (boundsAt d x (j + 1)).getD i (0, 0) =
-        (max ((boundsAt d x j).getD i (0, 0)).1 (intNegPart (headAt d x (j + 1) i)),
-          max ((boundsAt d x j).getD i (0, 0)).2 (intPosPart (headAt d x (j + 1) i))) := by
+        (max ((boundsAt d x j).getD i (0, 0)).1 (-(headAt d x (j + 1) i)).toNat,
+          max ((boundsAt d x j).getD i (0, 0)).2 (headAt d x (j + 1) i).toNat) := by
       rw [boundsAt_succ, getD_updateBounds _ _ hi_tapes hi_bounds, headAt]
     obtain ⟨a, ha⟩ := step_tape d x (run d x j) i
     have hstep : headAt d x (j + 1) i = headAt d x j i - 1 ∨
@@ -574,10 +439,8 @@ theorem visited_eq_Icc_boundsAt (j : ℕ) {i : ℕ} (hi : i < d.tapes) :
     set l := ((boundsAt d x j).getD i (0, 0)).1
     set r := ((boundsAt d x j).getD i (0, 0)).2
     set h' := headAt d x (j + 1) i
-    have hl' : -((max l (intNegPart h') : ℕ) : ℤ) = min (-(l : ℤ)) h' := by
-      simp only [intNegPart]; omega
-    have hr' : ((max r (intPosPart h') : ℕ) : ℤ) = max (r : ℤ) h' := by
-      simp only [intPosPart]; omega
+    have hl' : -((max l (-h').toNat : ℕ) : ℤ) = min (-(l : ℤ)) h' := by omega
+    have hr' : ((max r h'.toNat : ℕ) : ℤ) = max (r : ℤ) h' := by omega
     rw [hget]
     dsimp only
     rw [visited_succ, hvis, insert_Icc_of_step ⟨hlo, hhi⟩ hstep, hl', hr']
