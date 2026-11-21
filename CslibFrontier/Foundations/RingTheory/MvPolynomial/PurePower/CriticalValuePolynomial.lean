@@ -15,10 +15,13 @@ public import Mathlib.Algebra.Polynomial.Eval.Defs
 /-!
 # Characteristic polynomial of the critical-value quotient
 
-The deformed potential acts by multiplication in the actual critical quotient. Its monic
-characteristic polynomial has degree equal to the quotient dimension over a nontrivial
-coefficient ring. With a symbolic integer parameter, evaluation of its coefficients gives
-the same characteristic polynomial constructed in the specialized quotient.
+The deformed potential acts by multiplication in the quotient by the normalized critical
+equations `X i ^ ell - criticalLower ell a u F i`. The partial derivatives are `ell + 1`
+times these equations. The normalized ideal agrees with the gradient ideal when `ell + 1`
+is a unit, and the two ideals can differ when that scalar vanishes. The monic characteristic
+polynomial has degree equal to the quotient dimension over a nontrivial coefficient ring.
+With a symbolic integer parameter, evaluating the coefficients gives the characteristic
+polynomial of the corresponding normalized quotient over the target ring.
 
 Adapted from `ParametricCriticalPolynomial` and `ParametricCriticalSpecialization` in
 lean-canny at `970f28a5ecefc1327402ade16c068aa4b1b2c183`. Specialization uses the coefficient-map
@@ -34,7 +37,8 @@ open PurePower
 variable {S T : Type*} [CommRing S] [CommRing T] {n ell : ℕ}
 
 /-- The characteristic polynomial of multiplication by the deformed potential in the
-critical quotient with relations `X i ^ ell = criticalLower ell a u F i`. -/
+quotient by the normalized equations `X i ^ ell - criticalLower ell a u F i`.
+The gradient generates this ideal when the scalar `ell + 1` is a unit. -/
 noncomputable def valuePolynomial (hell : 1 ≤ ell) (a : Fin n → S) (u : S)
     (F : MvPolynomial (Fin n) S) (hF : F.totalDegree ≤ ell) : Polynomial S :=
   (multiplicationMatrix hell (criticalLower ell a u F) (criticalLower_degree ell hell a u F hF)
@@ -68,8 +72,8 @@ noncomputable def parametricValuePolynomial (hell : 1 ≤ ell) (F : MvPolynomial
   valuePolynomial hell (fun i => Polynomial.C (separatedCenters ell i : ℤ)) Polynomial.X
     (F.map Polynomial.C) ((totalDegree_map_le Polynomial.C F).trans hF)
 
-/-- Substitution of the deformation parameter gives the actual critical-value polynomial
-over the target ring, with the same separated centers. -/
+/-- Substitution of the deformation parameter gives the characteristic polynomial in the
+normalized critical quotient over the target ring, with the same separated centers. -/
 theorem parametricValuePolynomial_map_eval₂ (hell : 1 ≤ ell) (F : MvPolynomial (Fin n) ℤ)
     (hF : F.totalDegree ≤ ell) (u : T) :
     (parametricValuePolynomial hell F hF).map (Polynomial.eval₂RingHom (Int.castRingHom T) u) =

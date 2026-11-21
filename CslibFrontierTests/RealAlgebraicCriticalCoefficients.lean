@@ -7,7 +7,8 @@ module
 -- upstream: local-only (tests)
 
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
-import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValuePolynomial
+import all CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValuePolynomial
+import all CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.MultiplicationMatrix
 import CslibFrontier.Foundations.Data.MvPolynomial.Degrees
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.ResidueCoeffNorm
 import Mathlib.Tactic.NormNum
@@ -171,18 +172,45 @@ example :
   change (X (0 : Fin 1) * C U).coeff (Finsupp.single 0 1) = U
   rw [mul_comm, C_mul_X_eq_monomial, coeff_monomial, ite_eq_left rfl]
 
--- The quotient has dimension two even in characteristic two. The coefficient-map identity
--- still specializes the symbolic polynomial at a nonzero parameter.
+-- In characteristic two the normalized relation is x² = 1 and the potential is x³ − x.
+-- Therefore the specialized multiplication operator is zero on the two-dimensional quotient.
 example :
     let F : MvPolynomial (Fin 1) ℤ := X 0
     let hF : F.totalDegree ≤ 2 := by simp [F]
-    let G : MvPolynomial (Fin 1) (ZMod 2) := X 0
-    let hG : G.totalDegree ≤ 2 := by simp [G]
     (parametricValuePolynomial (by decide : 1 ≤ 2) F hF).map
         (Polynomial.eval₂RingHom (Int.castRingHom (ZMod 2)) 1) =
-      valuePolynomial (by decide : 1 ≤ 2) (fun i => (separatedCenters 2 i : ZMod 2)) 1 G hG := by
-  intro F hF G hG
-  simpa only [F, G, map_X] using
-    parametricValuePolynomial_map_eval₂ (by decide : 1 ≤ 2) F hF (1 : ZMod 2)
+      Polynomial.X ^ 2 := by
+  intro F hF
+  rw [parametricValuePolynomial_map_eval₂]
+  let G : MvPolynomial (Fin 1) (ZMod 2) := X 0
+  let a (i : Fin 1) : ZMod 2 := separatedCenters 2 i
+  let r := criticalLower 2 a 1 G
+  let π := projection 2 r
+  have ha (i : Fin 1) : a i = 0 := by
+    have hi : i = 0 := Subsingleton.elim _ _
+    subst i
+    decide
+  have hr : r 0 = 1 := by
+    calc
+      r 0 = -1 := by simp [r, criticalLower, ha, G]
+      _ = C (-(1 : ZMod 2)) := by rw [map_neg, map_one]
+      _ = 1 := by rw [show -(1 : ZMod 2) = 1 by decide, map_one]
+  have hproj : π (G ^ 2) = 1 := by
+    change projection 2 r (X 0 ^ 2) = 1
+    rw [map_pow, projection_X_pow, hr, map_one]
+  have hpot : potentialPolynomial 2 a = G ^ 3 := by
+    simp [potentialPolynomial, ha, G]
+  have hdef : deformedPolynomial 2 a 1 G = G ^ 3 - G := by
+    rw [deformedPolynomial, hpot, show (((2 + 1 : ℕ) : ZMod 2) * 1) = -1 by decide,
+      map_neg, map_one, neg_one_mul, sub_eq_add_neg]
+  have hzero : π (deformedPolynomial 2 a 1 G) = 0 := by
+    rw [hdef, pow_succ G 2, map_sub, map_mul, hproj, one_mul, sub_self]
+  have hdeg : G.totalDegree ≤ 2 := by simp [G]
+  have hchar : valuePolynomial (by decide : 1 ≤ 2) a 1 G hdeg = Polynomial.X ^ 2 := by
+    unfold valuePolynomial multiplicationMatrix
+    change (Algebra.leftMulMatrix _ (π (deformedPolynomial 2 a 1 G))).charpoly = _
+    rw [hzero, map_zero, Matrix.charpoly_zero]
+    simp [NormalIndex]
+  simpa only [F, G, a, map_X] using hchar
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
