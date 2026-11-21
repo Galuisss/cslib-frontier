@@ -369,7 +369,8 @@ example :
     let D := PolygonalDrawing.star 1
     let c : ℂ →ᵃ[ℝ] ℝ := Complex.reCLM.toLinearMap.toAffineMap - AffineMap.const ℝ ℂ (1 / 3)
     let d : ℂ →ᵃ[ℝ] ℝ := Complex.imCLM.toLinearMap.toAffineMap - AffineMap.const ℝ ℂ (2 / 3)
-    (∀ f ∈ [c, d], (0 : ℝ) ∈ Set.Ioo (f (D.route 0).finish) (f (D.route 0).start)) ∧
+    let edge : Fin (starGraph 1).edges.length := ⟨0, by decide +kernel⟩
+    (∀ f ∈ [c, d], (0 : ℝ) ∈ Set.Ioo (f (D.route edge).finish) (f (D.route edge).start)) ∧
       ∃ E : PolygonalDrawing (starGraph 1), E.IsEmbedding ∧ E.vertex = D.vertex ∧
         (∀ e, (E.route e).support = (D.route e).support) ∧
         ∀ e (i : Fin (E.route e).segments) f, f ∈ [c, d] →
