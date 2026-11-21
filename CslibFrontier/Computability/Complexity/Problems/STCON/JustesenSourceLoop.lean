@@ -26,6 +26,8 @@ membership tally at the designated target.
 
 ## Main results
 
+* `Cslib.Complexity.STCON.justesenSourceLoop_parts_inSpace`: query, transition, halt and
+  verdict decoding certificates under the framed loop encoding.
 * `Cslib.Complexity.STCON.configurationJustesenSourceLoop_haltsWithin_clock`: every
   branch at a valid initialized entry halts within the common polynomial clock.
 * `Cslib.Complexity.STCON.configurationJustesenSourceLoop_length_run_le_log`: every
@@ -48,7 +50,7 @@ namespace Cslib.Complexity.STCON
 
 open Cslib.Code.JustesenFamily Cslib.DoubleCounting
 open _root_.Turing _root_.Turing.DoubleCounting _root_.Turing.NondeterministicQueryMachine
-open _root_.Turing.MultiTapeTM
+open _root_.Turing.MultiTapeTM _root_.Turing.MultiTapeTM.ComputableInSpace
 
 variable {k : ℕ} {State : Type} [Fintype State]
 
@@ -71,6 +73,40 @@ abbrev JustesenSourceLoopState :=
     justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
     (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
     MembershipTally.retainedReply
+
+/-- Query, step, halt and decode the source loop in workspace linear in the encoded argument. -/
+theorem justesenSourceLoop_parts_inSpace (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (context : JustesenSourceContext) (limit : ℕ) :
+    let E := encJustesenSourceLoopState
+    let encStep := encPair E encReadChoice
+    let M := justesenSourceLoop ntm c context limit
+    ComputableInSpace M.query E encNat (fun s => (E s).length) ∧
+      ComputableInSpace M.next encStep E (fun p => (encStep p).length) ∧
+      ComputableInSpace M.halted E encBool (fun s => (E s).length) ∧
+      ComputableInSpace SourceRoundLoop.reply E (encOption SourceRoundLoop.encVerdict)
+        (fun s => (E s).length) := by
+  intro E encStep M
+  let encRound := encJustesenRetainedSourceRoundState
+  let encMember := MembershipTally.encRetainedState encJustesenSubdivisionContext
+    encJustesenSubdivisionState
+  let initial := SourceRoundLoop.start context limit
+  let round := justesenRetainedSourceRound ntm c initial
+  let member := justesenSourceMembershipMachine ntm c
+  obtain ⟨hrq, hrn, hrh, hrr⟩ := justesenRetainedSourceRound_parts_inSpace ntm c initial
+  obtain ⟨hq, hn, hh, hr⟩ := justesenSourceMembershipMachine_parts_inSpace ntm c
+  exact ⟨SourceRoundLoop.query_inSpace encJustesenSourceContext encRound encMember
+      initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
+      member justesenSourceMembershipStart
+      MembershipTally.retainedReply hrq hq,
+    SourceRoundLoop.next_inSpace encJustesenSourceContext encRound encMember
+      initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
+      member justesenSourceMembershipStart
+      MembershipTally.retainedReply justesenRetainedSourceRoundEntry_inSpace
+      justesenSourceMembershipStart_inSpace hrr hr hrh hh hrn hn,
+    SourceRoundLoop.halted_inSpace encJustesenSourceContext encRound encMember
+      initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
+      member justesenSourceMembershipStart MembershipTally.retainedReply,
+    SourceRoundLoop.reply_inSpace encJustesenSourceContext encRound encMember⟩
 
 /-- Zero fuel returns no verdict and never starts a callback. -/
 theorem justesenSourceLoop_run_zero (ntm : MultiTapeNTM k Bool State) (c : ℕ)
