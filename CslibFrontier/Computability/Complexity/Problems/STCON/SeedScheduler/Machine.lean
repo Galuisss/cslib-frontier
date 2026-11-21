@@ -152,6 +152,14 @@ theorem step_liveScan {σ : Type} (setup : SeedSearchSetup) (scan : Nondetermini
       .inl (.inr (frame, scan.step w s choice)) := by
   simp [NondeterministicQueryMachine.step, NondeterministicQueryMachine.read, machine, hlive]
 
+private theorem step_haltedScan {σ : Type} (setup : SeedSearchSetup)
+    (scan : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
+    (verdict : σ → Option ControllerVerdict) (input : List Bool)
+    (frame : SeedSchedulerFrame) (s : σ) (selector : Bool) (hhalt : scan.halted s = true) :
+    (machine setup scan start verdict).step input (.inl (.inr (frame, s))) selector =
+      if selector then .inr none else resume start frame (verdict s) := by
+  simp [NondeterministicQueryMachine.step, machine, hhalt]
+
 /-- A successful first halt from an active scan consumes its parsed verdict and then
 first halts from the resumed scheduler, using the parser's unmodified suffix.
 The frame must request a scan, as it does when `enter` selects the active phase. -/
@@ -172,10 +180,7 @@ theorem firstHalting_scan_iff {σ : Type} (setup : SeedSearchSetup)
     (.inr none) (.inr (some answer)) rfl (by simp) rfl (fun _ => rfl)
     (step_liveScan setup scan start verdict w frame) ?_ state bits
   intro s selector hhalt
-  have hstep : M.step w (.inl (.inr (frame, s))) selector =
-      if selector then .inr none else resume start frame (verdict s) := by
-    simp [M, NondeterministicQueryMachine.step, machine, hhalt]
-  rw [hstep]
+  rw [step_haltedScan setup scan start verdict w frame s selector hhalt]
   cases hv : verdict s with
   | none => simp [resume, seedSchedulerStep_noReply_of_needsScan frame hscan]
   | some v => rfl
@@ -209,7 +214,7 @@ private def PrefixState {σ : Type} (setup : SeedSearchSetup)
     (w : List Bool) : State σ → Prop
   | .inl (.inl f) => f.Valid ∧ f.request.setup = setup
   | .inl (.inr (f, state)) =>
-    f.Valid ∧ f.request.setup = setup ∧
+    f.Valid ∧ f.request.setup = setup ∧ f.needsScan = true ∧
       ∃ bits, scan.replay w bits (start f.request) = state
   | .inr (some (some a)) => a.seed < setup.parameters.search.seedLimit
   | .inr none | .inr (some none) => True
@@ -220,7 +225,7 @@ private theorem prefixState_enter {σ : Type} {setup : SeedSearchSetup}
     PrefixState setup scan start w (enter start f) := by
   unfold enter
   split
-  · exact ⟨hf, hs, [], rfl⟩
+  · exact ⟨hf, hs, ‹f.needsScan = true›, [], rfl⟩
   · exact ⟨hf, hs⟩
 
 private theorem prefixState_resume {σ : Type} {setup : SeedSearchSetup}
@@ -257,19 +262,20 @@ private theorem prefixState_step {σ : Type} {setup : SeedSearchSetup}
       · trivial
     | inr active =>
       obtain ⟨f, s⟩ := active
-      obtain ⟨hf, hs, bits, rfl⟩ := h
+      obtain ⟨hf, hs, hscan, bits, rfl⟩ := h
       cases hh : scan.halted (scan.replay w bits (start f.request))
       · rw [step_liveScan _ _ _ _ _ _ _ _ hh]
-        exact ⟨hf, hs, bits ++ [bit], scan.replay_append w bits [bit] _⟩
-      · cases bit
-        · simpa [NondeterministicQueryMachine.step, machine, hh] using
-            prefixState_resume scan start w hf hs
-              (verdict (scan.replay w bits (start f.request)))
-        · simp [NondeterministicQueryMachine.step, machine, hh, PrefixState]
+        exact ⟨hf, hs, hscan, bits ++ [bit], scan.replay_append w bits [bit] _⟩
+      · rw [step_haltedScan _ _ _ _ _ _ _ _ hh]
+        cases bit
+        · exact prefixState_resume scan start w hf hs
+            (verdict (scan.replay w bits (start f.request)))
+        · trivial
 
 /-- Every selector prefix of the same-input scheduler, including rejecting branches,
 uses at most the uniform scanner state bound plus a linear allowance for the retained
-setup and frame. The scanner bound applies to every valid frame on the original input. -/
+setup and frame. The scanner bound applies to valid frames that request a scan on the
+original input. -/
 theorem length_run_le {σ : Type} (setup : SeedSearchSetup)
     (scan : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
     (verdict : σ → Option ControllerVerdict) (encScan : σ ↪ List Bool)
@@ -277,8 +283,9 @@ theorem length_run_le {σ : Type} (setup : SeedSearchSetup)
     (hsource : setup.sourceID < setup.parameters.search.subdivision.vertexCount)
     (hroot : ∀ j < setup.parameters.search.subdivision.originalCount,
       setup.originalSourceID j < setup.parameters.search.subdivision.vertexCount)
-    (hscan : ∀ f : SeedSchedulerFrame, f.Valid → f.request.setup = setup → ∀ bits,
-      (encScan (scan.replay w bits (start f.request))).length ≤ scanBound)
+    (hscan : ∀ f : SeedSchedulerFrame, f.request.setup = setup → f.Valid →
+      f.needsScan = true → ∀ bits,
+        (encScan (scan.replay w bits (start f.request))).length ≤ scanBound)
     (bits : List Bool) :
     (encState encScan ((machine setup scan start verdict).run w bits)).length ≤
       24 * (encSeedSearchSetup setup).length + scanBound + 21 := by
@@ -312,9 +319,9 @@ theorem length_run_le {σ : Type} (setup : SeedSearchSetup)
       omega
     | inr active =>
       obtain ⟨f, s⟩ := active
-      obtain ⟨hf, hs, choices, rfl⟩ := hrun
+      obtain ⟨hf, hs, hneeds, choices, rfl⟩ := hrun
       have hframe := frameLength hf hs
-      have hcallback := hscan f hf hs choices
+      have hcallback := hscan f hs hf hneeds choices
       simp only [encState, encSum_inl, encSum_inr, List.length_cons, length_encPair]
       omega
   | inr result =>

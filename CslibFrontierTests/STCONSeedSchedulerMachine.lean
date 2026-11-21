@@ -133,7 +133,7 @@ example (w bits : List Bool) :
   have hbound := length_run_le setup scan (fun r => .inl r.sourceID) verdict
     (encSum encNat (encOption encBool)) w (12 * (encSeedSearchSetup setup).length + 10)
     hsource hroot (by
-      intro f hf hs choices
+      intro f hs hf _ choices
       cases choices with
       | nil =>
         have hid := (encSeedScanRequest_sourceID_length_le f.request).trans
