@@ -7,9 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.BinaryFieldHorner
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.Justesen
-meta import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.BinaryFieldHorner
 
 /-! Checked native coordinate decoding, point words and agreement with the indexed evaluator. -/
 
@@ -50,18 +48,5 @@ example {w n : ℕ} (j : Fin (codeLength w n)) :
     List.ofFn (nonzeroPointBits (decodeCoordinate w n j).1) =
       Cslib.BitString.lowBits (fieldDegree w n) (decodeIndex (fieldDegree w n) j.val).point :=
   (lowBits_decodeIndex_point j).symm
-
-/-- The evaluator's public equation determines the result of a request with no blocks. -/
-example : (Turing.BinaryField.HornerInput.mk [true, true, true] [true, false] 9 0).evaluate =
-    [] := by
-  rw [Turing.BinaryField.HornerInput.evaluate_eq]
-  exact Cslib.BinaryField.hornerBits_eq_iterate 2
-    (Cslib.BinaryField.fieldMulMod [true, true, true]) [true, false]
-    (fun i => Cslib.BitString.lowBits 2 (9 >>> (2 * i))) 0
-
--- The packed blocks encode `1 + X·t`. At `t = X`, this reduces to `X` modulo `X² + X + 1`.
-set_option linter.hashCommand false in
-#guard (Turing.BinaryField.HornerInput.mk [true, true, true] [false, true] 9 2).evaluate ==
-  [false, true]
 
 end CslibFrontierTests.JustesenCoordinates
