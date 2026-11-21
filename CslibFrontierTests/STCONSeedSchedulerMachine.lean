@@ -163,6 +163,7 @@ example (w bits : List Bool) :
   change (encState (encSum encNat (encOption encBool)) (scheduler.run w bits)).length ≤ _ at hbound
   omega
 
+open MultiTapeTM in
 /-- The initial scheduler state can use the workspace of a variable setup producer. -/
 example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ ↪ List Bool)
     (call : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)

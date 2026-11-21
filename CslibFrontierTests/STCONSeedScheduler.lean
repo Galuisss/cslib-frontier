@@ -257,4 +257,10 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   ⟨configurationJustesenSeedSchedulerClock_polyBounded ntm c,
     configurationJustesenSeedScheduler_haltsWithin_clock ntm c w⟩
 
+/-- The original word produces the full retained entry within the compiler's budget. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ComputableInSpace (configurationJustesenSeedSchedulerEntry ntm c)
+      encBits encJustesenSeedSchedulerState (fun w => Nat.log2 w.length + 1) :=
+  configurationJustesenSeedSchedulerEntry_inSpace ntm c
+
 end CslibFrontierTests.STCONSeedScheduler
