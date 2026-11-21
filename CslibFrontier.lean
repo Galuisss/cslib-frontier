@@ -3012,6 +3012,7 @@ public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenBoun
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenMembershipTally
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceContext
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision
+public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision.Replay
 public import CslibFrontier.Computability.Complexity.Problems.STCON.Layered
 public import CslibFrontier.Computability.Complexity.Problems.STCON.LayeredCallback
 public import CslibFrontier.Computability.Complexity.Problems.STCON.LayeredParameters
@@ -3703,6 +3704,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.L
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.CallReplay
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Compiler
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.CountingView
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.DeterministicCall
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Native
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Recompute
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Routines
@@ -6264,6 +6266,7 @@ public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.RatPoly
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.RootBound
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ShiftedLabel
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseIntegerRootLabel
+public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseRootProduct
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.Sturm
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.TotalIsolation
@@ -7275,6 +7278,7 @@ public import CslibFrontier.Foundations.LinearAlgebra.Matrix.BlockEmbedding
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.BranchingProgramDeterminant
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.CauchyBinet
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Charpoly.CoeffNorm
+public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Charpoly.EvalDeterminant
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Charpoly.ParameterDegree
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Charpoly.TraceExponential
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.ClosedSubmatrix
