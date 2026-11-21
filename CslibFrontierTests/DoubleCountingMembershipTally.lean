@@ -200,6 +200,25 @@ example :
   exact ⟨hentry, budget_comp_linear hquery hentry, budget_comp_linear hhalt hentry,
     budget_comp_linear (retainedReply_inSpace encBool encBool) hentry⟩
 
+open Turing.DoubleCounting in
+/-- Exact totals at radius zero yield one successful selector list, which may answer false. -/
+example :
+    let start := fun (_ : Unit) (_ _ : ℕ) => ()
+    let entry := BoundedWalk.Runtime.entry edge start verdict 0 () (N := 1) ⟨0, 0, 0⟩
+    let M := withRuntimeWalk edge start verdict 0 entry ()
+      ⟨2, (0 : Fin 2).val, (1 : Fin 2).val, 0, ⟨1, 0⟩⟩
+    (∃! bits, M.FirstHalting [] bits M.init ∧ (reply (M.run [] bits)).isSome) ∧
+      M.FirstHalting [] negativeSelectors M.init ∧
+      reply (M.run [] negativeSelectors) = some false := by
+  intro start entry M
+  have hunique := withRuntimeWalk_existsUnique_firstHalting edge start verdict 0 entry () []
+    adjacent 0 1 0 (fun _ _ => rfl) (fun _ _ => rfl)
+    (existsUnique_passes_zero (fun u v => adjacent u v = true) 0)
+  have hnegative := (withRuntimeWalk_firstHalting_iff edge start verdict 0 entry () []
+    adjacent 0 1 0 ⟨1, 0⟩ (fun _ _ => rfl) (fun _ _ => rfl) negativeSelectors false).mpr
+      ⟨negativeBranch, ⟨rfl, negativeScan⟩, fun other h => negativeBranch_unique other h.1⟩
+  exact ⟨by simpa only [expected_zero, M] using hunique, hnegative⟩
+
 example :
     let E := encState (Turing.DoubleCounting.BoundedWalk.encState (N := 2) encUnit)
     ComputableInSpace reply E (encOption encBool) (fun s => (E s).length) :=

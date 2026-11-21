@@ -30,6 +30,8 @@ tally also loads the adjacency context from its own entry state.
 
 * `Turing.DoubleCounting.MembershipTally.withRuntimeWalk_firstHalting_iff`: a successful
   first-halt selector list describes exactly one successful typed scan with the same reply.
+* `Turing.DoubleCounting.MembershipTally.withRuntimeWalk_existsUnique_firstHalting`: a unique
+  passing transcript at the exact round totals gives one successful selector list.
 * `Turing.DoubleCounting.MembershipTally.withRuntimeWalk_haltsWithin` and
   `Turing.DoubleCounting.MembershipTally.withRuntimeWalk_length_run_le`: the common selector
   clock and encoded-state bound for all branches starting from a valid source.
@@ -94,6 +96,39 @@ theorem withRuntimeWalk_firstHalting_iff {N : ℕ} (input : List Bool)
   simpa only [enterRuntimeWalk, source.isLt, v.isLt, and_self, dite_true] using
     Runtime.firstHalting_remainingFuel_iff edge start verdict clock initialWalk context
       ⟨source, v, radius⟩ input adjacent hclock hedge ws left
+
+/-- With the exact round totals and a unique passing transcript, the runtime tally has
+exactly one successful first-halting selector list, for either membership answer. -/
+theorem withRuntimeWalk_existsUnique_firstHalting {N : ℕ} (input : List Bool)
+    (adjacent : Fin N → Fin N → Bool) (source target : Fin N) (radius : ℕ)
+    (hclock : ∀ u v : Fin N,
+      edge.halted (edge.runFrom input (start context u.val v.val) clock) = true)
+    (hedge : ∀ u v : Fin N,
+      verdict (edge.runFrom input (start context u.val v.val) clock) = adjacent u v)
+    (hpass : ∃! w, Passes (fun u v => adjacent u v = true) source radius w) :
+    let totals := expected (fun u v => adjacent u v = true) source radius
+    let M := withRuntimeWalk edge start verdict clock initialWalk context
+      ⟨N, source.val, target.val, radius, totals⟩
+    ∃! bits, M.FirstHalting input bits M.init ∧ (reply (M.run input bits)).isSome := by
+  intro totals M
+  obtain ⟨chosen, hchosen, hunique⟩ :=
+    Scan.existsUnique_successful_branch adjacent source target radius hpass
+  have branch_eq_chosen {branch : Scan.Branch N} {hit : Bool}
+      (h : Scan.run adjacent source target radius totals branch = some hit) : branch = chosen :=
+    hunique branch (Option.isSome_iff_exists.mpr ⟨hit, h⟩)
+  have hreplay (bits : List Bool) (hit : Bool) :=
+    withRuntimeWalk_firstHalting_iff edge start verdict clock initialWalk context input
+      adjacent source target radius totals hclock hedge bits hit
+  dsimp only at hreplay
+  let render := selectors (BoundedWalk.selectors (N := N) clock)
+  obtain ⟨hit, hhit⟩ := Option.isSome_iff_exists.mp hchosen
+  have hsuccess := (hreplay (render chosen) hit).mpr
+    ⟨chosen, ⟨rfl, hhit⟩, fun _ h => branch_eq_chosen h.2⟩
+  refine ⟨render chosen, ⟨hsuccess.1, Option.isSome_iff_exists.mpr ⟨hit, hsuccess.2⟩⟩, ?_⟩
+  intro bits hbits
+  obtain ⟨answer, hanswer⟩ := Option.isSome_iff_exists.mp hbits.2
+  obtain ⟨branch, ⟨hword, hscan⟩, _⟩ := (hreplay bits answer).mp ⟨hbits.1, hanswer⟩
+  exact hword.trans (congrArg render (branch_eq_chosen hscan))
 
 private theorem runtimeWalk_withInit {ctx : Context} (r : Registers) (hr : r.context = ctx)
     (hsource : ctx.source < ctx.size) (hcursor : r.cursor < ctx.size) :
