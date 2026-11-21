@@ -22,6 +22,15 @@ A source scan repeatedly calls a supplied round machine. A tied round reports th
 radius. A stable round calls a membership machine with the current radius and tally.
 Only the false selector can return from a call. A rejected call or exhausted round fuel
 rejects the source scan.
+
+## Main results
+
+* `firstHalting_iff_replayRounds` identifies successful selector streams with replay of the
+  existing fuel-bounded loop.
+* `haltsWithin` and `length_run_le` charge the retained registers and supplied callback bounds
+  on every branch.
+* `exists_routines` compiles the loop with supplied native callbacks and
+  `native_firstHalting_accept_iff` preserves its accepting occurrence lists.
 -/
 
 public section
@@ -694,7 +703,8 @@ local notation "P" => encPair R encRound
 local notation "Q" => encPair R encMember
 local notation "F" => encOption encVerdict
 local notation "E" => encState encContext encRound encMember
-local notation "encChoice" => encPair (encOption encBool) encBool
+/-- A query answer paired with the selected branch bit. -/
+abbrev encChoice := encPair (encOption encBool) encBool
 
 private theorem round_budget {α : Type} {enc : α ↪ List Bool} {budget : α → ℕ}
     {r : α → Registers κ} {s : α → ρ}

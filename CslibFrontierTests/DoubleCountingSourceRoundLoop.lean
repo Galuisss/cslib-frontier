@@ -17,6 +17,7 @@ set_option linter.privateModule false
 namespace CslibFrontierTests.DoubleCountingSourceRoundLoop
 
 open Cslib.DoubleCounting Turing Turing.DoubleCounting.SourceRoundLoop
+open MultiTapeTM ComputableInSpace NondeterministicQueryMachine
 
 private def done : NondeterministicQueryMachine Unit where
   init := ()
@@ -33,22 +34,21 @@ private def round : NondeterministicQueryMachine (Registers Unit) where
   accept := fun _ => true
 
 private def runWith (answer : Registers Unit → Option RoundUpdate) (choices : List Bool) :
-    Option ControllerVerdict :=
-  reply ((machine (start () 2) round id answer done (fun _ => ()) (fun _ => some false)).run []
-    choices)
+    State Unit (Registers Unit) Unit :=
+  (machine (start () 2) round id answer done (fun _ => ()) (fun _ => some false)).run [] choices
 
 -- A tied round reports the next radius, and no final membership call is made.
-example : runWith (fun _ => some ⟨⟨1, 0⟩, true⟩) [false] = some (.bad 1) := rfl
+example : reply (runWith (fun _ => some ⟨⟨1, 0⟩, true⟩) [false]) = some (.bad 1) := rfl
 
 -- A growing round is followed by a stable round and the final membership query.
-example : runWith (fun _ => some ⟨⟨2, 1⟩, false⟩) [false, false, false] =
+example : reply (runWith (fun _ => some ⟨⟨2, 1⟩, false⟩) [false, false, false]) =
     some (.decided false) := rfl
 
 -- A rejected round never produces a source verdict.
-example : runWith (fun _ => none) [false] = none := rfl
+example : runWith (fun _ => none) [false] = .inr none := rfl
 
 -- A true selector at a deterministic return rejects, even after a successful round.
-example : runWith (fun _ => some ⟨⟨1, 0⟩, true⟩) [true] = none := rfl
+example : runWith (fun _ => some ⟨⟨1, 0⟩, true⟩) [true] = .inr none := rfl
 
 private def growingRound (_ : Registers Unit) : Option RoundUpdate := some ⟨⟨2, 1⟩, false⟩
 
@@ -85,5 +85,63 @@ example (input : List Bool) :
   haltsWithin (start () 2) round id growingRound done (fun _ => ()) (fun _ => some false) input
     (fun _ => True) trivial (fun _ _ _ _ _ _ _ => trivial)
     0 0 (fun _ _ _ _ => rfl) (fun _ _ _ _ => rfl)
+
+private def stableReply (_ : Unit) : Option RoundUpdate := some ⟨⟨1, 0⟩, false⟩
+
+private def negativeReply (_ : Unit) : Option Bool := some false
+
+private def callbackInit (_ : Registers Unit) : Unit := ()
+
+private def initialRegisters : Registers Unit := start () 1
+
+private def nativeBudget (input : List Bool) : ℕ :=
+  Nat.log2 input.length + 2 * (encRegisters encUnit initialRegisters).length +
+    (encNat (initialRegisters.fuel + initialRegisters.radius)).length + 4
+
+private theorem nativeRoutines : Nonempty
+    (Routines (machine initialRegisters done callbackInit stableReply
+      done callbackInit negativeReply)
+      (fun _ : List Bool => enterRound (μ := Unit) callbackInit initialRegisters)
+      encBits nativeBudget) := by
+  refine exists_routines encUnit encUnit encUnit initialRegisters done callbackInit stableReply
+    done callbackInit negativeReply encBits nativeBudget (fun _ => initialRegisters)
+    ((ComputableInSpace.constZero initialRegisters).mono_le fun _ => Nat.zero_le _) ?_
+    (budget_const () (.refl _)) (budget_const () (.refl _))
+    (budget_const (stableReply ()) (.refl _)) (budget_const (some false) (.refl _))
+    (budget_const 0 (.refl _)) (budget_const 0 (.refl _))
+    (budget_const true (.refl _)) (budget_const true (.refl _))
+    (budget_const () (.refl _)) (budget_const () (.refl _)) ⟨1, ?_⟩
+  · intro input
+    simp only [nativeBudget, encBits_apply]
+    omega
+  · intro input bits
+    rw [Nat.one_mul]
+    refine (length_run_le initialRegisters done callbackInit stableReply done callbackInit
+      negativeReply (encBits input) encUnit encUnit encUnit (· = initialRegisters) rfl
+      ?_ (encRegisters encUnit initialRegisters).length 0 0
+      (by rintro _ rfl; exact le_rfl) (fun _ _ _ => Nat.zero_le 0)
+      (fun _ _ _ => Nat.zero_le 0) bits).trans ?_
+    · intro r hr _ a ha _ hc
+      subst r
+      have he : a = ⟨⟨1, 0⟩, false⟩ := Option.some.inj ha.symm
+      subst a
+      exact (hc rfl).elim
+    · unfold nativeBudget
+      omega
+
+/-- A stabilized negative result determines exactly one accepting native callback occurrence. -/
+example : ∃ R : Routines (machine initialRegisters done callbackInit stableReply
+      done callbackInit negativeReply)
+      (fun _ : List Bool => enterRound (μ := Unit) callbackInit initialRegisters)
+      encBits nativeBudget,
+    ∃! indices, ∃ final,
+      Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg []) indices =
+        some ([false, false], final) ∧ final.Halted ∧ final.output = [true] := by
+  obtain ⟨R⟩ := nativeRoutines
+  refine ⟨R, (native_firstHalting_accept_iff initialRegisters done callbackInit stableReply
+    done callbackInit negativeReply (fun _ => initialRegisters) R [] [false, false]).mpr ?_⟩
+  refine ⟨.decided false, (firstHalting_iff_replayRounds initialRegisters done callbackInit
+    stableReply done callbackInit negativeReply [] _ _).mp ⟨?_, rfl⟩⟩
+  exact NondeterministicQueryMachine.firstHalting_append_singleton _ [] [false] false rfl rfl
 
 end CslibFrontierTests.DoubleCountingSourceRoundLoop
