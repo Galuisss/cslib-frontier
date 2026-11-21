@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceRound
+import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceLoop
 
 /-! Re-enter the Justesen tally at a variable seed and check replay and encoded length. -/
 
@@ -279,19 +279,17 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
 
 -- Plug the retained round and final membership into the source-loop transition.
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
-    (initial : SourceRoundLoop.Registers JustesenSourceContext) :
+    (context : JustesenSourceContext) (limit : ℕ) :
     let encRound := encJustesenRetainedSourceRoundState
     let encMember := MembershipTally.encRetainedState encJustesenSubdivisionContext
       encJustesenSubdivisionState
     let E := SourceRoundLoop.encState encJustesenSourceContext encRound encMember
     let encStep := encPair E encReadChoice
-    let M := SourceRoundLoop.machine initial (justesenRetainedSourceRound ntm c initial)
-      justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
-      (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
-      MembershipTally.retainedReply
+    let M := justesenSourceLoop ntm c context limit
     ComputableInSpace M.query E encNat (fun s => (E s).length) ∧
       ComputableInSpace M.next encStep E (fun p => (encStep p).length) := by
   intro encRound encMember E encStep M
+  let initial := SourceRoundLoop.start context limit
   let round := justesenRetainedSourceRound ntm c initial
   obtain ⟨hrq, hrn, hrh, hrr⟩ := justesenRetainedSourceRound_parts_inSpace ntm c initial
   obtain ⟨hq, hn, hh, hr⟩ := justesenSourceMembershipMachine_parts_inSpace ntm c
@@ -304,6 +302,26 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
       (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
       MembershipTally.retainedReply justesenRetainedSourceRoundEntry_inSpace
       justesenSourceMembershipStart_inSpace hrr hr hrh hh hrn hn⟩
+
+-- The loop shares its clock across fuel limits and stops at entry with zero fuel.
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n)
+      (limit : ℕ), limit ≤ n →
+      let ctx : JustesenSourceContext :=
+        ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+      let M := justesenSourceLoop ntm c ctx limit
+      M.HaltsWithin w (configurationJustesenSourceLoopClock ntm c w) ∧
+        (limit = 0 → ∀ bits, M.run w bits = .inr none) := by
+  intro I n seed source target limit hlimit ctx M
+  refine ⟨configurationJustesenSourceLoop_haltsWithin_clock ntm c w
+    seed source target limit hlimit, fun hzero bits => ?_⟩
+  subst limit
+  change M.replay w bits M.init = .inr none
+  rw [M.replay_of_halted w (by rfl)]
+  rfl
 
 /-- A round with retained Justesen adjacency has native query and transition certificates. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
