@@ -9,10 +9,10 @@ module
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.BranchReplay
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.CallReplay
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Sum
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.Sum
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.Cases
-import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.CallReplay
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.NatLength
 
@@ -203,7 +203,7 @@ private theorem member_return (r : Registers κ) (s : μ) (bit : Bool)
 
 /-- Replay the existing round loop using the supplied callbacks and a stream of selectors.
 On success the result records the verdict and the selector suffix still unused. -/
-def replayRounds (r : Registers κ) (bits : List Bool) :
+@[expose] def replayRounds (r : Registers κ) (bits : List Bool) :
     Option (Option ControllerVerdict × List Bool) :=
   (runRoundsWith (m := StateT (List Bool) Option)
     (fun fuel radius tally => readReply round roundReply input

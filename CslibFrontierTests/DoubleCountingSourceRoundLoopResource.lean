@@ -49,6 +49,26 @@ example : ComputableInSpace
 -- The first call counts no new vertex, and the final membership call returns a valid negative.
 example : (scan.run [] [false, false, false, false]) = .inr (some (.decided false)) := rfl
 
+/-- Whole-loop typed replay consumes the stabilized negative and excludes an invalid return. -/
+example :
+    let replay := replayTypedRounds oneVertex source callback entry (fun _ => some true) []
+      callback memberEntry (fun _ => some false) (start () 1)
+    replay [false, false, false, false] = some (some (.decided false), []) ∧
+      ∀ verdict, replay [false, false, true, false] ≠ some (some verdict, []) := by
+  dsimp only
+  have h (bits : List Bool) (verdict : Cslib.DoubleCounting.ControllerVerdict) :=
+    firstHalting_iff_replayTypedRounds oneVertex source callback entry (fun _ => some true) []
+      callback memberEntry (fun _ => some false) () 1 bits verdict
+  constructor
+  · exact (h _ _).mp ⟨NondeterministicQueryMachine.firstHalting_append_singleton scan []
+      [false, false, false] false rfl rfl, rfl⟩
+  · intro verdict hr
+    obtain ⟨_, hrun⟩ := (h _ _).mpr hr
+    change (scan.run [] [false, false, true, false]) = .inr (some verdict) at hrun
+    have hrejected : scan.run [] [false, false, true, false] = .inr none := rfl
+    rw [hrejected] at hrun
+    cases hrun
+
 -- Enter a different register state and leave two bits for the enclosing loop.
 example :
     let initial : Registers Unit := ⟨(), 3, 2, ⟨0, 0⟩⟩
