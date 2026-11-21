@@ -35,13 +35,14 @@ tally also loads the adjacency context from its own entry state.
   clock and encoded-state bound for all branches starting from a valid source.
 * `Turing.DoubleCounting.MembershipTally.retainedMachine_replay`: every selector prefix agrees
   with the tally for the retained adjacency context.
+* The retained entry, query, halt, and reply operations have linear-space certificates.
 -/
 
 public section
 
 namespace Turing.DoubleCounting.MembershipTally
 
-open Cslib.DoubleCounting MultiTapeTM
+open Cslib.DoubleCounting MultiTapeTM ComputableInSpace
 open Turing.DoubleCounting.BoundedWalk
 
 variable {κ τ : Type} (edge : QueryMachine τ) (start : κ → ℕ → ℕ → τ)
@@ -247,5 +248,54 @@ theorem retainedMachine_length_run_le (encK : κ ↪ List Bool) (encCallee : τ 
   change (encRetainedState encK encCallee ⟨context, tally.run input bits⟩).length ≤ _
   simp only [encRetainedState_apply, encRetainedStateFields, length_encPair, retainedStateBound]
   exact Nat.add_le_add_left h (2 * (encK context).length + 1)
+
+section RetainedSpace
+
+variable (encK : κ ↪ List Bool) (encCallee : τ ↪ List Bool)
+
+local notation "E" => encRetainedState encK encCallee
+local notation "T" => encState (Runtime.encState encK encCallee)
+
+/-- Initialize a retained tally within the common budget for the context and query producers. -/
+theorem retainedInitial_budget {α : Type} {encIn : α ↪ List Bool} {budget : α → ℕ}
+    {walkContext : α → κ} {params : α → Context}
+    (hcontext : ComputableInSpace walkContext encIn encK budget)
+    (hparams : ComputableInSpace params encIn encContext budget) :
+    ComputableInSpace (fun a => retainedInitial (τ := τ) (walkContext a) (params a))
+      encIn E budget :=
+  encRetainedState_mk_budget encK encCallee hcontext
+    (budget_comp_linear (initial_inSpace (Runtime.encState encK encCallee)) hparams)
+
+private theorem tally_inSpace :
+    ComputableInSpace RetainedState.tally E T (fun s => (E s).length) :=
+  encRetainedState_tally_budget encK encCallee (budget_id (enc := E) (.refl _))
+
+/-- Read the active walk's original-input query position in linear workspace. -/
+theorem retainedMachine_query_inSpace (ctx : Context)
+    (hquery : ComputableInSpace edge.query encCallee encNat (fun s => (encCallee s).length)) :
+    ComputableInSpace (retainedMachine edge start verdict clock initialWalk context ctx).query
+      E encNat (fun s => (E s).length) := by
+  let W := Runtime.machine edge start verdict clock initialWalk
+  have hw := Runtime.query_inSpace edge start verdict clock initialWalk encK encCallee hquery
+  have ht := query_inSpace _ ctx W (enterRuntimeWalk edge start verdict clock context)
+    Runtime.remainingFuel hw
+  exact (budget_comp_linear ht (tally_inSpace encK encCallee)).of_enc_eq fun _ => rfl
+
+/-- Detect the terminal phase of the retained tally in linear workspace. -/
+theorem retainedMachine_halted_inSpace (ctx : Context) :
+    ComputableInSpace (retainedMachine edge start verdict clock initialWalk context ctx).halted
+      E encBool (fun s => (E s).length) := by
+  let W := Runtime.machine edge start verdict clock initialWalk
+  have ht := halted_inSpace (Runtime.encState encK encCallee) ctx W
+    (enterRuntimeWalk edge start verdict clock context) Runtime.remainingFuel
+  exact (budget_comp_linear ht (tally_inSpace encK encCallee)).of_enc_eq fun _ => rfl
+
+/-- Decode the optional membership reply without changing the passing negative value. -/
+theorem retainedReply_inSpace :
+    ComputableInSpace retainedReply E (encOption encBool) (fun s => (E s).length) :=
+  (budget_comp_linear (reply_inSpace (Runtime.encState encK encCallee))
+    (tally_inSpace encK encCallee)).of_enc_eq fun _ => rfl
+
+end RetainedSpace
 
 end Turing.DoubleCounting.MembershipTally
