@@ -7,7 +7,8 @@ Authors: Christian Reitwiessner, Erik Demaine
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Routines
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.Cases
 
 /-!
 # Deterministic calls in a binary-choice query machine
@@ -15,6 +16,8 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.L
 The adapter uses the false selector for each live deterministic step. A true selector at a
 live state enters the rejecting state `none`. The all-false replay preserves the original
 input and the deterministic state. At a known first halt, it is the unique successful replay.
+If the deterministic query, transition and halt test use linear workspace, so do their
+binary-choice counterparts.
 -/
 
 public section
@@ -30,6 +33,34 @@ def withRejectingChoice (M : QueryMachine σ) : NondeterministicQueryMachine (Op
   next := fun (s, answer, choice) => if choice then none else s.map (fun q => M.next (q, answer))
   halted := fun s => s.elim true M.halted
   accept := fun s => s.elim false M.halted
+
+open MultiTapeTM MultiTapeTM.ComputableInSpace
+open NondeterministicQueryMachine (encReadChoice)
+
+/-- The rejecting-choice adapter preserves linear workspace for the query, transition and
+halt test. The transition input carries the original optional read and the binary selector. -/
+theorem withRejectingChoice_parts_inSpace {τ : Type} (M : QueryMachine τ)
+    (encS : τ ↪ List Bool)
+    (hq : ComputableInSpace M.query encS encNat fun s => (encS s).length)
+    (hn : ComputableInSpace M.next (encStateRead encS) encS fun p => (encStateRead encS p).length)
+    (hh : ComputableInSpace M.halted encS encBool fun s => (encS s).length) :
+    let B := M.withRejectingChoice
+    let enc := encOption encS
+    let encNext := encPair enc encReadChoice
+    ComputableInSpace B.query enc encNat (fun s => (enc s).length) ∧
+    ComputableInSpace B.next encNext enc (fun p => (encNext p).length) ∧
+    ComputableInSpace B.halted enc encBool (fun s => (enc s).length) := by
+  intro B enc encNext
+  refine ⟨optionElim 0 hq, ?_, optionElim true hh⟩
+  let encAnswer := encOption encBool
+  have hstate := fst enc encReadChoice
+  have htail := snd enc encReadChoice
+  have hnext := budget_optionSome
+    (budget_comp_linear hn (budget_prod (snd encAnswer encS) (fst encAnswer encS)))
+  have hmap := optionElimSnd (budget_const (encIn := encAnswer) (encB := enc) none (.refl _)) hnext
+  have hcontinue := budget_comp_linear hmap (budget_prod (fst' htail) hstate)
+  exact (budget_ite (snd' htail) (budget_const none (.refl _)) hcontinue).of_enc_eq
+    fun ⟨state, _, choice⟩ => by cases state <;> cases choice <;> rfl
 
 private theorem step_false (M : QueryMachine σ) (input : List Bool) (s : σ) :
     M.withRejectingChoice.step input (some s) false = some (M.step input s) := by
