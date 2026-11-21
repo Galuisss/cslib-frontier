@@ -206,9 +206,8 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   obtain ⟨C, h⟩ := justesenSourceMembership_bounds ntm c
   refine ⟨C, fun w => ?_⟩
   intro I n seed source target ctx r M entry
-  have hsize : ctx.size = n := by
-    simp only [ctx, n, JustesenSourceContext.size, configurationJustesenSubdivisionContext,
-      (configurationSeedSearchSetup_endpoints ntm c w).1]
+  have hsize : ctx.size = n :=
+    configurationJustesenSourceContext_size ntm c w seed.val source.val target.val
   have hr : SourceRoundLoop.Admissible ctx ctx.size n r := by
     simp only [SourceRoundLoop.Admissible, r, hsize, Nat.zero_add, and_self, le_refl]
   exact h w seed source target n le_rfl r hr

@@ -59,6 +59,15 @@ enc_structure encJustesenSourceContext : JustesenSourceContext where
 @[expose] def JustesenSourceContext.size (ctx : JustesenSourceContext) : ℕ :=
   ctx.adjacency.parameters.search.subdivision.vertexCount
 
+/-- The initialized source context uses the scheduler setup's subdivision dimension. -/
+theorem configurationJustesenSourceContext_size {k : ℕ} {State : Type} [Fintype State]
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) (rank source target : ℕ) :
+    (⟨configurationJustesenSubdivisionContext ntm c w rank, source, target⟩ :
+      JustesenSourceContext).size =
+        (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount := by
+  simp only [JustesenSourceContext.size, configurationJustesenSubdivisionContext,
+    (configurationSeedSearchSetup_endpoints ntm c w).1]
+
 /-- Read the subdivision size from the existing adjacency context encoding. -/
 theorem encJustesenSourceContext_size_budget {α : Type} {enc : α ↪ List Bool} {S : α → ℕ}
     {ctx : α → JustesenSourceContext}
@@ -106,8 +115,7 @@ theorem justesenSourceMembershipMachine_withInit
             source, target, radius, totals⟩ := by
   intro ctx
   unfold justesenSourceMembershipMachine
-  simp only [justesenSourceMembershipStart, ctx, JustesenSourceContext.size,
-    configurationJustesenSubdivisionContext, (configurationSeedSearchSetup_endpoints ntm c w).1]
+  simp only [justesenSourceMembershipStart, ctx, configurationJustesenSourceContext_size]
   exact configurationJustesenMembershipTally_withInit ntm c [] w 0 rank _ _
 
 open NondeterministicQueryMachine in
@@ -166,9 +174,8 @@ theorem justesenSourceMembership_bounds (ntm : MultiTapeNTM k Bool State) (c : �
   obtain ⟨C, hlength⟩ := configurationJustesenMembershipTally_length_run_le_log_of_loop_caps ntm c
   refine ⟨C, fun w => ?_⟩
   intro I size seed source target limit hlimit ctx r hr M entry
-  have hsize : ctx.size = size.vertexCount := by
-    simp only [ctx, size, JustesenSourceContext.size, configurationJustesenSubdivisionContext,
-      (configurationSeedSearchSetup_endpoints ntm c w).1]
+  have hsize : ctx.size = size.vertexCount :=
+    configurationJustesenSourceContext_size ntm c w seed.val source.val target.val
   rcases r with ⟨actual, fuel, radius, totals⟩
   obtain ⟨hctx, hfuel, hc, hs⟩ := hr
   change actual = ctx at hctx
