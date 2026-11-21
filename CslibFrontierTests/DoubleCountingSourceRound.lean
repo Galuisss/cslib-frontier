@@ -8,6 +8,8 @@ module
 -- upstream: local-only (test driver)
 
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.SourceRound
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Dispatch.Resource
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.Cases
 
 /-! Checked scalar traces for the source controller's tie and rejection results. -/
 
@@ -30,7 +32,43 @@ private def start (_ : Context) : Request → Option Bool
   | .edge u v => some (decide (u < 2 ∧ v = 2))
   | .member u => some (decide (u < 2))
 
-private def tieRound := machine context reply start id
+private def scalarRound := machine context reply start id
+
+private def membershipReply : NondeterministicQueryMachine Bool where
+  init := false
+  query _ := 0
+  next p := p.1
+  halted _ := true
+  accept _ := true
+
+private def mixedStart (ctx : Context) (req : Request) : Option Bool ⊕ Bool :=
+  match req with
+  | .edge .. => .inl (start ctx req)
+  | .member v => .inr (decide (v < 2))
+
+private def mixedReply := reply.dispatch membershipReply
+
+private def mixedFinish : Option Bool ⊕ Bool → Option Bool := Sum.elim id some
+
+private def tieRound := machine context mixedReply mixedStart mixedFinish
+
+open ComputableInSpace NondeterministicQueryMachine in
+/-- The round's native transition combines the two steps using the same read and selector. -/
+example
+    (hentry : ComputableInSpace (fun q : State => mixedStart q.context (request q)) encState
+      (encSum (encOption encBool) encBool) fun q => (encState q).length) :
+    let encCallback := encSum (encOption encBool) encBool
+    let encStep := encPair (encMachineState (Option Bool ⊕ Bool) encCallback) encReadChoice
+    ComputableInSpace tieRound.next encStep (encMachineState (Option Bool ⊕ Bool) encCallback)
+      fun p => (encStep p).length := by
+  have hfinish := sumElim (of_inO (ComputableInDegree.id' (enc := encOption encBool)).inO_one)
+    (budget_optionSome (of_inO (ComputableInDegree.id' (enc := encBool)).inO_one))
+  have hhalt := sumElim (encE := encBool)
+    (budget_const (encIn := encOption encBool) true (.refl _))
+    (budget_const (encIn := encBool) true (.refl _))
+  have hnext := reply.dispatch_next_inSpace membershipReply (encOption encBool) encBool
+    (fst (encOption encBool) encReadChoice) (fst encBool encReadChoice)
+  exact machine_next_inSpace _ context mixedReply mixedStart mixedFinish hentry hfinish hhalt hnext
 
 -- The first two vertices are already in the round. Both reach the third vertex.
 example :
@@ -46,18 +84,26 @@ private theorem tie_firstHalting :
   interval_cases n <;> decide +kernel
 
 /-- A tied result is a successful scan occurrence with its full updated tally. -/
-example : replayScan context reply start id [] (List.replicate 16 false) =
+example : replayScan context mixedReply mixedStart mixedFinish [] (List.replicate 16 false) =
     some (⟨⟨3, 1⟩, true⟩, []) :=
-  (firstHalting_iff_replayScan context reply start id _ _ _).mp ⟨tie_firstHalting, rfl⟩
+  (firstHalting_iff_replayScan context mixedReply mixedStart mixedFinish _ _ _).mp
+    ⟨tie_firstHalting, rfl⟩
 
 /-- A tied round remains successful and has only one complete selector list. -/
 example : {bits : List Bool | tieRound.FirstHalting [] bits tieRound.init ∧
     (answer (tieRound.run [] bits)).isSome} = {List.replicate 16 false} := by
-  have hu := subsingleton_successful_firstHalting context reply start id [] (by
+  have hu := subsingleton_successful_firstHalting context mixedReply mixedStart mixedFinish [] (by
     intro req _ left hl right hr
-    have hempty (bits : List Bool) :=
-      reply.firstHalting_iff_nil_of_halted [] bits (start context req) rfl
-    exact ((hempty left).mp hl.1).trans ((hempty right).mp hr.1).symm)
+    have hempty (bits : List Bool) (h : mixedReply.FirstHalting [] bits (mixedStart context req)) :
+        bits = [] := by
+      cases req with
+      | edge u v =>
+        exact (reply.firstHalting_iff_nil_of_halted [] bits _ rfl).mp
+          ((reply.firstHalting_dispatch_inl membershipReply [] bits _).mp h)
+      | member v =>
+        exact (membershipReply.firstHalting_iff_nil_of_halted [] bits _ rfl).mp
+          ((reply.firstHalting_dispatch_inr membershipReply [] bits _).mp h)
+    exact (hempty left hl.1).trans (hempty right hr.1).symm)
   exact hu.eq_singleton_of_mem ⟨tie_firstHalting, rfl⟩
 
 private def rejectRound := machine context reply
@@ -94,6 +140,15 @@ private def finish : CallbackState → Option Bool
   | .pending _ => none
   | .finished result => result
 
+/-- A live edge call retains its tag and reads the original word during its own step. -/
+example :
+    let combined := callback.dispatch membershipReply
+    Sum.elim finish some (combined.replay [true] [true] (.inl (.pending (.edge 0 2)))) =
+      some true := by
+  dsimp only
+  rw [callback.replay_dispatch]
+  rfl
+
 private def round := machine context callback (fun _ => .pending) finish
 
 /-- Reading an edge bit on the original input distinguishes a tie from a missing reply. -/
@@ -114,7 +169,7 @@ example (choices : List Bool) :
 
 /-- The encoded prefix includes the full suspended caller and optional callee. -/
 example (choices : List Bool) :
-    (encMachineState (Option Bool) (encOption encBool) (tieRound.run [] choices)).length ≤
+    (encMachineState (Option Bool) (encOption encBool) (scalarRound.run [] choices)).length ≤
       roundStateBound context 2 := by
   have hcallee (req : Request) (_ : req.InRange context.size) (bits : List Bool) :
       (encOption encBool (reply.replay [] bits (start context req))).length ≤ 2 := by
@@ -125,7 +180,7 @@ example (choices : List Bool) :
     [] choices 2 hcallee
 
 /-- The common clock covers wrong routing selectors as well as valid calls. -/
-example : tieRound.HaltsWithin [] (roundClock context.size 0) :=
+example : scalarRound.HaltsWithin [] (roundClock context.size 0) :=
   Turing.DoubleCounting.SourceRound.haltsWithin context reply start id [] 0 (fun _ _ _ _ => rfl)
 
 example :
