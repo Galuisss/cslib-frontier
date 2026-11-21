@@ -23,6 +23,8 @@ to every bounded walk, so the typed scan uses the subdivision adjacency for the 
 
 * `Cslib.Complexity.STCON.configurationJustesenMembershipTally_firstHalting_iff`: exact
   first-halting selector and membership-reply correspondence for the weighted tally.
+* `Cslib.Complexity.STCON.configurationJustesenMembershipTally_native_firstHalting_iff`:
+  one accepting native occurrence list per passing selector list.
 * `Cslib.Complexity.STCON.configurationJustesenMembershipTally_length_run_le_log`:
   logarithmic encoded length on every prefix of a bounded tally query.
 * `Cslib.Complexity.STCON.configurationJustesenMembershipTally_haltsWithin_clock`:
@@ -92,6 +94,42 @@ theorem configurationJustesenMembershipTally_firstHalting_iff
     (MembershipTally.withRuntimeWalk_firstHalting_iff edge start callbackVerdict 3 initial ctx
       w (configurationJustesenSubdivisionAdjacent ntm c w seed) source target radius expected
       (fun u v => (hcall u v).1) (fun u v => (hcall u v).2) bits hit)
+
+open NondeterministicQueryMachine in
+/-- A fixed selector list has exactly one accepting native occurrence list precisely when
+it encodes a passing typed tally at the initialized seed. Both membership replies pass. -/
+theorem configurationJustesenMembershipTally_native_firstHalting_iff
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) {α : Type} {enc : α ↪ List Bool}
+    {S : α → ℕ} {rank : α → ℕ} {params : α → MembershipTally.Context}
+    {w₀ : List Bool} {rank₀ : ℕ} {params₀ : MembershipTally.Context}
+    (R : Routines (configurationJustesenMembershipTally ntm c w₀ rank₀ params₀)
+      (fun a => MembershipTally.retainedInitial
+        (configurationJustesenSubdivisionContext ntm c (enc a) (rank a)) (params a)) enc S)
+    (a : α) :
+    let I := configurationInstance ntm c (enc a)
+    let size := (configurationSeedSearchSetup ntm c (enc a)).parameters.search.subdivision
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin size.vertexCount)
+      (radius : ℕ) (expected : Tally) (bits : List Bool),
+      rank a = seed.val →
+      params a = ⟨size.vertexCount, source.val, target.val, radius, expected⟩ →
+      ((∃! indices, ∃ final,
+        Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg (enc a)) indices =
+          some (bits, final) ∧ final.Halted ∧ final.output = [true]) ↔
+        ∃! branch, bits = MembershipTally.selectors (BoundedWalk.selectors 3) branch ∧
+          ∃ hit, Scan.run (configurationJustesenSubdivisionAdjacent ntm c (enc a) seed)
+            source target radius expected branch = some hit) := by
+  intro I size seed source target radius expected bits hrank hparams
+  let edge := justesenWeightedSubdivisionCallback ntm
+  let start := fun ctx u v => justesenSubdivisionEdgeStart (ctx, u, v)
+  let ctx a := configurationJustesenSubdivisionContext ntm c (enc a) (rank a)
+  have hcall := configurationJustesenSubdivisionEdge_halts_and_agrees ntm c (enc a) seed
+  refine MembershipTally.retainedMachine_native_firstHalting_iff edge start callbackVerdict 3
+    (tallyWalkInitial ntm c) (configurationJustesenSubdivisionContext ntm c w₀ rank₀)
+    params₀ ctx params R a _ source target radius expected bits hparams ?_ ?_
+  · intro u v
+    simpa only [ctx, hrank] using (hcall u v).1
+  · intro u v
+    simpa only [ctx, hrank] using (hcall u v).2
 
 /-- The tally envelope is logarithmic apart from the charged adjacency callback state. -/
 theorem configurationJustesenMembershipTally_stateBound_le_log

@@ -72,8 +72,22 @@ private noncomputable def zeroRadiusParams {k : ℕ} {State : Type} [Fintype Sta
   let setup := configurationSeedSearchSetup ntm c w
   ⟨setup.parameters.search.subdivision.vertexCount, setup.sourceID, setup.targetID, 0, ⟨0, 0⟩⟩
 
+private theorem run_skip {n : ℕ} (edge : Fin n → Fin n → Bool) (source target : Fin n) :
+    Scan.run edge source target 0 ⟨0, 0⟩ (fun _ => none) = some false := by
+  have hprefix (i : ℕ) (hi : i ≤ n) :
+      Scan.tallyPrefix edge source target 0 (fun _ => none) hi = some Scan.Result.zero := by
+    induction i with
+    | zero => exact Scan.tallyPrefix_zero edge source target 0 _
+    | succ i ih =>
+      rw [Scan.tallyPrefix_succ edge source target 0 _ (Nat.lt_of_succ_le hi),
+        ih (Nat.le_of_succ_le hi)]
+      rfl
+  rw [Scan.run_eq_finish, hprefix]
+  rfl
+
 /-- Compile queries at seed zero using the designated endpoints computed from the original
-word. The same machine has a native workspace bound and halts on every input. -/
+word. The same machine has a native workspace bound, halts on every input, and has one
+accepting occurrence for the passing negative selector list. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
     let M := configurationJustesenMembershipTally ntm c [] 0 ⟨0, 0, 0, 0, ⟨0, 0⟩⟩
     let init := fun w => MembershipTally.retainedInitial
@@ -81,7 +95,12 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     ∃ K, ∃ R : Routines M init encBits (fun w => K * (Nat.log2 (encBits w).length + 1)),
       ∀ w, R.machine.RunsInSpace (encBits w)
         (R.k * (2 * (R.c * (K * (Nat.log2 (encBits w).length + 1))) + 1)) ∧
-        ∃ t, R.machine.RunsInTime (encBits w) t := by
+        (∃ t, R.machine.RunsInTime (encBits w) t) ∧
+        let n := (zeroRadiusParams ntm c w).size
+        let bits := MembershipTally.selectors (BoundedWalk.selectors 3) (fun _ : Fin n => none)
+        ∃! indices, ∃ final,
+          Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg (encBits w)) indices =
+            some (bits, final) ∧ final.Halted ∧ final.output = [true] := by
   let budget (w : List Bool) := Nat.log2 (encBits w).length
   obtain ⟨t, A, hspace⟩ := configurationSeedSearchSetup_inLogSpace ntm c
   obtain ⟨D, hlength⟩ := length_configurationSeedSearchSetup_le_log ntm c
@@ -107,13 +126,20 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
       obtain ⟨hs, ht⟩ := configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w
       simp only [encBits_apply, zeroRadiusParams]
       exact ⟨True.intro, hs, ht, Nat.zero_le _, Nat.zero_le _, Nat.zero_le _⟩)
-  refine ⟨K, R, fun w => ⟨R.runsInSpace w, ?_⟩⟩
-  apply R.exists_runsInTime w (time := configurationJustesenMembershipTallyClock ntm c w)
-  rw [encBits_apply, configurationJustesenMembershipTally_withInit]
-  let setup := configurationSeedSearchSetup ntm c w
-  obtain ⟨hs, ht⟩ := configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w
-  exact configurationJustesenMembershipTally_haltsWithin_clock ntm c w
-    ⟨0, Nat.two_pow_pos _⟩ ⟨setup.sourceID, hs⟩ ⟨setup.targetID, ht⟩
-    0 ⟨0, 0⟩ (Nat.zero_le _)
+  refine ⟨K, R, fun w => ⟨R.runsInSpace w, ?_, ?_⟩⟩
+  · apply R.exists_runsInTime w (time := configurationJustesenMembershipTallyClock ntm c w)
+    rw [encBits_apply, configurationJustesenMembershipTally_withInit]
+    let setup := configurationSeedSearchSetup ntm c w
+    obtain ⟨hs, ht⟩ := configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w
+    exact configurationJustesenMembershipTally_haltsWithin_clock ntm c w
+      ⟨0, Nat.two_pow_pos _⟩ ⟨setup.sourceID, hs⟩ ⟨setup.targetID, ht⟩
+      0 ⟨0, 0⟩ (Nat.zero_le _)
+  · let setup := configurationSeedSearchSetup ntm c (encBits w)
+    obtain ⟨hs, ht⟩ := configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c (encBits w)
+    apply (configurationJustesenMembershipTally_native_firstHalting_iff ntm c R w
+      ⟨0, Nat.two_pow_pos _⟩ ⟨setup.sourceID, hs⟩ ⟨setup.targetID, ht⟩
+      0 ⟨0, 0⟩ _ rfl rfl).mpr
+    exact ⟨fun _ => none, ⟨rfl, false, run_skip _ _ _⟩, fun _ h =>
+      MembershipTally.selectors_injective _ (BoundedWalk.eq_of_selectors_prefix 3) h.1.symm⟩
 
 end CslibFrontierTests.STCONJustesenTally
