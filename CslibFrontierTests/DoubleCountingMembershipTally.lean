@@ -70,4 +70,41 @@ example : ∃ branch : Cslib.DoubleCounting.Scan.Branch 1,
       (fun _ => some 0) [] [true, false] ⟨⟨1, 0⟩, true⟩ true rfl rfl).1
   · rfl
 
+private def edge : QueryMachine Unit where
+  init := ()
+  query := fun _ => 0
+  next := fun _ => ()
+  halted := fun _ => true
+  emit := fun _ => []
+  finish := fun _ => []
+
+-- A checked zero-step walk is selected, but the queried vertex is skipped.
+example :
+    let branch : Cslib.DoubleCounting.Scan.Branch 2 := fun v =>
+      if v = 0 then some [] else none
+    let bits := selectors (Turing.DoubleCounting.BoundedWalk.selectors 0) branch
+    let M := withBoundedWalk edge (fun (_ _ : Fin 2) => ()) (fun _ => false)
+      0 0 ⟨2, 0, 1, 0, ⟨1, 0⟩⟩
+    M.FirstHalting [] bits M.init ∧ M.run [] bits = .inr (.inr (some false)) := by
+  let branch : Cslib.DoubleCounting.Scan.Branch 2 := fun v =>
+    if v = 0 then some [] else none
+  let bits := selectors (Turing.DoubleCounting.BoundedWalk.selectors 0) branch
+  let adjacent : Fin 2 → Fin 2 → Bool := fun _ _ => false
+  have hrun : Cslib.DoubleCounting.Scan.run adjacent 0 1 0 ⟨1, 0⟩ branch = some false := by
+    rw [Cslib.DoubleCounting.Scan.run_eq_finish,
+      Cslib.DoubleCounting.Scan.tallyPrefix_succ adjacent 0 1 0 branch (n := 1) (by decide),
+      Cslib.DoubleCounting.Scan.tallyPrefix_succ adjacent 0 1 0 branch (n := 0) (by decide),
+      Cslib.DoubleCounting.Scan.tallyPrefix_zero]
+    simp [branch, Cslib.DoubleCounting.Scan.walkM, Cslib.DoubleCounting.Scan.readNext,
+      bind, StateT.bind, pure, StateT.pure, Cslib.DoubleCounting.Scan.Result.finish,
+      Cslib.DoubleCounting.Scan.Result.recordWalk, Cslib.DoubleCounting.Scan.Result.zero,
+      Cslib.DoubleCounting.Tally.matches_iff]
+  apply (withBoundedWalk_firstHalting_iff edge (fun _ _ => ()) (fun _ => false) 0 0 []
+    adjacent 0 1 0 ⟨1, 0⟩ bits false (fun _ _ => rfl) (fun _ _ => rfl)).mpr
+  refine ⟨branch, ⟨rfl, hrun⟩, ?_⟩
+  intro other hother
+  -- The serializer has a fixed-width, prefix-free payload at each selected candidate.
+  exact selectors_injective _ (Turing.DoubleCounting.BoundedWalk.eq_of_selectors_prefix 0)
+    hother.1.symm
+
 end CslibFrontierTests.DoubleCountingMembershipTally

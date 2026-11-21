@@ -29,6 +29,16 @@ the membership bit, with a passing negative result distinct from rejection.
 ## Main definitions
 
 * `Turing.DoubleCounting.MembershipTally.machine`: one membership scan using a supplied walk.
+* `Turing.DoubleCounting.MembershipTally.withBoundedWalk`: the scan with the canonical bounded
+  walk reading the original input.
+
+## Main results
+
+* `Turing.DoubleCounting.MembershipTally.withBoundedWalk_native_firstHalting_iff`: exactly one
+  accepting native occurrence list for the selectors of each passing typed scan.
+
+The native scanner fixes the graph dimension and adjacency clock. Its query parameters are
+input-dependent. The branch correspondence is for one membership query.
 -/
 
 public section
@@ -946,17 +956,20 @@ theorem withBoundedWalk_firstHalting_iff (input : List Bool)
     let M := withBoundedWalk edge start verdict clock fallback
       ⟨N, source.val, target.val, radius, expected⟩
     M.FirstHalting input bits M.init ∧ M.run input bits = .inr (.inr (some hit)) ↔
-      ∃ branch, bits = selectors (BoundedWalk.selectors clock) branch ∧
+      ∃! branch, bits = selectors (BoundedWalk.selectors clock) branch ∧
         Scan.run adjacent source target radius expected branch = some hit := by
   dsimp only [withBoundedWalk]
   constructor
   · rintro ⟨hfirst, hend⟩
-    refine exists_scan_of_firstHalting W enterWalk BoundedWalk.remainingFuel input adjacent
-      source target radius expected (BoundedWalk.selectors clock) ?_ bits hit hfirst hend
-    intro v acc ws left r hf hr
-    exact (boundedWalk_replay edge start verdict clock fallback input adjacent source target v
-      radius expected acc ws left hclock hedge).mp ⟨hf, hr⟩
-  · rintro ⟨branch, rfl, hrun⟩
+    have h := exists_scan_of_firstHalting W enterWalk BoundedWalk.remainingFuel input adjacent
+      source target radius expected (BoundedWalk.selectors clock)
+    obtain ⟨branch, hbits, hrun⟩ := h (fun v acc ws left hf hr =>
+      (boundedWalk_replay edge start verdict clock fallback input adjacent source target v
+        radius expected acc ws left hclock hedge).mp ⟨hf, hr⟩) bits hit hfirst hend
+    refine ⟨branch, ⟨hbits, hrun⟩, fun other hother => ?_⟩
+    exact selectors_injective _ (BoundedWalk.eq_of_selectors_prefix clock)
+      (hother.1.symm.trans hbits)
+  · rintro ⟨branch, ⟨rfl, hrun⟩, _⟩
     refine firstHalting_of_scan W enterWalk BoundedWalk.remainingFuel input adjacent
       source target radius expected branch hit (BoundedWalk.selectors clock) ?_ hrun
     intro v acc tail left hw r
@@ -1082,8 +1095,8 @@ theorem withBoundedWalk_native_firstHalting_iff {α : Type} {enc : α ↪ List B
     (∃! indices, ∃ final,
       Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg (enc a)) indices =
         some (bits, final) ∧ final.Halted ∧ final.output = [true]) ↔
-      ∃ branch hit, bits = selectors (BoundedWalk.selectors clock) branch ∧
-        Scan.run adjacent source target radius expected branch = some hit := by
+      ∃! branch, bits = selectors (BoundedWalk.selectors clock) branch ∧
+        ∃ hit, Scan.run adjacent source target radius expected branch = some hit := by
   let M := withBoundedWalk edge start verdict clock fallback ctx
   let startState : State (BoundedWalk.State N τ) := initial (context a)
   have hM : M.withInit startState = withBoundedWalk edge start verdict clock fallback
@@ -1098,7 +1111,7 @@ theorem withBoundedWalk_native_firstHalting_iff {α : Type} {enc : α ↪ List B
   have hiff (hit : Bool) :
       M.FirstHalting (enc a) bits startState ∧
           M.replay (enc a) bits startState = .inr (.inr (some hit)) ↔
-        ∃ branch, bits = selectors (BoundedWalk.selectors clock) branch ∧
+        ∃! branch, bits = selectors (BoundedWalk.selectors clock) branch ∧
           Scan.run adjacent source target radius expected branch = some hit := by
     simpa only [← hM, init_withInit, firstHalting_withInit, run_withInit] using hspec hit
   have accept_iff (s : State (BoundedWalk.State N τ)) :
@@ -1109,10 +1122,17 @@ theorem withBoundedWalk_native_firstHalting_iff {α : Type} {enc : α ↪ List B
     obtain ⟨hfirst, houtput⟩ := R.replay_correct a hreplay hhalt
     have haccept := List.cons.inj (houtput.symm.trans hout) |>.1
     obtain ⟨hit, hresult⟩ := (accept_iff _).mp haccept
-    obtain ⟨branch, hbits, hscan⟩ := (hiff hit).mp ⟨hfirst, hresult⟩
-    exact ⟨branch, hit, hbits, hscan⟩
-  · rintro ⟨branch, hit, hbits, hscan⟩
-    obtain ⟨hfirst, hresult⟩ := (hiff hit).mpr ⟨branch, hbits, hscan⟩
+    obtain ⟨branch, ⟨hbits, hscan⟩, _⟩ := (hiff hit).mp ⟨hfirst, hresult⟩
+    refine ⟨branch, ⟨hbits, hit, hscan⟩, fun other hother => ?_⟩
+    exact selectors_injective _ (BoundedWalk.eq_of_selectors_prefix clock)
+      (hother.1.symm.trans hbits)
+  · rintro ⟨branch, ⟨hbits, hit, hscan⟩, _⟩
+    have hbranch : ∃! b, bits = selectors (BoundedWalk.selectors clock) b ∧
+        Scan.run adjacent source target radius expected b = some hit :=
+      ⟨branch, ⟨hbits, hscan⟩, fun _ hother =>
+        selectors_injective _ (BoundedWalk.eq_of_selectors_prefix clock)
+          (hother.1.symm.trans hbits)⟩
+    obtain ⟨hfirst, hresult⟩ := (hiff hit).mpr hbranch
     obtain ⟨indices, ⟨final, hreplay, hhalt⟩, hunique⟩ :=
       (R.existsUnique_replay_iff a bits).mpr hfirst
     have hout := (R.replay_correct a hreplay hhalt).2
