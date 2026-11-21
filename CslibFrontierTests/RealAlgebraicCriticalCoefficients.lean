@@ -724,4 +724,34 @@ example :
     Polynomial.roots_X_sub_C, Polynomial.roots_X_sub_C, Multiset.map_add, Multiset.prod_add]
   norm_num
 
+-- The determinant in the zero-variable quotient comes from its one characteristic root.
+example :
+    let r : Fin 0 → MvPolynomial (Fin 0) ℤ := 0
+    let μ := multiplicationMatrix (ell := 1) (by decide) r (fun i => i.elim0)
+    let g : Polynomial ℤ := Polynomial.X - Polynomial.C 1
+    (μ (Polynomial.aeval (MvPolynomial.C (2 : ℤ)) g)).det = 1 := by
+  intro r μ g
+  let M := μ (MvPolynomial.C (2 : ℤ))
+  have hM : M = Matrix.diagonal (fun _ => (2 : ℤ)) := by
+    change μ (MvPolynomial.C (2 : ℤ)) = _
+    rw [← MvPolynomial.algebraMap_eq, μ.commutes, Matrix.algebraMap_eq_diagonal]
+    rfl
+  have hchar : M.charpoly = Polynomial.X - Polynomial.C 2 := by
+    rw [hM, Matrix.charpoly_diagonal, Fintype.prod_unique]
+  have hcharMap : M.charpoly.map (algebraMap ℤ ℚ) = Polynomial.X - Polynomial.C 2 := by
+    rw [hchar, Polynomial.map_sub, Polynomial.map_X, Polynomial.map_C, map_ofNat]
+  have hg : (g.map (algebraMap ℤ ℚ)).Splits := by
+    simpa [g] using Polynomial.Splits.X_sub_C (1 : ℚ)
+  have h := Matrix.algebraMap_det_aeval_eq_prod_aroots_toFinset (K := ℚ) M g hg
+    (hcharMap ▸ Polynomial.Splits.X_sub_C (2 : ℚ))
+    (hcharMap ▸ Polynomial.separable_X_sub_C (x := (2 : ℚ)))
+  rw [hchar, Polynomial.aroots_X_sub_C] at h
+  have hval : Polynomial.aeval (algebraMap ℤ ℚ 2) g = 1 := by
+    norm_num [g, Polynomial.aeval_def, algebraMap_int_eq]
+  rw [Multiset.toFinset_singleton, Finset.prod_singleton, hval] at h
+  have hcast : ((Polynomial.aeval M g).det : ℚ) = 1 := by
+    simpa only [algebraMap_int_eq, Int.coe_castRingHom] using h
+  have hsrc : (Polynomial.aeval M g).det = 1 := by exact_mod_cast hcast
+  simpa only [M, Polynomial.aeval_algHom_apply] using hsrc
+
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
