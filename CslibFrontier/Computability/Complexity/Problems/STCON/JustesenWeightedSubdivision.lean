@@ -269,4 +269,35 @@ theorem configurationJustesenSubdivisionEdge_contract
         Nat.mul_le_mul_left C (Nat.add_le_add_right hctx _)
       _ = _ := by rw [Nat.mul_assoc, Nat.add_mul, Nat.one_mul]
 
+/-- The generated subdivision adjacency transported to its canonical finite vertex IDs. -/
+@[expose] noncomputable def configurationJustesenSubdivisionAdjacent
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let size := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision
+    Fin (2 ^ codeLength I.n (I.n - 1)) → Fin size.vertexCount → Fin size.vertexCount → Bool :=
+  fun seed u v =>
+    let I := configurationInstance ntm c w
+    let size := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision
+    let index := configurationSubdivisionIndex ntm c w
+    let G := graph (layeredDigraph I) (generatedWeight ((BitString.equivFin _).symm seed))
+      size.chainBound
+    @decide (G.Adj (index.symm u) (index.symm v)) (Classical.propDecidable _)
+
+/-- At clock three the initialized callback has halted with the typed subdivision adjacency. -/
+theorem configurationJustesenSubdivisionEdge_halts_and_agrees
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let size := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (u v : Fin size.vertexCount),
+      let ctx := configurationJustesenSubdivisionContext ntm c w seed.val
+      let M := justesenWeightedSubdivisionCallback ntm
+      let final := M.runFrom w (justesenSubdivisionEdgeStart (ctx, u.val, v.val)) 3
+      M.halted final = true ∧
+        callbackVerdict final = configurationJustesenSubdivisionAdjacent ntm c w seed u v := by
+  intro I size seed u v ctx M final
+  obtain ⟨_, hcall⟩ := configurationJustesenSubdivisionEdge_contract ntm c
+  refine ⟨(hcall w seed u v).2.1, Bool.eq_iff_iff.mpr ?_⟩
+  simpa only [configurationJustesenSubdivisionAdjacent, decide_eq_true_eq] using
+    (hcall w seed u v).2.2.1
+
 end Cslib.Complexity.STCON
