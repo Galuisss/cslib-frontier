@@ -106,4 +106,16 @@ example (choices : List Bool) :
 example : tieRound.HaltsWithin [] 57 :=
   Turing.DoubleCounting.SourceRound.haltsWithin context reply start id [] 0 (fun _ _ _ => rfl)
 
+example :
+    ComputableInSpace (entry (τ := Option Bool)) encContext
+      (encMachineState (Option Bool) (encOption encBool)) (fun ctx => (encContext ctx).length) :=
+  entry_inSpace _
+
+example :
+    ComputableInSpace (answer (τ := Option Bool))
+      (encMachineState (Option Bool) (encOption encBool))
+      (encOption Turing.DoubleCounting.encRoundUpdate)
+      (fun q => (encMachineState (Option Bool) (encOption encBool) q).length) :=
+  answer_inSpace _
+
 end CslibFrontierTests.DoubleCountingSourceRound

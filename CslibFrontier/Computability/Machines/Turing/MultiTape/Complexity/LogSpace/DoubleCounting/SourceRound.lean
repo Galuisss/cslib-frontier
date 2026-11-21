@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.Predecessor
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.FunPropFinite
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.NatLength
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
 
@@ -25,7 +26,7 @@ public section
 
 namespace Turing.DoubleCounting.SourceRound
 
-open Cslib.DoubleCounting MultiTapeTM
+open Cslib.DoubleCounting MultiTapeTM ComputableInSpace
 
 /-- Immutable arguments for a round of membership and adjacency calls. -/
 structure Context where
@@ -202,6 +203,64 @@ theorem machine_withInit {τ : Type} (ctx next : Context) (N : NondeterministicQ
     (start : Context → Request → τ) (finish : τ → Option Bool) :
     (machine ctx N start finish).withInit (entry next) = machine next N start finish :=
   rfl
+
+/-- Re-enter a fixed round controller using only the supplied binary context. -/
+theorem entry_inSpace {τ : Type} (encT : τ ↪ List Bool) :
+    ComputableInSpace (entry (τ := τ)) encContext (encMachineState τ encT)
+      (fun ctx => (encContext ctx).length) := by
+  have hctx := of_inO (ComputableInDegree.id' (enc := encContext)).inO_one
+  have zero := budget_const (encIn := encContext) (encB := encNat) 0 (.refl _)
+  have no := budget_const (encIn := encContext) (encB := encBool) false (.refl _)
+  have hupdate := encRoundUpdate_mk_budget (encContext_expected_budget hctx) no
+  have hcaller := encState_mk_budget hctx zero hupdate (budget_const none (.refl _)) no
+  exact (encMachineState_mk_budget τ encT hcaller (budget_const none (.refl _))).of_enc_eq
+    fun _ => rfl
+
+/-- Query the original input at the callee's position, or at zero between calls. -/
+theorem machine_query_inSpace {τ : Type} (encT : τ ↪ List Bool)
+    (ctx : Context) (N : NondeterministicQueryMachine τ)
+    (start : Context → Request → τ) (finish : τ → Option Bool)
+    (hq : ComputableInSpace N.query encT encNat (fun t => (encT t).length)) :
+    ComputableInSpace (machine ctx N start finish).query (encMachineState τ encT) encNat
+      (fun q => (encMachineState τ encT q).length) := by
+  have hid := of_inO (ComputableInDegree.id' (enc := encMachineState τ encT)).inO_one
+  have hpair := budget_prod (encMachineState_controller_budget τ encT hid)
+    (encMachineState_callee_budget τ encT hid)
+  exact (budget_comp_linear
+    (optionElimSnd (budget_const 0 (.refl _)) (budget_comp_linear hq (snd encState encT)))
+    hpair).of_enc_eq fun q => by cases q; rfl
+
+/-- The native halt test compares the binary cursor and size and checks the rejection bit. -/
+theorem machine_halted_inSpace {τ : Type} (encT : τ ↪ List Bool)
+    (ctx : Context) (N : NondeterministicQueryMachine τ)
+    (start : Context → Request → τ) (finish : τ → Option Bool) :
+    ComputableInSpace (machine ctx N start finish).halted (encMachineState τ encT) encBool
+      (fun q => (encMachineState τ encT q).length) := by
+  have hid := of_inO (ComputableInDegree.id' (enc := encMachineState τ encT)).inO_one
+  have hc := encMachineState_controller_budget τ encT hid
+  have hi := encState_cursor_budget hc
+  have hn := encContext_size_budget (encState_context_budget hc)
+  have hr := encState_rejected_budget hc
+  exact (budget_boolOr hr (budget_natLe hn hi)).of_enc_eq fun _ => rfl
+
+/-- A completed tied round accepts, while an explicit callback rejection does not. -/
+theorem machine_accept_inSpace {τ : Type} (encT : τ ↪ List Bool)
+    (ctx : Context) (N : NondeterministicQueryMachine τ)
+    (start : Context → Request → τ) (finish : τ → Option Bool) :
+    ComputableInSpace (machine ctx N start finish).accept (encMachineState τ encT) encBool
+      (fun q => (encMachineState τ encT q).length) := by
+  have hid := of_inO (ComputableInDegree.id' (enc := encMachineState τ encT)).inO_one
+  have hc := encMachineState_controller_budget τ encT hid
+  exact (budget_boolNot (encState_rejected_budget hc)).of_enc_eq fun _ => rfl
+
+/-- Decode the reply for a caller while preserving the distinction between a tie and rejection. -/
+theorem answer_inSpace {τ : Type} (encT : τ ↪ List Bool) :
+    ComputableInSpace (answer (τ := τ)) (encMachineState τ encT) (encOption encRoundUpdate)
+      (fun q => (encMachineState τ encT q).length) := by
+  have hid := of_inO (ComputableInDegree.id' (enc := encMachineState τ encT)).inO_one
+  have hc := encMachineState_controller_budget τ encT hid
+  exact (budget_ite (encState_rejected_budget hc) (budget_const none (.refl _))
+    (budget_optionSome (encState_update_budget hc))).of_enc_eq fun _ => rfl
 
 private theorem replay_callee {τ : Type} (ctx : Context)
     (N : NondeterministicQueryMachine τ) (start : Context → Request → τ) (finish : τ → Option Bool)
