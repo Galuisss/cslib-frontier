@@ -15,6 +15,7 @@ import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicValueBound
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
 import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomial
+import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomialBounds
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalMinimumValue
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalRootFeasibility
 import CslibFrontier.Foundations.Analysis.SignLabelScore
@@ -553,5 +554,20 @@ example :
     rw [Polynomial.coeffNorm1_one]
     omega
   exact Polynomial.dyadicSignProduct_comp_bounds 1 1 g hD hg
+
+-- The integer label of a single identity test has explicit size bounds.
+example :
+    let g : Fin 1 → Polynomial ℤ := fun _ => Polynomial.X
+    let p := Polynomial.signLabelPolynomial 1 g (fun _ => 1)
+    p.natDegree ≤ 48 ∧ p.coeffNorm1 ≤ 2 ^ 156 := by
+  intro g p
+  have hb (i : Fin 1) : (g i).coeffNorm1 ≤ 2 ^ 0 := by
+    simpa only [g, mul_one, Polynomial.coeffNorm1_one, pow_zero] using
+      (Polynomial.coeffNorm1_X_mul 1).le
+  have hDegree : Polynomial.signLabelDegreeBound 1 1 1 = 48 := by decide
+  have hNorm : Polynomial.signLabelNormExponent 1 1 0 = 156 := by decide
+  simpa only [hDegree, hNorm] using
+    Polynomial.signLabelPolynomial_bounds 1 g (fun _ => 1)
+      (D := 1) (fun _ => Polynomial.natDegree_X_le) hb
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
