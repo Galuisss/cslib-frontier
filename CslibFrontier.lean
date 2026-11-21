@@ -7296,6 +7296,7 @@ public import CslibFrontier.Foundations.Geometry.Polyhedra.PiecewiseLinear
 public import CslibFrontier.Foundations.Geometry.Polyhedra.PiecewiseQuadratic
 public import CslibFrontier.Foundations.Geometry.Polyhedra.Polytope
 public import CslibFrontier.Foundations.Geometry.SegmentSign
+public import CslibFrontier.Foundations.Geometry.StarConvexEscape
 public import CslibFrontier.Foundations.GroupTheory.Perm.CycleSurgery
 public import CslibFrontier.Foundations.GroupTheory.Perm.Doubled
 public import CslibFrontier.Foundations.GroupTheory.Perm.Fin
