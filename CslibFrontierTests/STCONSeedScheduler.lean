@@ -232,4 +232,19 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   exact ⟨justesenSourceLoopEntryOfRequest_eq ntm c w rank s.sourceID,
     justesenSourceLoopEntryOfRequest_eq ntm c w rank (s.originalSourceID position)⟩
 
+/-- The fixed machine preserves the initialized field and returns the initialized scheduler's
+terminal observation on the original word. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w bits : List Bool) :
+    let field := configurationFieldContext ntm c w
+    let setup := configurationSeedSearchSetup ntm c w
+    let endState := (justesenSeedScheduler ntm c).replay w bits
+      (configurationJustesenSeedSchedulerEntry ntm c w)
+    endState.1 = field ∧
+      SeedSchedulerMachine.reply endState.2 =
+        SeedSchedulerMachine.reply ((justesenSeedSchedulerFor ntm c setup field).run w bits) := by
+  intro field setup endState
+  have h := configurationJustesenSeedScheduler_replay ntm c w bits
+  exact ⟨congrArg Prod.fst h, congrArg (fun q => SeedSchedulerMachine.reply q.2) h⟩
+
 end CslibFrontierTests.STCONSeedScheduler
