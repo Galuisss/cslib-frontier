@@ -38,6 +38,8 @@ membership tally at the designated target.
   gives the first nonunique radius or the correct subdivision reachability answer.
 * `Cslib.Complexity.STCON.configurationJustesenSourceLoop_existsUnique_firstHalting`:
   a full-fuel loop has exactly one first-halting selector list returning a verdict.
+* `Cslib.Complexity.STCON.configurationJustesenSourceLoop_acceptCount_eq_one`:
+  the compiled full-fuel loop has one accepting branch at any sufficient native clock.
 -/
 
 public section
@@ -431,5 +433,30 @@ theorem configurationJustesenSourceLoop_exists_firstHalting
   intro I n seed source target
   exact (configurationJustesenSourceLoop_existsUnique_firstHalting
     ntm c w seed source target).exists
+
+/-- At any sufficient native clock, the compiled full-fuel source loop has exactly
+one accepting occurrence across all selector lists. -/
+theorem configurationJustesenSourceLoop_acceptCount_eq_one
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) {α : Type} {enc : α ↪ List Bool}
+    {S : α → ℕ} {contextOf : α → JustesenSourceContext} {limitOf : α → ℕ}
+    {baseline : JustesenSourceContext} {fuel : ℕ}
+    (R : Routines (justesenSourceLoop ntm c baseline fuel)
+      (fun a => (justesenSourceLoop ntm c (contextOf a) (limitOf a)).init) enc S)
+    (a : α) {clock : ℕ} (hclock : R.machine.RunsInTime (enc a) clock) :
+    let w := enc a
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n),
+      contextOf a =
+        ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩ →
+      limitOf a = n →
+      (Native.countingMachine R.I R.P R.F R.C).acceptCount clock (R.machine.initCfg w) = 1 := by
+  intro w I n seed source target hcontext hlimit
+  rw [R.acceptCount_eq_one_iff a hclock]
+  refine (existsUnique_congr fun bits => ?_).mpr
+    (configurationJustesenSourceLoop_existsUnique_firstHalting ntm c w seed source target)
+  have h := (R.existsUnique_accepting_replay_iff a bits).symm.trans
+    (justesenSourceLoop_native_firstHalting_accept_iff ntm c R a bits)
+  simpa only [hcontext, hlimit] using h
 
 end Cslib.Complexity.STCON
