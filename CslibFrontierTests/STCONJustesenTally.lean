@@ -9,7 +9,7 @@ module
 
 import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenMembershipTally
 
-/-! Re-enter the Justesen tally at a variable seed and replay a passing negative scan. -/
+/-! Re-enter the Justesen tally at a variable seed and check replay and encoded length. -/
 
 set_option linter.privateModule false
 
@@ -40,5 +40,25 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     radius expected bits false).mpr
     ⟨branch, ⟨rfl, hscan⟩, fun other h =>
       MembershipTally.selectors_injective _ (BoundedWalk.eq_of_selectors_prefix 3) h.1.symm⟩
+
+/-- The same bound covers arbitrary prefixes at the largest radius and tally inputs
+allowed by the subdivision size. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ∃ C, ∀ w : List Bool,
+      let I := configurationInstance ntm c w
+      let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+      ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n) (bits : List Bool),
+        let params : MembershipTally.Context := ⟨n, source.val, target.val, n, ⟨n, n * n⟩⟩
+        let base := configurationJustesenMembershipTally ntm c [] 0 params
+        let ctx := configurationJustesenSubdivisionContext ntm c w seed.val
+        let M := base.withInit (MembershipTally.retainedInitial ctx params)
+        (MembershipTally.encRetainedState encJustesenSubdivisionContext encJustesenSubdivisionState
+          (M.run w bits)).length ≤ C * (Nat.log2 w.length + 1) := by
+  obtain ⟨C, h⟩ := configurationJustesenMembershipTally_length_run_le_log ntm c
+  refine ⟨C, fun w => ?_⟩
+  intro I n seed source target bits params base ctx M
+  dsimp only [M, base, ctx]
+  rw [configurationJustesenMembershipTally_withInit]
+  exact h w seed source target n ⟨n, n * n⟩ le_rfl le_rfl le_rfl bits
 
 end CslibFrontierTests.STCONJustesenTally

@@ -234,7 +234,7 @@ theorem retainedMachine_haltsWithin (ctx : Context) (hsource : ctx.source < ctx.
     input bits hlen
 
 /-- The encoded state bound adds the context frame to the existing runtime tally envelope. -/
-def retainedStateBound (clock : ℕ) (ctx : Context)
+@[expose] def retainedStateBound (clock : ℕ) (ctx : Context)
     (contextLength calleeBound : ℕ) : ℕ :=
   2 * contextLength + 1 + runtimeWalkStateBound clock ctx contextLength calleeBound
 
