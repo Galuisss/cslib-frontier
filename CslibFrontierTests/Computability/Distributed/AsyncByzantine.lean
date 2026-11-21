@@ -7,12 +7,13 @@ Authors: Samuel Schlesinger
 module
 -- upstream: local-only (tests)
 
-import CslibFrontier.Computability.Distributed.AsyncByzantine.Basic
+import CslibFrontier.Computability.Distributed.AsyncByzantine.Impossibility
 
-/-! Asynchronous Byzantine reliable broadcast (`Basic`, checked as a `module` client with ordinary
-imports): direct broadcast positive checks (`t = 0` and `n ≤ 2`), equivocation counterexample on
-`Fin 3`, message-conservation identity `Protocol.card_msgs_add_traceSent` on `directProtocol`,
-and dot-notation usability for `Reachable.*` and `SolvesReliableBroadcast.*`. -/
+/-! Asynchronous Byzantine reliable broadcast (`Basic` and `Impossibility`, checked as a `module`
+client with ordinary imports): direct broadcast positive checks (`t = 0` and `n ≤ 2`), equivocation
+counterexample on `Fin 3`, message-conservation identity `Protocol.card_msgs_add_traceSent` on
+`directProtocol`, dot-notation usability for `Reachable.*` and `SolvesReliableBroadcast.*`, and
+`3 ≤ n ≤ 3t` impossibility including the singleton domain `V = Unit`. -/
 set_option linter.privateModule false
 
 namespace CslibFrontierTests.Distributed.AsyncByzantine
@@ -87,5 +88,19 @@ example {P S M V : Type*} {dealer : P} [Fintype P] [DecidableEq P] [DecidableEq 
     (h₁ : s.ProcDecided i v₁) (h₂ : s.ProcDecided j v₂) : v₁ = v₂ := by
   obtain ⟨ss, xs, k, ha, hsk, _⟩ := hr.exists_admissibleRun
   exact hsol.consistency_admissible hF ha hi hj (hsk.symm ▸ h₁) (hsk.symm ▸ h₂)
+
+/-! ### Impossibility at `3 ≤ n ≤ 3t` (including singleton `Unit`) -/
+
+example {S M : Type*} [DecidableEq M] (π : Protocol (Fin 3) S M Unit 0) :
+    ¬ π.SolvesReliableBroadcast 1 :=
+  π.not_solvesReliableBroadcast_three
+
+example {S M : Type*} [DecidableEq M] (π : Protocol (Fin 3) S M Bool 0) :
+    ¬ π.SolvesReliableBroadcast 1 :=
+  π.not_solvesReliableBroadcast_three
+
+example {S M : Type*} [DecidableEq M] (π : Protocol (Fin 6) S M ℕ 0) :
+    ¬ π.SolvesReliableBroadcast 2 :=
+  π.not_solvesReliableBroadcast (by simp) (by simp)
 
 end CslibFrontierTests.Distributed.AsyncByzantine
