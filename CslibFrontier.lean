@@ -5309,6 +5309,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.ProgrammedContinuation
 public import CslibFrontier.Crypto.Computational.MLDSA.PublicPairSigning
 public import CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitment
 public import CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitmentRegister
+public import CslibFrontier.Crypto.Computational.MLDSA.QuantumKeyOnly
 public import CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
 public import CslibFrontier.Crypto.Computational.MLDSA.RandomXof
 public import CslibFrontier.Crypto.Computational.MLDSA.RandomXofCoverage
