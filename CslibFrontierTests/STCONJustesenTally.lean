@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenRoundCallback.Resource
+import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceRound
 
 /-! Re-enter the Justesen tally at a variable seed and check replay and encoded length. -/
 
@@ -277,40 +277,33 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     simp only [SourceRoundLoop.Admissible, r, hsize, Nat.zero_add, and_self, le_refl]
   exact h w seed source target n le_rfl r hr
 
-/-- A supplied round and concrete final membership can share the existing source-loop
-transition and query certificates. -/
+-- Plug the retained round and final membership into the source-loop transition.
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
-    {ρ : Type} (encRound : ρ ↪ List Bool)
-    (initial : SourceRoundLoop.Registers JustesenSourceContext)
-    (round : NondeterministicQueryMachine ρ)
-    (roundStart : SourceRoundLoop.Registers JustesenSourceContext → ρ)
-    (roundReply : ρ → Option RoundUpdate) :
-    let R := SourceRoundLoop.encRegisters encJustesenSourceContext
+    (initial : SourceRoundLoop.Registers JustesenSourceContext) :
+    let encRound := encJustesenRetainedSourceRoundState
     let encMember := MembershipTally.encRetainedState encJustesenSubdivisionContext
       encJustesenSubdivisionState
     let E := SourceRoundLoop.encState encJustesenSourceContext encRound encMember
-    let encRoundStep := encPair encRound encReadChoice
     let encStep := encPair E encReadChoice
-    let M := SourceRoundLoop.machine initial round roundStart roundReply
+    let M := SourceRoundLoop.machine initial (justesenRetainedSourceRound ntm c initial)
+      justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
       (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
       MembershipTally.retainedReply
-    ComputableInSpace round.query encRound encNat (fun s => (encRound s).length) →
-    ComputableInSpace roundStart R encRound (fun r => (R r).length) →
-    ComputableInSpace roundReply encRound (encOption encRoundUpdate)
-      (fun s => (encRound s).length) →
-    ComputableInSpace round.halted encRound encBool (fun s => (encRound s).length) →
-    ComputableInSpace round.next encRoundStep encRound (fun p => (encRoundStep p).length) →
     ComputableInSpace M.query E encNat (fun s => (E s).length) ∧
       ComputableInSpace M.next encStep E (fun p => (encStep p).length) := by
-  intro R encMember E encRoundStep encStep M hquery hstart hreply hhalt hnext
+  intro encRound encMember E encStep M
+  let round := justesenRetainedSourceRound ntm c initial
+  obtain ⟨hrq, hrn, hrh, hrr⟩ := justesenRetainedSourceRound_parts_inSpace ntm c initial
   obtain ⟨hq, hn, hh, hr⟩ := justesenSourceMembershipMachine_parts_inSpace ntm c
   exact ⟨SourceRoundLoop.query_inSpace encJustesenSourceContext encRound encMember
-      initial round roundStart roundReply (justesenSourceMembershipMachine ntm c)
-      justesenSourceMembershipStart MembershipTally.retainedReply hquery hq,
+      initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
+      (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
+      MembershipTally.retainedReply hrq hq,
     SourceRoundLoop.next_inSpace encJustesenSourceContext encRound encMember
-      initial round roundStart roundReply (justesenSourceMembershipMachine ntm c)
-      justesenSourceMembershipStart MembershipTally.retainedReply
-      hstart justesenSourceMembershipStart_inSpace hreply hr hhalt hh hnext hn⟩
+      initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
+      (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
+      MembershipTally.retainedReply justesenRetainedSourceRoundEntry_inSpace
+      justesenSourceMembershipStart_inSpace hrr hr hrh hh hrn hn⟩
 
 /-- A round with retained Justesen adjacency has native query and transition certificates. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)

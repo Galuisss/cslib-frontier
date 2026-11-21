@@ -3013,6 +3013,7 @@ public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenMemb
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenRoundCallback
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenRoundCallback.Resource
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceContext
+public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceRound
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision.Replay
 public import CslibFrontier.Computability.Complexity.Problems.STCON.Layered
