@@ -334,4 +334,24 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
       (justesenRoundCallback ntm c) (justesenRoundCallbackStart adjacency)
       justesenRoundCallbackReply hentry hr hh hn⟩
 
+-- The two request tags give at most one successful complete round at exact totals.
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source : Fin n) (radius : ℕ),
+      let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
+      (∃! transcript, Passes edge source radius transcript) →
+      let ctx : SourceRound.Context := ⟨n, source.val, radius, expected edge source radius⟩
+      let adjacency := configurationJustesenSubdivisionContext ntm c w seed.val
+      let M := SourceRound.machine ctx (justesenRoundCallback ntm c)
+        (justesenRoundCallbackStart adjacency) justesenRoundCallbackReply
+      {bits : List Bool | M.FirstHalting w bits M.init ∧
+        (SourceRound.answer (M.run w bits)).isSome}.Subsingleton := by
+  intro I n seed source radius edge hpass ctx adjacency M
+  apply SourceRound.subsingleton_successful_firstHalting
+  intro req hr left hleft right hright
+  exact (configurationJustesenRoundCallback_existsUnique_firstHalting ntm c w
+    seed source radius hpass req hr).unique hleft hright
+
 end CslibFrontierTests.STCONJustesenTally
