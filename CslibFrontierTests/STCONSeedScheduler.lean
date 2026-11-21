@@ -8,6 +8,7 @@ module
 -- upstream: local-only (test driver)
 
 import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceContext.Scheduler
+import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceLoop
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.Cases
 meta import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler
 
@@ -18,7 +19,7 @@ set_option linter.privateModule false
 namespace CslibFrontierTests.STCONSeedScheduler
 
 open Cslib.Complexity.STCON Cslib.DoubleCounting
-open Turing Turing.MultiTapeTM
+open Turing Turing.DoubleCounting Turing.MultiTapeTM
 
 -- Original positions 0 and 1 map to subdivision IDs 0 and 2.
 private def setup : SeedSearchSetup :=
@@ -184,5 +185,43 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     ← seedSchedulerFrame_indexed_request s rank position false]
   exact ⟨justesenSourceContextOfRequest_adjacency_eq ntm c w rank s.sourceID,
     rfl, rfl, rfl, rfl, rfl⟩
+
+open Cslib.Code.JustesenFamily ComputableInSpace in
+/-- The scheduler's request and field can enter the concrete loop at the same budget. -/
+example :
+    let encArgs := encPair encSeedSearchSetup (encPair encNat (encOption encNat))
+    let E := encPair encArgs encFieldContext
+    ComputableInSpace (fun p => SourceRoundLoop.enterRound justesenRetainedSourceRoundEntry
+      (justesenSourceRegistersOfRequest (seedScanRequest p.1) p.2))
+      E encJustesenSourceLoopState (fun p => (E p).length) := by
+  intro encArgs E
+  have hregisters := justesenSourceRegistersOfRequest_budget
+    (budget_comp_linear seedScanRequest_inSpace (fst encArgs encFieldContext))
+    (snd encArgs encFieldContext)
+  have henter := SourceRoundLoop.enterRound_inSpace encJustesenSourceContext
+    encJustesenRetainedSourceRoundState
+    (MembershipTally.encRetainedState encJustesenSubdivisionContext encJustesenSubdivisionState)
+    justesenRetainedSourceRoundEntry justesenRetainedSourceRoundEntry_inSpace
+  exact budget_comp_linear henter hregisters
+
+/-- The designated and indexed scheduler requests enter the original-word native loop. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) (rank position : ℕ) :
+    let s := configurationSeedSearchSetup ntm c w
+    let n := s.parameters.search.subdivision.vertexCount
+    let field := configurationFieldContext ntm c w
+    let entry := SourceRoundLoop.enterRound (μ := MembershipTally.RetainedState
+      JustesenSubdivisionContext JustesenSubdivisionState) justesenRetainedSourceRoundEntry
+    let adj := configurationJustesenSubdivisionContext ntm c w rank
+    entry (justesenSourceRegistersOfRequest (seedScanRequest (s, rank, none)) field) =
+      (justesenSourceLoop ntm c ⟨adj, s.sourceID, s.targetID⟩ n).init ∧
+    entry (justesenSourceRegistersOfRequest (seedScanRequest (s, rank, some position)) field) =
+      (justesenSourceLoop ntm c ⟨adj, s.originalSourceID position, s.targetID⟩ n).init := by
+  intro s n field entry adj
+  rw [← seedSchedulerFrame_designated_request,
+    ← seedSchedulerFrame_indexed_request s rank position false]
+  exact ⟨congrArg entry (justesenSourceRegistersOfRequest_eq ntm c w rank s.sourceID),
+    congrArg entry (justesenSourceRegistersOfRequest_eq ntm c w rank
+      (s.originalSourceID position))⟩
 
 end CslibFrontierTests.STCONSeedScheduler

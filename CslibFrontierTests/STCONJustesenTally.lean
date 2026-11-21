@@ -538,9 +538,7 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   have hn (v : ℕ) : ComputableInSpace (fun _ => v) encBits encNat budget :=
     (ComputableInSpace.constZero v).mono_le fun _ => Nat.zero_le _
   have hc := encJustesenSourceContext_mk_budget hadj' (hn 0) (hn 0)
-  have ht : ComputableInSpace (fun _ => (⟨1, 0⟩ : Tally)) encBits encTally budget :=
-    (ComputableInSpace.constZero _).mono_le fun _ => Nat.zero_le _
-  have hreg := SourceRoundLoop.encRegisters_mk_budget encJustesenSourceContext hc (hn 1) (hn 0) ht
+  have hreg := SourceRoundLoop.start_budget encJustesenSourceContext hc (hn 1)
   exact configurationJustesenSourceLoop_exists_routines ntm c ctx (fun _ => 1) hreg
     (fun w => by
       obtain ⟨hs, _⟩ := configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w
