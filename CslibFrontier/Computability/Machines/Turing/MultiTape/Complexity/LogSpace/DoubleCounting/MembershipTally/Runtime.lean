@@ -35,7 +35,7 @@ public section
 
 namespace Turing.DoubleCounting.MembershipTally
 
-open Cslib.DoubleCounting MultiTapeTM
+open Cslib.DoubleCounting
 open Turing.DoubleCounting.BoundedWalk
 
 variable {κ τ : Type} (edge : QueryMachine τ) (start : κ → ℕ → ℕ → τ)
@@ -112,9 +112,7 @@ theorem withRuntimeWalk_haltsWithin (ctx : Context) (hsource : ctx.source < ctx.
 /-- Add the framed adjacency context and runtime dimension to the fixed-dimension tally bound. -/
 @[expose] def runtimeWalkStateBound (clock : ℕ) (ctx : Context)
     (contextLength calleeBound : ℕ) : ℕ :=
-  stateBound ctx (2 * contextLength + 14 * (encNat ctx.size).length +
-    4 * (Nat.log2 ctx.size.size + 1) + 4 * (encNat ctx.radius).length +
-    2 * (encNat clock).length + calleeBound + 23)
+  stateBound ctx (Runtime.stateBound ctx.size ctx.radius clock contextLength calleeBound)
 
 /-- Bound the encoded tally state on every selector prefix, including while a walk retains
 the adjacency context and a suspended callback state. -/
