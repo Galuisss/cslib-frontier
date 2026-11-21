@@ -40,7 +40,8 @@ example :
     [] [false] Cslib.DoubleCounting.Scan.Result.zero false rfl rfl).1
 
 -- The same choices reject when the expected count is one.
-example : reply (run 1 [false, false]) = none := rfl
+example : run 1 [false, false] = .inr (.inr none) ∧
+    reply (run 1 [false, false]) = none := ⟨rfl, rfl⟩
 
 -- A selected walk returns through one deterministic boundary step.
 example : run 1 [true, false, false] = .inr (.inr (some true)) := rfl
