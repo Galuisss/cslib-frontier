@@ -18,6 +18,7 @@ namespace CslibFrontierTests.STCONJustesenTally
 open Cslib.Code.JustesenFamily Cslib.Complexity.STCON Cslib.DoubleCounting
 open Turing Turing.MultiTapeTM Turing.DoubleCounting
 
+/-- Re-entry at a different subdivision dimension still returns a passing negative reply. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
     (c : ℕ) (w : List Bool) :
     let I := configurationInstance ntm c w
@@ -28,12 +29,15 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
           source target radius expected branch = some false →
       let params : MembershipTally.Context :=
         ⟨size.vertexCount, source.val, target.val, radius, expected⟩
-      let base := configurationJustesenMembershipTally ntm c [] 0 params
+      let baseParams := { params with size := params.size + 1 }
+      let base := configurationJustesenMembershipTally ntm c [] 0 baseParams
       let ctx := configurationJustesenSubdivisionContext ntm c w seed.val
       let M := base.withInit (MembershipTally.retainedInitial ctx params)
       let bits := MembershipTally.selectors (BoundedWalk.selectors 3) branch
-      M.FirstHalting w bits M.init ∧ MembershipTally.retainedReply (M.run w bits) = some false := by
-  intro I size seed source target radius expected branch hscan params base ctx M bits
+      baseParams.size ≠ params.size ∧ M.FirstHalting w bits M.init ∧
+        MembershipTally.retainedReply (M.run w bits) = some false := by
+  intro I size seed source target radius expected branch hscan params baseParams base ctx M bits
+  refine ⟨Nat.ne_of_gt (Nat.lt_succ_self params.size), ?_⟩
   dsimp only [M, base, ctx]
   rw [configurationJustesenMembershipTally_withInit]
   exact (configurationJustesenMembershipTally_firstHalting_iff ntm c w seed source target
