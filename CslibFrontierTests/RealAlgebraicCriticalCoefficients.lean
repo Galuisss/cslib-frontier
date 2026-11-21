@@ -7,6 +7,7 @@ module
 -- upstream: local-only (tests)
 
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
+import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValuePolynomial
 import CslibFrontier.Foundations.Data.MvPolynomial.Degrees
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.ResidueCoeffNorm
 import Mathlib.Tactic.NormNum
@@ -169,5 +170,19 @@ example :
   rw [htop]
   change (X (0 : Fin 1) * C U).coeff (Finsupp.single 0 1) = U
   rw [mul_comm, C_mul_X_eq_monomial, coeff_monomial, ite_eq_left rfl]
+
+-- The quotient has dimension two even in characteristic two. The coefficient-map identity
+-- still specializes the symbolic polynomial at a nonzero parameter.
+example :
+    let F : MvPolynomial (Fin 1) ℤ := X 0
+    let hF : F.totalDegree ≤ 2 := by simp [F]
+    let G : MvPolynomial (Fin 1) (ZMod 2) := X 0
+    let hG : G.totalDegree ≤ 2 := by simp [G]
+    (parametricValuePolynomial (by decide : 1 ≤ 2) F hF).map
+        (Polynomial.eval₂RingHom (Int.castRingHom (ZMod 2)) 1) =
+      valuePolynomial (by decide : 1 ≤ 2) (fun i => (separatedCenters 2 i : ZMod 2)) 1 G hG := by
+  intro F hF G hG
+  simpa only [F, G, map_X] using
+    parametricValuePolynomial_map_eval₂ (by decide : 1 ≤ 2) F hF (1 : ZMod 2)
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
