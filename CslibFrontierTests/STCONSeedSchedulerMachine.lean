@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler.Machine
+import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler.Replay
 meta import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler.Machine
 
 /-! Check the scheduler's same-input and single-selector call protocol. -/
@@ -53,6 +53,27 @@ set_option linter.hashCommand false in
 #guard
   let final := scheduler.run [true, false, false] (List.replicate 5 false)
   scheduler.accept final && decide (reply final = some (some ⟨0, true⟩))
+
+-- The same scanner has at most one first-halting scheduler trace, including a negative result.
+example (w : List Bool) :
+    {bits : List Bool | scheduler.FirstHalting w bits scheduler.init ∧
+      (reply (scheduler.run w bits)).isSome}.Subsingleton := by
+  refine subsingleton_successful_firstHalting setup scan (fun r => .inl r.sourceID) verdict w ?_
+  intro frame _ _ _
+  have unique (bits : List Bool) (hf : scan.FirstHalting w bits (.inl frame.request.sourceID))
+      (hv : (verdict (scan.replay w bits (.inl frame.request.sourceID))).isSome) :
+      bits = [false] := by
+    cases bits with
+    | nil => cases hf.1
+    | cons bit rest =>
+      have hrest := ((scan.firstHalting_cons_iff w bit rest _).mp hf).2
+      have he := (scan.firstHalting_iff_nil_of_halted w rest _ rfl).mp hrest
+      subst rest
+      cases bit with
+      | false => rfl
+      | true => cases hv
+  intro l hl r hr
+  exact (unique l hl.1 hl.2).trans (unique r hr.1 hr.2).symm
 
 -- A true selector on the skipped root rejects the branch.
 set_option linter.hashCommand false in
