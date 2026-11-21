@@ -16,6 +16,7 @@ import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ConjugateProduct
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ShiftedLabel
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseIntegerRootLabel
+import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseRootProduct
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
 import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomial
 import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomialBounds
@@ -674,5 +675,36 @@ example (e : ℕ) (he : e ≤ 1) :
   simpa only [Polynomial.eval_one, sign_pos (by norm_num : (0 : ℝ) < 1)] using
     Polynomial.sign_eval_shiftedRootLabel (g := 1) (x := 0) (by decide : 0 < (1 : ℕ)) he
       (Or.inl (by norm_num))
+
+-- The only root of X needs no derivative tests, and a constant test decides qualification.
+example (a : ℤ) (ha : a.natAbs ≤ 1) :
+    let p : Polynomial ℤ := Polynomial.X
+    let q := Polynomial.C a
+    (∃ e : ℕ, e ≤ 1 ∧
+      (∏ z ∈ (p.aroots ℂ).toFinset,
+        Polynomial.aeval z (Polynomial.shiftedRootLabel 1 e
+          (Polynomial.sparseIntegerRootLabel p q 0 0 ([] : List (Fin 1 × SignType))))).re < 0) ↔
+      0 < a := by
+  intro p q
+  have hp : p.coeffNorm1 ≤ 2 ^ 0 := by
+    simpa only [p, mul_one, Polynomial.coeffNorm1_one, pow_zero] using
+      (Polynomial.coeffNorm1_X_mul 1).le
+  have hq : q.coeffNorm1 ≤ 2 ^ 0 := by
+    simpa only [q, Polynomial.coeffNorm1_C, pow_zero] using ha
+  have h := Polynomial.exists_eval₂_pos_at_root_iff_neg_shiftedRootLabel_prod
+    (D := 1) (N := 0) Polynomial.X_ne_zero (by decide) Polynomial.natDegree_X_le
+    (by decide) (by simp [q]) hp hq
+  constructor
+  · rintro ⟨e, he, hneg⟩
+    obtain ⟨x, _, hx⟩ := h.mpr ⟨[], Nat.zero_le _, e, he, hneg⟩
+    have hx' : (0 : ℝ) < (a : ℝ) := by
+      simpa only [q, Polynomial.eval₂_C, Int.coe_castRingHom] using hx
+    exact_mod_cast hx'
+  · intro ha₀
+    have ha₀' : (0 : ℝ) < (a : ℝ) := by exact_mod_cast ha₀
+    obtain ⟨L, hL, e, he, hneg⟩ := h.mp
+      ⟨0, by simp, by simpa only [q, Polynomial.eval₂_C, Int.coe_castRingHom] using ha₀'⟩
+    have hnil := List.length_eq_zero_iff.mp (Nat.eq_zero_of_le_zero hL)
+    exact ⟨e, he, hnil ▸ hneg⟩
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
