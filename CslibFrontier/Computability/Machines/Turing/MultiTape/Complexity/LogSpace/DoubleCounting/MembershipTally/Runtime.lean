@@ -104,31 +104,24 @@ theorem withRuntimeWalk_existsUnique_firstHalting {N : ℕ} (input : List Bool)
       ⟨N, source.val, target.val, radius, totals⟩
     ∃! bits, M.FirstHalting input bits M.init ∧ (reply (M.run input bits)).isSome := by
   intro totals M
-  obtain ⟨transcript, htranscript, hunique⟩ := hpass
-  let scan := Scan.run adjacent source target radius totals
-  let correspondence := Scan.successfulBranches adjacent source target radius
-  let chosen := correspondence.symm ⟨transcript, htranscript⟩
-  have unique {branch : Scan.Branch N} {hit : Bool} (h : scan branch = some hit) :
-      branch = chosen.val := by
-    have hbranch : (scan branch).isSome := Option.isSome_iff_exists.mpr ⟨hit, h⟩
-    let candidate : {branch : Scan.Branch N // (scan branch).isSome} := ⟨branch, hbranch⟩
-    have heq : correspondence candidate = correspondence chosen :=
-      Subtype.ext ((hunique _ (correspondence candidate).property).trans
-        (hunique _ (correspondence chosen).property).symm)
-    exact congrArg Subtype.val (correspondence.injective heq)
+  obtain ⟨chosen, hchosen, hunique⟩ :=
+    Scan.existsUnique_successful_branch adjacent source target radius hpass
+  have branch_eq_chosen {branch : Scan.Branch N} {hit : Bool}
+      (h : Scan.run adjacent source target radius totals branch = some hit) : branch = chosen :=
+    hunique branch (Option.isSome_iff_exists.mpr ⟨hit, h⟩)
   have hreplay (bits : List Bool) (hit : Bool) :=
     withRuntimeWalk_firstHalting_iff edge start verdict clock initialWalk context input
       adjacent source target radius totals hclock hedge bits hit
   dsimp only at hreplay
   let render := selectors (BoundedWalk.selectors (N := N) clock)
-  obtain ⟨hit, hhit⟩ := Option.isSome_iff_exists.mp chosen.property
-  have hchosen := (hreplay (render chosen.val) hit).mpr
-    ⟨chosen.val, ⟨rfl, hhit⟩, fun _ h => unique h.2⟩
-  refine ⟨render chosen.val, ⟨hchosen.1, Option.isSome_iff_exists.mpr ⟨hit, hchosen.2⟩⟩, ?_⟩
+  obtain ⟨hit, hhit⟩ := Option.isSome_iff_exists.mp hchosen
+  have hsuccess := (hreplay (render chosen) hit).mpr
+    ⟨chosen, ⟨rfl, hhit⟩, fun _ h => branch_eq_chosen h.2⟩
+  refine ⟨render chosen, ⟨hsuccess.1, Option.isSome_iff_exists.mpr ⟨hit, hsuccess.2⟩⟩, ?_⟩
   intro bits hbits
   obtain ⟨answer, hanswer⟩ := Option.isSome_iff_exists.mp hbits.2
   obtain ⟨branch, ⟨hword, hscan⟩, _⟩ := (hreplay bits answer).mp ⟨hbits.1, hanswer⟩
-  exact hword.trans (congrArg render (unique hscan))
+  exact hword.trans (congrArg render (branch_eq_chosen hscan))
 
 private theorem runtimeWalk_withInit {ctx : Context} (r : Registers) (hr : r.context = ctx)
     (hsource : ctx.source < ctx.size) (hcursor : r.cursor < ctx.size) :
