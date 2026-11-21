@@ -32,6 +32,8 @@ prepared field in its state and uses it to start each scan on the original input
   uses the shared workspace budget.
 * `Cslib.Complexity.STCON.justesenSourceLoopEntryOfRequest_eq`: the scheduler and original-word
   initializers agree at any requested source.
+* `Cslib.Complexity.STCON.justesenSeedScheduler_observations_inSpace`:
+  query, halt and acceptance in linear workspace in the encoded state.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_replay`: re-entering the fixed
   scheduler agrees with the scheduler initialized for the original word.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_length_run_le_log`:
@@ -110,6 +112,35 @@ noncomputable def justesenSeedScheduler {k : ℕ} {State : Type} [Fintype State]
   NondeterministicQueryMachine.retain (Equiv.refl _)
     (justesenSeedSchedulerFor ntm c (configurationSeedSearchSetup ntm c []))
     (configurationFieldContext ntm c [])
+
+/-- The fixed scheduler's query, halt and acceptance observations use workspace linear in
+the encoded retained state. -/
+theorem justesenSeedScheduler_observations_inSpace {k : ℕ} {State : Type} [Fintype State]
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    let E := encJustesenSeedSchedulerState
+    let M := justesenSeedScheduler ntm c
+    ComputableInSpace M.query E encNat (fun s => (E s).length) ∧
+      ComputableInSpace M.halted E encBool (fun s => (E s).length) ∧
+      ComputableInSpace M.accept E encBool (fun s => (E s).length) := by
+  intro E M
+  let setup := configurationSeedSearchSetup ntm c []
+  let field := configurationFieldContext ntm c []
+  have hscan := (justesenSourceLoop_parts_inSpace ntm c
+    ⟨configurationJustesenSubdivisionContext ntm c [] 0, 0, 0⟩ 0).1
+  obtain ⟨hq, hh, _, ha⟩ := SeedSchedulerMachine.observations_inSpace
+    encJustesenSourceLoopState setup (justesenSeedSchedulerScan ntm c)
+    (fun request => justesenSourceLoopEntryOfRequest request field) SourceRoundLoop.reply hscan
+  have hstate := snd encFieldContext (SeedSchedulerMachine.encState encJustesenSourceLoopState)
+  refine ⟨(budget_comp_linear hq hstate).of_enc_eq ?_,
+    (budget_comp_linear hh hstate).of_enc_eq ?_, (budget_comp_linear ha hstate).of_enc_eq ?_⟩ <;>
+    rintro ⟨retained, state⟩ <;>
+    obtain ⟨hquery, hhalted, haccept⟩ := SeedSchedulerMachine.observations_eq setup setup
+      (justesenSeedSchedulerScan ntm c)
+      (fun request => justesenSourceLoopEntryOfRequest request retained)
+      (fun request => justesenSourceLoopEntryOfRequest request field) SourceRoundLoop.reply
+  · exact congrArg encNat (congrFun hquery state)
+  · exact congrArg encBool (congrFun hhalted state)
+  · exact congrArg encBool (congrFun haccept state)
 
 /-- Enter candidate zero with the setup and retained field computed on the original word. -/
 noncomputable def configurationJustesenSeedSchedulerEntry {k : ℕ} {State : Type}
