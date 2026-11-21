@@ -140,6 +140,34 @@ theorem configurationJustesenBoundedWalk_parts_inSpace (ntm : MultiTapeNTM k Boo
       (callbackVerdict_inSpace _ _),
     Runtime.halted_inSpace _ _ _ _ _ _ _, Runtime.remainingFuel_inSpace _ _⟩
 
+/-- The initialized walk's state envelope is logarithmic apart from the charged adjacency state. -/
+theorem configurationJustesenBoundedWalk_stateBound_le_log (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) :
+    ∃ C, ∀ w : List Bool,
+      let I := configurationInstance ntm c w
+      let size := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision
+      ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (fuel calleeBound : ℕ),
+        fuel ≤ size.vertexCount →
+        Runtime.stateBound size.vertexCount fuel 3
+          (encJustesenSubdivisionContext
+            (configurationJustesenSubdivisionContext ntm c w seed.val)).length calleeBound ≤
+          C * (Nat.log2 w.length + 1) + calleeBound := by
+  obtain ⟨D, hcontext⟩ := length_configurationJustesenSubdivisionContext_le_log ntm c
+  obtain ⟨P, hvertices⟩ := length_configurationSubdivisionVertexCount_le_log ntm c
+  refine ⟨2 * D + 22 * P + 31, fun w => ?_⟩
+  intro I size seed fuel calleeBound hfuel
+  have hctx := hcontext w seed.val seed.isLt
+  have hvertices := hvertices w
+  have hwidth : Nat.log2 size.vertexCount.size ≤ (encNat size.vertexCount).length := by
+    rw [length_encNat_eq_size]
+    exact Nat.log2_le_self _
+  have hf := length_encNat_mono hfuel
+  have hclock : (encNat 3).length = 2 := rfl
+  have hlog : 1 ≤ Nat.log2 w.length + 1 := Nat.succ_le_succ (Nat.zero_le _)
+  change (encNat size.vertexCount).length ≤ _ at hvertices
+  simp only [Runtime.stateBound, hclock, Nat.add_mul, Nat.mul_assoc]
+  omega
+
 /-- At each valid seed, the common clock and logarithmic state bound cover all selector
 lists, including rejection and suspended adjacency calls. -/
 theorem configurationJustesenBoundedWalk_bounds (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
@@ -153,9 +181,8 @@ theorem configurationJustesenBoundedWalk_bounds (ntm : MultiTapeNTM k Bool State
           ∀ bits, (Runtime.encState encJustesenSubdivisionContext encJustesenSubdivisionState
             (M.run w bits)).length ≤ C * (Nat.log2 w.length + 1) := by
   obtain ⟨A, hcall⟩ := configurationJustesenSubdivisionEdge_contract ntm c
-  obtain ⟨D, hcontext⟩ := length_configurationJustesenSubdivisionContext_le_log ntm c
-  obtain ⟨P, hparams⟩ := length_configurationSeedSearchSetup_le_log ntm c
-  refine ⟨2 * D + 22 * P + A + 31, fun w => ?_⟩
+  obtain ⟨C, hbound⟩ := configurationJustesenBoundedWalk_stateBound_le_log ntm c
+  refine ⟨C + A, fun w => ?_⟩
   intro I size seed r hfuel M
   let edge := justesenWeightedSubdivisionCallback ntm
   let start := fun ctx u v => justesenSubdivisionEdgeStart (ctx, u, v)
@@ -167,23 +194,7 @@ theorem configurationJustesenBoundedWalk_bounds (ntm : MultiTapeNTM k Bool State
     (hcall w seed u v).2.2.2 t ht
   have hrun := Runtime.length_run_le edge start callbackVerdict 3 ctx r w bits
     encJustesenSubdivisionContext encJustesenSubdivisionState (A * b) hcallee
-  have hctx : (encJustesenSubdivisionContext ctx).length ≤ D * b := hcontext w seed.val seed.isLt
-  let s := configurationSeedSearchSetup ntm c w
-  have hsize := encSeedSearchSetup_subdivision_length_le s
-  have hvertices : (encNat size.vertexCount).length ≤ P * b :=
-    ((encSubdivisionSize_vertexCount_length_le size).trans hsize).trans (hparams w)
-  have hwidth : Nat.log2 size.vertexCount.size ≤ (encNat size.vertexCount).length := by
-    rw [length_encNat_eq_size]
-    exact Nat.log2_le_self _
-  have hf := length_encNat_mono hfuel
-  have hclock : (encNat 3).length = 2 := rfl
-  have hb : 1 ≤ b := Nat.succ_le_succ (Nat.zero_le _)
-  change (Runtime.encState encJustesenSubdivisionContext encJustesenSubdivisionState
-    (M.run w bits)).length ≤ _
-  refine hrun.trans ?_
-  dsimp only [b, Runtime.stateBound] at hctx hvertices hb ⊢
-  simp only [hclock, Nat.add_mul, Nat.mul_assoc]
-  omega
+  exact hrun.trans (by simpa only [b, Nat.add_mul] using hbound w seed r.fuel (A * b) hfuel)
 
 /-- A common selector clock for fuel at most the initialized subdivision vertex count. -/
 noncomputable def configurationJustesenBoundedWalkClock (ntm : MultiTapeNTM k Bool State)
