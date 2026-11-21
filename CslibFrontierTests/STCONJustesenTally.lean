@@ -324,9 +324,7 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     seed source target limit hlimit, hspace w seed source target limit hlimit,
     fun hzero bits => ?_⟩
   subst limit
-  change M.replay w bits M.init = .inr none
-  rw [M.replay_of_halted w (by rfl)]
-  rfl
+  exact justesenSourceLoop_run_zero ntm c ctx w bits
 
 /-- A round with retained Justesen adjacency has native query and transition certificates. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
@@ -434,5 +432,23 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
       obtain ⟨hs, _⟩ := configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w
       have hpos := Nat.zero_lt_of_lt hs
       exact ⟨⟨0, Nat.two_pow_pos _⟩, ⟨0, hpos⟩, ⟨0, hpos⟩, rfl, hpos⟩)
+
+-- With no fuel, no accepting native occurrence can record any selector list.
+example {k : ℕ} {State : Type} [Fintype State] {α : Type} {enc : α ↪ List Bool} {S : α → ℕ}
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (baseline : JustesenSourceContext) (fuel : ℕ)
+    (contextOf : α → JustesenSourceContext)
+    (R : Routines (justesenSourceLoop ntm c baseline fuel)
+      (fun a => (justesenSourceLoop ntm c (contextOf a) 0).init) enc S)
+    (a : α) (bits : List Bool) :
+    ¬ ∃ indices final,
+      Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg (enc a)) indices =
+        some (bits, final) ∧ final.Halted ∧ final.output = [true] := by
+  rintro ⟨indices, final, hr, hh, hout⟩
+  obtain ⟨verdict, _, hret⟩ :=
+    (justesenSourceLoop_native_firstHalting_accept_iff ntm c R a bits).mp
+      ⟨indices, ⟨final, hr, hh, hout⟩, fun other ⟨_, hother, hhalt, _⟩ =>
+        Native.eq_occurrences_of_replayChoices R.I R.P R.F R.C hother hr hhalt hh⟩
+  rw [justesenSourceLoop_run_zero] at hret
+  cases hret
 
 end CslibFrontierTests.STCONJustesenTally
