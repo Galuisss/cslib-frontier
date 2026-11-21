@@ -51,6 +51,12 @@ private def coefficient (p : HornerInput) (i : ℕ) : List Bool :=
   let width := p.modulus.length - 1
   BitString.lowBits width (p.label >>> (width * i))
 
+/-- Evaluate the packed coefficient blocks at the supplied point, reducing products modulo
+the supplied polynomial. A request with zero coefficient blocks returns the empty word. -/
+def HornerInput.evaluate (p : HornerInput) : List Bool :=
+  hornerBits (p.modulus.length - 1) (fieldMulMod p.modulus) p.point
+    (fun i : Fin p.count => coefficient p i)
+
 private theorem coefficient_inSpace :
     ComputableInSpace (fun p : HornerInput × ℕ => coefficient p.1 p.2)
       (encPair encHornerInput encNat) encCoefficients
@@ -144,9 +150,7 @@ private theorem horner_state_length (p : HornerInput) (k : ℕ) :
   omega
 
 private theorem horner_agrees (p : HornerInput) :
-    (hornerAdvance^[p.count] (p, p.count, [])).2.2 =
-      hornerBits (p.modulus.length - 1) (fieldMulMod p.modulus) p.point
-        (fun i : Fin p.count => coefficient p i) := by
+    (hornerAdvance^[p.count] (p, p.count, [])).2.2 = p.evaluate := by
   let step := fun s : ℕ × List Bool =>
     (s.1 - 1, BitString.listXor (p.modulus.length - 1)
       [coefficient p (s.1 - 1), fieldMulMod p.modulus s.2 p.point])
@@ -162,9 +166,7 @@ private theorem horner_agrees (p : HornerInput) :
 private theorem horner_of_advance_inSpace
     (hstep : ComputableInSpace hornerAdvance encHornerState encHornerState
       (fun s => (encHornerState s).length)) :
-    ComputableInSpace (fun p : HornerInput =>
-      hornerBits (p.modulus.length - 1) (fieldMulMod p.modulus) p.point
-        (fun i : Fin p.count => coefficient p i)) encHornerInput encCoefficients
+    ComputableInSpace HornerInput.evaluate encHornerInput encCoefficients
       (fun p => (encHornerInput p).length) := by
   let : Inhabited HornerState := ⟨⟨⟨[], [], 0, 0⟩, 0, []⟩⟩
   have hid : ComputableInSpace (fun p => p) encHornerInput encHornerInput
