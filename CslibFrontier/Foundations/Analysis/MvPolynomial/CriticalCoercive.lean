@@ -133,16 +133,14 @@ theorem exists_isMinOn_eval_deformedPolynomial (ell : ℕ) (hell : 1 ≤ ell) (h
   have hk : IsCompact {x | f x ≤ f 0} :=
     isCompact_sublevel_eval_deformedPolynomial ell hell he a ha F hF u hu (f 0)
   have hf : Continuous f := continuous_eval _
-  have hzero : (0 : Fin n → ℝ) ∈ {x | f x ≤ f 0} := show f 0 ≤ f 0 from le_rfl
-  obtain ⟨x, hx, hmin⟩ := hk.exists_isMinOn ⟨0, hzero⟩ hf.continuousOn
-  change f x ≤ f 0 at hx
-  refine ⟨x, fun y _ => ?_⟩
-  by_cases hy : f y ≤ f 0
-  · exact hmin hy
-  · exact hx.trans (le_of_not_ge hy)
+  obtain ⟨x, hmin⟩ := hf.exists_forall_le' 0 (by
+    filter_upwards [hk.compl_mem_cocompact] with y hy
+    change ¬ f y ≤ f 0 at hy
+    exact le_of_not_ge hy)
+  exact ⟨x, fun y _ => hmin y⟩
 
-/-- A nonnegative real input has a zero exactly when its deformed values have a uniform
-upper bound attained at some point for each nonnegative parameter. -/
+/-- A nonnegative real input has a zero exactly when there is a common bound such that,
+for each nonnegative parameter, some point has deformed value at most that bound. -/
 theorem exists_zero_iff_bounded_eval_deformedPolynomial (ell : ℕ) (hell : 1 ≤ ell)
     (he : Even (ell + 1)) (a : Fin n → ℝ) (ha : ∀ i, 0 ≤ a i)
     (F : MvPolynomial (Fin n) ℝ) (hF : ∀ x, 0 ≤ eval x F) :
