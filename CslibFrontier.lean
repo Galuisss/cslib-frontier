@@ -3013,6 +3013,7 @@ public import CslibFrontier.Computability.Complexity.Problems.STCON.Completeness
 public import CslibFrontier.Computability.Complexity.Problems.STCON.Header
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenBoundedWalk
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenMembershipTally
+public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenRoundCallback
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceContext
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceContext.Scheduler
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision
