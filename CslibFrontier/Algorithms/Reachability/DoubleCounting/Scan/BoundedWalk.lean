@@ -438,17 +438,9 @@ theorem eq_of_selectors_prefix (clock : ℕ) {a b : List (Fin N)}
 private theorem replay_choice_of_live (r : Registers N) (bits : List Bool)
     (s : NondeterministicChoice.State)
     (hlive : ∀ i < bits.length, (C).halted ((C).replay input (bits.take i) s) = false) :
-    (M).replay input bits (.choose r s) = .choose r ((C).replay input bits s) := by
-  induction bits generalizing s with
-  | nil => rfl
-  | cons bit bits ih =>
-    have hhead : (C).halted s = false := hlive 0 (by simp)
-    rw [NondeterministicQueryMachine.replay_cons,
-      step_choose edge start verdict clock initial input hhead,
-      NondeterministicQueryMachine.replay_cons, ih]
-    intro i hi
-    simpa only [List.take_succ_cons, NondeterministicQueryMachine.replay_cons] using
-      hlive (i + 1) (by simpa only [List.length_cons, Nat.succ_lt_succ_iff] using hi)
+    (M).replay input bits (.choose r s) = .choose r ((C).replay input bits s) :=
+  (M).replay_map_of_live input (C) (State.choose r)
+    (fun _ bit h => step_choose edge start verdict clock initial input h bit) bits s hlive
 
 private theorem replay_choice (r : Registers N) (bits : List Bool)
     (s : NondeterministicChoice.State) (hfirst : (C).FirstHalting input bits s) :
