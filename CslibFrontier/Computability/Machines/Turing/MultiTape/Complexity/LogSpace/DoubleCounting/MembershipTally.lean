@@ -985,10 +985,9 @@ theorem native_firstHalting_iff_of_reply {α σ : Type} {N : ℕ}
         some (bits, final) ∧ final.Halted ∧ final.output = [true]) ↔
       ∃! branch, bits = selectors walkSelectors branch ∧
         ∃ hit, Scan.run adjacent source target radius expected branch = some hit := by
+  rw [R.existsUnique_accepting_replay_iff]
   constructor
-  · rintro ⟨_, ⟨final, hr, hh, hout⟩, _⟩
-    obtain ⟨hfirst, houtput⟩ := R.replay_correct a hr hh
-    have htrue := (List.cons.inj (houtput.symm.trans hout)).1
+  · rintro ⟨hfirst, htrue⟩
     rw [haccept] at htrue
     obtain ⟨hit, hreply⟩ := Option.isSome_iff_exists.mp htrue
     obtain ⟨branch, ⟨hbits, hscan⟩, _⟩ := (hreplay hit).mp ⟨hfirst, hreply⟩
@@ -998,11 +997,7 @@ theorem native_firstHalting_iff_of_reply {α σ : Type} {N : ℕ}
     obtain ⟨hfirst, hreply⟩ := (hreplay hit).mpr
       ⟨branch, ⟨hbits, hscan⟩, fun _ h => selectors_injective walkSelectors hprefix
         (h.1.symm.trans hbits)⟩
-    obtain ⟨indices, ⟨final, hr, hh⟩, hunique⟩ := (R.existsUnique_replay_iff a bits).mpr hfirst
-    have hout := (R.replay_correct a hr hh).2
-    refine ⟨indices, ⟨final, hr, hh, ?_⟩, fun other ⟨finish, hrun, hhalt, _⟩ =>
-      hunique other ⟨finish, hrun, hhalt⟩⟩
-    simpa [haccept, hreply] using hout
+    exact ⟨hfirst, by simp only [haccept, hreply, Option.isSome_some]⟩
 
 section BoundedWalk
 
