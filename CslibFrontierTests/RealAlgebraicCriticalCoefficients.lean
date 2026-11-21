@@ -8,6 +8,7 @@ module
 
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
 import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalParameterEvaluation
+import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProduct
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicValueBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
@@ -464,5 +465,17 @@ example :
   · norm_num [g] at hzero
   · simpa only [R, g, Polynomial.eval₂_X, abs_of_nonneg (by norm_num : (0 : ℝ) ≤ 1 / 2)]
       using hbounds
+
+-- A nonintegral input in the dyadic interval has the amplified reflection bound.
+example :
+    let p := Polynomial.dyadicSignProduct 1 1
+    let x : ℝ := 3 / 4
+    9 * p.eval₂ (Int.castRingHom ℝ) (-x) ≤ p.eval₂ (Int.castRingHom ℝ) x ∧
+      1 ≤ p.eval₂ (Int.castRingHom ℝ) x + p.eval₂ (Int.castRingHom ℝ) (-x) := by
+  intro p x
+  refine ⟨?_, Polynomial.one_le_eval₂_dyadicSignProduct_add_neg 1 1 x⟩
+  have h := Polynomial.eval₂_dyadicSignProduct_neg_le 1 1 (x := x)
+    (by norm_num [x]) (by norm_num [x])
+  simpa only [p, Nat.mul_one, show (3 : ℝ) ^ 2 = 9 by norm_num] using h
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
