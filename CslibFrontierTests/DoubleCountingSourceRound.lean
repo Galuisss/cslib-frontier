@@ -102,4 +102,8 @@ example (choices : List Bool) :
   exact length_encMachineState_run_le (encOption encBool) context reply start id
     [] choices 2 hcallee
 
+/-- The common clock covers wrong routing selectors as well as valid calls. -/
+example : tieRound.HaltsWithin [] 57 :=
+  Turing.DoubleCounting.SourceRound.haltsWithin context reply start id [] 0 (fun _ _ _ => rfl)
+
 end CslibFrontierTests.DoubleCountingSourceRound

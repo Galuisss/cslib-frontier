@@ -411,10 +411,22 @@ theorem Returns.exists_run {τ : Type} {ctx : Context} {N : QueryMachine τ}
 
 /-- Pending callback phases remaining: two per untested predecessor, minus the completed
 edge test while membership is pending. -/
-private def remainingCalls (q : State) : ℕ :=
+def remainingCalls (q : State) : ℕ :=
   2 * (q.context.size - q.cursor) - if q.memberPhase then 1 else 0
 
-private theorem advance_progress {q : State} (hlive : halted q = false)
+/-- A live predecessor state has at least one callback phase remaining. -/
+theorem remainingCalls_pos {q : State} (h : halted q = false) : 0 < remainingCalls q := by
+  have hi : q.cursor < q.context.size := by
+    simp only [halted, Bool.or_eq_false_iff, decide_eq_false_iff_not, Nat.not_le] at h
+    exact h.2
+  cases hp : q.memberPhase <;> simp [remainingCalls, hp] <;> omega
+
+/-- At entry, each vertex has two possible callback phases. -/
+theorem remainingCalls_initial (ctx : Context) : remainingCalls (initial ctx) = 2 * ctx.size := by
+  simp [remainingCalls, initial]
+
+/-- A callback reply consumes one phase whenever the predecessor loop stays live. -/
+theorem advance_progress {q : State} (hlive : halted q = false)
     (reply : Option Bool) (hnext : halted (advance q reply) = false) :
     remainingCalls (advance q reply) < remainingCalls q := by
   have hi : q.cursor < q.context.size := by
