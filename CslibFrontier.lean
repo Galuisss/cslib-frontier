@@ -5999,6 +5999,7 @@ public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicVal
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BitBounds
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.CoeffNormBound
+public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ConjugateProduct
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.Isolation
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ParameterExclusion
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.RatPoly

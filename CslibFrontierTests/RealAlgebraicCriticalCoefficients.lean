@@ -13,6 +13,7 @@ import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProduct
 import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProductBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicValueBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
+import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ConjugateProduct
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseIntegerRootLabel
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
 import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomial
@@ -639,5 +640,23 @@ example :
       Complex.prod_eq_ofReal_mul_prod_normSq S id hS (fun _ _ => rfl)
     _ = -1 := by
       norm_num [S, Finset.filter_insert, Finset.filter_singleton, Complex.normSq_I]
+
+-- A double real root contributes once to the product over distinct roots.
+example :
+    let p : Polynomial ℝ := (Polynomial.X - Polynomial.C (-1)) ^ 2
+    (∏ z ∈ (p.aroots ℂ).toFinset, Polynomial.aeval z (Polynomial.X : Polynomial ℝ)) = -1 := by
+  classical
+  intro p
+  have hp : p ≠ 0 := pow_ne_zero _ (Polynomial.X_sub_C_ne_zero _)
+  have hreal : p.roots.toFinset = {-1} := by
+    ext x
+    rw [Multiset.mem_toFinset, Polynomial.mem_roots hp, Polynomial.IsRoot.def]
+    simp [p, add_eq_zero_iff_eq_neg]
+  have hcomplex : (p.aroots ℂ).toFinset = {-1} := by
+    ext z
+    rw [Multiset.mem_toFinset, Polynomial.mem_aroots, and_iff_right hp]
+    simp [p, add_eq_zero_iff_eq_neg]
+  rw [Polynomial.prod_aeval_aroots_toFinset_eq, hreal, hcomplex]
+  norm_num [Finset.filter_singleton]
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
