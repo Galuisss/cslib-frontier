@@ -10,6 +10,8 @@ public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoeff
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValuePolynomial
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalParameterExclusion
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValueCoeffNorm
+import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValueParameterDegree
+import CslibFrontier.Foundations.Data.Polynomial.CoeffList
 import CslibFrontier.Foundations.Data.MvPolynomial.Degrees
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.InitialCriticalSeparability
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.ResidueCoeffNorm
@@ -256,5 +258,16 @@ example :
   exact parametricValuePolynomial_at_parameterExclusion (by decide : 1 ≤ 2) F hF
     (parametricValuePolynomial_bivariateCoeffNorm1_le (by decide) F hF
       (b := 0) (by simp [F, MvPolynomial.coeffNorm1_X]))
+
+-- A finite list of parameter coefficients recovers the linear characteristic coefficient.
+example :
+    let F : MvPolynomial (Fin 1) ℤ := X 0
+    let hF : F.totalDegree ≤ 2 := by simp [F]
+    let p := (parametricValuePolynomial (by decide : 1 ≤ 2) F hF).coeff 1
+    Polynomial.ofCoeffList (p.coeffsBelow 7) = p := by
+  intro F hF p
+  apply Polynomial.ofCoeffList_coeffsBelow
+  exact (natDegree_parametricValuePolynomial_coeff_le (by decide : 2 ≤ 2) F hF 1).trans_lt
+    (by decide)
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
