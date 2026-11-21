@@ -8,10 +8,12 @@ module
 
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValuePolynomial
+import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalParameterExclusion
 import CslibFrontier.Foundations.Data.MvPolynomial.Degrees
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.InitialCriticalSeparability
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.ResidueCoeffNorm
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.SeparatedCriticalValues
+import Mathlib.Data.Nat.Size
 import Mathlib.Tactic.NormNum
 import Mathlib.Tactic.Ring
 
@@ -238,5 +240,20 @@ example :
   intro F hF q
   refine ⟨parametricValuePolynomial_at_zero_separable (by decide : 1 ≤ 2) F hF, ?_⟩
   simp only [q, parametricValuePolynomial_map_eval₂, valuePolynomial_natDegree, pow_one]
+
+-- Apply the explicit parameter choice to the one-variable critical family, using the
+-- bit size of its actual norm as a bound in this test.
+example :
+    let F : MvPolynomial (Fin 1) ℤ := X 0
+    let hF : F.totalDegree ≤ 2 := by simp [F]
+    let q := parametricValuePolynomial (by decide : 1 ≤ 2) F hF
+    let H := q.bivariateCoeffNorm1.size
+    let a : ℤ := 2 ^ (H + 1)
+    let u : ℝ := 2 ^ Polynomial.parameterExclusionExponent 2 H
+    let q' := q.map (Polynomial.eval₂RingHom (Int.castRingHom ℝ) u)
+    q'.Separable ∧ q'.eval (a : ℝ) ≠ 0 := by
+  intro F hF q H a u q'
+  exact parametricValuePolynomial_at_parameterExclusion (by decide : 1 ≤ 2) F hF
+    (Nat.lt_size_self q.bivariateCoeffNorm1).le
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
