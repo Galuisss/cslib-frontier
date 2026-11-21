@@ -570,4 +570,26 @@ example :
     Polynomial.signLabelPolynomial_bounds 1 g (fun _ => 1)
       (D := 1) (fun _ => Polynomial.natDegree_X_le) hb
 
+-- One precision covers all derivative orders at the real root of 2X.
+example (k : ℕ) :
+    let p : Polynomial ℤ := Polynomial.C 2 * Polynomial.X
+    let v := (Polynomial.derivative^[k] p).eval₂ (Int.castRingHom ℝ) 0
+    let R := (2 : ℝ) ^ Polynomial.algebraicValuePrecision 1 1 1 2
+    v = 0 ∨ (R⁻¹ ≤ |v| ∧ |v| ≤ R) := by
+  intro p v R
+  have hp : p ≠ 0 :=
+    mul_ne_zero (Polynomial.C_ne_zero.mpr (by decide)) Polynomial.X_ne_zero
+  have hD : p.natDegree ≤ 1 :=
+    (Polynomial.natDegree_C_mul_le _ _).trans Polynomial.natDegree_X_le
+  have hb : p.coeffNorm1 ≤ 2 ^ 1 := by
+    have h := Polynomial.coeffNorm1_X_mul (Polynomial.C (2 : ℤ))
+    rw [mul_comm, Polynomial.coeffNorm1_C] at h
+    exact h.le
+  have hk := Polynomial.coeffNorm1_iterate_derivative_le_two_pow p hD hb k
+  have hbudget : Polynomial.iterateDerivativeNormExponent 1 1 = 2 := by decide
+  rw [hbudget] at hk
+  exact Polynomial.eval₂_eq_zero_or_dyadic_bounds hp hD
+    ((Polynomial.natDegree_iterate_derivative p k).trans ((Nat.sub_le _ _).trans hD)) hb hk
+    (by simp [p])
+
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
