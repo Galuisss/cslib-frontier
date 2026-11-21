@@ -151,4 +151,24 @@ example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ �
     ComputableInSpace (fun a => resume start (current a) (returned a)) enc (encState encScan) S :=
   budget_comp_linear (resume_inSpace encScan start hstart) (budget_prod hcurrent hreturned)
 
+open MultiTapeTM ComputableInSpace NondeterministicQueryMachine in
+/-- A caller can supply the scheduler's state and selector input at a shared budget. -/
+example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ ↪ List Bool)
+    (call : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
+    (readVerdict : σ → Option ControllerVerdict)
+    (hstart : ComputableInSpace start encSeedScanRequest encScan
+      (fun r => (encSeedScanRequest r).length))
+    (hhalt : ComputableInSpace call.halted encScan encBool (fun s => (encScan s).length))
+    (hreply : ComputableInSpace readVerdict encScan
+      (encOption Turing.DoubleCounting.SourceRoundLoop.encVerdict) (fun s => (encScan s).length))
+    (hnext : ComputableInSpace call.next (encPair encScan encReadChoice) encScan
+      (fun p => (encPair encScan encReadChoice p).length))
+    {current : α → State σ} {readChoice : α → Option Bool × Bool}
+    (hcurrent : ComputableInSpace current enc (encState encScan) S)
+    (hread : ComputableInSpace readChoice enc encReadChoice S) :
+    ComputableInSpace (fun a => (machine setup call start readVerdict).next
+      (current a, readChoice a)) enc (encState encScan) S :=
+  budget_comp_linear (next_inSpace encScan setup call start readVerdict hstart hhalt hreply hnext)
+    (budget_prod hcurrent hread)
+
 end CslibFrontierTests.STCONSeedSchedulerMachine

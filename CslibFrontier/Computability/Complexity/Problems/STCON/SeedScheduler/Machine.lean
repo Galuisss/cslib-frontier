@@ -33,6 +33,8 @@ skipped designated root.
   supplied scan or skip phase within the caller's workspace budget.
 * `SeedSchedulerMachine.resume_inSpace`: process the scheduler's control result in space
   linear in the paired frame and verdict encoding.
+* `SeedSchedulerMachine.next_inSpace`: advance the scheduler in space linear in its encoded
+  state, read bit, and selector.
 * `SeedSchedulerMachine.observations_inSpace`: query, halt, terminal reply, and acceptance
   use space linear in the encoded state.
 * `SeedSchedulerMachine.step_liveScan`: a live scan takes the callback's step on the same input.
@@ -216,6 +218,57 @@ theorem observations_inSpace {σ : Type} (encScan : σ ↪ List Bool) (setup : S
   have haccept := budget_comp_linear (optionElim false (optionElim false hanswer)) hreply
   exact ⟨hqueryMachine, hhalt, hreply, haccept.of_enc_eq fun
     | .inl _ | .inr none | .inr (some none) | .inr (some (some _)) => rfl⟩
+
+open _root_.Turing.MultiTapeTM.ComputableInSpace NondeterministicQueryMachine in
+/-- Forward a live scanner transition or resume its caller, using workspace linear in the
+encoded scheduler state and the read and selector bits. -/
+theorem next_inSpace {σ : Type} (encScan : σ ↪ List Bool) (setup : SeedSearchSetup)
+    (scan : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
+    (verdict : σ → Option ControllerVerdict)
+    (hstart : ComputableInSpace start encSeedScanRequest encScan
+      (fun r => (encSeedScanRequest r).length))
+    (hhalt : ComputableInSpace scan.halted encScan encBool (fun s => (encScan s).length))
+    (hverdict : ComputableInSpace verdict encScan
+      (encOption _root_.Turing.DoubleCounting.SourceRoundLoop.encVerdict)
+      (fun s => (encScan s).length))
+    (hnext : ComputableInSpace scan.next (encPair encScan encReadChoice) encScan
+      (fun p => (encPair encScan encReadChoice p).length)) :
+    let E := encState encScan
+    let P := encPair E encReadChoice
+    ComputableInSpace (machine setup scan start verdict).next P E (fun p => (P p).length) := by
+  let F := encSeedSchedulerFrame
+  let A := encPair F encScan
+  let L := encSum F A
+  let T := encOption (encOption encAnswer)
+  let E := encState encScan
+  let V := encOption _root_.Turing.DoubleCounting.SourceRoundLoop.encVerdict
+  have hresume := resume_inSpace encScan start hstart
+  have hskipFrame := fst F encReadChoice
+  have hskipChoice := snd' (snd F encReadChoice)
+  have hskipReject := budget_const (encIn := encPair F encReadChoice) (encB := E) (.inr none)
+    (.refl _)
+  have hnoVerdict := budget_const (encIn := encPair F encReadChoice) (encB := V) none (.refl _)
+  have hskip := budget_ite hskipChoice hskipReject
+    (budget_comp_linear hresume (budget_prod hskipFrame hnoVerdict))
+  have hactive := fst A encReadChoice
+  have hread := snd A encReadChoice
+  have hsuspended := fst' hactive
+  have hscan := snd' hactive
+  have hreturn := budget_comp_linear hresume
+    (budget_prod hsuspended (budget_comp_linear hverdict hscan))
+  have hscanReject := budget_const (encIn := encPair A encReadChoice) (encB := E) (.inr none)
+    (.refl _)
+  have hliveState := budget_prod hsuspended (budget_comp_linear hnext (budget_prod hscan hread))
+  have hlive := budget_comp_linear (of_inO (ComputableInO.inl L T))
+    (budget_comp_linear (of_inO (ComputableInO.inr F A)) hliveState)
+  have hrun := budget_ite (budget_comp_linear hhalt hscan)
+    (budget_ite (snd' hread) hscanReject hreturn) hlive
+  have hfinished := budget_comp_linear (of_inO (ComputableInO.inr L T)) (fst T encReadChoice)
+  refine (sumElimFst (sumElimFst hskip hrun) hfinished).of_enc_eq ?_
+  rintro ⟨(f | ⟨f, s⟩) | result, read, bit⟩
+  · cases bit <;> rfl
+  · cases scan.halted s <;> cases bit <;> rfl
+  · rfl
 
 /-- The live callback sees the original query answer and selector, and its caller frame
 is unchanged by the step. -/
