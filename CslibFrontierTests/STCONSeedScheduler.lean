@@ -7,8 +7,7 @@ Authors: Christian Reitwiessner, Samuel Schlesinger
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceContext.Scheduler
-import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceLoop
+import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceLoop.Scheduler
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.Cases
 meta import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler
 
@@ -191,18 +190,30 @@ open Cslib.Code.JustesenFamily ComputableInSpace in
 example :
     let encArgs := encPair encSeedSearchSetup (encPair encNat (encOption encNat))
     let E := encPair encArgs encFieldContext
-    ComputableInSpace (fun p => SourceRoundLoop.enterRound justesenRetainedSourceRoundEntry
-      (justesenSourceRegistersOfRequest (seedScanRequest p.1) p.2))
+    ComputableInSpace (fun p => justesenSourceLoopEntryOfRequest (seedScanRequest p.1) p.2)
       E encJustesenSourceLoopState (fun p => (E p).length) := by
   intro encArgs E
-  have hregisters := justesenSourceRegistersOfRequest_budget
+  exact justesenSourceLoopEntryOfRequest_budget
     (budget_comp_linear seedScanRequest_inSpace (fst encArgs encFieldContext))
     (snd encArgs encFieldContext)
-  have henter := SourceRoundLoop.enterRound_inSpace encJustesenSourceContext
-    encJustesenRetainedSourceRoundState
-    (MembershipTally.encRetainedState encJustesenSubdivisionContext encJustesenSubdivisionState)
-    justesenRetainedSourceRoundEntry justesenRetainedSourceRoundEntry_inSpace
-  exact budget_comp_linear henter hregisters
+
+open ComputableInSpace Turing.NondeterministicQueryMachine in
+/-- The scheduler can call all four operations within the budget of its live state and selector. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (context : JustesenSourceContext) (limit : ℕ)
+    {α : Type} {enc : α ↪ List Bool} {S : α → ℕ}
+    {state : α → JustesenSourceLoopState} {choice : α → Option Bool × Bool}
+    (hstate : ComputableInSpace state enc encJustesenSourceLoopState S)
+    (hchoice : ComputableInSpace choice enc encReadChoice S) :
+    let M := justesenSourceLoop ntm c context limit
+    ComputableInSpace (fun a => M.query (state a)) enc encNat S ∧
+      ComputableInSpace (fun a => M.next (state a, choice a)) enc encJustesenSourceLoopState S ∧
+      ComputableInSpace (fun a => M.halted (state a)) enc encBool S ∧
+      ComputableInSpace (fun a => SourceRoundLoop.reply (state a)) enc
+        (encOption SourceRoundLoop.encVerdict) S := by
+  obtain ⟨hq, hn, hh, hr⟩ := justesenSourceLoop_parts_inSpace ntm c context limit
+  exact ⟨budget_comp_linear hq hstate, budget_comp_linear hn (budget_prod hstate hchoice),
+    budget_comp_linear hh hstate, budget_comp_linear hr hstate⟩
 
 /-- The designated and indexed scheduler requests enter the original-word native loop. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
@@ -210,18 +221,15 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     let s := configurationSeedSearchSetup ntm c w
     let n := s.parameters.search.subdivision.vertexCount
     let field := configurationFieldContext ntm c w
-    let entry := SourceRoundLoop.enterRound (μ := MembershipTally.RetainedState
-      JustesenSubdivisionContext JustesenSubdivisionState) justesenRetainedSourceRoundEntry
     let adj := configurationJustesenSubdivisionContext ntm c w rank
-    entry (justesenSourceRegistersOfRequest (seedScanRequest (s, rank, none)) field) =
+    justesenSourceLoopEntryOfRequest (seedScanRequest (s, rank, none)) field =
       (justesenSourceLoop ntm c ⟨adj, s.sourceID, s.targetID⟩ n).init ∧
-    entry (justesenSourceRegistersOfRequest (seedScanRequest (s, rank, some position)) field) =
+    justesenSourceLoopEntryOfRequest (seedScanRequest (s, rank, some position)) field =
       (justesenSourceLoop ntm c ⟨adj, s.originalSourceID position, s.targetID⟩ n).init := by
-  intro s n field entry adj
+  intro s n field adj
   rw [← seedSchedulerFrame_designated_request,
     ← seedSchedulerFrame_indexed_request s rank position false]
-  exact ⟨congrArg entry (justesenSourceRegistersOfRequest_eq ntm c w rank s.sourceID),
-    congrArg entry (justesenSourceRegistersOfRequest_eq ntm c w rank
-      (s.originalSourceID position))⟩
+  exact ⟨justesenSourceLoopEntryOfRequest_eq ntm c w rank s.sourceID,
+    justesenSourceLoopEntryOfRequest_eq ntm c w rank (s.originalSourceID position)⟩
 
 end CslibFrontierTests.STCONSeedScheduler

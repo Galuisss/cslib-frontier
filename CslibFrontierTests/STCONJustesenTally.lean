@@ -329,32 +329,6 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     simp only [SourceRoundLoop.Admissible, r, hsize, Nat.zero_add, and_self, le_refl]
   exact h w seed source target n le_rfl r hr
 
--- Plug the retained round and final membership into the source-loop transition.
-example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
-    (context : JustesenSourceContext) (limit : ℕ) :
-    let E := encJustesenSourceLoopState
-    let encStep := encPair E encReadChoice
-    let M := justesenSourceLoop ntm c context limit
-    ComputableInSpace M.query E encNat (fun s => (E s).length) ∧
-      ComputableInSpace M.next encStep E (fun p => (encStep p).length) := by
-  intro E encStep M
-  let encRound := encJustesenRetainedSourceRoundState
-  let encMember := MembershipTally.encRetainedState encJustesenSubdivisionContext
-    encJustesenSubdivisionState
-  let initial := SourceRoundLoop.start context limit
-  let round := justesenRetainedSourceRound ntm c initial
-  obtain ⟨hrq, hrn, hrh, hrr⟩ := justesenRetainedSourceRound_parts_inSpace ntm c initial
-  obtain ⟨hq, hn, hh, hr⟩ := justesenSourceMembershipMachine_parts_inSpace ntm c
-  exact ⟨SourceRoundLoop.query_inSpace encJustesenSourceContext encRound encMember
-      initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
-      (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
-      MembershipTally.retainedReply hrq hq,
-    SourceRoundLoop.next_inSpace encJustesenSourceContext encRound encMember
-      initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
-      (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
-      MembershipTally.retainedReply justesenRetainedSourceRoundEntry_inSpace
-      justesenSourceMembershipStart_inSpace hrr hr hrh hh hrn hn⟩
-
 -- Every prefix fits the shared budget, and zero fuel stops without a verdict.
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
     ∃ C, ∀ w : List Bool,
