@@ -70,7 +70,7 @@ def encState {σ : Type} (encScan : σ ↪ List Bool) : State σ ↪ List Bool :
   if frame.needsScan then .inl (.inr (frame, start frame.request)) else .inl (.inl frame)
 
 /-- Apply the local scheduler transition and enter its next frame or terminal state. -/
-def resume {σ : Type} (start : SeedScanRequest → σ) (frame : SeedSchedulerFrame)
+@[expose] def resume {σ : Type} (start : SeedScanRequest → σ) (frame : SeedSchedulerFrame)
     (verdict : Option ControllerVerdict) : State σ :=
   match seedSchedulerStep frame verdict with
   | none => .inr none
@@ -182,6 +182,18 @@ theorem firstHalting_scan_iff {σ : Type} (setup : SeedSearchSetup)
   cases hv : verdict s with
   | none => simp [resume, seedSchedulerStep_noReply_of_needsScan frame hscan]
   | some v => rfl
+
+/-- The initial state enters the zero seed candidate when it exists. -/
+theorem machine_init {σ : Type} (setup : SeedSearchSetup) (scan : NondeterministicQueryMachine σ)
+    (start : SeedScanRequest → σ) (verdict : σ → Option ControllerVerdict) :
+    (machine setup scan start verdict).init =
+      (seedSchedulerCandidate setup 0).elim (.inr (some none)) (enter start) := by simp [machine]
+
+/-- The scheduler halts precisely in the terminal phase, including rejection and exhaustion. -/
+theorem machine_halted {σ : Type} (setup : SeedSearchSetup) (scan : NondeterministicQueryMachine σ)
+    (start : SeedScanRequest → σ) (verdict : σ → Option ControllerVerdict) (state : State σ) :
+    (machine setup scan start verdict).halted state = state.isRight := by
+  cases state <;> rfl
 
 /-- A successful first halt from a skipped root consumes exactly one false selector
 before continuing the search. -/
