@@ -109,6 +109,13 @@ def withInit (s : σ) : NondeterministicQueryMachine σ := { M with init := s }
 theorem withInit_init : M.withInit M.init = M := rfl
 
 @[simp]
+theorem init_withInit (s : σ) : (M.withInit s).init = s := rfl
+
+@[simp]
+theorem firstHalting_withInit (s : σ) :
+    (M.withInit s).FirstHalting = M.FirstHalting := rfl
+
+@[simp]
 theorem step_withInit (s : σ) : (M.withInit s).step = M.step := rfl
 
 @[simp]
@@ -183,6 +190,21 @@ theorem run_append_of_halted {choices : List Bool}
     (h : M.halted (M.run input choices) = true) (more : List Bool) :
     M.run input (choices ++ more) = M.run input choices := by
   rw [run_append, M.replay_of_halted input h]
+
+/-- A live replay that halts on one additional choice first halts at that choice. -/
+theorem firstHalting_append_singleton (choices : List Bool) (choice : Bool) {s : σ}
+    (hlive : M.halted (M.replay input choices s) = false)
+    (hhalt : M.halted (M.replay input (choices ++ [choice]) s) = true) :
+    M.FirstHalting input (choices ++ [choice]) s := by
+  refine ⟨hhalt, fun n hn => ?_⟩
+  have hle : n ≤ choices.length := by simpa using hn
+  rw [List.take_append_of_le_length hle]
+  by_contra h
+  have hprefix := Bool.eq_true_of_not_eq_false h
+  have heq := M.replay_append input (choices.take n) (choices.drop n) s
+  rw [List.take_append_drop, M.replay_of_halted input hprefix] at heq
+  rw [heq, hprefix] at hlive
+  contradiction
 
 /-- A replay ending halted has a unique prefix that first halts at its end. That prefix
 reaches the same state as the full replay. If the starting state is halted, the prefix is

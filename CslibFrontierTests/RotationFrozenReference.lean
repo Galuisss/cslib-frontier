@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Recognition.FrozenReference
 import CslibFrontier.Foundations.Geometry.Polygonal.LineEnds
+import CslibFrontier.Foundations.Geometry.Polygonal.SegmentCuts
 import Mathlib.Tactic.NormNum
 
 /-! Ordinary clients keep both loop ends, parallel occurrences, unused fresh leaves, a fixed
@@ -144,7 +145,7 @@ example :
         F z = referencePoint bothFixed 1 + (1 / 2 : ℝ) • (z - referencePoint bothFixed 1) := by
   let a : Dart bothFixed.graph := (⟨0, by decide⟩, false)
   let b : Dart bothFixed.graph := (⟨1, by decide⟩, true)
-  obtain ⟨F, hF, _, hcenter, hspoke⟩ :=
+  obtain ⟨F, _, hcenter, hspoke, _⟩ :=
     exists_frozen_reference_compression valid_bothFixed (s := 1 / 2) (by constructor <;> norm_num)
   have ha : a.vertex = 0 := by decide +kernel
   have hb : b.vertex = 1 := by decide +kernel
@@ -152,7 +153,32 @@ example :
   have hFb := hspoke b (by decide +kernel)
   rw [ha] at hFa
   rw [hb] at hFb
-  exact ⟨F, hF, hcenter 0 (by decide +kernel), hcenter 1 (by decide +kernel), hFa, hFb⟩
+  exact ⟨F, F.injective, hcenter 0 (by decide +kernel), hcenter 1 (by decide +kernel), hFa, hFb⟩
+
+-- A vertical segment in the compressed plane needs no subdivision, even on a cut line.
+example (z w : ℂ) (h : z.re = w.re) (t : ℝ) (ht : t ∈ Set.Icc 0 1) :
+    ∃ F : ℂ ≃ₜ ℂ, F (referencePoint bothFixed 0) = referencePoint bothFixed 0 ∧
+      F.symm (AffineMap.lineMap z w t) = AffineMap.lineMap (F.symm z) (F.symm w) t := by
+  obtain ⟨F, _, hcenter, _, hline⟩ :=
+    exists_frozen_reference_compression valid_bothFixed (s := 1 / 2) (by constructor <;> norm_num)
+  refine ⟨F, hcenter 0 (by decide +kernel), hline z w ?_ t ht⟩
+  intro x _
+  rw [h, min_self, max_self]
+  exact fun hx => (not_lt_of_ge hx.1.le) hx.2
+
+-- Each actual indexed piece in the compressed plane is transported by straight interpolation.
+example (a b : ℂ) :
+    ∃ (F : ℂ ≃ₜ ℂ) (cuts : Finset ℝ),
+      let times := segmentCuts cuts a.re b.re
+      ∀ (k : ℕ) (hk : k + 1 < times.length) (t : ℝ), t ∈ Set.Icc 0 1 →
+        F.symm (AffineMap.lineMap a b (AffineMap.lineMap times[k] times[k + 1] t)) =
+          AffineMap.lineMap (F.symm (AffineMap.lineMap a b times[k]))
+            (F.symm (AffineMap.lineMap a b times[k + 1])) t := by
+  obtain ⟨F, cuts, _, _, hline⟩ :=
+    exists_frozen_reference_compression valid_bothFixed (s := 1 / 2) (by constructor <;> norm_num)
+  refine ⟨F, cuts, fun k hk t ht => ?_⟩
+  exact segmentCuts_map_lineMap cuts Complex.reCLM.toLinearMap.toAffineMap F.symm
+    hline a b hk ht
 
 /-- Removing every edge keeps the entire frame as distinct isolated points. -/
 theorem all_free_frame :
