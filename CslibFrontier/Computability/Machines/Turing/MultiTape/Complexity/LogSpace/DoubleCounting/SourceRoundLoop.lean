@@ -142,21 +142,6 @@ theorem machine_withInit {κ ρ μ : Type} (r r' : Registers κ)
   unfold machine NondeterministicQueryMachine.withInit
   rfl
 
-private theorem replay_call {α β : Type} (outer : NondeterministicQueryMachine α)
-    (callee : NondeterministicQueryMachine β) (input : List Bool) (wrap : β → α)
-    (hstep : ∀ s bit, callee.halted s = false →
-      outer.step input (wrap s) bit = wrap (callee.step input s bit))
-    (bits : List Bool) (s : β)
-    (hlive : ∀ n < bits.length, callee.halted (callee.replay input (bits.take n) s) = false) :
-    outer.replay input bits (wrap s) = wrap (callee.replay input bits s) := by
-  induction bits generalizing s with
-  | nil => rfl
-  | cons bit bits ih =>
-    have hs : callee.halted s = false := hlive 0 (by simp)
-    rw [outer.replay_cons, callee.replay_cons, hstep s bit hs, ih]
-    intro n hn
-    simpa only [List.take_succ_cons, callee.replay_cons] using hlive (n + 1) (by simpa using hn)
-
 private theorem live_prefix {α : Type} (M : NondeterministicQueryMachine α)
     (input bits : List Bool) (s : α) (hlive : M.halted (M.replay input bits s) = false)
     (n : ℕ) : M.halted (M.replay input (bits.take n) s) = false := by
@@ -180,12 +165,12 @@ private theorem split_call {α β : Type} (outer : NondeterministicQueryMachine 
   have hc : callee.halted (callee.replay input bits s) = true := by
     by_contra hn
     have hlive := Bool.eq_false_iff.mpr hn
-    rw [replay_call outer callee input wrap hstep bits s
+    rw [outer.replay_map_of_live input callee wrap hstep bits s
       (fun n _ => live_prefix callee input bits s hlive n), hwrap] at hh
     cases hh
   obtain ⟨callBits, ⟨hp, hfirst, _⟩, _⟩ := callee.existsUnique_firstHalting_prefix input hc
   obtain ⟨rest, he⟩ := hp
-  have hr := replay_call outer callee input wrap hstep callBits s hfirst.2
+  have hr := outer.replay_map_of_live input callee wrap hstep callBits s hfirst.2
   cases rest with
   | nil =>
     rw [List.append_nil] at he
@@ -279,7 +264,7 @@ private theorem successful_call_iff {α β γ : Type}
       (outer.FirstHalting input (callBits ++ bit :: rest) (wrap s) ∧
         outer.replay input (callBits ++ bit :: rest) (wrap s) = final) ↔
       (outer.FirstHalting input rest t ∧ outer.replay input rest t = final) := by
-    have hr := replay_call outer callee input wrap hlive callBits s h.2
+    have hr := outer.replay_map_of_live input callee wrap hlive callBits s h.2
     have hp := firstHalting_append_live_iff outer input callBits (bit :: rest) (wrap s)
       (by rw [hr, hwrap])
     simp only [hp, outer.replay_append, hr, outer.firstHalting_cons_iff, hwrap, true_and,
@@ -517,7 +502,7 @@ theorem haltsWithin (P : Registers κ → Prop) (hp : P initial)
     obtain ⟨callBits, selector, rest, rfl, _, hfirst⟩ :=
       call_returns_by member input bits (memberStart r) memberClock (hmember r hr) hlen
     rw [(M).replay_append,
-      replay_call (M) member input (memberState r)
+      (M).replay_map_of_live input member (memberState r)
         (member_step initial round roundStart roundReply member memberStart memberReply input r)
         callBits (memberStart r) hfirst.2,
       (M).replay_cons, member_return _ _ _ _ _ _ _ _ _ _ _ hfirst.1]
@@ -541,7 +526,7 @@ theorem haltsWithin (P : Registers κ → Prop) (hp : P initial)
         have hentry : enterRound (μ := μ) roundStart r = roundState r (roundStart r) := by
           simp only [enterRound, ite_eq_right hzero, roundState]
         rw [hentry, (M).replay_append,
-          replay_call (M) round input (roundState r)
+          (M).replay_map_of_live input round (roundState r)
             (round_step initial round roundStart roundReply member memberStart memberReply input r)
             callBits (roundStart r) hfirst.2,
           (M).replay_cons, round_return _ _ _ _ _ _ _ _ _ _ _ hfirst.1]
