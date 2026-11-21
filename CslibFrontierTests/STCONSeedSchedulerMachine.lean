@@ -163,4 +163,15 @@ example (w bits : List Bool) :
   change (encState (encSum encNat (encOption encBool)) (scheduler.run w bits)).length ≤ _ at hbound
   omega
 
+/-- The initial scheduler state can use the workspace of a variable setup producer. -/
+example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ ↪ List Bool)
+    (call : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
+    (readVerdict : σ → Option ControllerVerdict)
+    (hstart : ComputableInSpace start encSeedScanRequest encScan
+      (fun r => (encSeedScanRequest r).length))
+    {prepare : α → SeedSearchSetup} (hsetup : ComputableInSpace prepare enc encSeedSearchSetup S) :
+    ComputableInSpace (fun a => (machine (prepare a) call start readVerdict).init)
+      enc (encState encScan) S :=
+  init_budget encScan call start readVerdict hstart hsetup
+
 end CslibFrontierTests.STCONSeedSchedulerMachine
