@@ -8,7 +8,6 @@ module
 -- upstream: local-only (test driver)
 
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.SourceRound
-import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.BranchReplay
 
 /-! Checked scalar traces for the source controller's tie and rejection results. -/
 
@@ -38,6 +37,15 @@ example :
     let q := tieRound.run [] (List.replicate 16 false)
     tieRound.halted q = true ∧ (answer q).map (·.bad) = some true ∧
       (answer q).map (·.tally.count) = some 3 := by decide +kernel
+
+/-- A tied result is a successful scan occurrence with its full updated tally. -/
+example : replayScan context reply start id [] (List.replicate 16 false) =
+    some (⟨⟨3, 1⟩, true⟩, []) := by
+  apply (firstHalting_iff_replayScan context reply start id _ _ _).mp
+  refine ⟨⟨by decide +kernel, ?_⟩, by rfl⟩
+  intro n hn
+  simp only [List.length_replicate] at hn
+  interval_cases n <;> decide +kernel
 
 private def rejectRound := machine context reply
   (fun ctx request => match request with
