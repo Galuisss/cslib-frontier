@@ -7,7 +7,8 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceContext
+import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenRoundCallback
+import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision.Replay
 
 /-! Re-enter the Justesen tally at a variable seed and check replay and encoded length. -/
 
@@ -120,13 +121,34 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source candidate : Fin n),
       let ctx : SourceRound.Context := ⟨n, source.val, 0, ⟨0, 0⟩⟩
       let adjacency := configurationJustesenSubdivisionContext ntm c w seed.val
-      let entry := justesenRoundMembershipStart adjacency ctx candidate.val
+      let entry := justesenRoundCallbackStart adjacency ctx (.member candidate.val)
       let bits := MembershipTally.selectors (BoundedWalk.selectors 3) (fun _ : Fin n => none)
-      (justesenSourceMembershipMachine ntm c).readReply MembershipTally.retainedReply
+      (justesenRoundCallback ntm c).readReply justesenRoundCallbackReply
         w entry (bits ++ [false, true]) = some (false, [true]) := by
   intro I n seed source candidate ctx adjacency entry bits
+  dsimp only [entry]
+  rw [justesenRoundCallback_readReply]
   exact (justesenRoundMembership_readReply_iff ntm c w seed source candidate
     0 ⟨0, 0⟩ _ false [true]).mpr ⟨fun _ => none, rfl, run_skip _ _ _⟩
+
+/-- A tagged edge request returns adjacency on the original word and keeps the suffix. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (u v : Fin n) (ctx : SourceRound.Context)
+      (suffix : List Bool),
+      let adjacency := configurationJustesenSubdivisionContext ntm c w seed.val
+      let entry := justesenRoundCallbackStart adjacency ctx (.edge u.val v.val)
+      (justesenRoundCallback ntm c).readReply justesenRoundCallbackReply
+        w entry ([false, false, false, false] ++ suffix) =
+        some (configurationJustesenSubdivisionAdjacent ntm c w seed u v, suffix) := by
+  intro I n seed u v ctx suffix adjacency entry
+  dsimp only [entry]
+  rw [justesenRoundCallback_readReply]
+  refine (configurationJustesenSubdivisionEdge_readReply_iff ntm c w seed u v _ suffix _).mpr
+    ⟨rfl, ?_⟩
+  simp only [configurationJustesenSubdivisionAdjacent, decide_eq_true_eq]
 
 /-- The final callback returns a passing negative reply and preserves the next selectors. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
