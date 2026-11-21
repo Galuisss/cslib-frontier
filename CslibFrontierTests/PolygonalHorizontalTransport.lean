@@ -403,8 +403,8 @@ private theorem stretch_interpolation (cut x y t : ℝ) (ht : t ∈ Set.Icc 0 1)
   · have hm : 0 ≤ AffineMap.lineMap x y t - cut := by
       rw [AffineMap.lineMap_apply_ring]
       nlinarith only [mul_nonneg hn hx, mul_nonneg ht.1 hy]
-    simp only [stretch, max_eq_right hm, max_eq_right hx, max_eq_right hy,
-      AffineMap.lineMap_apply_ring]
+    simp only [stretch, max_eq_right hm, max_eq_right hx, max_eq_right hy]
+    simp only [AffineMap.lineMap_apply_ring]
     ring
   · have hm : AffineMap.lineMap x y t - cut ≤ 0 := by
       rw [AffineMap.lineMap_apply_ring]
