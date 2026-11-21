@@ -124,25 +124,31 @@ example :
   rw [← run_withInit, withBoundedWalk_withInit, reply_eq_some_iff]
   exact negativeReplay.2
 
+private def contextEdge : QueryMachine Bool where
+  init := false
+  query := fun _ => 0
+  next := fun p => p.1
+  halted := fun _ => true
+  emit := fun _ => []
+  finish := fun _ => []
+
 open Turing.DoubleCounting in
-/-- The same tally re-enters at a larger dimension and selects a walk to a vertex outside
-the original carrier. The queried vertex is skipped, so the tally returns `some false`.
+/-- The same tally re-enters with a larger carrier and an adjacency context that permits
+the selected edge. The queried vertex is skipped, so the tally returns a passing negative.
 The clock and encoded-state bounds cover every branch from the new entry. -/
 example :
-    let start := fun (_ : Unit) (_ _ : ℕ) => ()
-    let acceptEdge := fun (_ : Unit) => true
-    let entry := BoundedWalk.Runtime.entry edge start acceptEdge 0 () (N := 1) ⟨0, 0, 0⟩
-    let single := withRuntimeWalk edge start acceptEdge 0 entry () ⟨1, 0, 0, 0, ⟨0, 0⟩⟩
+    let start := fun (flag : Bool) (_ _ : ℕ) => flag
+    let entry := BoundedWalk.Runtime.entry contextEdge start id 0 false (N := 1) ⟨0, 0, 0⟩
+    let single := retainedMachine contextEdge start id 0 entry false ⟨1, 0, 0, 0, ⟨0, 0⟩⟩
     let expanded : Context := ⟨2, 0, 0, 1, ⟨1, 1⟩⟩
-    let double := single.withInit (initial expanded)
-    let enc := MembershipTally.encState (BoundedWalk.Runtime.encState encUnit encUnit)
+    let double := single.withInit (retainedInitial true expanded)
+    let enc := encRetainedState encBool encBool
     let branch : Scan.Branch 2 := fun v => if v = 1 then some [1] else none
     let bits := MembershipTally.selectors (BoundedWalk.selectors 0) branch
-    (double.FirstHalting [true] bits double.init ∧ reply (double.run [true] bits) = some false) ∧
-      double.HaltsWithin [true] 23 ∧
-      ∀ choices, (enc (double.run [true] choices)).length ≤
-        runtimeWalkStateBound 0 expanded 0 0 := by
-  intro start acceptEdge entry single expanded double enc branch bits
+    (double.FirstHalting [true] bits double.init ∧ retainedReply (double.run [true] bits) =
+      some false) ∧ double.HaltsWithin [true] 23 ∧
+      ∀ choices, (enc (double.run [true] choices)).length ≤ retainedStateBound 0 expanded 1 1 := by
+  intro start entry single expanded double enc branch bits
   let allEdges (_ _ : Fin 2) := true
   have hscan : Scan.run allEdges 0 0 1 ⟨1, 1⟩ branch = some false := by
     rw [Scan.run_eq_finish, Scan.tallyPrefix_succ allEdges 0 0 1 branch (n := 1) (by decide),
@@ -150,23 +156,25 @@ example :
     simp [branch, allEdges, Scan.walkM, Scan.readNext, bind, StateT.bind, pure, StateT.pure,
       Scan.Result.finish, Scan.Result.recordWalk, Scan.Result.zero, Tally.matches_iff]
   dsimp only [double, single]
-  rw [withRuntimeWalk_withInit]
+  rw [retainedMachine_withInit]
   have hsource : expanded.source < expanded.size := by decide
   refine ⟨?_, ?_, ?_⟩
-  · exact (withRuntimeWalk_firstHalting_iff edge start acceptEdge 0 entry () [true]
+  · apply (retainedMachine_firstHalting_reply_iff contextEdge start id 0 entry true expanded
+      [true] bits false).mpr
+    exact (withRuntimeWalk_firstHalting_iff contextEdge start id 0 entry true [true]
       allEdges 0 0 1 ⟨1, 1⟩ (fun _ _ => rfl) (fun _ _ => rfl) bits false).mpr
       ⟨branch, ⟨rfl, hscan⟩, fun other h =>
         selectors_injective _ (BoundedWalk.eq_of_selectors_prefix 0) h.1.symm⟩
   · refine HaltsWithin.mono _ _
-      (withRuntimeWalk_haltsWithin edge start acceptEdge 0 entry () expanded hsource [true]) ?_
+      (retainedMachine_haltsWithin contextEdge start id 0 entry true expanded hsource [true]) ?_
     change 2 * (1 * ((2 : ℕ).size + 0 + 3) + ((2 : ℕ).size + 2) + 2) + 1 ≤ 23
     rw [← Nat.size_eq_bits_len]
     decide
   · intro choices
-    simpa only [enc, encUnit_apply, List.length_nil] using
-      withRuntimeWalk_length_run_le edge start acceptEdge 0 entry () encUnit encUnit expanded
-        hsource [true] 0 (fun _ _ _ _ => by simp only [encUnit_apply, List.length_nil, le_refl])
-        choices
+    simpa only [enc, encBool_apply, List.length_singleton] using
+      retainedMachine_length_run_le contextEdge start id 0 entry true encBool encBool expanded
+        hsource [true] 1
+        (fun _ _ _ _ => by simp only [encBool_apply, List.length_singleton, le_refl]) choices
 
 example :
     let E := encState (Turing.DoubleCounting.BoundedWalk.encState (N := 2) encUnit)
