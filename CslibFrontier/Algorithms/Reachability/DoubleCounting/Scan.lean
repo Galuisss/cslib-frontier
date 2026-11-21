@@ -106,11 +106,14 @@ private theorem walk_next (edge : Fin N → Fin N → Bool) (target current v : 
   simp only [bind, StateT.bind, readNext, pure, StateT.pure]
   split <;> rfl
 
-private theorem walk_eq_some {edge : Fin N → Fin N → Bool} {target current : Fin N}
+/-- A replayed walk returns exactly its unused fuel when the destination list forms a path
+to the target within the original fuel. -/
+theorem walkM_replay_eq_some {edge : Fin N → Fin N → Bool} {target current : Fin N}
     {fuel left : ℕ} {tail : List (Fin N)} :
-    walk edge target fuel current tail = some left ↔
+    (walkM readNext (fun u v => pure (edge u v)) target fuel current tail).1 = some left ↔
       (current :: tail).IsChainFromTo (fun u v => edge u v = true) current target ∧
       left + tail.length = fuel := by
+  change walk edge target fuel current tail = some left ↔ _
   induction tail generalizing fuel current with
   | nil =>
     have hchain : [current].IsChainFromTo (fun u v => edge u v = true) current target ↔
@@ -240,6 +243,19 @@ theorem tallyPrefix_succ (edge : Fin N → Fin N → Bool) (source target : Fin 
     simp [add, Result.zero]
   · simp only [Option.map_map, Function.comp_def, add_ofWalk, walk]
 
+/-- A partial tally depends only on selections below its cursor. -/
+theorem tallyPrefix_congr (edge : Fin N → Fin N → Bool) (source target : Fin N)
+    (k : ℕ) {n : ℕ} (hn : n ≤ N) {a b : Branch N}
+    (h : ∀ v : Fin N, v.val < n → a v = b v) :
+    tallyPrefix edge source target k a hn = tallyPrefix edge source target k b hn := by
+  induction n with
+  | zero => simp only [tallyPrefix_zero]
+  | succ n ih =>
+    have hn' : n < N := hn
+    rw [tallyPrefix_succ edge source target k a hn',
+      tallyPrefix_succ edge source target k b hn', ih hn'.le (fun v hv => h v (by omega))]
+    simp only [h ⟨n, hn'⟩ (Nat.lt_succ_self n)]
+
 /-- Replay a scan, returning the accumulated tally and target membership if all chosen walks
 check. -/
 def tally (edge : Fin N → Fin N → Bool) (source target : Fin N) (k : ℕ)
@@ -297,6 +313,13 @@ def run (edge : Fin N → Fin N → Bool) (source target : Fin N) (k : ℕ)
     (expected : Tally) (branch : Branch N) : Option Bool :=
   (tally edge source target k branch).bind (Result.finish expected)
 
+/-- The terminal scan checks the required totals after processing all candidates. -/
+theorem run_eq_finish (edge : Fin N → Fin N → Bool) (source target : Fin N) (k : ℕ)
+    (expected : Tally) (branch : Branch N) :
+    run edge source target k expected branch =
+      (tallyPrefix edge source target k branch le_rfl).bind (Result.finish expected) := by
+  rw [run, tally]
+
 /-- Feeding the streaming scanner a typed branch implements its replay, including the
 terminal tally test. -/
 theorem runM_replay (edge : Fin N → Fin N → Bool) (source target : Fin N)
@@ -337,12 +360,13 @@ private theorem candidate_spec (edge : Fin N → Fin N → Bool) (source target 
       have hn : ¬ ((source :: tail).IsChainFromTo (fun u v => edge u v = true) source v ∧
           tail.length ≤ k) := by
         intro ⟨hc, hl⟩
-        have hs := walk_eq_some.mpr ⟨hc, show k - tail.length + tail.length = k by omega⟩
+        have hs := walkM_replay_eq_some.mpr ⟨hc, show k - tail.length + tail.length = k by omega⟩
+        change walk edge v k source tail = some (k - tail.length) at hs
         rw [hw] at hs
         contradiction
       simp [hn]
     | some left =>
-      obtain ⟨hc, hl⟩ := walk_eq_some.mp hw
+      obtain ⟨hc, hl⟩ := walkM_replay_eq_some.mp hw
       have hle : tail.length ≤ k := by omega
       have heq : k - left = tail.length := by omega
       simp [Result.ofWalk, hc, hle, heq]

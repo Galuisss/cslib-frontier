@@ -43,4 +43,20 @@ example : run 1 [false, false] = .inr (.inr none) := rfl
 -- A selected walk returns through one deterministic boundary step.
 example : run 1 [true, false, false] = .inr (.inr (some true)) := rfl
 
+-- Decode the selected zero-step walk and check the same result in the typed scanner.
+example : ∃ branch : Cslib.DoubleCounting.Scan.Branch 1,
+    Cslib.DoubleCounting.Scan.run (fun _ _ => false) 0 0 0 ⟨1, 0⟩ branch = some true := by
+  refine exists_scan_of_firstHalting unusedWalk (fun _ => ()) (fun _ => some 0)
+    [] (fun _ _ => false) 0 0 0 ⟨1, 0⟩ ?_ [true, false, false] true ?_ ?_
+  · intro v _ _ remaining _ _ hfuel
+    change some 0 = some remaining at hfuel
+    cases hfuel
+    have hv : v = 0 := Fin.eq_zero v
+    subst v
+    exact ⟨[], Cslib.DoubleCounting.Scan.walkM_replay_eq_some.mpr
+      ⟨List.isChainFromTo_singleton, rfl⟩⟩
+  · exact (firstHalting_finish ⟨1, 0, 0, 0, ⟨1, 0⟩⟩ unusedWalk (fun _ => ())
+      (fun _ => some 0) [] [true, false] ⟨⟨1, 0⟩, true⟩ true rfl rfl).1
+  · rfl
+
 end CslibFrontierTests.DoubleCountingMembershipTally
