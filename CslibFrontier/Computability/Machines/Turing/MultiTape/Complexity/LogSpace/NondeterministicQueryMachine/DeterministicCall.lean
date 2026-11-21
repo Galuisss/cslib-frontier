@@ -38,6 +38,12 @@ private theorem step_false (M : QueryMachine σ) (input : List Bool) (s : σ) :
     simp [NondeterministicQueryMachine.step, NondeterministicQueryMachine.read,
       withRejectingChoice, QueryMachine.step, QueryMachine.read, h]
 
+private theorem step_true_of_live (M : QueryMachine σ) (input : List Bool) {s : Option σ}
+    (hlive : M.withRejectingChoice.halted s = false) :
+    M.withRejectingChoice.step input s true = none := by
+  rw [NondeterministicQueryMachine.step, hlive]
+  rfl
+
 /-- An all-false replay from an explicit entry state performs the same original-input run. -/
 theorem withRejectingChoice_replay_false (M : QueryMachine σ) (input : List Bool)
     (s : σ) (t : ℕ) :
@@ -70,9 +76,10 @@ theorem withRejectingChoice_replay_eq_none_or_runFrom (M : QueryMachine σ) (inp
       | false => exact Or.inr (step_false M input _)
       | true =>
         cases hh : M.halted (M.runFrom input s pre.length)
-        · exact Or.inl (by simp [NondeterministicQueryMachine.step, withRejectingChoice, hh])
-        · exact Or.inr (by
-            simp [NondeterministicQueryMachine.step, withRejectingChoice, QueryMachine.step, hh])
+        · exact Or.inl (step_true_of_live M input hh)
+        · right
+          rw [M.withRejectingChoice.step_of_halted input (s := some _) hh true]
+          simp only [QueryMachine.step, hh, ite_true]
 
 private theorem replicate_of_success (M : QueryMachine σ) (input : List Bool)
     (bits : List Bool) (s : Option σ)
@@ -89,10 +96,7 @@ private theorem replicate_of_success (M : QueryMachine σ) (input : List Bool)
     | false =>
       exact congrArg (List.cons false) (ih _ htail hsuccess)
     | true =>
-      have hreject : B.step input s true = none := by
-        rw [NondeterministicQueryMachine.step, hlive]
-        rfl
-      rw [hreject, B.replay_of_halted input (s := none) rfl] at hsuccess
+      rw [step_true_of_live M input hlive, B.replay_of_halted input (s := none) rfl] at hsuccess
       cases hsuccess
 
 /-- A deterministic first halt at time `t` has exactly the all-false selector word of length
