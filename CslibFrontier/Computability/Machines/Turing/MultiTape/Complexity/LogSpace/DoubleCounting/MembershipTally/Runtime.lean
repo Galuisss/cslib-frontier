@@ -26,13 +26,16 @@ allows different tally queries to use the same walk on the original input.
 
 * `Turing.DoubleCounting.MembershipTally.withRuntimeWalk_firstHalting_iff`: a successful
   first-halt selector list describes exactly one successful typed scan with the same reply.
+* `Turing.DoubleCounting.MembershipTally.withRuntimeWalk_haltsWithin` and
+  `Turing.DoubleCounting.MembershipTally.withRuntimeWalk_length_run_le`: the common selector
+  clock and encoded-state bound for all branches starting from a valid source.
 -/
 
 public section
 
 namespace Turing.DoubleCounting.MembershipTally
 
-open Cslib.DoubleCounting
+open Cslib.DoubleCounting MultiTapeTM
 open Turing.DoubleCounting.BoundedWalk
 
 variable {κ τ : Type} (edge : QueryMachine τ) (start : κ → ℕ → ℕ → τ)
@@ -84,5 +87,52 @@ theorem withRuntimeWalk_firstHalting_iff {N : ℕ} (input : List Bool)
   simpa only [enterRuntimeWalk, source.isLt, v.isLt, and_self, dite_true] using
     Runtime.firstHalting_remainingFuel_iff edge start verdict clock initialWalk context
       ⟨source, v, radius⟩ input adjacent hclock hedge ws left
+
+private theorem runtimeWalk_withInit {ctx : Context} (r : Registers) (hr : r.context = ctx)
+    (hsource : ctx.source < ctx.size) (hcursor : r.cursor < ctx.size) :
+    let entry := Runtime.entry edge start verdict clock context
+      ⟨⟨ctx.source, hsource⟩, ⟨r.cursor, hcursor⟩, ctx.radius⟩
+    (Runtime.machine edge start verdict clock initialWalk).withInit
+      (enterRuntimeWalk edge start verdict clock context r) =
+    Runtime.machine edge start verdict clock entry := by
+  cases hr
+  simp only [Runtime.machine_withInit, enterRuntimeWalk, dite_eq_left (And.intro hsource hcursor)]
+
+/-- Charge the candidate scan and its calls, including all rejecting selector lists. -/
+theorem withRuntimeWalk_haltsWithin (ctx : Context) (hsource : ctx.source < ctx.size)
+    (input : List Bool) :
+    (withRuntimeWalk edge start verdict clock initialWalk context ctx).HaltsWithin input
+      (ctx.size * (ctx.radius * (ctx.size.size + clock + 3) + (ctx.size.size + 2) + 2) + 1) := by
+  apply haltsWithin
+  intro r hr _ hcursor
+  rw [runtimeWalk_withInit edge start verdict clock initialWalk context r hr hsource hcursor]
+  exact Runtime.haltsWithin edge start verdict clock context
+    ⟨⟨ctx.source, hsource⟩, ⟨r.cursor, hcursor⟩, ctx.radius⟩ input
+
+/-- Add the framed adjacency context and runtime dimension to the fixed-dimension tally bound. -/
+@[expose] def runtimeWalkStateBound (clock : ℕ) (ctx : Context)
+    (contextLength calleeBound : ℕ) : ℕ :=
+  stateBound ctx (2 * contextLength + 14 * (encNat ctx.size).length +
+    4 * (Nat.log2 ctx.size.size + 1) + 4 * (encNat ctx.radius).length +
+    2 * (encNat clock).length + calleeBound + 23)
+
+/-- Bound the encoded tally state on every selector prefix, including while a walk retains
+the adjacency context and a suspended callback state. -/
+theorem withRuntimeWalk_length_run_le (encK : κ ↪ List Bool) (encCallee : τ ↪ List Bool)
+    (ctx : Context) (hsource : ctx.source < ctx.size) (input : List Bool) (calleeBound : ℕ)
+    (hcallee : ∀ u v : Fin ctx.size, ∀ t ≤ clock,
+      (encCallee (edge.runFrom input (start context u.val v.val) t)).length ≤ calleeBound)
+    (bits : List Bool) :
+    (encState (Runtime.encState encK encCallee)
+      ((withRuntimeWalk edge start verdict clock initialWalk context ctx).run input bits)).length ≤
+      runtimeWalkStateBound clock ctx (encK context).length calleeBound := by
+  unfold runtimeWalkStateBound
+  apply length_replay_le
+  intro r hr _ hcursor choices
+  rw [← NondeterministicQueryMachine.run_withInit,
+    runtimeWalk_withInit edge start verdict clock initialWalk context r hr hsource hcursor]
+  exact Runtime.length_run_le edge start verdict clock context
+    ⟨⟨ctx.source, hsource⟩, ⟨r.cursor, hcursor⟩, ctx.radius⟩ input choices
+    encK encCallee calleeBound hcallee
 
 end Turing.DoubleCounting.MembershipTally

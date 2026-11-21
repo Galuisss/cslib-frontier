@@ -808,6 +808,11 @@ private theorem length_registers_le (r : Registers) (h : r.Bounded) :
     encTally_apply, encTallyFields, encBool_apply, List.length_singleton, length_encPair]
   omega
 
+/-- Bound the phase, retained tally registers, and a suspended walk of at most `walkBound` bits. -/
+@[expose] def stateBound (ctx : Context) (walkBound : ℕ) : ℕ :=
+  4 * (encContext ctx).length + 12 * (Nat.log2 ctx.size + 1) +
+    4 * (Nat.log2 (ctx.size * ctx.radius) + 1) + walkBound + 15
+
 /-- Charge the complete suspended tally and the walk state on every finite branch prefix. -/
 theorem length_replay_le {τ : Type} (encT : τ ↪ List Bool) (ctx : Context)
     (walk : NondeterministicQueryMachine τ) (enter : Registers → τ) (result : τ → Option ℕ)
@@ -816,8 +821,8 @@ theorem length_replay_le {τ : Type} (encT : τ ↪ List Bool) (ctx : Context)
       ∀ choices, (encT (walk.replay input choices (enter r))).length ≤ budget)
     (choices : List Bool) :
     (encState encT ((machine ctx walk enter result).run input choices)).length ≤
-      4 * (encContext ctx).length + 12 * (Nat.log2 ctx.size + 1) +
-        4 * (Nat.log2 (ctx.size * ctx.radius) + 1) + budget + 15 := by
+      stateBound ctx budget := by
+  unfold stateBound
   have hi : Invariant ctx walk enter input (initial ctx) := ⟨rfl, initial_bounded ctx⟩
   have hb := invariant_replay ctx walk enter result input choices hi
   change Invariant ctx walk enter input ((machine ctx walk enter result).run input choices) at hb
@@ -1024,10 +1029,8 @@ theorem withBoundedWalk_haltsWithin (ctx : Context) (input : List Bool) :
 
 /-- Encoded tally and walk registers plus one adjacency callback state. -/
 def boundedWalkStateBound (N clock : ℕ) (ctx : Context) (calleeBound : ℕ) : ℕ :=
-  4 * (encContext ctx).length + 12 * (Nat.log2 ctx.size + 1) +
-    4 * (Nat.log2 (ctx.size * ctx.radius) + 1) +
-    (12 * (encNat N).length + 4 * (Nat.log2 N.size + 1) +
-      4 * (encNat ctx.radius).length + 2 * (encNat clock).length + calleeBound + 21) + 15
+  stateBound ctx (12 * (encNat N).length + 4 * (Nat.log2 N.size + 1) +
+    4 * (encNat ctx.radius).length + 2 * (encNat clock).length + calleeBound + 21)
 
 /-- Charge both the suspended tally and the entire bounded walk on all branch prefixes. -/
 theorem withBoundedWalk_length_run_le (encCallee : τ ↪ List Bool)
