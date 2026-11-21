@@ -66,4 +66,31 @@ example (w : List Bool) (frame : SeedSchedulerFrame) (pos : ℕ) (bit : Bool) :
       .inl (.inr (frame, scan.step w (.inl pos) bit)) :=
   step_liveScan setup scan _ verdict w frame (.inl pos) bit rfl
 
+/-- A skipped root and a positive indexed scan leave their exact suffix to the scheduler.
+The eventual terminal answer is the designated negative answer. -/
+example (skipped indexed : SeedSchedulerFrame)
+    (henter : resume (σ := ℕ ⊕ Option Bool) (fun r => .inl r.sourceID) skipped none =
+      .inl (.inr (indexed, .inl 2))) :
+    let w := [false, false, true]
+    let start : SeedScanRequest → ℕ ⊕ Option Bool := fun r => .inl r.sourceID
+    let answer : Option Answer := some ⟨0, false⟩
+    let resumed := resume start indexed (some (.decided true))
+    scheduler.FirstHalting w [false, false, false] (.inl (.inl skipped)) ∧
+      scheduler.replay w [false, false, false] (.inl (.inl skipped)) = .inr (some answer) ↔
+    scheduler.FirstHalting w [] resumed ∧ scheduler.replay w [] resumed = .inr (some answer) := by
+  intro w start answer resumed
+  have hparse : scan.readReply verdict w (.inl 2) [false, false] =
+      some (.decided true, []) := rfl
+  change (machine setup scan start verdict).FirstHalting w _ _ ∧
+    (machine setup scan start verdict).replay w _ _ = _ ↔ _
+  have hskip := firstHalting_skip_iff setup scan start verdict w skipped
+    [false, false, false] answer
+  have hscan := firstHalting_scan_iff setup scan start verdict w indexed (.inl 2)
+    [false, false] answer
+  dsimp only at hskip hscan
+  rw [hskip]
+  simp only [List.cons.injEq, true_and, exists_eq_left']
+  rw [show resume start skipped none = _ from henter, hscan, hparse]
+  simp [resumed, scheduler, start]
+
 end CslibFrontierTests.STCONSeedSchedulerMachine
