@@ -11,9 +11,10 @@ public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenRoun
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision.Replay
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Dispatch.Resource
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.Cases
+import CslibFrontier.Computability.Machines.Turing.MultiTape.ResourceBounds.Polynomial.Automation
 
 /-!
-# Linear-space operations of the tagged Justesen callback
+# Resources of the tagged Justesen callback
 
 The callback uses the existing encodings for the rejecting-choice edge state and retained
 membership state, preceded by the dispatch tag. The same read response and selector encoding
@@ -22,6 +23,7 @@ is used in both branches.
 ## Main definitions
 
 * `Cslib.Complexity.STCON.encJustesenRoundCallbackState`: the tagged state encoding.
+* `Cslib.Complexity.STCON.configurationJustesenRoundCallbackClock`: the common selector clock.
 
 ## Main results
 
@@ -29,6 +31,8 @@ is used in both branches.
   halt test, and optional Boolean reply consume linear workspace in their encoded requests.
 * `Cslib.Complexity.STCON.justesenRoundCallbackStart_inSpace`: enter the requested callback
   from retained adjacency and the encoded source-round state.
+* `Cslib.Complexity.STCON.configurationJustesenRoundCallback_bounds`: all valid requests
+  halt within the common clock and have logarithmic encoded length at every replay prefix.
 -/
 
 public section
@@ -111,5 +115,81 @@ theorem justesenRoundCallbackStart_inSpace :
   | some p =>
     cases hphase : p.memberPhase <;> simp only [hp, hphase, SourceRound.request,
       Option.elim_some, Bool.false_eq_true, ite_false, ite_true]
+
+open Cslib.Code.JustesenFamily Cslib.DoubleCounting
+
+variable {k : ℕ} {State : Type} [Fintype State]
+
+/-- Both callback alternatives fit the larger of their selector clocks. -/
+noncomputable def configurationJustesenRoundCallbackClock
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) : ℕ :=
+  max 3 (configurationJustesenMembershipTallyClock ntm c w)
+
+/-- The common callback selector clock is polynomial in the length of the original input. -/
+theorem configurationJustesenRoundCallbackClock_polyBounded
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    PolyBounded List.length (configurationJustesenRoundCallbackClock ntm c) :=
+  PolyBounded.max (.const 3) (configurationJustesenMembershipTallyClock_polyBounded ntm c)
+
+/-- From any in-range request in an initialized round, all branches halt within the common
+clock and every selector prefix has logarithmic encoded length, including after rejection. -/
+theorem configurationJustesenRoundCallback_bounds
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ∃ C, ∀ w : List Bool,
+      let I := configurationInstance ntm c w
+      let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+      ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source : Fin n)
+        (radius : ℕ) (expected : Tally),
+        radius ≤ n → expected.count ≤ 1 + n * n → expected.lengthSum ≤ n * n * n →
+        ∀ request : SourceRound.Request, request.InRange n →
+          let adjacency := configurationJustesenSubdivisionContext ntm c w seed.val
+          let ctx : SourceRound.Context := ⟨n, source.val, radius, expected⟩
+          let M := justesenRoundCallback ntm c
+          let entry := justesenRoundCallbackStart adjacency ctx request
+          M.HaltsFrom w entry (configurationJustesenRoundCallbackClock ntm c w) ∧
+            ∀ bits, (encJustesenRoundCallbackState (M.replay w bits entry)).length ≤
+              C * (Nat.log2 w.length + 1) := by
+  obtain ⟨A, hedge⟩ := configurationJustesenSubdivisionEdge_choice_bounds ntm c
+  obtain ⟨B, hmember⟩ :=
+    configurationJustesenMembershipTally_length_run_le_log_of_loop_caps ntm c
+  refine ⟨max A B + 1, fun w => ?_⟩
+  intro I n seed source radius expected hrad hcount hsum request hr adjacency ctx M entry
+  have htag {D length : ℕ} (hD : D ≤ max A B)
+      (hlength : length ≤ D * (Nat.log2 w.length + 1)) :
+      length + 1 ≤ (max A B + 1) * (Nat.log2 w.length + 1) := by
+    rw [Nat.add_mul, Nat.one_mul]
+    exact Nat.add_le_add (hlength.trans (Nat.mul_le_mul_right _ hD))
+      (Nat.succ_le_succ (Nat.zero_le _))
+  cases request with
+  | edge u v =>
+    obtain ⟨hu, hv⟩ := hr
+    obtain ⟨hclock, hlength⟩ := hedge w seed ⟨u, hu⟩ ⟨v, hv⟩
+    let start := some (justesenSubdivisionEdgeStart (adjacency, u, v))
+    have hhalt : ((justesenWeightedSubdivisionCallback ntm).withRejectingChoice.withInit
+        start).HaltsWithin w 3 := hclock
+    refine ⟨fun bits hlen => ?_, fun bits => ?_⟩
+    · simp only [M, entry, justesenRoundCallback, justesenRoundCallbackStart, replay_dispatch,
+        Sum.map_inl]
+      exact HaltsWithin.mono _ _ hhalt (Nat.le_max_left _ _) bits hlen
+    · simp only [M, entry, justesenRoundCallback, justesenRoundCallbackStart, replay_dispatch,
+        Sum.map_inl, encJustesenRoundCallbackState, encSum_inl, List.length_cons]
+      exact htag (Nat.le_max_left _ _) (hlength bits)
+  | member v =>
+    have hhalt : ((justesenSourceMembershipMachine ntm c).withInit
+        (justesenRoundMembershipStart adjacency ctx v)).HaltsWithin w
+        (configurationJustesenMembershipTallyClock ntm c w) := by
+      dsimp only [adjacency]
+      rw [justesenRoundMembershipMachine_withInit]
+      exact configurationJustesenMembershipTally_haltsWithin_clock ntm c w
+        seed source ⟨v, hr⟩ radius expected hrad
+    refine ⟨fun bits hlen => ?_, fun bits => ?_⟩
+    · simp only [M, entry, justesenRoundCallback, justesenRoundCallbackStart, replay_dispatch,
+        Sum.map_inr]
+      exact HaltsWithin.mono _ _ hhalt (Nat.le_max_right _ _) bits hlen
+    · simp only [M, entry, justesenRoundCallback, justesenRoundCallbackStart, replay_dispatch,
+        Sum.map_inr, encJustesenRoundCallbackState, encSum_inr, List.length_cons]
+      rw [← run_withInit, justesenRoundMembershipMachine_withInit]
+      exact htag (Nat.le_max_right _ _) (hmember w seed source ⟨v, hr⟩
+        radius expected hrad hcount hsum bits)
 
 end Cslib.Complexity.STCON
