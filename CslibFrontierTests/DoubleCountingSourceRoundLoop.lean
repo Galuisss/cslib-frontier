@@ -73,17 +73,15 @@ example :
   let traces : Set (List Bool) :=
     {bits | scan.FirstHalting [] bits scan.init ∧ scan.accept (scan.run [] bits) = true}
   change traces = _
-  have onlyEmpty {σ : Type} (N : NondeterministicQueryMachine σ) (s : σ) (h : N.halted s = true)
-      {bits : List Bool} (hf : N.FirstHalting [] bits s) : bits = [] := by
-    by_contra hn
-    have hl := hf.2 0 (List.length_pos_iff.mpr hn)
-    simp only [List.take_zero, NondeterministicQueryMachine.replay_nil, h] at hl
-    cases hl
   have hu := subsingleton_successful_firstHalting (start () 2) round id growingRound
     done (fun _ => ()) (fun _ => some false) [] (fun _ => True) trivial
     (fun _ _ _ _ _ _ _ _ => trivial)
-    (fun r _ _ _ hx _ hy => (onlyEmpty round r rfl hx.1).trans (onlyEmpty round r rfl hy.1).symm)
-    (fun _ _ _ _ hx _ hy => (onlyEmpty done () rfl hx.1).trans (onlyEmpty done () rfl hy.1).symm)
+    (fun r _ _ _ hx _ hy =>
+      ((round.firstHalting_iff_nil_of_halted [] _ r rfl).mp hx.1).trans
+        ((round.firstHalting_iff_nil_of_halted [] _ r rfl).mp hy.1).symm)
+    (fun _ _ _ _ hx _ hy =>
+      ((done.firstHalting_iff_nil_of_halted [] _ () rfl).mp hx.1).trans
+        ((done.firstHalting_iff_nil_of_halted [] _ () rfl).mp hy.1).symm)
   have hmem : [false, false, false] ∈ traces :=
     ⟨NondeterministicQueryMachine.firstHalting_append_singleton scan [] [false, false] false
       rfl rfl, rfl⟩

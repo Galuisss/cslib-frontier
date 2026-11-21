@@ -78,6 +78,14 @@ private theorem firstHalting_append_live_iff {α : Type} (M : NondeterministicQu
     · rw [List.take_append, List.take_of_length_le (by omega : before.length ≤ n), M.replay_append]
       exact h.2 (n - before.length) (by simp only [List.length_append] at hn; omega)
 
+/-- A replay starting at an already halted state first halts exactly on the empty list. -/
+theorem firstHalting_iff_nil_of_halted {α : Type} (M : NondeterministicQueryMachine α)
+    (input bits : List Bool) (q : α) (hh : M.halted q = true) :
+    M.FirstHalting input bits q ↔ bits = [] := by
+  cases bits with
+  | nil => simp [NondeterministicQueryMachine.FirstHalting, hh]
+  | cons b bits => simp [M.firstHalting_cons_iff, hh]
+
 /-- Decode a successful callback reply. The callback consumes its first-halting selector prefix
 and a false return selector. The unconsumed selector suffix is returned unchanged. -/
 @[expose] def readReply {β γ : Type} (callee : NondeterministicQueryMachine β)
@@ -112,20 +120,18 @@ theorem readReply_iff {β γ : Type} (callee : NondeterministicQueryMachine β)
           obtain ⟨rfl, rfl⟩ := List.cons.inj he
           exact ⟨tl, rfl, ((callee.firstHalting_cons_iff input _ _ _).mp hfirst).2, hret⟩
     · rw [readReply, ite_eq_left hhalt]
-      suffices hh : (∃ callBits, bit :: bits = callBits ++ false :: rest ∧
+      have hprefix : (∃ callBits, bit :: bits = callBits ++ false :: rest ∧
           callee.FirstHalting input callBits s ∧
           ret (callee.replay input callBits s) = some value) ↔
-          bit = false ∧ bits = rest ∧ ret s = some value by
-        rw [hh]
-        cases bit <;> simp [eq_comm, and_comm]
-      constructor
-      · rintro ⟨(_ | hd), he, hfirst, hret⟩
-        · exact ⟨(List.cons.inj he).1, (List.cons.inj he).2, hret⟩
-        · have hl := ((callee.firstHalting_cons_iff input _ _ _).mp hfirst).1
-          rw [hhalt] at hl
-          cases hl
-      · rintro ⟨rfl, rfl, hret⟩
-        exact ⟨[], rfl, ⟨hhalt, by simp⟩, hret⟩
+          bit = false ∧ bits = rest ∧ ret s = some value := by
+        constructor
+        · rintro ⟨callBits, he, hf, hret⟩
+          obtain rfl := (callee.firstHalting_iff_nil_of_halted input callBits s hhalt).mp hf
+          exact ⟨(List.cons.inj he).1, (List.cons.inj he).2, hret⟩
+        · rintro ⟨rfl, rfl, hret⟩
+          exact ⟨[], rfl, (callee.firstHalting_iff_nil_of_halted input [] s hhalt).mpr rfl, hret⟩
+      rw [hprefix]
+      cases bit <;> simp [eq_comm, and_comm]
 
 /-- If successful callback traces are unique, two successful parses consume the same callback
 prefix and false return selector, and return the same reply. -/

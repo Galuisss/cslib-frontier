@@ -677,13 +677,6 @@ def replayScan {τ : Type} (ctx : Context) (N : NondeterministicQueryMachine τ)
     (fun _ _ v => readRequest N start finish input ctx (.member v))
     ctx.radius ctx.expected).run bits
 
-private theorem firstHalting_at_halted {α : Type} (M : NondeterministicQueryMachine α)
-    (input bits : List Bool) (q : α) (hh : M.halted q = true) :
-    M.FirstHalting input bits q ↔ bits = [] := by
-  cases bits with
-  | nil => simp [NondeterministicQueryMachine.FirstHalting, hh]
-  | cons b bits => simp [M.firstHalting_cons_iff, hh]
-
 private theorem firstHalting_iff_remaining {τ : Type} (ctx : Context)
     (N : NondeterministicQueryMachine τ) (start : Context → Request → τ) (finish : τ → Option Bool)
     (input : List Bool) (update : RoundUpdate) (q : State) (bits : List Bool)
@@ -752,7 +745,7 @@ private theorem firstHalting_iff_remaining {τ : Type} (ctx : Context)
           exact ⟨hf', hfinal.symm ▸ ha⟩
     | true =>
       have hh : M.halted ⟨q, none⟩ = true := hlive
-      rw [firstHalting_at_halted M input bits ⟨q, none⟩ hh, M.replay_of_halted input hh]
+      rw [M.firstHalting_iff_nil_of_halted input bits ⟨q, none⟩ hh, M.replay_of_halted input hh]
       cases hr : q.rejected with
       | true =>
         simp [answer, result, hr, rem, remaining, StateT.run]
@@ -974,8 +967,8 @@ theorem subsingleton_successful_firstHalting {τ : Type} (ctx : Context)
     | h left ih =>
       cases hh : halted q with
       | true =>
-        exact ((firstHalting_at_halted M input _ ⟨q, none⟩ hh).mp hl.1).trans
-          ((firstHalting_at_halted M input _ ⟨q, none⟩ hh).mp hr.1).symm
+        exact ((M.firstHalting_iff_nil_of_halted input _ ⟨q, none⟩ hh).mp hl.1).trans
+          ((M.firstHalting_iff_nil_of_halted input _ ⟨q, none⟩ hh).mp hr.1).symm
       | false =>
         obtain ⟨hit, suffix, hlread, hlf, hlend⟩ :=
           (successful_request_iff ctx N start finish input q left _ hh hl.1.1 hl.2).mp

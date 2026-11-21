@@ -249,11 +249,9 @@ private theorem finish_iff (terminal : Option ControllerVerdict) (verdict : Cont
     (M).FirstHalting input bits (.inr terminal) ∧
         (M).replay input bits (.inr terminal) = .inr (some verdict) ↔
       bits = [] ∧ terminal = some verdict := by
-  cases bits with
-  | nil => simp [NondeterministicQueryMachine.FirstHalting, machine]
-  | cons bit bits =>
-    rw [(M).firstHalting_cons_iff]
-    simp [machine]
+  have hh : (M).halted (.inr terminal) = true := rfl
+  rw [(M).firstHalting_iff_nil_of_halted input bits _ hh, (M).replay_of_halted input hh]
+  simp only [Sum.inr.injEq]
 
 private theorem member_success_iff (r : Registers κ) (bits : List Bool)
     (verdict : ControllerVerdict) :

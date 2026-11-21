@@ -55,12 +55,9 @@ example : {bits : List Bool | tieRound.FirstHalting [] bits tieRound.init ∧
     (answer (tieRound.run [] bits)).isSome} = {List.replicate 16 false} := by
   have hu := subsingleton_successful_firstHalting context reply start id [] (by
     intro req _ left hl right hr
-    have onlyEmpty (bits : List Bool)
-        (hf : reply.FirstHalting [] bits (start context req)) : bits = [] := by
-      cases bits with
-      | nil => rfl
-      | cons b bits => cases (reply.firstHalting_cons_iff [] b bits _).mp hf |>.1
-    exact (onlyEmpty left hl.1).trans (onlyEmpty right hr.1).symm)
+    have hempty (bits : List Bool) :=
+      reply.firstHalting_iff_nil_of_halted [] bits (start context req) rfl
+    exact ((hempty left).mp hl.1).trans ((hempty right).mp hr.1).symm)
   exact hu.eq_singleton_of_mem ⟨tie_firstHalting, rfl⟩
 
 private def rejectRound := machine context reply
