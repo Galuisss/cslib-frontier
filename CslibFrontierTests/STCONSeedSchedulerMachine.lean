@@ -118,4 +118,16 @@ example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ �
   exact ⟨budget_comp_linear hq hstate, budget_comp_linear hh hstate,
     budget_comp_linear hr hstate, budget_comp_linear ha hstate⟩
 
+open MultiTapeTM in
+/-- The initial scheduler state can use the workspace of a variable setup producer. -/
+example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ ↪ List Bool)
+    (call : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
+    (readVerdict : σ → Option ControllerVerdict)
+    (hstart : ComputableInSpace start encSeedScanRequest encScan
+      (fun r => (encSeedScanRequest r).length))
+    {prepare : α → SeedSearchSetup} (hsetup : ComputableInSpace prepare enc encSeedSearchSetup S) :
+    ComputableInSpace (fun a => (machine (prepare a) call start readVerdict).init)
+      enc (encState encScan) S :=
+  init_budget encScan call start readVerdict hstart hsetup
+
 end CslibFrontierTests.STCONSeedSchedulerMachine
