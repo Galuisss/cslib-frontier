@@ -24,6 +24,7 @@ import CslibFrontier.Foundations.Analysis.Complex.ConjugateProduct
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalMinimumValue
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalRootFeasibility
 import CslibFrontier.Foundations.Analysis.SignLabelScore
+import CslibFrontier.Foundations.LinearAlgebra.Matrix.Charpoly.EvalDeterminant
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValuePolynomial
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalIntegerSpecialization
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CriticalValueParameterDegree
@@ -706,5 +707,21 @@ example (a : ℤ) (ha : a.natAbs ≤ 1) :
       ⟨0, by simp, by simpa only [q, Polynomial.eval₂_C, Int.coe_castRingHom] using ha₀'⟩
     have hnil := List.length_eq_zero_iff.mp (Nat.eq_zero_of_le_zero hL)
     exact ⟨e, he, hnil ▸ hneg⟩
+
+-- Evaluating X − 1 at the matrix with eigenvalues 2 and 3 gives determinant 1 · 2.
+example :
+    let M : Matrix (Fin 2) (Fin 2) ℚ := Matrix.diagonal ![2, 3]
+    (Polynomial.aeval M ((Polynomial.X : Polynomial ℚ) - Polynomial.C 1)).det = 2 := by
+  intro M
+  have hM : M.charpoly = (Polynomial.X - Polynomial.C 2) * (Polynomial.X - Polynomial.C 3) := by
+    simp [M, Matrix.charpoly_diagonal, Fin.prod_univ_two]
+  have hs : M.charpoly.Splits := by
+    rw [hM]
+    exact (Polynomial.Splits.X_sub_C _).mul (Polynomial.Splits.X_sub_C _)
+  rw [Matrix.det_aeval_eq_prod_charpoly_roots M _ (Polynomial.Splits.X_sub_C 1) hs, hM,
+    Polynomial.roots_mul
+      (mul_ne_zero (Polynomial.X_sub_C_ne_zero _) (Polynomial.X_sub_C_ne_zero _)),
+    Polynomial.roots_X_sub_C, Polynomial.roots_X_sub_C, Multiset.map_add, Multiset.prod_add]
+  norm_num
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
