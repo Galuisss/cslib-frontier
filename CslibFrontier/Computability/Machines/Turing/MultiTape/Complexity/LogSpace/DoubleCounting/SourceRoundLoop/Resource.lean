@@ -240,8 +240,8 @@ theorem withSourceRound_exists_routines {α : Type} (enc : α ↪ List Bool) (S 
     (hcalleeQuery : ComputableInSpace callee.query encCallee encNat (fun t => (encCallee t).length))
     (hcalleeHalt : ComputableInSpace callee.halted encCallee encBool
       (fun t => (encCallee t).length))
-    (hcalleeNext : ComputableInSpace callee.next (encPair encCallee SourceRound.encReadChoice)
-      encCallee (fun p => (encPair encCallee SourceRound.encReadChoice p).length))
+    (hcalleeNext : ComputableInSpace callee.next (encPair encCallee encReadChoice)
+      encCallee (fun p => (encPair encCallee encReadChoice p).length))
     (hmemberStart : ComputableInSpace memberStart (encRegisters encContext) encMember
       (fun r => (encRegisters encContext r).length))
     (hmemberReply : ComputableInSpace memberReply encMember (encOption encBool)
@@ -249,8 +249,8 @@ theorem withSourceRound_exists_routines {α : Type} (enc : α ↪ List Bool) (S 
     (hmemberQuery : ComputableInSpace member.query encMember encNat (fun s => (encMember s).length))
     (hmemberHalt : ComputableInSpace member.halted encMember encBool
       (fun s => (encMember s).length))
-    (hmemberNext : ComputableInSpace member.next (encPair encMember encChoice) encMember
-      (fun p => (encPair encMember encChoice p).length))
+    (hmemberNext : ComputableInSpace member.next (encPair encMember encReadChoice) encMember
+      (fun p => (encPair encMember encReadChoice p).length))
     (hstates : ∃ c, ∀ a bits, (encState encContext (SourceRound.encMachineState τ encCallee)
       encMember ((withSourceRound size source callee calleeStart calleeReply
         (contextOf a) (limitOf a) member memberStart memberReply).run (enc a) bits)).length ≤
