@@ -6570,6 +6570,7 @@ public import CslibFrontier.Foundations.Data.Finset.ApplyUpdate
 public import CslibFrontier.Foundations.Data.Finset.Average
 public import CslibFrontier.Foundations.Data.Finset.BigHalf
 public import CslibFrontier.Foundations.Data.Finset.CollisionInsert
+public import CslibFrontier.Foundations.Data.Finset.CoordinateSelection
 public import CslibFrontier.Foundations.Data.Finset.Density
 public import CslibFrontier.Foundations.Data.Finset.Expect
 public import CslibFrontier.Foundations.Data.Finset.Expect.Chebyshev

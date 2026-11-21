@@ -398,19 +398,22 @@ example : ∃ x : Fin 1 → ℝ, x 0 = 2 ∧ aeval x (X 0 : MvPolynomial (Fin 1)
     simpa only [r, aeval_C, Algebra.algebraMap_self_apply, pow_one] using (hx 0).symm
   exact ⟨x, hx₀, hv⟩
 
--- The two roots of x² − 1 have distinct positive-order derivative signs.
+-- One derivative sign test suffices to select one of the two roots of x² − 1.
+open scoped Classical in
 example :
     let p : Polynomial ℝ := Polynomial.X ^ 2 - 1
-    (fun i : Fin 2 => p.derivativeSign (-1) (i.val + 1)) ≠
-      (fun i : Fin 2 => p.derivativeSign 1 (i.val + 1)) := by
-  intro p hsign
+    let S : Finset ℝ := {-1, 1}
+    ∃ L : List (Fin 2 × SignType), L.length ≤ 1 ∧
+      ∃ x ∈ S, ∀ y ∈ S, (∀ c ∈ L, p.derivativeSign y (c.1.val + 1) = c.2) ↔ y = x := by
+  intro p S
   have hc : p.coeff 2 = 1 := by
     simp [p, Polynomial.coeff_X_pow, Polynomial.coeff_one]
   have hp : p ≠ 0 := fun h => by simp [h] at hc
   have hD : p.natDegree ≤ 2 := (Polynomial.natDegree_sub_le _ _).trans (by simp)
-  have hneg : p.IsRoot (-1) := by norm_num [p, Polynomial.IsRoot.def]
-  have hpos : p.IsRoot 1 := by norm_num [p, Polynomial.IsRoot.def]
-  have heq := p.injOn_derivativeSign_roots hp hD hneg hpos hsign
-  norm_num at heq
+  have hS : S.Nonempty := ⟨-1, by simp [S]⟩
+  have hroots (x : ℝ) (hx : x ∈ S) : p.IsRoot x := by
+    simp only [S, Finset.mem_insert, Finset.mem_singleton] at hx
+    rcases hx with rfl | rfl <;> norm_num [p, Polynomial.IsRoot.def]
+  exact p.exists_short_derivativeSign_selector hp hD (by decide) hS hroots
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
