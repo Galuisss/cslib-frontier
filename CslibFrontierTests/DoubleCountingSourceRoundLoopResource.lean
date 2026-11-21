@@ -7,7 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (test driver)
 
-import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.SourceRoundLoop.Resource
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.SourceRoundLoop.Replay
 
 /-! A concrete single-round machine composed with the multi-round source loop. -/
 
@@ -48,6 +48,25 @@ example : ComputableInSpace
 
 -- The first call counts no new vertex, and the final membership call returns a valid negative.
 example : (scan.run [] [false, false, false, false]) = .inr (some (.decided false)) := rfl
+
+-- Enter a different register state and leave two bits for the enclosing loop.
+example :
+    let initial : Registers Unit := ⟨(), 3, 2, ⟨0, 0⟩⟩
+    let r := start () 1
+    let round := SourceRound.machine (roundContext oneVertex source initial) callback entry
+      (fun _ => some true)
+    let run := round.readReply SourceRound.answer [] (SourceRound.entry
+      (roundContext oneVertex source r))
+    run [false, false, false, true, false] = some (⟨⟨1, 0⟩, false⟩, [true, false]) ∧
+      run [false, false, true, true, false] = none := by
+  dsimp only
+  constructor
+  · apply (readSourceRoundReply_iff oneVertex source callback entry (fun _ => some true)
+      _ _ [] _ _ _).mpr
+    refine ⟨[false, false], rfl, (SourceRound.firstHalting_iff_replayScan _ callback entry
+      (fun _ => some true) [] [false, false] _).mp ⟨?_, rfl⟩⟩
+    exact NondeterministicQueryMachine.firstHalting_append_singleton _ [] [false] false rfl rfl
+  · rfl
 
 -- The same concrete machine has the composed clock on every branch and every input.
 example (input : List Bool) : scan.HaltsWithin input 15 := by
