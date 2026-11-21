@@ -43,7 +43,8 @@ private theorem squareTent_sub_le (a : ℂ) (r : ℝ) (z w : ℂ) :
         (abs_abs_sub_abs_le_abs_sub _ _) (abs_abs_sub_abs_le_abs_sub _ _))
     _ ≤ ‖z - w‖ := by
       rw [sub_sub_sub_cancel_right, sub_sub_sub_cancel_right]
-      exact max_le (Complex.abs_re_le_norm _) (Complex.abs_im_le_norm _)
+      simpa only [Complex.sub_re, Complex.sub_im] using
+        max_le (Complex.abs_re_le_norm (z - w)) (Complex.abs_im_le_norm (z - w))
 
 private theorem affine_order_on_segment (f g : ℂ →ᵃ[ℝ] ℝ) (x y : ℂ)
     (h : 0 ∉ Set.Ioo (min ((f - g) x) ((f - g) y)) (max ((f - g) x) ((f - g) y))) :
@@ -51,7 +52,7 @@ private theorem affine_order_on_segment (f g : ℂ →ᵃ[ℝ] ℝ) (x y : ℂ)
       (∀ t ∈ Set.Icc (0 : ℝ) 1, g (AffineMap.lineMap x y t) ≤ f (AffineMap.lineMap x y t)) := by
   have hs : (g x ≤ f x ∧ g y ≤ f y) ∨ (f x ≤ g x ∧ f y ≤ g y) := by
     simpa only [Set.mem_Ioo, not_and_or, not_lt, le_min_iff, max_le_iff,
-      AffineMap.coe_sub, Pi.sub_apply, sub_nonneg, sub_nonpos] using h
+      FunLike.coe_sub, Pi.sub_apply, sub_nonneg, sub_nonpos] using h
   have hle (p q : ℂ →ᵃ[ℝ] ℝ) (hx : p x ≤ q x) (hy : p y ≤ q y) (t : ℝ)
       (ht : t ∈ Set.Icc 0 1) : p (AffineMap.lineMap x y t) ≤ q (AffineMap.lineMap x y t) := by
     rw [AffineMap.apply_lineMap p, AffineMap.apply_lineMap q,
@@ -143,7 +144,7 @@ theorem exists_square_move (a b : ℂ) {r : ℝ} (hr : 0 < r) (hb : ‖b - a‖ 
         F (AffineMap.lineMap x y t) = H (AffineMap.lineMap x y t) := by
       change _ + squareTent a r (AffineMap.lineMap x y t) • v =
         _ + T (AffineMap.lineMap x y t) • v
-      rw [hT t ht]
+      rw [hT t ht, AffineMap.id_apply]
     have hx : F x = H x := by
       simpa only [AffineMap.lineMap_apply_zero] using happ 0 ⟨le_rfl, zero_le_one⟩
     have hy : F y = H y := by
