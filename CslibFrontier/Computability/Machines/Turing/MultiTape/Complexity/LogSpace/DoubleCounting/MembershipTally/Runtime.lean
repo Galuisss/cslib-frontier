@@ -38,6 +38,8 @@ tally also loads the adjacency context from its own entry state.
   with the tally for the retained adjacency context.
 * The retained entry, transition, query, halt, and reply operations have linear-space
   certificates.
+* `Turing.DoubleCounting.MembershipTally.retainedMachine_exists_routines`: compile the tally
+  with input-dependent entry parameters and the all-branch encoded-state bound.
 -/
 
 public section
@@ -365,6 +367,50 @@ theorem retainedMachine_next_inSpace (ctx : Context)
   have hp := budget_prod ht (budget_prod hk (snd E encReadChoice))
   exact (encRetainedState_mk_budget encK encCallee hk
     (budget_comp_linear hstep hp)).of_enc_eq fun _ => rfl
+
+/-- The tally accepts exactly when its terminal state carries a membership reply. -/
+theorem retainedMachine_accept_inSpace (ctx : Context) :
+    ComputableInSpace (retainedMachine edge start verdict clock initialWalk context ctx).accept
+      E encBool (fun s => (E s).length) :=
+  (budget_optionIsSome (retainedReply_inSpace encK encCallee)).of_enc_eq fun _ => rfl
+
+open NondeterministicQueryMachine in
+/-- Compile the retained tally using the state bound for every selector branch. -/
+theorem retainedMachine_exists_routines {α : Type} (enc : α ↪ List Bool) (S : α → ℕ)
+    (ctx : Context) (walkContext : α → κ) (params : α → Context)
+    (hcontext : ComputableInSpace walkContext enc encK S)
+    (hparams : ComputableInSpace params enc encContext S)
+    (hlog : ∀ a, Nat.log2 (enc a).length + 1 ≤ S a)
+    (hstart : ComputableInSpace (fun (k, u, v) => start k u v)
+      (BoundedWalk.encStartRequest encK) encCallee
+      (fun p => (BoundedWalk.encStartRequest encK p).length))
+    (hq : ComputableInSpace edge.query encCallee encNat (fun s => (encCallee s).length))
+    (hn : ComputableInSpace edge.next (QueryMachine.encStateRead encCallee) encCallee
+      (fun p => (QueryMachine.encStateRead encCallee p).length))
+    (hh : ComputableInSpace edge.halted encCallee encBool (fun s => (encCallee s).length))
+    (hv : ComputableInSpace verdict encCallee encBool (fun s => (encCallee s).length))
+    (hsource : ∀ a, (params a).source < (params a).size)
+    (calleeBound : α → ℕ)
+    (hcallee : ∀ a, ∀ u v : Fin (params a).size, ∀ t ≤ clock,
+      (encCallee (edge.runFrom (enc a) (start (walkContext a) u.val v.val) t)).length ≤
+        calleeBound a)
+    (hstate : ∀ a,
+      retainedStateBound clock (params a) (encK (walkContext a)).length (calleeBound a) ≤ S a) :
+    Nonempty (Routines (retainedMachine edge start verdict clock initialWalk context ctx)
+      (fun a => retainedInitial (walkContext a) (params a)) enc S) := by
+  refine (retainedMachine edge start verdict clock initialWalk context ctx).exists_routines
+    (retainedMachine_query_inSpace edge start verdict clock initialWalk context encK encCallee
+      ctx hq)
+    (retainedMachine_next_inSpace edge start verdict clock initialWalk context encK encCallee ctx
+      hstart hn hh hv)
+    (retainedMachine_halted_inSpace edge start verdict clock initialWalk context encK encCallee ctx)
+    (retainedMachine_accept_inSpace edge start verdict clock initialWalk context encK encCallee ctx)
+    _ S hlog (retainedInitial_budget encK encCallee hcontext hparams) ⟨1, ?_⟩
+  intro a bits
+  rw [retainedMachine_withInit, Nat.one_mul]
+  exact (retainedMachine_length_run_le edge start verdict clock initialWalk (walkContext a)
+    encK encCallee (params a) (hsource a) (enc a) (calleeBound a) (hcallee a) bits).trans
+    (hstate a)
 
 end RetainedSpace
 
