@@ -20,6 +20,7 @@ import CslibFrontier.Foundations.Data.MvPolynomial.Degrees
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.InitialCriticalSeparability
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.ResidueCoeffNorm
 import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.SeparatedCriticalValues
+import CslibFrontier.Foundations.RingTheory.Polynomial.ValueResultant
 import Mathlib.Data.Nat.Size
 import Mathlib.Tactic.NormNum
 import Mathlib.Tactic.Ring
@@ -415,5 +416,23 @@ example :
     simp only [S, Finset.mem_insert, Finset.mem_singleton] at hx
     rcases hx with rfl | rfl <;> norm_num [p, Polynomial.IsRoot.def]
   exact p.exists_short_derivativeSign_selector hp hD (by decide) hS hroots
+
+-- A nonmonic source with a double root at 1 gives a degree-two resultant with root 3.
+example :
+    let p : Polynomial ℤ := Polynomial.C 3 * (Polynomial.X - Polynomial.C 1) ^ 2
+    let g : Polynomial ℤ := Polynomial.X + Polynomial.C 2
+    p.valueResultant g ≠ 0 ∧ (p.valueResultant g).natDegree = 2 ∧
+      ((p.valueResultant g).map (Int.castRingHom ℝ)).IsRoot 3 := by
+  intro p g
+  have hp : p ≠ 0 := mul_ne_zero (Polynomial.C_ne_zero.mpr (by decide))
+    (pow_ne_zero _ (Polynomial.X_sub_C_ne_zero _))
+  have hdeg : p.natDegree = 2 := by
+    simp only [p, Polynomial.natDegree_C_mul (by decide : (3 : ℤ) ≠ 0),
+      Polynomial.natDegree_pow, Polynomial.natDegree_X_sub_C]
+  have ha : (p.map (Int.castRingHom ℝ)).IsRoot 1 := by
+    norm_num [p, Polynomial.IsRoot.def]
+  obtain ⟨h₀, hd⟩ := Polynomial.valueResultant_ne_zero_and_natDegree hp g
+  exact ⟨h₀, hd.trans hdeg, by
+    simpa [g, show (1 : ℝ) + 2 = 3 by norm_num] using Polynomial.isRoot_valueResultant hp g ha⟩
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
