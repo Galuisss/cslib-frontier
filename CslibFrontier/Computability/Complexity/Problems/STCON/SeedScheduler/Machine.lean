@@ -97,6 +97,15 @@ def machine {σ : Type} (setup : SeedSearchSetup) (scan : NondeterministicQueryM
     | .inr _ => true
   accept s := ((reply s).join.map Answer.reachable).getD false
 
+/-- Changing the initial setup changes only the scheduler's entry. -/
+theorem machine_withInit {σ : Type} (setup next : SeedSearchSetup)
+    (scan : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
+    (verdict : σ → Option ControllerVerdict) :
+    (machine setup scan start verdict).withInit (machine next scan start verdict).init =
+      machine next scan start verdict := by
+  unfold machine NondeterministicQueryMachine.withInit
+  rfl
+
 /-- The live callback sees the original query answer and selector, and its caller frame
 is unchanged by the step. -/
 theorem step_liveScan {σ : Type} (setup : SeedSearchSetup) (scan : NondeterministicQueryMachine σ)
