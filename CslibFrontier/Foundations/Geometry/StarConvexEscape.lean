@@ -66,7 +66,9 @@ theorem exists_segment_to_frontier_avoiding_starConvex {E : Type*}
     have hnear : t + ε / 2 ∈ Metric.ball t ε := by
       rw [Metric.mem_ball, Real.dist_eq, add_sub_cancel_left, abs_of_pos (half_pos hε)]
       exact half_lt_self hε
-    have hu : t + ε / 2 ∈ T := ⟨ht.1.trans hlt.le, interior_subset (hball hnear)⟩
+    have hinside : ray (t + ε / 2) ∈ interior K := hball hnear
+    have huK : ray (t + ε / 2) ∈ K := interior_subset hinside
+    have hu : t + ε / 2 ∈ T := ⟨ht.1.trans hlt.le, huK⟩
     exact (hmax hu).not_gt hlt
   refine ⟨ray t, hfrontier, ?_⟩
   intro w hw
