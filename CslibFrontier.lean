@@ -308,6 +308,7 @@ public import CslibFrontier.Algorithms.Reachability.DoubleCounting.ControllerRep
 public import CslibFrontier.Algorithms.Reachability.DoubleCounting.Round
 public import CslibFrontier.Algorithms.Reachability.DoubleCounting.Scan
 public import CslibFrontier.Algorithms.Reachability.DoubleCounting.Scan.Binary
+public import CslibFrontier.Algorithms.Reachability.DoubleCounting.Scan.BoundedWalk
 public import CslibFrontier.Algorithms.Reachability.DoubleCounting.Scan.Combined
 public import CslibFrontier.Algorithms.Reachability.DoubleCounting.Scan.NondeterministicChoice
 public import CslibFrontier.Algorithms.Reachability.DoubleCounting.Scan.OffsetReader
