@@ -28,6 +28,7 @@ public section
 namespace Turing.DoubleCounting.SourceRound
 
 open Cslib.DoubleCounting MultiTapeTM ComputableInSpace
+open NondeterministicQueryMachine (encReadChoice)
 
 /-- Immutable arguments for a round of membership and adjacency calls. -/
 structure Context where
@@ -336,9 +337,6 @@ theorem answer_inSpace {τ : Type} (encT : τ ↪ List Bool) :
   have hc := encMachineState_controller_budget τ encT hid
   exact (budget_ite (encState_rejected_budget hc) (budget_const none (.refl _))
     (budget_optionSome (encState_update_budget hc))).of_enc_eq fun _ => rfl
-
-/-- Input bit and binary selector passed to a native callback step. -/
-abbrev encReadChoice := encPair (encOption encBool) encBool
 
 /-- Advance the suspended caller or the active callee in linear space in their joint encoding. -/
 theorem machine_next_inSpace {τ : Type} (encT : τ ↪ List Bool)
