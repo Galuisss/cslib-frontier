@@ -26,6 +26,7 @@ rejects the source scan.
 
 ## Main results
 
+* `subsingleton_successful_firstHalting` composes callback occurrence uniqueness.
 * `firstHalting_iff_replayRounds` identifies successful selector streams with replay of the
   existing fuel-bounded loop.
 * `haltsWithin` and `length_run_le` charge the retained registers and supplied callback bounds
@@ -340,6 +341,105 @@ theorem firstHalting_iff_replayRounds (bits : List Bool) (verdict : ControllerVe
   ∀ r, P r → 0 < r.fuel → ∀ bits a,
     roundReply (round.replay input bits (roundStart r)) = some a →
     a.bad = false → a.tally.count ≠ r.tally.count → P (r.advance a.tally)
+
+private theorem readReply_commonPrefix {β γ : Type} (callee : NondeterministicQueryMachine β)
+    (ret : β → Option γ) (input : List Bool) (s : β)
+    (hu : {bits : List Bool | callee.FirstHalting input bits s ∧
+      (ret (callee.replay input bits s)).isSome}.Subsingleton)
+    {left right rest rest' : List Bool} {a a' : γ}
+    (ha : readReply callee ret input s left = some (a, rest))
+    (ha' : readReply callee ret input s right = some (a', rest')) :
+    ∃ callBits, left = callBits ++ false :: rest ∧ right = callBits ++ false :: rest' ∧
+      ret (callee.replay input callBits s) = some a ∧ a = a' := by
+  obtain ⟨callBits, hleft, hf, hret⟩ :=
+    (NondeterministicQueryMachine.readReply_iff _ _ _ _ _ _ _).mp ha
+  obtain ⟨other, hright, hf', hret'⟩ :=
+    (NondeterministicQueryMachine.readReply_iff _ _ _ _ _ _ _).mp ha'
+  have he : callBits = other := hu ⟨hf, by simp [hret]⟩ ⟨hf', by simp [hret']⟩
+  subst other
+  exact ⟨callBits, hleft, hright, hret, Option.some.inj (hret.symm.trans hret')⟩
+
+/-- The source loop has at most one successful first-halting selector list if each round and
+final membership invocation at an admissible register state has at most one successful list.
+The invariant is needed only at the initial state and after a round that continues the loop. -/
+theorem subsingleton_successful_firstHalting (P : Registers κ → Prop) (hp : P initial)
+    (hclosed : Closed round roundStart roundReply input P)
+    (hround : ∀ r, P r → 0 < r.fuel →
+      {bits : List Bool | round.FirstHalting input bits (roundStart r) ∧
+        (roundReply (round.replay input bits (roundStart r))).isSome}.Subsingleton)
+    (hmember : ∀ r, P r → 0 < r.fuel →
+      {bits : List Bool | member.FirstHalting input bits (memberStart r) ∧
+        (memberReply (member.replay input bits (memberStart r))).isSome}.Subsingleton) :
+    {bits : List Bool | (M).FirstHalting input bits (M).init ∧
+      (M).accept ((M).run input bits) = true}.Subsingleton := by
+  have aux (r : Registers κ) (hr : P r) (left right : List Bool)
+      (v v' : ControllerVerdict) :
+      replayRounds round roundStart roundReply member memberStart memberReply input r left =
+        some (some v, []) →
+      replayRounds round roundStart roundReply member memberStart memberReply input r right =
+        some (some v', []) → left = right := by
+    induction hf : r.fuel using Nat.strongRecOn generalizing r left right v v' with
+    | ind fuel ih =>
+      intro hleft hright
+      by_cases hz : r.fuel = 0
+      · rw [replayRounds, hz, runRoundsWith] at hleft
+        cases hleft
+      · have hpos : 0 < r.fuel := Nat.pos_of_ne_zero hz
+        rw [replayRounds_step _ _ _ _ _ _ _ _ _ hz] at hleft hright
+        cases hl : readReply round roundReply input (roundStart r) left with
+        | none => simp [hl] at hleft
+        | some l =>
+          cases hr' : readReply round roundReply input (roundStart r) right with
+          | none => simp [hr'] at hright
+          | some r' =>
+            obtain ⟨a, suffix⟩ := l
+            obtain ⟨a', suffix'⟩ := r'
+            obtain ⟨callBits, hlBits, hrBits, hret, rfl⟩ :=
+              readReply_commonPrefix round roundReply input (roundStart r) (hround r hr hpos) hl hr'
+            simp only [hl] at hleft
+            simp only [hr'] at hright
+            rw [hlBits, hrBits]
+            suffices he : suffix = suffix' by rw [he]
+            by_cases hb : a.bad = true
+            · rw [ite_eq_left hb] at hleft hright
+              exact (congrArg Prod.snd (Option.some.inj hleft)).trans
+                (congrArg Prod.snd (Option.some.inj hright)).symm
+            · rw [ite_eq_right hb] at hleft hright
+              by_cases hc : (a.tally.count == r.tally.count) = true
+              · rw [ite_eq_left hc] at hleft hright
+                obtain ⟨⟨hit, tail⟩, hread, hout⟩ := Option.map_eq_some_iff.mp hleft
+                obtain ⟨⟨hit', tail'⟩, hread', hout'⟩ := Option.map_eq_some_iff.mp hright
+                have htail : tail = [] := congrArg Prod.snd hout
+                have htail' : tail' = [] := congrArg Prod.snd hout'
+                obtain ⟨memberBits, hl', hr', _, _⟩ :=
+                  readReply_commonPrefix member memberReply input (memberStart r)
+                    (hmember r hr hpos) hread hread'
+                rw [hl', hr', htail, htail']
+              · rw [ite_eq_right hc] at hleft hright
+                have hc' : a.tally.count ≠ r.tally.count := fun he => hc (beq_iff_eq.mpr he)
+                have hnext := hclosed r hr hpos callBits a hret (Bool.eq_false_iff.mpr hb) hc'
+                have hlt : (r.advance a.tally).fuel < fuel := by
+                  simp only [Registers.advance]
+                  omega
+                exact ih _ hlt (r.advance a.tally) hnext suffix suffix' v v' rfl hleft hright
+  intro left hl right hr
+  have accepted (bits : List Bool)
+      (h : (M).accept ((M).run input bits) = true) :
+      ∃ v, (M).run input bits = .inr (some v) := by
+    change (reply ((M).run input bits)).isSome = true at h
+    cases he : (M).run input bits with
+    | inl => rw [he] at h; cases h
+    | inr verdict =>
+      cases verdict with
+      | none => rw [he] at h; cases h
+      | some v => exact ⟨v, rfl⟩
+  obtain ⟨v, hv⟩ := accepted left hl.2
+  obtain ⟨v', hv'⟩ := accepted right hr.2
+  exact aux initial hp left right v v'
+    ((firstHalting_iff_replayRounds initial round roundStart roundReply member memberStart
+      memberReply input left v).mp ⟨hl.1, hv⟩)
+    ((firstHalting_iff_replayRounds initial round roundStart roundReply member memberStart
+      memberReply input right v').mp ⟨hr.1, hv'⟩)
 
 /-- A round fuel bound, the common round clock and the final membership clock bound every
 source branch. Both return selectors and all rejections are charged to the same clock. -/
