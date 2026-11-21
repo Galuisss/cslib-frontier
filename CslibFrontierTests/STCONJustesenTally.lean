@@ -280,15 +280,15 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
 -- Plug the retained round and final membership into the source-loop transition.
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
     (context : JustesenSourceContext) (limit : ℕ) :
-    let encRound := encJustesenRetainedSourceRoundState
-    let encMember := MembershipTally.encRetainedState encJustesenSubdivisionContext
-      encJustesenSubdivisionState
-    let E := SourceRoundLoop.encState encJustesenSourceContext encRound encMember
+    let E := encJustesenSourceLoopState
     let encStep := encPair E encReadChoice
     let M := justesenSourceLoop ntm c context limit
     ComputableInSpace M.query E encNat (fun s => (E s).length) ∧
       ComputableInSpace M.next encStep E (fun p => (encStep p).length) := by
-  intro encRound encMember E encStep M
+  intro E encStep M
+  let encRound := encJustesenRetainedSourceRoundState
+  let encMember := MembershipTally.encRetainedState encJustesenSubdivisionContext
+    encJustesenSubdivisionState
   let initial := SourceRoundLoop.start context limit
   let round := justesenRetainedSourceRound ntm c initial
   obtain ⟨hrq, hrn, hrh, hrr⟩ := justesenRetainedSourceRound_parts_inSpace ntm c initial
@@ -303,21 +303,26 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
       MembershipTally.retainedReply justesenRetainedSourceRoundEntry_inSpace
       justesenSourceMembershipStart_inSpace hrr hr hrh hh hrn hn⟩
 
--- The loop shares its clock across fuel limits and stops at entry with zero fuel.
-example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
-    (c : ℕ) (w : List Bool) :
-    let I := configurationInstance ntm c w
-    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
-    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n)
-      (limit : ℕ), limit ≤ n →
-      let ctx : JustesenSourceContext :=
-        ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
-      let M := justesenSourceLoop ntm c ctx limit
-      M.HaltsWithin w (configurationJustesenSourceLoopClock ntm c w) ∧
-        (limit = 0 → ∀ bits, M.run w bits = .inr none) := by
+-- Every prefix fits the shared budget, and zero fuel stops without a verdict.
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ∃ C, ∀ w : List Bool,
+      let I := configurationInstance ntm c w
+      let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+      ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n)
+        (limit : ℕ), limit ≤ n →
+        let ctx : JustesenSourceContext :=
+          ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+        let M := justesenSourceLoop ntm c ctx limit
+        M.HaltsWithin w (configurationJustesenSourceLoopClock ntm c w) ∧
+          (∀ bits, (encJustesenSourceLoopState (M.run w bits)).length ≤
+            C * (Nat.log2 w.length + 1)) ∧
+          (limit = 0 → ∀ bits, M.run w bits = .inr none) := by
+  obtain ⟨C, hspace⟩ := configurationJustesenSourceLoop_length_run_le_log ntm c
+  refine ⟨C, fun w => ?_⟩
   intro I n seed source target limit hlimit ctx M
   refine ⟨configurationJustesenSourceLoop_haltsWithin_clock ntm c w
-    seed source target limit hlimit, fun hzero bits => ?_⟩
+    seed source target limit hlimit, hspace w seed source target limit hlimit,
+    fun hzero bits => ?_⟩
   subst limit
   change M.replay w bits M.init = .inr none
   rw [M.replay_of_halted w (by rfl)]
