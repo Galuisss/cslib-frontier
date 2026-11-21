@@ -96,38 +96,27 @@ theorem configurationJustesenBoundedWalk_firstHalting_iff (ntm : MultiTapeNTM k 
     (c : ℕ) (w : List Bool) :
     let I := configurationInstance ntm c w
     let size := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision
-    let index := configurationSubdivisionIndex ntm c w
     ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (r : Registers size.vertexCount)
       (bits : List Bool) (left : ℕ),
       let M := configurationJustesenBoundedWalk ntm c w seed.val r
-      let G := graph (layeredDigraph I) (generatedWeight ((BitString.equivFin _).symm seed))
-        size.chainBound
+      let adjacent := configurationJustesenSubdivisionAdjacent ntm c w seed
       M.FirstHalting w bits M.init ∧ Runtime.remainingFuel (M.run w bits) = some left ↔
         ∃ tail, bits = selectors 3 tail ∧
-          (walkM readNext
-            (fun u v => pure (@decide (G.Adj (index.symm u) (index.symm v))
-              (Classical.propDecidable _))) r.target r.fuel r.current tail).1 = some left := by
-  intro I size index seed r bits left M G
+          (walkM readNext (fun u v => pure (adjacent u v)) r.target r.fuel r.current tail).1 =
+            some left := by
+  intro I size seed r bits left M adjacent
   let edge := justesenWeightedSubdivisionCallback ntm
   let start := fun ctx u v => justesenSubdivisionEdgeStart (ctx, u, v)
   let ctx := configurationJustesenSubdivisionContext ntm c w seed.val
-  let adjacent : Fin size.vertexCount → Fin size.vertexCount → Bool :=
-    fun u v => @decide (G.Adj (index.symm u) (index.symm v)) (Classical.propDecidable _)
-  obtain ⟨_, hcall⟩ := configurationJustesenSubdivisionEdge_contract ntm c
-  have hhalt (u v : Fin size.vertexCount) :
-      edge.halted (edge.runFrom w (start ctx u.val v.val) 3) = true := (hcall w seed u v).2.1
-  have hedge (u v : Fin size.vertexCount) :
-      callbackVerdict (edge.runFrom w (start ctx u.val v.val) 3) = adjacent u v := by
-    apply Bool.eq_iff_iff.mpr
-    simpa only [adjacent, decide_eq_true_eq] using (hcall w seed u v).2.2.1
+  have hcall := configurationJustesenSubdivisionEdge_halts_and_agrees ntm c w seed
   let initial := Runtime.entry edge start callbackVerdict 3 ctx r
   let walk := Runtime.machine edge start callbackVerdict 3 initial
   have hinit : walk.init = initial := Runtime.machine_init edge start callbackVerdict 3 initial
   change walk.FirstHalting w bits walk.init ∧
     Runtime.remainingFuel (walk.run w bits) = some left ↔ _
   rw [NondeterministicQueryMachine.run, hinit]
-  exact Runtime.firstHalting_remainingFuel_iff edge start callbackVerdict 3
-    initial ctx r w adjacent hhalt hedge bits left
+  exact Runtime.firstHalting_remainingFuel_iff edge start callbackVerdict 3 initial ctx r w adjacent
+    (fun u v => (hcall u v).1) (fun u v => (hcall u v).2) bits left
 
 /-- At each valid seed, the common clock and logarithmic state bound cover all selector
 lists, including rejection and suspended adjacency calls. -/
