@@ -153,30 +153,41 @@ private def contextEdge : QueryMachine Bool where
   emit := fun _ => []
   finish := fun _ => []
 
-open Turing.DoubleCounting in
+namespace RetainedTally
+
+open Turing.DoubleCounting
+
+private def start (flag : Bool) (_ _ : ℕ) := flag
+
+private def entry :=
+  BoundedWalk.Runtime.entry contextEdge start id 0 false (N := 1) ⟨0, 0, 0⟩
+
+private def baseline : Context := ⟨1, 0, 0, 0, ⟨0, 0⟩⟩
+
+private def expanded : Context := ⟨2, 0, 0, 1, ⟨1, 1⟩⟩
+
+private def tally :=
+  retainedMachine contextEdge start id 0 entry false baseline
+
 /-- The same tally re-enters with a larger carrier and an adjacency context that permits
 the selected edge. The queried vertex is skipped, so the tally returns a passing negative.
 The clock and encoded-state bounds cover every branch from the new entry. -/
 example :
-    let start := fun (flag : Bool) (_ _ : ℕ) => flag
-    let entry := BoundedWalk.Runtime.entry contextEdge start id 0 false (N := 1) ⟨0, 0, 0⟩
-    let single := retainedMachine contextEdge start id 0 entry false ⟨1, 0, 0, 0, ⟨0, 0⟩⟩
-    let expanded : Context := ⟨2, 0, 0, 1, ⟨1, 1⟩⟩
-    let double := single.withInit (retainedInitial true expanded)
+    let double := tally.withInit (retainedInitial true expanded)
     let enc := encRetainedState encBool encBool
     let branch : Scan.Branch 2 := fun v => if v = 1 then some [1] else none
     let bits := MembershipTally.selectors (BoundedWalk.selectors 0) branch
     (double.FirstHalting [true] bits double.init ∧ retainedReply (double.run [true] bits) =
       some false) ∧ double.HaltsWithin [true] 23 ∧
       ∀ choices, (enc (double.run [true] choices)).length ≤ retainedStateBound 0 expanded 1 1 := by
-  intro start entry single expanded double enc branch bits
+  intro double enc branch bits
   let allEdges (_ _ : Fin 2) := true
   have hscan : Scan.run allEdges 0 0 1 ⟨1, 1⟩ branch = some false := by
     rw [Scan.run_eq_finish, Scan.tallyPrefix_succ allEdges 0 0 1 branch (n := 1) (by decide),
       Scan.tallyPrefix_succ allEdges 0 0 1 branch (n := 0) (by decide), Scan.tallyPrefix_zero]
     simp [branch, allEdges, Scan.walkM, Scan.readNext, bind, StateT.bind, pure, StateT.pure,
       Scan.Result.finish, Scan.Result.recordWalk, Scan.Result.zero, Tally.matches_iff]
-  dsimp only [double, single]
+  dsimp only [double, tally]
   rw [retainedMachine_withInit]
   have hsource : expanded.source < expanded.size := by decide
   refine ⟨?_, ?_, ?_⟩
@@ -197,36 +208,70 @@ example :
         hsource [true] 1
         (fun _ _ _ _ => by simp only [encBool_apply, List.length_singleton, le_refl]) choices
 
-open Turing.DoubleCounting in
 /-- A caller can initialize and step a retained tally, and use its observers, under the
 same input budget. -/
 example :
-    let start := fun (flag : Bool) (_ _ : ℕ) => flag
-    let entry := BoundedWalk.Runtime.entry contextEdge start id 0 false (N := 1) ⟨0, 0, 0⟩
-    let M := retainedMachine contextEdge start id 0 entry false ⟨1, 0, 0, 0, ⟨0, 0⟩⟩
     let encIn := encPair encBool encContext
     let enc := encRetainedState encBool encBool
     let budget (p : Bool × Context) := (encIn p).length
     let enter (p : Bool × Context) : RetainedState Bool Bool := retainedInitial p.1 p.2
     ComputableInSpace enter encIn enc budget ∧
-      ComputableInSpace (fun p => M.next (enter p, none, true)) encIn enc budget ∧
-      ComputableInSpace (fun p => M.query (enter p)) encIn encNat budget ∧
-      ComputableInSpace (fun p => M.halted (enter p)) encIn encBool budget ∧
+      ComputableInSpace (fun p => tally.next (enter p, none, true)) encIn enc budget ∧
+      ComputableInSpace (fun p => tally.query (enter p)) encIn encNat budget ∧
+      ComputableInSpace (fun p => tally.halted (enter p)) encIn encBool budget ∧
       ComputableInSpace (fun p => retainedReply (enter p)) encIn (encOption encBool) budget := by
-  intro start entry M encIn enc budget enter
+  intro encIn enc budget enter
   have hentry : ComputableInSpace enter encIn enc budget :=
     retainedInitial_budget encBool encBool (fst encBool encContext) (snd encBool encContext)
   have hquery := retainedMachine_query_inSpace contextEdge start id 0 entry false encBool encBool
-    ⟨1, 0, 0, 0, ⟨0, 0⟩⟩ (budget_const (encIn := encBool) (encB := encNat) 0 (.refl _))
+    baseline (budget_const (encIn := encBool) (encB := encNat) 0 (.refl _))
   have hhalt := retainedMachine_halted_inSpace contextEdge start id 0 entry false encBool encBool
-    ⟨1, 0, 0, 0, ⟨0, 0⟩⟩
+    baseline
   have hstep := retainedMachine_next_inSpace contextEdge start id 0 entry false encBool encBool
-    ⟨1, 0, 0, 0, ⟨0, 0⟩⟩ (fst encBool (encPair encNat encNat)) (fst encBool (encOption encBool))
+    baseline (fst encBool (encPair encNat encNat)) (fst encBool (encOption encBool))
     (budget_const true (.refl _)) (of_inO ComputableInDegree.id'.inO_one)
   have hchoice := budget_const (encIn := encIn) (encB := encReadChoice) (none, true) (.refl _)
   exact ⟨hentry, budget_comp_linear hstep (budget_prod hentry hchoice),
     budget_comp_linear hquery hentry, budget_comp_linear hhalt hentry,
     budget_comp_linear (retainedReply_inSpace encBool encBool) hentry⟩
+
+/-- A single native compilation handles both input-dependent adjacency contexts. -/
+example :
+    let budget (flag : Bool) := Nat.log2 (encBool flag).length + 1 +
+      retainedStateBound 0 expanded (encBool flag).length 1
+    ∃ R : Routines tally (fun flag => retainedInitial flag expanded) encBool budget,
+      ∀ flag,
+        R.machine.RunsInSpace (encBool flag) (R.k * (2 * (R.c * budget flag) + 1)) ∧
+          ∃ t, R.machine.RunsInTime (encBool flag) t := by
+  intro budget
+  have hid : ComputableInSpace id encBool encBool (fun flag => (encBool flag).length) :=
+    of_inO ComputableInDegree.id'.inO_one
+  have hcontext : ComputableInSpace id encBool encBool budget :=
+    hid.mono_le fun flag => by
+      simp only [budget, encBool_apply, List.length_singleton]
+      omega
+  have hparams : ComputableInSpace (fun _ : Bool => expanded) encBool encContext budget :=
+    (ComputableInSpace.constZero expanded).mono_le fun _ => Nat.zero_le _
+  have hsource : expanded.source < expanded.size := by decide
+  have hroutines : Nonempty
+      (Routines tally (fun flag => retainedInitial flag expanded) encBool budget) :=
+    retainedMachine_exists_routines contextEdge start id 0 entry false encBool encBool
+      encBool budget baseline id (fun _ => expanded) hcontext hparams
+      (fun _ => Nat.le_add_right _ _)
+      (fst encBool (encPair encNat encNat)) (budget_const 0 (.refl _))
+      (fst encBool (encOption encBool)) (budget_const true (.refl _)) hid
+      (fun _ => hsource) (fun _ => 1)
+      (fun _ _ _ _ _ => by simp only [encBool_apply, List.length_singleton, le_refl])
+      (fun _ => Nat.le_add_left _ _)
+  obtain ⟨R⟩ := hroutines
+  refine ⟨R, fun flag => ⟨R.runsInSpace flag, ?_⟩⟩
+  apply R.exists_runsInTime flag (time := runtimeWalkClock 0 expanded)
+  dsimp only [tally]
+  rw [retainedMachine_withInit]
+  exact retainedMachine_haltsWithin contextEdge start id 0 entry flag expanded hsource
+    (encBool flag)
+
+end RetainedTally
 
 open Turing.DoubleCounting in
 /-- Exact totals at radius zero yield one successful selector list, which may answer false. -/
