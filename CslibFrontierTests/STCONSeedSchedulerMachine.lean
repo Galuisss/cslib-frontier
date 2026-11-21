@@ -44,10 +44,7 @@ example (w : List Bool) :
     ∃ bits, M.FirstHalting w bits M.init ∧ (reply (M.run w bits)).isSome := by
   refine exists_successful_firstHalting setup totalScan (fun r => .inl r.sourceID) verdict w ?_
   intro f _ _ _
-  exact ⟨[false], ⟨rfl, fun n hn => by
-    have hn0 : n = 0 := by simpa using hn
-    subst n
-    rfl⟩, rfl⟩
+  exact ⟨[false], totalScan.firstHalting_append_singleton w [] false rfl rfl, rfl⟩
 
 -- The common clock also covers a rejecting selector or a read past the input.
 example (w : List Bool) : scheduler.HaltsWithin w 24 := by
