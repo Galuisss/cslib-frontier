@@ -399,4 +399,30 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   exact (configurationJustesenRoundCallback_existsUnique_firstHalting ntm c w
     seed source radius hpass req hr).unique hleft hright
 
+-- Re-entry at the exact radius-zero tally gives the mathematical update of the original graph.
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (w : List Bool) (base : SourceRoundLoop.Registers JustesenSourceContext) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n) (fuel : ℕ),
+      let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
+      let ctx : JustesenSourceContext :=
+        ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+      let r : SourceRoundLoop.Registers JustesenSourceContext :=
+        ⟨ctx, fuel, 0, expected edge source 0⟩
+      let M := (justesenRetainedSourceRound ntm c base).withInit
+        (justesenRetainedSourceRoundEntry r)
+      ∀ (bits : List Bool) (update : RoundUpdate), M.FirstHalting w bits M.init →
+        justesenRetainedSourceRoundReply (M.run w bits) = some update →
+        update.tally = expected edge source 1 ∧
+          (update.bad = false ↔ ∃! transcript, Passes edge source 1 transcript) := by
+  intro I n seed source target fuel edge ctx r M bits update hfirst hreply
+  have hreentry : M = justesenRetainedSourceRound ntm c r :=
+    SourceRoundLoop.retainedRound_withInit JustesenSourceContext.size JustesenSourceContext.sourceID
+      (justesenRoundCallback ntm c) (fun ctx => justesenRoundCallbackStart ctx.adjacency)
+      justesenRoundCallbackReply base r
+  rw [hreentry] at hfirst hreply
+  exact configurationJustesenRetainedSourceRound_correct ntm c w seed source target fuel 0
+    (existsUnique_passes_zero edge source) bits update hfirst hreply
+
 end CslibFrontierTests.STCONJustesenTally
