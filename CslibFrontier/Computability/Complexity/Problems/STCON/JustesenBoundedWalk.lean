@@ -125,12 +125,9 @@ theorem configurationJustesenBoundedWalk_firstHalting_iff (ntm : MultiTapeNTM k 
   have hinit : walk.init = initial := Runtime.machine_init edge start callbackVerdict 3 initial
   change walk.FirstHalting w bits walk.init ∧
     Runtime.remainingFuel (walk.run w bits) = some left ↔ _
-  have hfirst := Runtime.firstHalting_iff edge start callbackVerdict 3 ctx r w bits
-  have hremaining := Runtime.remainingFuel_run edge start callbackVerdict 3 ctx r w bits
-  dsimp only at hfirst hremaining
-  rw [hinit, hfirst, hremaining]
-  exact firstHalting_remainingFuel_iff edge (fun u v => start ctx u.val v.val)
-    callbackVerdict 3 r w adjacent hhalt hedge bits left
+  rw [NondeterministicQueryMachine.run, hinit]
+  exact Runtime.firstHalting_remainingFuel_iff edge start callbackVerdict 3
+    initial ctx r w adjacent hhalt hedge bits left
 
 /-- At each valid seed, the common clock and logarithmic state bound cover all selector
 lists, including rejection and suspended adjacency calls. -/

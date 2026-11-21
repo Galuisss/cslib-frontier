@@ -255,6 +255,34 @@ theorem remainingFuel_run {N : ℕ} (ctx : κ) (r : Registers N) (input selector
   rw [run_eq]
   rfl
 
+open Cslib.DoubleCounting.Scan in
+/-- After re-entry, a successful first halt corresponds to the typed walk's canonical selectors
+and returns its unused fuel. The machine's original entry may have a different dimension. -/
+theorem firstHalting_remainingFuel_iff (initial : State κ τ)
+    {N : ℕ} (ctx : κ) (r : Registers N) (input : List Bool)
+    (adjacent : Fin N → Fin N → Bool)
+    (hclock : ∀ u v : Fin N,
+      edge.halted (edge.runFrom input (start ctx u.val v.val) clock) = true)
+    (hedge : ∀ u v : Fin N,
+      verdict (edge.runFrom input (start ctx u.val v.val) clock) = adjacent u v)
+    (bits : List Bool) (left : ℕ) :
+    let M := machine edge start verdict clock initial
+    let s := entry edge start verdict clock ctx r
+    M.FirstHalting input bits s ∧ remainingFuel (M.replay input bits s) = some left ↔
+      ∃ tail, bits = selectors clock tail ∧
+        (walkM readNext (fun u v => pure (adjacent u v)) r.target r.fuel r.current tail).1 =
+          some left := by
+  dsimp only
+  rw [← NondeterministicQueryMachine.firstHalting_withInit
+    (machine edge start verdict clock initial) (entry edge start verdict clock ctx r),
+    ← NondeterministicQueryMachine.run_withInit, machine_withInit]
+  have hfirst := firstHalting_iff edge start verdict clock ctx r input bits
+  have hremaining := remainingFuel_run edge start verdict clock ctx r input bits
+  dsimp only at hfirst hremaining
+  rw [hfirst, hremaining]
+  exact BoundedWalk.firstHalting_remainingFuel_iff edge
+    (fun u v => start ctx u.val v.val) verdict clock r input adjacent hclock hedge bits left
+
 /-- The runtime walk preserves the common clock on every branch. -/
 theorem haltsWithin {N : ℕ} (ctx : κ) (r : Registers N) (input : List Bool) :
     (machine edge start verdict clock (entry edge start verdict clock ctx r)).HaltsWithin

@@ -193,9 +193,10 @@ example :
     let initial := Runtime.entry edge runtimeStart verdict 1 false moving
     let r : Registers 4 := ⟨0, 1, 1⟩
     let next := Runtime.entry edge runtimeStart verdict 1 true r
-    let M := (Runtime.machine edge runtimeStart verdict 1 initial).withInit next
+    let M := Runtime.machine edge runtimeStart verdict 1 initial
     let bits := selectors (N := 4) 1 [1]
-    M.FirstHalting [true] bits next ∧ Runtime.remainingFuel (M.run [true] bits) = some 0 := by
+    M.FirstHalting [true] bits next ∧
+      Runtime.remainingFuel (M.replay [true] bits next) = some 0 := by
   intro initial r next M bits
   have hhalt (u v : Fin 4) :
       edge.halted (edge.runFrom [true] (runtimeStart true u.val v.val) 1) = true := by rfl
@@ -204,13 +205,8 @@ example :
   have hresult :
       (walkM readNext (fun _ _ => pure true) r.target r.fuel r.current [1]).1 = some 0 := by
     simp [r, walkM, readNext, bind, StateT.bind, pure, StateT.pure]
-  obtain ⟨hfirst, hfuel⟩ := (firstHalting_remainingFuel_iff edge
-    (fun u v : Fin 4 => runtimeStart true u.val v.val) verdict 1 r [true]
+  exact (Runtime.firstHalting_remainingFuel_iff edge runtimeStart verdict 1 initial true r [true]
     (fun _ _ => true) hhalt hedge bits 0).mpr ⟨[1], rfl, hresult⟩
-  dsimp only [M]
-  rw [Runtime.machine_withInit]
-  exact ⟨(Runtime.firstHalting_iff edge runtimeStart verdict 1 true r [true] bits).mpr hfirst,
-    (Runtime.remainingFuel_run edge runtimeStart verdict 1 true r [true] bits).trans hfuel⟩
 
 /-- The runtime state envelope also covers arbitrary rejecting selector prefixes. -/
 example (input bits : List Bool) :
