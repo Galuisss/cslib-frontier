@@ -240,4 +240,94 @@ theorem replay_request {τ : Type} (ctx : Context)
   simp [NondeterministicQueryMachine.replay_cons, NondeterministicQueryMachine.step, machine,
     hq, hcall.1]
 
+/-- Every completed vertex contributes at most one count and one distance increment,
+independently of the callback's replies. -/
+private theorem advance_tally_bounds {q : State} (reply : Option Bool)
+    (hc : q.update.tally.count ≤ q.context.expected.count + q.cursor)
+    (hs : q.update.tally.lengthSum ≤
+      q.context.expected.lengthSum + q.cursor * (q.context.radius + 1)) :
+    let next := advance q reply
+    next.update.tally.count ≤ q.context.expected.count + next.cursor ∧
+    next.update.tally.lengthSum ≤
+      q.context.expected.lengthSum + next.cursor * (q.context.radius + 1) := by
+  have unchanged :
+      q.update.tally.count ≤ q.context.expected.count + (q.cursor + 1) ∧
+      q.update.tally.lengthSum ≤
+        q.context.expected.lengthSum + (q.cursor + 1) * (q.context.radius + 1) := by
+    rw [Nat.add_mul]
+    omega
+  have updated (count : ℕ) :
+      (q.update.addVertex q.context.radius count).tally.count ≤
+        q.context.expected.count + (q.cursor + 1) ∧
+      (q.update.addVertex q.context.radius count).tally.lengthSum ≤
+        q.context.expected.lengthSum + (q.cursor + 1) * (q.context.radius + 1) := by
+    by_cases h : count = 0
+    · simpa [RoundUpdate.addVertex, h] using unchanged
+    · simp only [RoundUpdate.addVertex, h, ite_false, Nat.add_mul]
+      omega
+  cases reply with
+  | none => exact ⟨hc, hs⟩
+  | some hit =>
+    cases hp : q.predecessor with
+    | none =>
+      cases hit
+      · simpa only [advance, hp, Bool.false_eq_true, ite_false] using And.intro hc hs
+      · simpa only [advance, hp, ite_true] using unchanged
+    | some p =>
+      simp only [advance, hp]
+      split
+      · exact updated _
+      · exact ⟨hc, hs⟩
+
+
+private def ScalarBounds (ctx : Context) (q : State) : Prop :=
+  q.context = ctx ∧ q.cursor ≤ ctx.size ∧
+    q.update.tally.count ≤ ctx.expected.count + q.cursor ∧
+    q.update.tally.lengthSum ≤ ctx.expected.lengthSum + q.cursor * (ctx.radius + 1)
+
+private theorem step_scalarBounds {τ : Type} (ctx : Context)
+    (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
+    (finish : τ → Option Bool) (input : List Bool) (q : MachineState τ) (choice : Bool)
+    (hq : ScalarBounds ctx q.controller) :
+    ScalarBounds ctx ((machine ctx N start finish).step input q choice).controller := by
+  by_cases hs : halted q.controller = true
+  · rw [(machine ctx N start finish).step_of_halted input hs]
+    exact hq
+  have hlive := Bool.eq_false_iff.mpr hs
+  have hadv (reply : Option Bool) : ScalarBounds ctx (advance q.controller reply) := by
+    obtain ⟨hc, _, ht, hl⟩ := hq
+    rw [← hc] at ht hl ⊢
+    exact ⟨advance_context _ _, advance_cursor_le hlive reply, advance_tally_bounds reply ht hl⟩
+  obtain ⟨state, callee⟩ := q
+  change halted state = false at hlive
+  cases callee with
+  | none =>
+    cases choice
+    · simpa [NondeterministicQueryMachine.step, machine, hlive] using hq
+    · simpa [NondeterministicQueryMachine.step, machine, hlive] using hadv none
+  | some callee =>
+    cases hc : N.halted callee
+    · simpa [NondeterministicQueryMachine.step, machine, hlive, hc] using hq
+    · cases choice
+      · simpa [NondeterministicQueryMachine.step, machine, hlive, hc] using hadv (finish callee)
+      · simpa [NondeterministicQueryMachine.step, machine, hlive, hc] using hadv none
+
+/-- Every selector prefix retains the original context and bounds the cursor and tally.
+These bounds also apply when a selector or callback rejects. -/
+theorem run_scalar_bounds {τ : Type} (ctx : Context)
+    (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
+    (finish : τ → Option Bool) (input choices : List Bool) :
+    let q := ((machine ctx N start finish).run input choices).controller
+    q.context = ctx ∧ q.cursor ≤ ctx.size ∧
+      q.update.tally.count ≤ ctx.expected.count + q.cursor ∧
+      q.update.tally.lengthSum ≤ ctx.expected.lengthSum + q.cursor * (ctx.radius + 1) := by
+  have replay_bounds (bits : List Bool) (q : MachineState τ) (hq : ScalarBounds ctx q.controller) :
+      ScalarBounds ctx ((machine ctx N start finish).replay input bits q).controller := by
+    induction bits generalizing q with
+    | nil => exact hq
+    | cons b bits ih =>
+      rw [NondeterministicQueryMachine.replay_cons]
+      exact ih _ (step_scalarBounds ctx N start finish input q b hq)
+  exact replay_bounds choices _ (by simp [ScalarBounds, machine, entry, initial])
+
 end Turing.DoubleCounting.SourceRound

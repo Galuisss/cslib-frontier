@@ -82,4 +82,12 @@ example :
       round.halted rejected = true ∧ (answer rejected).isNone = true := by
   decide +kernel
 
+/-- Any selector prefix on a missing edge reply stays within the scalar round envelope. -/
+example (choices : List Bool) :
+    let q := (round.run [] choices).controller
+    q.cursor ≤ 3 ∧ q.update.tally.count ≤ 2 + q.cursor ∧
+      q.update.tally.lengthSum ≤ q.cursor := by
+  simpa only [round, context, Nat.zero_add, Nat.mul_one] using
+    (run_scalar_bounds context callback (fun _ => .pending) finish [] choices).2
+
 end CslibFrontierTests.DoubleCountingSourceRound
