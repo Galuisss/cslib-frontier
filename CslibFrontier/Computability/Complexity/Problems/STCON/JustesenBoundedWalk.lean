@@ -175,7 +175,7 @@ theorem configurationJustesenBoundedWalk_bounds (ntm : MultiTapeNTM k Bool State
   exact hrun.trans (by simpa only [b, Nat.add_mul] using hbound w seed r.fuel (A * b) hfuel)
 
 /-- A common selector clock for fuel at most the initialized subdivision vertex count. -/
-noncomputable def configurationJustesenBoundedWalkClock (ntm : MultiTapeNTM k Bool State)
+@[expose] noncomputable def configurationJustesenBoundedWalkClock (ntm : MultiTapeNTM k Bool State)
     (c : ℕ) (w : List Bool) : ℕ :=
   let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
   n * (n.size + 6) + (n.size + 2)
@@ -187,8 +187,7 @@ theorem configurationJustesenBoundedWalkClock_polyBounded
   let count (w : List Bool) :=
     (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
   have hcount : PolyBounded List.length count :=
-    (configurationSeedSearchParameters_polyBounded ntm c).2.2.mono fun w => by
-      simp only [count, (configurationSeedSearchSetup_endpoints ntm c w).1, le_refl]
+    configurationSubdivisionVertexCount_polyBounded ntm c
   have hwidth : PolyBounded List.length (fun w => (count w).size) :=
     hcount.mono fun w => Nat.size_le_self (count w)
   exact (hcount.mul (hwidth.add (.const 6))).add (hwidth.add (.const 2))

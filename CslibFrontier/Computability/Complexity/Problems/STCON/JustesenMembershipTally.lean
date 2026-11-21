@@ -25,6 +25,8 @@ to every bounded walk, so the typed scan uses the subdivision adjacency for the 
   first-halting selector and membership-reply correspondence for the weighted tally.
 * `Cslib.Complexity.STCON.configurationJustesenMembershipTally_length_run_le_log`:
   logarithmic encoded length on every prefix of a bounded tally query.
+* `Cslib.Complexity.STCON.configurationJustesenMembershipTally_haltsWithin_clock`:
+  a common polynomial selector clock for those queries.
 -/
 
 public section
@@ -184,5 +186,41 @@ theorem configurationJustesenMembershipTally_length_run_le_log
     params source.isLt w (A * b) hcallee bits
   refine hrun.trans ?_
   simpa only [b, Nat.add_mul] using hbound w seed source target radius expected (A * b) hr hc hs
+
+/-- Charge one bounded walk and its entry and return at each candidate, then the final check. -/
+noncomputable def configurationJustesenMembershipTallyClock
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) : ℕ :=
+  let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+  n * (configurationJustesenBoundedWalkClock ntm c w + 2) + 1
+
+/-- The common tally selector clock is polynomial in the length of the original input. -/
+theorem configurationJustesenMembershipTallyClock_polyBounded
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    PolyBounded List.length (configurationJustesenMembershipTallyClock ntm c) :=
+  ((configurationSubdivisionVertexCount_polyBounded ntm c).mul
+      ((configurationJustesenBoundedWalkClock_polyBounded ntm c).add (.const 2))).add (.const 1)
+
+/-- The clock covers all tally branches uniformly over valid seed and endpoint IDs
+and radii at most the subdivision vertex count. -/
+theorem configurationJustesenMembershipTally_haltsWithin_clock
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let size := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin size.vertexCount)
+      (radius : ℕ) (expected : Tally), radius ≤ size.vertexCount →
+      let params : MembershipTally.Context :=
+        ⟨size.vertexCount, source.val, target.val, radius, expected⟩
+      (configurationJustesenMembershipTally ntm c w seed.val params).HaltsWithin w
+        (configurationJustesenMembershipTallyClock ntm c w) := by
+  intro I size seed source target radius expected hr params
+  let edge := justesenWeightedSubdivisionCallback ntm
+  let start := fun ctx u v => justesenSubdivisionEdgeStart (ctx, u, v)
+  let ctx := configurationJustesenSubdivisionContext ntm c w seed.val
+  have h := MembershipTally.retainedMachine_haltsWithin edge start callbackVerdict 3
+    (tallyWalkInitial ntm c) ctx params source.isLt w
+  refine NondeterministicQueryMachine.HaltsWithin.mono _ _ h ?_
+  simp only [MembershipTally.runtimeWalkClock, params, configurationJustesenMembershipTallyClock,
+    configurationJustesenBoundedWalkClock, Nat.add_assoc, Nat.reduceAdd]
+  gcongr
 
 end Cslib.Complexity.STCON
