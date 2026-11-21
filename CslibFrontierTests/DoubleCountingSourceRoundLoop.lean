@@ -83,7 +83,7 @@ example (input : List Bool) :
     (machine (start () 2) round id growingRound done (fun _ => ())
       (fun _ => some false)).HaltsWithin input 3 :=
   haltsWithin (start () 2) round id growingRound done (fun _ => ()) (fun _ => some false) input
-    (fun _ => True) trivial (fun _ _ _ _ _ _ _ => trivial)
+    (fun _ => True) trivial (fun _ _ _ _ _ _ _ _ => trivial)
     0 0 (fun _ _ _ _ => rfl) (fun _ _ _ _ => rfl)
 
 private def stableReply (_ : Unit) : Option RoundUpdate := some ⟨⟨1, 0⟩, false⟩
@@ -121,7 +121,7 @@ private theorem nativeRoutines : Nonempty
       ?_ (encRegisters encUnit initialRegisters).length 0 0
       (by rintro _ rfl; exact le_rfl) (fun _ _ _ => Nat.zero_le 0)
       (fun _ _ _ => Nat.zero_le 0) bits).trans ?_
-    · intro r hr _ a ha _ hc
+    · intro r hr _ _ a ha _ hc
       subst r
       have he : a = ⟨⟨1, 0⟩, false⟩ := Option.some.inj ha.symm
       subst a

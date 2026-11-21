@@ -483,9 +483,9 @@ theorem firstHalting_iff_replayRounds (bits : List Bool) (verdict : ControllerVe
           cases bit <;> cases roundReply t <;> rfl
   exact aux initial bits
 
-/-- A register invariant preserved when a round grows without tying. -/
+/-- A register invariant preserved when a round with fuel grows without tying. -/
 @[expose] def Closed (P : Registers κ → Prop) : Prop :=
-  ∀ r, P r → ∀ bits a,
+  ∀ r, P r → 0 < r.fuel → ∀ bits a,
     roundReply (round.replay input bits (roundStart r)) = some a →
     a.bad = false → a.tally.count ≠ r.tally.count → P (r.advance a.tally)
 
@@ -557,7 +557,8 @@ theorem haltsWithin (P : Registers κ → Prop) (hp : P initial)
                     (r.advance a.tally).fuel * (roundClock + 1) + (roundClock + 1) := by
                   rw [← hnext, Nat.add_mul, Nat.one_mul]
                 have hp' : P (r.advance a.tally) :=
-                  hclosed r hr callBits a hret (Bool.eq_false_iff.mpr hbad)
+                  hclosed r hr (Nat.pos_of_ne_zero hzero) callBits a hret
+                    (Bool.eq_false_iff.mpr hbad)
                     (by simpa only [beq_iff_eq] using hstable)
                 exact ih _ hlt (r.advance a.tally) hp' rest (by omega) rfl
         · exact hreject
@@ -611,7 +612,7 @@ private theorem invariant_step {P : Registers κ → Prop}
               exact ⟨hp, [], rfl⟩
             · rw [returnRound, ite_eq_right hbad, ite_eq_right heq]
               apply invariant_enter
-              · exact hclosed r hp bits a (ht.symm ▸ ha)
+              · exact hclosed r hp hfuel bits a (ht.symm ▸ ha)
                   (Bool.eq_false_iff.mpr hbad) (by simpa only [beq_iff_eq] using heq)
               · simp only [Registers.advance]
                 omega
