@@ -16,6 +16,7 @@ import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ConjugateProduct
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ShiftedLabel
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseIntegerRootLabel
+import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseRootDeterminant
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseRootProduct
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
 import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomial
@@ -753,5 +754,31 @@ example :
     simpa only [algebraMap_int_eq, Int.coe_castRingHom] using h
   have hsrc : (Polynomial.aeval M g).det = 1 := by exact_mod_cast hcast
   simpa only [M, Polynomial.aeval_algHom_apply] using hsrc
+
+-- The actual rank-one quotient determinant detects the root of its characteristic polynomial.
+example :
+    let r : Fin 0 → MvPolynomial (Fin 0) ℤ := 0
+    let μ := multiplicationMatrix (ell := 1) (by decide) r (fun i => i.elim0)
+    let p := (μ 0).charpoly
+    ∃ e : ℕ, e ≤ 1 ∧
+      (μ (Polynomial.aeval (0 : MvPolynomial (Fin 0) ℤ) (Polynomial.shiftedRootLabel 1 e
+        (Polynomial.sparseIntegerRootLabel p 1 0 0 ([] : List (Fin 1 × SignType)))))).det < 0 := by
+  intro r μ p
+  let M := μ 0
+  have hcard : Fintype.card (NormalIndex 0 1) = 1 := Fintype.card_unique
+  have hchar : M.charpoly = Polynomial.X := by
+    simp only [M, map_zero, Matrix.charpoly_zero, hcard, pow_one]
+  have hMb : M.charpoly.coeffNorm1 ≤ 2 ^ 0 := by
+    simpa only [hchar, mul_one, Polynomial.coeffNorm1_one, pow_zero] using
+      (Polynomial.coeffNorm1_X_mul 1).le
+  have hsep : (M.charpoly.map (algebraMap ℤ ℂ)).Separable := by
+    rw [hchar, Polynomial.map_X]
+    exact Polynomial.separable_X
+  have h := Matrix.exists_eval₂_pos_at_charpoly_root_iff_neg_shiftedRootLabel_det M
+    (q := 1) (N := 0) (by decide) hcard.le (by decide) (by simp) hMb (by simp) hsep
+  obtain ⟨L, hL, e, he, hneg⟩ := h.mp ⟨0, by simp [hchar], by simp⟩
+  have hnil := List.length_eq_zero_iff.mp (Nat.eq_zero_of_le_zero hL)
+  subst L
+  exact ⟨e, he, by simpa only [p, M, Polynomial.aeval_algHom_apply] using hneg⟩
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
