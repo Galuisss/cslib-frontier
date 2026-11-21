@@ -102,6 +102,15 @@ def machine (edge : QueryMachine τ) (start : Fin N → Fin N → τ) (verdict :
   halted := halted
   accept s := (remainingFuel s).isSome
 
+/-- Changing the walk registers at entry leaves all transitions and verdicts unchanged. -/
+theorem machine_withInit (edge : QueryMachine τ) (start : Fin N → Fin N → τ)
+    (verdict : τ → Bool) (clock : ℕ) (initial registers : Registers N) :
+    (machine edge start verdict clock initial).withInit
+      (machine edge start verdict clock registers).init =
+        machine edge start verdict clock registers := by
+  unfold machine NondeterministicQueryMachine.withInit
+  rfl
+
 section Bounds
 
 variable (edge : QueryMachine τ) (start : Fin N → Fin N → τ) (verdict : τ → Bool)
@@ -808,6 +817,16 @@ private theorem choose_budget {r : α → Registers N} {s : α → Nondeterminis
   (budget_comp_linear (of_inO (ComputableInO.inl (encChoose N)
     (encSum (encCall N encCallee) (encOption encNat)))) (budget_prod hr hs)).of_enc_eq fun _ => rfl
 
+/-- Load a walk boundary from certified endpoint and fuel registers. -/
+theorem init_budget (edge : QueryMachine τ) (start : Fin N → Fin N → τ)
+    (verdict : τ → Bool) (clock : ℕ) {registers : α → Registers N}
+    (hr : ComputableInSpace registers encIn (encRegisters N) budget) :
+    ComputableInSpace (fun a => (machine edge start verdict clock (registers a)).init)
+      encIn (encState encCallee) budget :=
+  choose_budget hr
+    ((ComputableInSpace.constZero (NondeterministicChoice.machine N).init).mono_le
+      fun _ => Nat.zero_le _)
+
 private theorem call_budget {r : α → Registers N} {v : α → Fin N} {ticks : α → ℕ} {s : α → τ}
     (hr : ComputableInSpace r encIn (encRegisters N) budget)
     (hv : ComputableInSpace v encIn (encVertex N) budget)
@@ -929,7 +948,8 @@ private theorem callNext_inSpace (encCallee : τ ↪ List Bool)
     (.call r v ticks callee, answer, selector)) = _
   cases selector <;> cases ticks <;> rfl
 
-private theorem query_inSpace (encCallee : τ ↪ List Bool)
+/-- The walk reads the original input at the active adjacency query position. -/
+theorem query_inSpace (encCallee : τ ↪ List Bool)
     (hquery : ComputableInSpace edge.query encCallee encNat (fun s => (encCallee s).length)) :
     ComputableInSpace (M).query (encState encCallee) encNat
       (fun s => (encState encCallee s).length) := by
@@ -940,7 +960,8 @@ private theorem query_inSpace (encCallee : τ ↪ List Bool)
     (sumElim hcall (budget_const (encIn := encOption encNat) 0 (.refl _)))
   exact (h.of_encIn_eq (stateView N τ) (fun _ => rfl)).of_enc_eq fun s => by cases s <;> rfl
 
-private theorem halted_inSpace (encCallee : τ ↪ List Bool) :
+/-- Detect the walk’s terminal state in linear workspace. -/
+theorem halted_inSpace (encCallee : τ ↪ List Bool) :
     ComputableInSpace (M).halted (encState encCallee) encBool
       (fun s => (encState encCallee s).length) := by
   have h := sumElim
@@ -949,28 +970,37 @@ private theorem halted_inSpace (encCallee : τ ↪ List Bool) :
       (budget_const (encIn := encOption encNat) (encB := encBool) true (.refl _)))
   exact (h.of_encIn_eq (stateView N τ) (fun _ => rfl)).of_enc_eq fun s => by cases s <;> rfl
 
-private theorem accept_inSpace (encCallee : τ ↪ List Bool) :
-    ComputableInSpace (M).accept (encState encCallee) encBool
+/-- Decode unused fuel at success, with no result on live or rejected states. -/
+theorem remainingFuel_inSpace (encCallee : τ ↪ List Bool) :
+    ComputableInSpace (remainingFuel (N := N) (τ := τ)) (encState encCallee) (encOption encNat)
       (fun s => (encState encCallee s).length) := by
   have hid : ComputableInSpace id (encOption encNat) (encOption encNat)
       (fun s => (encOption encNat s).length) :=
     of_inO ComputableInDegree.id'.inO_one
   have h := sumElim
-    (budget_const (encIn := encChoose N) (encB := encBool) false (.refl _))
-    (sumElim (budget_const (encIn := encCall N encCallee) (encB := encBool) false (.refl _))
-      (budget_optionIsSome hid))
+    (budget_const (encIn := encChoose N) (encB := encOption encNat) none (.refl _))
+    (sumElim
+      (budget_const (encIn := encCall N encCallee) (encB := encOption encNat) none (.refl _)) hid)
   exact (h.of_encIn_eq (stateView N τ) (fun _ => rfl)).of_enc_eq fun s => by cases s <;> rfl
 
-private theorem next_inSpace (encCallee : τ ↪ List Bool)
+private theorem accept_inSpace (encCallee : τ ↪ List Bool) :
+    ComputableInSpace (M).accept (encState encCallee) encBool
+      (fun s => (encState encCallee s).length) :=
+  budget_optionIsSome (remainingFuel_inSpace encCallee)
+
+/-- Advance one selector with linear workspace, including an active adjacency call. -/
+theorem next_inSpace (encCallee : τ ↪ List Bool)
     (hstart : ComputableInSpace (fun p : Fin N × Fin N => start p.1 p.2)
-      (encPair (encVertex N) (encVertex N)) encCallee
-      (fun p => (encPair (encVertex N) (encVertex N) p).length))
+      (encPair (Fin.valEmbedding.trans encNat) (Fin.valEmbedding.trans encNat)) encCallee
+      (fun p =>
+        (encPair (Fin.valEmbedding.trans encNat) (Fin.valEmbedding.trans encNat) p).length))
     (hnext : ComputableInSpace edge.next (QueryMachine.encStateRead encCallee) encCallee
       (fun p => (QueryMachine.encStateRead encCallee p).length))
     (hhalted : ComputableInSpace edge.halted encCallee encBool (fun s => (encCallee s).length))
     (hverdict : ComputableInSpace verdict encCallee encBool (fun s => (encCallee s).length)) :
-    ComputableInSpace (M).next (encPair (encState encCallee) encAnswer) (encState encCallee)
-      (fun p => (encPair (encState encCallee) encAnswer p).length) := by
+    ComputableInSpace (M).next
+      (encPair (encState encCallee) (encPair (encOption encBool) encBool)) (encState encCallee)
+      (fun p => (encPair (encState encCallee) (encPair (encOption encBool) encBool) p).length) := by
   have h := sumElimFst (chooseNext_inSpace edge start verdict clock initial encCallee hstart)
     (sumElimFst (callNext_inSpace edge start verdict clock initial encCallee hnext hhalted hverdict)
       (done_budget (encCallee := encCallee) (N := N) (fst (encOption encNat) encAnswer)))
@@ -1007,8 +1037,7 @@ theorem exists_routines (encCallee : τ ↪ List Bool)
     have hb := hbound a
     have hp : 1 ≤ budget a := by have := hlog a; omega
     omega
-  have hInit := choose_budget (encCallee := encCallee) hregisters
-    ((ComputableInSpace.constZero (C).init).mono_le fun _ => Nat.zero_le _)
+  have hInit := init_budget (encCallee := encCallee) edge start verdict clock hregisters
   refine (M).exists_routines (query_inSpace edge start verdict clock initial encCallee hquery)
     (next_inSpace edge start verdict clock initial encCallee hstart hnext hhalted hverdict)
     (halted_inSpace edge start verdict clock initial encCallee)

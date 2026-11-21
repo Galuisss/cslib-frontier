@@ -61,6 +61,15 @@ example :
     (edge_halts [true]) (edge_agrees [true])]
   simp [walkM, readNext, bind, StateT.bind, pure, StateT.pure]
 
+/-- A suspended caller can enter the same transition machine with a new target and fuel. -/
+example :
+    (machine edge start verdict 1 moving).replay [false] (selectors (N := 3) 1 [])
+      (machine edge start verdict 1 ⟨0, 0, 0⟩).init = .done (some 0) := by
+  rw [← run_withInit, machine_withInit]
+  rw [run_selectors edge start verdict 1 _ [false] (fun _ _ => false)
+    (edge_halts [false]) (edge_agrees [false])]
+  simp [walkM, readNext, bind, StateT.bind, pure, StateT.pure]
+
 /-- Rank three is outside the three-vertex domain. -/
 example :
     (machine edge start verdict 1 moving).run [true] [true, true, true, false] = .done none :=
@@ -92,6 +101,16 @@ example (input bits : List Bool) :
     length_run_le edge start verdict 1 moving input (encOption encBool) 2 hlength bits⟩
 
 private def budget (input : List Bool) : ℕ := Nat.log2 input.length + 10
+
+/-- An enclosing caller can load the boundary and decode the returned fuel in native space. -/
+example :
+    ComputableInSpace (fun (r : Registers 3) => (machine edge start verdict 1 r).init)
+      (encRegisters 3) (encState (encOption encBool)) (fun r => (encRegisters 3 r).length) ∧
+    ComputableInSpace (remainingFuel (N := 3) (τ := Option Bool))
+      (encState (encOption encBool)) (encOption encNat)
+      (fun s => (encState (encOption encBool) s).length) :=
+  ⟨init_budget edge start verdict 1 (of_inO ComputableInDegree.id'.inO_one),
+    remainingFuel_inSpace (encOption encBool)⟩
 
 /-- The same walk has native routines with one space envelope for all selector paths. -/
 private theorem routines : Nonempty (Routines (machine edge start verdict 1 moving)
