@@ -9,6 +9,8 @@ module
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.Predecessor
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.NatLength
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
 
 /-!
 # Scalar controller for one double-counting round
@@ -23,7 +25,7 @@ public section
 
 namespace Turing.DoubleCounting.SourceRound
 
-open Cslib.DoubleCounting
+open Cslib.DoubleCounting MultiTapeTM
 
 /-- Immutable arguments for a round of membership and adjacency calls. -/
 structure Context where
@@ -48,6 +50,19 @@ structure State where
   predecessor : Option Predecessor.State
   /-- A callback rejected. -/
   rejected : Bool
+
+/-- Binary graph size, source, radius and expected tally. -/
+enc_structure encContext : Context where
+  size : encNat, source : encNat, radius : encNat, expected : encTally
+
+/-- The current encoded tally and its tie bit. -/
+enc_structure encUpdate : RoundUpdate where
+  tally : encTally, bad : encBool
+
+/-- Binary outer cursor and tally, with the active predecessor loop if present. -/
+enc_structure encState : State where
+  context : encContext, cursor : encNat, update : encUpdate,
+  predecessor : (encOption Predecessor.encState), rejected : encBool
 
 /-- Arguments of the currently requested same-input callback. -/
 inductive Request where
@@ -132,6 +147,28 @@ structure MachineState (τ : Type) where
   controller : State
   /-- Callback state while a request is pending. -/
   callee : Option τ
+
+/-- The framed controller and, during a call, the entire encoded callee state. -/
+enc_structure encMachineState (τ : Type) (encT : τ ↪ List Bool) : MachineState τ where
+  controller : encState, callee : (encOption encT)
+
+/-- A bound on the entire round machine state, including the suspended caller and live callee. -/
+theorem length_encMachineState_le {τ : Type} (encT : τ ↪ List Bool)
+    (q : MachineState τ) (C D : ℕ) (hc : (encState q.controller).length ≤ C)
+    (ht : ∀ t ∈ q.callee, (encT t).length ≤ D) :
+    (encMachineState τ encT q).length ≤ 2 * C + D + 2 := by
+  rw [encMachineState_apply]
+  simp only [encMachineStateFields, length_encPair]
+  cases hcall : q.callee with
+  | none =>
+    rw [encOption_none]
+    simp only [List.length_nil]
+    omega
+  | some t =>
+    have hlen := ht t (by simp [hcall])
+    rw [encOption_some]
+    simp only [List.length_cons]
+    omega
 
 /-- Enter the fixed round transition machine with the supplied radius and tally. -/
 @[expose] def entry {τ : Type} (ctx : Context) : MachineState τ :=
