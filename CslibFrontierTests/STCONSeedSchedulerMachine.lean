@@ -138,4 +138,17 @@ example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ �
       enc (encState encScan) S :=
   init_budget encScan call start readVerdict hstart hsetup
 
+open MultiTapeTM ComputableInSpace in
+/-- Compose resumption with a retained frame and a separately produced scanner verdict. -/
+example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ ↪ List Bool)
+    (start : SeedScanRequest → σ)
+    (hstart : ComputableInSpace start encSeedScanRequest encScan
+      (fun r => (encSeedScanRequest r).length))
+    {current : α → SeedSchedulerFrame} {returned : α → Option ControllerVerdict}
+    (hcurrent : ComputableInSpace current enc encSeedSchedulerFrame S)
+    (hreturned : ComputableInSpace returned enc
+      (encOption Turing.DoubleCounting.SourceRoundLoop.encVerdict) S) :
+    ComputableInSpace (fun a => resume start (current a) (returned a)) enc (encState encScan) S :=
+  budget_comp_linear (resume_inSpace encScan start hstart) (budget_prod hcurrent hreturned)
+
 end CslibFrontierTests.STCONSeedSchedulerMachine
