@@ -82,15 +82,19 @@ private def hornerAdvance (s : HornerState) : HornerState :=
   (s.1, i, BitString.listXor (s.1.modulus.length - 1)
     [coefficient s.1 i, fieldMulMod s.1.modulus s.2.2 s.1.point])
 
-private abbrev CoefficientSumInput := List Bool × List Bool × List Bool
+private theorem listXor_eq_zipWith {width : ℕ} {u v : List Bool}
+    (hu : u.length = width) (hv : v.length = width) :
+    BitString.listXor width [u, v] = u.zipWith xor v := by
+  apply List.ext_getElem (by simp [hu, hv])
+  intro i hi _
+  have hi' : i < width := by simpa using hi
+  simp [BitString.listXor, List.getElem?_eq_getElem (hu ▸ hi'),
+    List.getElem?_eq_getElem (hv ▸ hi')]
 
-private def encCoefficientSumInput :=
-  encPair encCoefficients (encPair encCoefficients encCoefficients)
-
-private theorem hornerAdvance_of_sum_inSpace
-    (hsum : ComputableInSpace (fun q : CoefficientSumInput =>
-      BitString.listXor q.1.length [q.2.1, q.2.2])
-      encCoefficientSumInput encCoefficients (fun q => (encCoefficientSumInput q).length)) :
+private theorem hornerAdvance_of_xor_inSpace
+    (hxor : ComputableInSpace (fun q : List Bool × List Bool => q.1.zipWith xor q.2)
+      (encPair encCoefficients encCoefficients) encCoefficients
+      (fun q => (encPair encCoefficients encCoefficients q).length)) :
     ComputableInSpace hornerAdvance encHornerState encHornerState
       (fun s => (encHornerState s).length) := by
   have hp := fst encHornerInput (encPair encNat encCoefficients)
@@ -101,9 +105,10 @@ private theorem hornerAdvance_of_sum_inSpace
   have ha := snd' hr
   have hc := budget_comp_linear coefficient_inSpace (budget_prod hp hi)
   have hmul := budget_comp_linear fieldMulMod_inSpace (encMulInput_mk_budget hm ha hx)
-  have hword := budget_comp_linear hsum (budget_prod (budget_tail hm) (budget_prod hc hmul))
+  have hword := budget_comp_linear hxor (budget_prod hc hmul)
   exact (budget_prod hp (budget_prod hi hword)).of_enc_eq fun s => by
-    simp only [hornerAdvance, encHornerState, List.length_tail]
+    simp only [hornerAdvance, encHornerState]
+    rw [listXor_eq_zipWith (by simp [coefficient]) (by simp)]
 
 private theorem horner_input (p : HornerInput) (n k : ℕ) (acc : List Bool) :
     (hornerAdvance^[k] (p, n, acc)).1 = p := by
