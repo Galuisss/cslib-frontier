@@ -18,6 +18,7 @@ import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.NatLength
 The loop keeps a binary radius and tally. Each round enters the same transition machine
 with the current registers and runs it on the original input. The scalar invariant makes
 the round and final membership envelopes available at every entry reached by the loop.
+The compiler combines native certificates for both callbacks with a common state budget.
 -/
 
 public section
@@ -219,6 +220,54 @@ theorem withSourceRound_length_run_le (encContext : κ ↪ List Bool) (encCallee
   have h := SourceRound.length_encMachineState_run_le encCallee (roundContext size source r)
     callee calleeStart calleeReply input choices calleeBound (hcallee r hr)
   exact h.trans (roundStateBound_le size source context limit r hr calleeBound)
+
+/-- Compile the composed source loop from native certificates for the round callee, final
+membership callback, and input-dependent initial registers. The state budget covers all runs. -/
+theorem withSourceRound_exists_routines {α : Type} (enc : α ↪ List Bool) (S : α → ℕ)
+    (encContext : κ ↪ List Bool) (encCallee : τ ↪ List Bool) (encMember : μ ↪ List Bool)
+    (member : NondeterministicQueryMachine μ) (memberStart : Registers κ → μ)
+    (memberReply : μ → Option Bool) (contextOf : α → κ) (limitOf : α → ℕ)
+    (hregisters : ComputableInSpace (fun a => start (contextOf a) (limitOf a))
+      enc (encRegisters encContext) S)
+    (hlog : ∀ a, Nat.log2 (enc a).length + 1 ≤ S a)
+    (hsize : ComputableInSpace size encContext encNat (fun c => (encContext c).length))
+    (hsource : ComputableInSpace source encContext encNat (fun c => (encContext c).length))
+    (hcalleeStart : ComputableInSpace
+      (fun q : SourceRound.State => calleeStart q.context (SourceRound.request q))
+      SourceRound.encState encCallee (fun q => (SourceRound.encState q).length))
+    (hcalleeReply : ComputableInSpace calleeReply encCallee (encOption encBool)
+      (fun t => (encCallee t).length))
+    (hcalleeQuery : ComputableInSpace callee.query encCallee encNat (fun t => (encCallee t).length))
+    (hcalleeHalt : ComputableInSpace callee.halted encCallee encBool
+      (fun t => (encCallee t).length))
+    (hcalleeNext : ComputableInSpace callee.next (encPair encCallee SourceRound.encReadChoice)
+      encCallee (fun p => (encPair encCallee SourceRound.encReadChoice p).length))
+    (hmemberStart : ComputableInSpace memberStart (encRegisters encContext) encMember
+      (fun r => (encRegisters encContext r).length))
+    (hmemberReply : ComputableInSpace memberReply encMember (encOption encBool)
+      (fun s => (encMember s).length))
+    (hmemberQuery : ComputableInSpace member.query encMember encNat (fun s => (encMember s).length))
+    (hmemberHalt : ComputableInSpace member.halted encMember encBool
+      (fun s => (encMember s).length))
+    (hmemberNext : ComputableInSpace member.next (encPair encMember encChoice) encMember
+      (fun p => (encPair encMember encChoice p).length))
+    (hstates : ∃ c, ∀ a bits, (encState encContext (SourceRound.encMachineState τ encCallee)
+      encMember ((withSourceRound size source callee calleeStart calleeReply
+        (contextOf a) (limitOf a) member memberStart memberReply).run (enc a) bits)).length ≤
+      c * S a) :
+    Nonempty (Routines (withSourceRound size source callee calleeStart calleeReply context limit
+      member memberStart memberReply)
+      (fun a => (withSourceRound size source callee calleeStart calleeReply
+        (contextOf a) (limitOf a) member memberStart memberReply).init) enc S) :=
+  exists_routines encContext (SourceRound.encMachineState τ encCallee) encMember
+    (start context limit) (singleRound) (entryRound) SourceRound.answer member memberStart
+    memberReply enc S (fun a => start (contextOf a) (limitOf a)) hregisters hlog
+    (roundEntry_inSpace size source encContext encCallee hsize hsource) hmemberStart
+    (SourceRound.answer_inSpace encCallee) hmemberReply
+    (SourceRound.machine_query_inSpace encCallee _ _ _ _ hcalleeQuery) hmemberQuery
+    (SourceRound.machine_halted_inSpace encCallee _ _ _ _) hmemberHalt
+    (SourceRound.machine_next_inSpace encCallee _ _ _ _ hcalleeStart hcalleeReply
+      hcalleeHalt hcalleeNext) hmemberNext hstates
 
 end Composition
 
