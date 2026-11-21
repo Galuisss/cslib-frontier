@@ -32,6 +32,8 @@ context and read the original input.
 * `Cslib.Complexity.STCON.configurationJustesenRoundCallback_existsUnique_firstHalting`:
   each request at exact tally totals has one first-halting trace returning a Boolean
   if the membership transcript is unique.
+* `Cslib.Complexity.STCON.configurationJustesenRoundCallback_readReply_correct`:
+  at exact totals, parsed edge and membership replies agree with adjacency and reachability.
 -/
 
 public section
@@ -123,5 +125,37 @@ theorem configurationJustesenRoundCallback_existsUnique_firstHalting
     rw [justesenRoundMembershipMachine_withInit]
     exact configurationJustesenMembershipTally_existsUnique_firstHalting ntm c w
       seed source ⟨v, hr⟩ radius hpass
+
+/-- A successful tagged reply agrees with subdivision adjacency or bounded reachability,
+according to the request. The membership call uses the exact round totals. -/
+theorem configurationJustesenRoundCallback_readReply_correct
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source : Fin n) (radius : ℕ),
+      let adjacent := configurationJustesenSubdivisionAdjacent ntm c w seed
+      let edge := fun u v => adjacent u v = true
+      let adjacency := configurationJustesenSubdivisionContext ntm c w seed.val
+      let ctx : SourceRound.Context := ⟨n, source.val, radius, expected edge source radius⟩
+      ∀ (req : SourceRound.Request) (hr : req.InRange n) (bits : List Bool)
+        (hit : Bool) (suffix : List Bool),
+        (justesenRoundCallback ntm c).readReply justesenRoundCallbackReply w
+          (justesenRoundCallbackStart adjacency ctx req) bits = some (hit, suffix) →
+        match req, hr with
+        | .edge u v, ⟨hu, hv⟩ => hit = adjacent ⟨u, hu⟩ ⟨v, hv⟩
+        | .member v, hv =>
+          hit ↔ (⟨v, hv⟩ : Fin n) ∈ Relation.reachableWithin edge source radius := by
+  intro I n seed source radius adjacent edge adjacency ctx req hr bits hit suffix hreply
+  rw [justesenRoundCallback_readReply] at hreply
+  cases req with
+  | edge u v =>
+    rcases hr with ⟨hu, hv⟩
+    have h := (configurationJustesenSubdivisionEdge_readReply_iff ntm c w
+      seed ⟨u, hu⟩ ⟨v, hv⟩ bits suffix hit).mp hreply
+    apply Bool.eq_iff_iff.mpr
+    simpa only [adjacent, configurationJustesenSubdivisionAdjacent, decide_eq_true_eq] using h.2
+  | member v =>
+    exact justesenRoundMembership_readReply_correct ntm c w seed source ⟨v, hr⟩
+      radius bits hit suffix hreply
 
 end Cslib.Complexity.STCON

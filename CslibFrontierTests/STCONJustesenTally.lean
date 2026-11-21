@@ -149,6 +149,27 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     ⟨rfl, ?_⟩
   simp only [configurationJustesenSubdivisionAdjacent, decide_eq_true_eq]
 
+-- Parsed replies can be used directly as adjacency and reachability facts.
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source u v : Fin n) (radius : ℕ),
+      let adjacent := configurationJustesenSubdivisionAdjacent ntm c w seed
+      let edge := fun i j => adjacent i j = true
+      let ctx : SourceRound.Context := ⟨n, source.val, radius, expected edge source radius⟩
+      let adjacency := configurationJustesenSubdivisionContext ntm c w seed.val
+      let parse := fun req => (justesenRoundCallback ntm c).readReply justesenRoundCallbackReply
+        w (justesenRoundCallbackStart adjacency ctx req)
+      ∀ (bits : List Bool) (hit : Bool) (suffix : List Bool),
+        (parse (.edge u.val v.val) bits = some (hit, suffix) → hit = adjacent u v) ∧
+        (parse (.member v.val) bits = some (hit, suffix) →
+          (hit ↔ v ∈ Relation.reachableWithin edge source radius)) := by
+  intro I n seed source u v radius adjacent edge ctx adjacency parse bits hit suffix
+  have h := configurationJustesenRoundCallback_readReply_correct ntm c w seed source radius
+  exact ⟨h (.edge u.val v.val) ⟨u.isLt, v.isLt⟩ bits hit suffix,
+    h (.member v.val) v.isLt bits hit suffix⟩
+
 /-- The final callback returns a passing negative reply and preserves the next selectors. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
     (c : ℕ) (w : List Bool) :
