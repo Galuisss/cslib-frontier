@@ -368,37 +368,48 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   exact (configurationJustesenRoundCallback_existsUnique_firstHalting ntm c w
     seed source radius hpass req hr).unique hleft hright
 
--- Re-entry at radius zero has one complete trace with the mathematical next update.
+-- The first complete round either ends the scan or preserves its exact-tally invariant.
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
     (w : List Bool) (base : SourceRoundLoop.Registers JustesenSourceContext) :
     let I := configurationInstance ntm c w
     let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
-    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n) (fuel : ℕ),
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n),
       let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
       let ctx : JustesenSourceContext :=
         ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
-      let r : SourceRoundLoop.Registers JustesenSourceContext :=
-        ⟨ctx, fuel, 0, expected edge source 0⟩
+      let r := SourceRoundLoop.start ctx n
       let M := (justesenRetainedSourceRound ntm c base).withInit
         (justesenRetainedSourceRoundEntry r)
       ∃! bits, ∃ update, M.FirstHalting w bits M.init ∧
         justesenRetainedSourceRoundReply (M.run w bits) = some update ∧
         update.tally = expected edge source 1 ∧
-          (update.bad = false ↔ ∃! transcript, Passes edge source 1 transcript) := by
-  intro I n seed source target fuel edge ctx r M
+        (update.bad = false ↔ ∃! transcript, Passes edge source 1 transcript) ∧
+        (update.bad = false → update.tally.count ≠ r.tally.count →
+          JustesenSourceRoundExact ctx edge source (r.advance update.tally)) := by
+  intro I n seed source target edge ctx r M
   have hreentry : M = justesenRetainedSourceRound ntm c r :=
     SourceRoundLoop.retainedRound_withInit JustesenSourceContext.size JustesenSourceContext.sourceID
       (justesenRoundCallback ntm c) (fun ctx => justesenRoundCallbackStart ctx.adjacency)
       justesenRoundCallbackReply base r
   rw [hreentry]
   have hpass := existsUnique_passes_zero edge source
+  have hinit : JustesenSourceRoundExact ctx edge source r :=
+    justesenSourceRoundExact_start ctx edge source
+  have htally : r = ⟨ctx, n, 0, expected edge source 0⟩ := by
+    simp only [r, SourceRoundLoop.start, expected_zero]
   obtain ⟨bits, ⟨update, hfirst, hreply⟩, hunique⟩ :=
     configurationJustesenRetainedSourceRound_existsUnique_firstHalting ntm c w
-      seed source target fuel 0 hpass
-  refine ⟨bits, ⟨update, hfirst, hreply, ?_⟩, ?_⟩
-  · exact configurationJustesenRetainedSourceRound_correct ntm c w
-      seed source target fuel 0 hpass bits update hfirst hreply
-  · rintro other ⟨result, hfirst', hreply', _, _⟩
-    exact hunique other ⟨result, hfirst', hreply'⟩
+      seed source target n 0 hpass
+  have hnext := configurationJustesenRetainedSourceRound_correct ntm c w
+    seed source target n 0 hpass bits update hfirst hreply
+  have hfirst' : (justesenRetainedSourceRound ntm c r).FirstHalting w bits
+      (justesenRetainedSourceRound ntm c r).init := htally.symm ▸ hfirst
+  have hreply' : justesenRetainedSourceRoundReply
+      ((justesenRetainedSourceRound ntm c r).run w bits) = some update := htally.symm ▸ hreply
+  refine ⟨bits, ⟨update, hfirst', hreply', hnext.1, hnext.2, ?_⟩, ?_⟩
+  · exact configurationJustesenRetainedSourceRound_exact_advance ntm c w
+      seed source target r hinit bits update hfirst' hreply'
+  · rintro other ⟨result, hother, hret, _, _, _⟩
+    exact hunique other ⟨result, htally ▸ hother, htally ▸ hret⟩
 
 end CslibFrontierTests.STCONJustesenTally
