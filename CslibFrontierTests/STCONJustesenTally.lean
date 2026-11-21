@@ -355,4 +355,28 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     ⟨(hc (.edge source.val target.val) ⟨source.isLt, target.isLt⟩).2 bits,
       (hc (.member target.val) target.isLt).2 bits⟩⟩
 
+-- Re-enter the same round at admissible loop registers without changing its clock or envelope.
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (initial : SourceRoundLoop.Registers JustesenSourceContext) :
+    ∃ C, ∀ w : List Bool,
+      let I := configurationInstance ntm c w
+      let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+      ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n),
+        let context : JustesenSourceContext :=
+          ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+        ∀ r, SourceRoundLoop.Admissible context context.size n r →
+          let M := (justesenRetainedSourceRound ntm c initial).withInit
+            (justesenRetainedSourceRoundEntry r)
+          M.HaltsWithin w (configurationJustesenRetainedSourceRoundClock ntm c w) ∧
+            ∀ bits, (encJustesenRetainedSourceRoundState (M.run w bits)).length ≤
+              2 * (encJustesenSourceContext context).length + 1 +
+                SourceRound.roundStateBound ⟨n, source.val, n, ⟨1 + n * n, n * n * n⟩⟩
+                  (C * (Nat.log2 w.length + 1)) := by
+  obtain ⟨C, h⟩ := configurationJustesenRetainedSourceRound_bounds ntm c
+  refine ⟨C, fun w => ?_⟩
+  intro I n seed source target context r hr M
+  dsimp only [M]
+  rw [justesenRetainedSourceRound_withInit]
+  exact h w seed source target n le_rfl r hr
+
 end CslibFrontierTests.STCONJustesenTally

@@ -66,7 +66,8 @@ theorem start_admissible (context : κ) (size limit : ℕ) :
     Admissible context size limit (start context limit) := by
   simp [Admissible, start]
 
-private theorem admissible_caps {context : κ} {size limit : ℕ} {r : Registers κ}
+/-- Bound both counters and the tally using the fixed loop limit. -/
+theorem admissible_caps {context : κ} {size limit : ℕ} {r : Registers κ}
     (hr : Admissible context size limit r) :
     r.fuel ≤ limit ∧ r.radius ≤ limit ∧
       r.tally.count ≤ 1 + limit * size ∧ r.tally.lengthSum ≤ size * limit * limit := by
@@ -177,7 +178,8 @@ theorem withSourceRound_haltsWithin (member : NondeterministicQueryMachine μ)
     input callbackClock (hcall r hr)
   simpa only [roundContext, hr.1] using h
 
-private theorem roundStateBound_le (r : Registers κ)
+/-- Every admissible round fits the scalar envelope at the loop's maximum radius and tally. -/
+theorem roundStateBound_le (r : Registers κ)
     (hr : Admissible context (size context) limit r) (calleeBound : ℕ) :
     SourceRound.roundStateBound (roundContext size source r) calleeBound ≤
       SourceRound.roundStateBound ⟨size context, source context, limit,

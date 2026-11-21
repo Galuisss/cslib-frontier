@@ -296,24 +296,21 @@ theorem justesenSourceMembership_bounds (ntm : MultiTapeNTM k Bool State) (c : �
   intro I size seed source target limit hlimit ctx r hr M entry
   have hsize : ctx.size = size.vertexCount :=
     configurationJustesenSourceContext_size ntm c w seed.val source.val target.val
-  rcases r with ⟨actual, fuel, radius, totals⟩
-  obtain ⟨hctx, hfuel, hc, hs⟩ := hr
-  change actual = ctx at hctx
-  subst actual
-  change fuel + radius = limit at hfuel
-  change totals.count ≤ 1 + radius * ctx.size at hc
-  change totals.lengthSum ≤ ctx.size * radius * radius at hs
+  obtain ⟨_, hrad, hc, hs⟩ := SourceRoundLoop.admissible_caps hr
   rw [hsize] at hc hs
-  have hrad : radius ≤ size.vertexCount := by omega
-  have hc' := hc.trans (Nat.add_le_add_left (Nat.mul_le_mul_right _ hrad) 1)
-  have hs' := hs.trans (Nat.mul_le_mul (Nat.mul_le_mul_left _ hrad) hrad)
+  rcases r with ⟨actual, fuel, radius, totals⟩
+  have hctx : actual = ctx := hr.1
+  subst actual
+  have hrad' : radius ≤ size.vertexCount := hrad.trans hlimit
+  have hc' := hc.trans (Nat.add_le_add_left (Nat.mul_le_mul_right _ hlimit) 1)
+  have hs' := hs.trans (Nat.mul_le_mul (Nat.mul_le_mul_left _ hlimit) hlimit)
   dsimp only [M, entry]
   constructor
   · rw [justesenSourceMembershipMachine_withInit]
     exact configurationJustesenMembershipTally_haltsWithin_clock ntm c w
-      seed source target radius totals hrad
+      seed source target radius totals hrad'
   · intro bits
     rw [← run_withInit, justesenSourceMembershipMachine_withInit]
-    exact hlength w seed source target radius totals hrad hc' hs' bits
+    exact hlength w seed source target radius totals hrad' hc' hs' bits
 
 end Cslib.Complexity.STCON

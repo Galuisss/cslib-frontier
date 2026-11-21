@@ -21,12 +21,15 @@ tagged edge and membership callbacks use the original input and the current roun
 * `Cslib.Complexity.STCON.justesenRetainedSourceRound`: the fixed round with tagged callbacks.
 * `Cslib.Complexity.STCON.justesenRetainedSourceRoundEntry`: initialize it from loop registers.
 * `Cslib.Complexity.STCON.justesenRetainedSourceRoundReply`: read its optional round update.
+* `Cslib.Complexity.STCON.configurationJustesenRetainedSourceRoundClock`: a common selector clock.
 
 ## Main results
 
 * `Cslib.Complexity.STCON.justesenRetainedSourceRoundEntry_inSpace`: linear workspace for entry.
 * `Cslib.Complexity.STCON.justesenRetainedSourceRound_parts_inSpace`: linear workspace for
   query, transition, halt and reply on the encoded round state.
+* `Cslib.Complexity.STCON.configurationJustesenRetainedSourceRound_bounds`: the clock and
+  uniform state envelope hold at every admissible round entry.
 -/
 
 public section
@@ -109,5 +112,90 @@ theorem justesenRetainedSourceRound_parts_inSpace {k : ℕ} {State : Type} [Fint
     (SourceRound.machine_halted_inSpace C ctx N start justesenRoundCallbackReply) hsnd
   have hreply := budget_comp_linear (SourceRound.answer_inSpace C) hsnd
   exact ⟨hquery, hnext, hhalt, hreply⟩
+
+open Cslib.Code.JustesenFamily
+
+variable {k : ℕ} {State : Type} [Fintype State]
+
+/-- Use the same fixed round machine with any new retained context and scalar registers. -/
+theorem justesenRetainedSourceRound_withInit
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (r next : SourceRoundLoop.Registers JustesenSourceContext) :
+    (justesenRetainedSourceRound ntm c r).withInit (justesenRetainedSourceRoundEntry next) =
+      justesenRetainedSourceRound ntm c next :=
+  SourceRoundLoop.retainedRound_withInit JustesenSourceContext.size JustesenSourceContext.sourceID
+    (justesenRoundCallback ntm c) (fun ctx => justesenRoundCallbackStart ctx.adjacency)
+    justesenRoundCallbackReply r next
+
+/-- Charge round routing and the common tagged callback clock on the original input. -/
+noncomputable def configurationJustesenRetainedSourceRoundClock
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) : ℕ :=
+  SourceRound.roundClock
+    (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    (configurationJustesenRoundCallbackClock ntm c w)
+
+/-- The retained round's common selector clock is polynomial in the original word length. -/
+theorem configurationJustesenRetainedSourceRoundClock_polyBounded
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    PolyBounded List.length (configurationJustesenRetainedSourceRoundClock ntm c) := by
+  have hn := configurationSubdivisionVertexCount_polyBounded ntm c
+  have ht := configurationJustesenRoundCallbackClock_polyBounded ntm c
+  exact (((hn.add (.const 1)).mul (((PolyBounded.const 2).mul hn).add (.const 1))).mul
+    (ht.add (.const 2))).add (ht.add (.const 1))
+
+/-- For an initialized subdivision, every admissible round entry shares a selector clock and
+an encoded-state envelope. The latter charges the retained context and the scalar round at
+the maximum radius and tally allowed by the loop limit. -/
+theorem configurationJustesenRetainedSourceRound_bounds
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ∃ C, ∀ w : List Bool,
+      let I := configurationInstance ntm c w
+      let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+      ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n)
+        (limit : ℕ), limit ≤ n →
+        let context : JustesenSourceContext :=
+          ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+        ∀ r, SourceRoundLoop.Admissible context context.size limit r →
+          let M := justesenRetainedSourceRound ntm c r
+          let D := C * (Nat.log2 w.length + 1)
+          M.HaltsWithin w (configurationJustesenRetainedSourceRoundClock ntm c w) ∧
+            ∀ bits, (encJustesenRetainedSourceRoundState (M.run w bits)).length ≤
+              2 * (encJustesenSourceContext context).length + 1 +
+                SourceRound.roundStateBound
+                  ⟨n, source.val, limit, ⟨1 + limit * n, n * limit * limit⟩⟩ D := by
+  obtain ⟨C, hcallback⟩ := configurationJustesenRoundCallback_bounds ntm c
+  refine ⟨C, fun w => ?_⟩
+  intro I n seed source target limit hlimit context r hr M D
+  have hsize : context.size = n :=
+    configurationJustesenSourceContext_size ntm c w seed.val source.val target.val
+  obtain ⟨_, hrad, hcount, hsum⟩ := SourceRoundLoop.admissible_caps hr
+  rw [hsize] at hcount hsum
+  have hcount' := hcount.trans (Nat.add_le_add_left (Nat.mul_le_mul_right n hlimit) 1)
+  have hsum' := hsum.trans (Nat.mul_le_mul (Nat.mul_le_mul_left n hlimit) hlimit)
+  let N := justesenRoundCallback ntm c
+  let start := fun k : JustesenSourceContext => justesenRoundCallbackStart k.adjacency
+  let clock := configurationJustesenRoundCallbackClock ntm c w
+  have hcall (req : SourceRound.Request) (hv : req.InRange r.context.size) :
+      let entry := start r.context
+        (SourceRoundLoop.roundContext JustesenSourceContext.size JustesenSourceContext.sourceID r)
+        req
+      N.HaltsFrom w entry clock ∧
+        ∀ bits, (encJustesenRoundCallbackState (N.replay w bits entry)).length ≤ D := by
+    simp only [SourceRoundLoop.roundContext, hr.1, hsize] at hv ⊢
+    exact hcallback w seed source r.radius r.tally (hrad.trans hlimit) hcount' hsum' req hv
+  have hhalt := SourceRoundLoop.retainedRound_haltsWithin JustesenSourceContext.size
+    JustesenSourceContext.sourceID N start justesenRoundCallbackReply r w clock
+    (fun req hv => (hcall req hv).1)
+  refine ⟨?_, fun bits => ?_⟩
+  · simpa only [M, justesenRetainedSourceRound, N, start, clock, n,
+      configurationJustesenRetainedSourceRoundClock, hr.1, hsize] using hhalt
+  · have hlen := SourceRoundLoop.retainedRound_length_run_le JustesenSourceContext.size
+      JustesenSourceContext.sourceID N start justesenRoundCallbackReply r encJustesenSourceContext
+      encJustesenRoundCallbackState w bits D (fun req hv => (hcall req hv).2)
+    refine hlen.trans ?_
+    have hscalar := SourceRoundLoop.roundStateBound_le JustesenSourceContext.size
+      JustesenSourceContext.sourceID context limit r hr D
+    simpa only [SourceRoundLoop.retainedRoundStateBound, hr.1, hsize] using
+      Nat.add_le_add_left hscalar (2 * (encJustesenSourceContext context).length + 1)
 
 end Cslib.Complexity.STCON
