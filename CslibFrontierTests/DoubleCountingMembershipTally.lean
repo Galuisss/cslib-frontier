@@ -176,6 +176,30 @@ example :
         hsource [true] 1
         (fun _ _ _ _ => by simp only [encBool_apply, List.length_singleton, le_refl]) choices
 
+open Turing.DoubleCounting in
+/-- A caller can initialize a retained tally and invoke its observers under one input budget. -/
+example :
+    let start := fun (flag : Bool) (_ _ : ℕ) => flag
+    let entry := BoundedWalk.Runtime.entry contextEdge start id 0 false (N := 1) ⟨0, 0, 0⟩
+    let M := retainedMachine contextEdge start id 0 entry false ⟨1, 0, 0, 0, ⟨0, 0⟩⟩
+    let encIn := encPair encBool encContext
+    let enc := encRetainedState encBool encBool
+    let budget (p : Bool × Context) := (encIn p).length
+    let enter (p : Bool × Context) : RetainedState Bool Bool := retainedInitial p.1 p.2
+    ComputableInSpace enter encIn enc budget ∧
+      ComputableInSpace (fun p => M.query (enter p)) encIn encNat budget ∧
+      ComputableInSpace (fun p => M.halted (enter p)) encIn encBool budget ∧
+      ComputableInSpace (fun p => retainedReply (enter p)) encIn (encOption encBool) budget := by
+  intro start entry M encIn enc budget enter
+  have hentry : ComputableInSpace enter encIn enc budget :=
+    retainedInitial_budget encBool encBool (fst encBool encContext) (snd encBool encContext)
+  have hquery := retainedMachine_query_inSpace contextEdge start id 0 entry false encBool encBool
+    ⟨1, 0, 0, 0, ⟨0, 0⟩⟩ (budget_const (encIn := encBool) (encB := encNat) 0 (.refl _))
+  have hhalt := retainedMachine_halted_inSpace contextEdge start id 0 entry false encBool encBool
+    ⟨1, 0, 0, 0, ⟨0, 0⟩⟩
+  exact ⟨hentry, budget_comp_linear hquery hentry, budget_comp_linear hhalt hentry,
+    budget_comp_linear (retainedReply_inSpace encBool encBool) hentry⟩
+
 example :
     let E := encState (Turing.DoubleCounting.BoundedWalk.encState (N := 2) encUnit)
     ComputableInSpace reply E (encOption encBool) (fun s => (E s).length) :=
