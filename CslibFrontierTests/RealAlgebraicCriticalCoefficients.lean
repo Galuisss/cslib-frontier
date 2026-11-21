@@ -10,6 +10,7 @@ public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoeff
 import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalParameterEvaluation
 import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignApproximation
 import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProduct
+import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProductBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicValueBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
@@ -535,5 +536,22 @@ example :
     have hsign := hneg.mp h (0 : Fin 1)
     simp [g, sign_neg hx] at hsign
   exact ⟨hmatch.resolve_right (by linarith), hmiss.resolve_left (by linarith)⟩
+
+-- Applying the sign product to X² − 1 gives explicit degree and coefficient budgets.
+example :
+    let g : Polynomial ℤ := Polynomial.X ^ 2 - 1
+    let q := (Polynomial.dyadicSignProduct 1 1).comp g
+    q.natDegree ≤ 12 ∧ q.coeffNorm1 ≤ 2 ^ 24 := by
+  intro g q
+  have hD : g.natDegree ≤ 2 := (Polynomial.natDegree_sub_le _ _).trans (by simp)
+  have hx : (Polynomial.X : Polynomial ℤ).coeffNorm1 = 1 := by
+    simpa only [mul_one, Polynomial.coeffNorm1_one] using Polynomial.coeffNorm1_X_mul 1
+  have hg : g.coeffNorm1 ≤ 2 ^ 1 := by
+    refine (Polynomial.coeffNorm1_sub_le _ _).trans ?_
+    have h := Polynomial.coeffNorm1_pow_le (Polynomial.X : Polynomial ℤ) 2
+    rw [hx, one_pow] at h
+    rw [Polynomial.coeffNorm1_one]
+    omega
+  exact Polynomial.dyadicSignProduct_comp_bounds 1 1 g hD hg
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients

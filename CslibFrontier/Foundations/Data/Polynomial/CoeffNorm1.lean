@@ -79,19 +79,6 @@ theorem coeffNorm1_reverse (p : ℤ[X]) : p.reverse.coeffNorm1 = p.coeffNorm1 :=
   rw [coeffNorm1, reverse, reflect_support, sum_image (revAt _).injective.injOn]
   simp only [coeff_reflect, revAt_invol, coeffNorm1]
 
-/-- Evaluation at a nonzero integer is bounded by the coefficient norm times the
-absolute value of the integer raised to the degree. -/
-theorem natAbs_eval_le_coeffNorm1 (p : ℤ[X]) (a : ℤ) (ha : 1 ≤ a.natAbs) :
-    (p.eval a).natAbs ≤ p.coeffNorm1 * a.natAbs ^ p.natDegree := by
-  rw [eval_eq_sum, Polynomial.sum]
-  refine (Int.natAbs_sum_le _ _).trans ?_
-  calc
-    _ ≤ ∑ i ∈ p.support, (p.coeff i).natAbs * a.natAbs ^ p.natDegree := by
-      refine sum_le_sum fun i hi => ?_
-      rw [Int.natAbs_mul, Int.natAbs_pow]
-      exact Nat.mul_le_mul_left _ (Nat.pow_le_pow_right ha (le_natDegree_of_mem_supp i hi))
-    _ = _ := by rw [← sum_mul, coeffNorm1]
-
 /-- Multiplication by a natural scalar scales the coefficient norm exactly. -/
 theorem coeffNorm1_nsmul (k : ℕ) (p : ℤ[X]) : coeffNorm1 (k • p) = k * coeffNorm1 p := by
   rw [coeffNorm1_eq_sum_of_support_subset (support_smul k p), coeffNorm1, Finset.mul_sum]
@@ -225,6 +212,26 @@ theorem coeffNorm1_pow_le (p : ℤ[X]) (k : ℕ) :
 theorem coeffNorm1_prod_le {ι : Type*} (s : Finset ι) (f : ι → ℤ[X]) :
     coeffNorm1 (∏ a ∈ s, f a) ≤ ∏ a ∈ s, coeffNorm1 (f a) :=
   le_prod_of_submultiplicative coeffNorm1 coeffNorm1_one.le coeffNorm1_mul_le s f
+
+/-- Composition grows the coefficient norm by at most the inner norm to the
+outer degree, with the inner norm rounded up to one to include zero. -/
+theorem coeffNorm1_comp_le (p q : ℤ[X]) :
+    (p.comp q).coeffNorm1 ≤ p.coeffNorm1 * (max 1 q.coeffNorm1) ^ p.natDegree := by
+  rw [comp_eq_sum_left, Polynomial.sum]
+  refine (coeffNorm1_sum_le _ _).trans ?_
+  calc
+    _ ≤ ∑ i ∈ p.support, (p.coeff i).natAbs * (max 1 q.coeffNorm1) ^ p.natDegree := by
+      refine sum_le_sum fun i hi => (coeffNorm1_C_mul_le _ _).trans (Nat.mul_le_mul_left _ ?_)
+      exact (coeffNorm1_pow_le q i).trans
+        ((Nat.pow_le_pow_left (le_max_right 1 q.coeffNorm1) i).trans
+          (Nat.pow_le_pow_right (le_max_left 1 q.coeffNorm1) (le_natDegree_of_mem_supp i hi)))
+    _ = _ := by simp only [coeffNorm1, sum_mul]
+
+/-- Evaluation at a nonzero integer is bounded by the coefficient norm times the
+absolute value of the integer raised to the degree. -/
+theorem natAbs_eval_le_coeffNorm1 (p : ℤ[X]) (a : ℤ) (ha : 1 ≤ a.natAbs) :
+    (p.eval a).natAbs ≤ p.coeffNorm1 * a.natAbs ^ p.natDegree := by
+  simpa only [comp_C, coeffNorm1_C, max_eq_right ha] using coeffNorm1_comp_le p (C a)
 
 /-- Casting `coeffNorm1 p` to `ℤ` gives the sum of integer absolute values `|p.coeff i|`. -/
 theorem natCast_coeffNorm1 (p : ℤ[X]) :
