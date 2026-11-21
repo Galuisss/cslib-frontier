@@ -110,4 +110,22 @@ example (skipped indexed : SeedSchedulerFrame) (hneedsScan : indexed.needsScan =
   rw [show resume start skipped none = _ from henter, hscan, hparse]
   simp [resumed, scheduler, start]
 
+open MultiTapeTM in
+/-- The bound applies to the rejecting skip selector used in the checked example above. -/
+example (stateBound : ℕ) :
+    let w := [false, false, true]
+    let E := encSum encNat (encOption encBool)
+    (∀ f : SeedSchedulerFrame, f.request.setup = setup → f.Valid → f.needsScan = true →
+      ∀ bits, (E (scan.replay w bits (.inl f.request.sourceID))).length ≤ stateBound) →
+    (encState E (scheduler.run w [false, false, true])).length ≤
+      24 * (encSeedSearchSetup setup).length + stateBound + 21 := by
+  intro w E hscan
+  apply length_run_le E setup scan (fun r => .inl r.sourceID) verdict w stateBound
+    (by decide) _ hscan
+  intro i hi
+  change i < 2 at hi
+  rw [SeedSearchSetup.originalSourceID]
+  change 2 * i < 4
+  omega
+
 end CslibFrontierTests.STCONSeedSchedulerMachine

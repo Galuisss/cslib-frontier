@@ -9,6 +9,8 @@ module
 
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.CallReplay
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.NatLength
+import CslibFrontier.Tactic.EncLen
 
 /-!
 # Same-input seed scheduler
@@ -27,6 +29,7 @@ skipped designated root.
 
 ## Main results
 
+* `SeedSchedulerMachine.length_run_le`: bound the encoded state at every selector prefix.
 * `SeedSchedulerMachine.step_liveScan`: a live scan takes the callback's step on the same input.
 * `SeedSchedulerMachine.firstHalting_scan_iff`: split a successful scan and the resumed trace.
 * `SeedSchedulerMachine.firstHalting_skip_iff`: split a skipped root's false selector and suffix.
@@ -314,5 +317,117 @@ theorem haltsWithin {σ : Type} (setup : SeedSearchSetup) (scan : Nondeterminist
     simp only [remaining, hs, hz, Nat.sub_zero]
     rw [hlen, Nat.add_comm 1, ← Nat.mul_assoc]
     exact Nat.mul_le_mul_right _ (Nat.sub_le _ _)
+
+open Cslib.Reachability.Hoza (encSeedSearchSize_seedLimit_length_le) in
+/-- Every selector prefix uses the encoded frame bound and at most the supplied scanner bound.
+The bound covers skipped roots, terminal answers, and rejected branches. -/
+theorem length_run_le {σ : Type} (encScan : σ ↪ List Bool) (setup : SeedSearchSetup)
+    (scan : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
+    (verdict : σ → Option ControllerVerdict) (input : List Bool) (stateBound : ℕ)
+    (hsource : setup.sourceID < setup.parameters.search.subdivision.vertexCount)
+    (hroot : ∀ i < setup.parameters.search.subdivision.originalCount,
+      setup.originalSourceID i < setup.parameters.search.subdivision.vertexCount)
+    (hscan : ∀ f : SeedSchedulerFrame, f.request.setup = setup → f.Valid →
+      f.needsScan = true → ∀ bits,
+        (encScan (scan.replay input bits (start f.request))).length ≤ stateBound)
+    (bits : List Bool) :
+    (encState encScan ((machine setup scan start verdict).run input bits)).length ≤
+      24 * (encSeedSearchSetup setup).length + stateBound + 21 := by
+  let M := machine setup scan start verdict
+  let validFrame (f : SeedSchedulerFrame) := f.request.setup = setup ∧ f.Valid
+  let validState : State σ → Prop
+    | .inl (.inl f) => validFrame f
+    | .inl (.inr (f, s)) => validFrame f ∧ f.needsScan = true ∧
+        ∃ choices, scan.replay input choices (start f.request) = s
+    | .inr (some (some a)) => a.seed < setup.parameters.search.seedLimit
+    | .inr none | .inr (some none) => True
+  have henter (f : SeedSchedulerFrame) (hf : validFrame f) : validState (enter start f) := by
+    unfold enter
+    split
+    · exact ⟨hf, ‹_›, [], rfl⟩
+    · exact hf
+  have hrejected : validState (.inr none) := trivial
+  have hresume (f : SeedSchedulerFrame) (hf : validFrame f) (v : Option ControllerVerdict) :
+      validState (resume start f v) := by
+    unfold resume
+    cases hv : seedSchedulerStep f v with
+    | none => exact hrejected
+    | some result =>
+      cases result with
+      | inl next =>
+        obtain ⟨hnext, hs, _⟩ := seedSchedulerStep_progress hf.2 hv
+        exact henter next ⟨hs.trans hf.1, hnext⟩
+      | inr result =>
+        cases result with
+        | none => trivial
+        | some a =>
+          change f.request.seed < setup.parameters.search.seedLimit
+          exact hf.1 ▸ seed_lt hf.2
+  have hstep (s : State σ) (hs : validState s) (bit : Bool) :
+      validState (M.step input s bit) := by
+    rcases s with (f | ⟨f, q⟩) | result
+    · change validState (if bit then .inr none else resume start f none)
+      cases bit
+      · exact hresume f hs none
+      · exact hrejected
+    · obtain ⟨hf, hneeds, scanBits, rfl⟩ := hs
+      cases hhalt : scan.halted (scan.replay input scanBits (start f.request))
+      · rw [step_liveScan _ _ _ _ _ _ _ _ hhalt]
+        exact ⟨hf, hneeds, scanBits ++ [bit], by rw [scan.replay_append, scan.replay_cons,
+          scan.replay_nil]⟩
+      · rw [step_haltedScan _ _ _ _ _ _ _ _ hhalt]
+        cases bit
+        · exact hresume f hf _
+        · exact hrejected
+    · rwa [M.step_of_halted input (by rfl)]
+  have hinit : validState M.init := by
+    change validState
+      ((seedSchedulerCandidate setup 0).elim (.inr (some none)) (enter start))
+    cases h : seedSchedulerCandidate setup 0 with
+    | none => trivial
+    | some f =>
+      obtain ⟨hf, hsetup, _⟩ := seedSchedulerCandidate_valid h
+      exact henter f ⟨hsetup, hf⟩
+  have replay_valid (s : State σ) (hs : validState s) (selectors : List Bool) :
+      validState (M.replay input selectors s) := by
+    induction selectors generalizing s with
+    | nil => exact hs
+    | cons bit selectors ih =>
+      rw [M.replay_cons]
+      exact ih _ (hstep s hs bit)
+  have hframe (f : SeedSchedulerFrame) (hf : validFrame f) :
+      (encSeedSchedulerFrame f).length ≤ 12 * (encSeedSearchSetup setup).length + 9 := by
+    have hs := seed_lt hf.2
+    have hposition : f.cursor ≤ setup.parameters.search.subdivision.originalCount ∧
+        f.request.sourceID < setup.parameters.search.subdivision.vertexCount := by
+      have hp := hf.2
+      cases ha : f.answer with
+      | none =>
+        simp only [SeedSchedulerFrame.Valid, ha] at hp
+        exact ⟨by simp [hp.2.1], (hp.2.2.trans (congrArg SeedSearchSetup.sourceID hf.1)) ▸ hsource⟩
+      | some answer =>
+        simp only [SeedSchedulerFrame.Valid, ha, hf.1] at hp
+        exact ⟨hp.2.1.le, hp.2.2 ▸ hroot _ hp.2.1⟩
+    obtain ⟨hc, hu⟩ := hposition
+    rw [← hf.1] at hc hu ⊢
+    exact length_encSeedSchedulerFrame_le f.request.setup f.request.seed f.cursor
+      f.request.sourceID f.answer hs.le hc hu.le
+  have hb := replay_valid M.init hinit bits
+  change (encState encScan (M.replay input bits M.init)).length ≤ _
+  generalize M.replay input bits M.init = s at hb ⊢
+  rcases s with (f | ⟨f, q⟩) | (_ | (_ | a))
+  · have h := hframe f hb
+    enc_len [encState]
+  · obtain ⟨hf, hneeds, choices, rfl⟩ := hb
+    have h := hframe f hf
+    have he := hscan f hf.1 hf.2 hneeds choices
+    enc_len [encState]
+  · enc_len [encState]
+  · enc_len [encState]
+  · have hsearch := (encSeedSearchParameters_search_length_le setup.parameters).trans
+      (encSeedSearchSetup_parameters_length_le setup)
+    have hseed := (length_encNat_mono (show a.seed < _ from hb).le).trans
+      ((encSeedSearchSize_seedLimit_length_le setup.parameters.search).trans hsearch)
+    enc_len [encState, encAnswer_apply]
 
 end Cslib.Complexity.STCON.SeedSchedulerMachine
