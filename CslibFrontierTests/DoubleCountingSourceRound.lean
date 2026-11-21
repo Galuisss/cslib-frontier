@@ -7,6 +7,7 @@ Authors: Christian Reitwiessner
 module
 -- upstream: local-only (test driver)
 
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Retain
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.SourceRound
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Dispatch.Resource
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.Cases
@@ -249,5 +250,28 @@ example : ∃ (R : Routines (machine context reply allMembers id)
       (fun _ _ _ _ => rfl)
   obtain ⟨fuel, hclock⟩ := R.exists_runsInTime true hhalt
   exact ⟨R, fuel, branchCount_eq_encard_replayScan R true hclock⟩
+
+private def roundFor (enabled : Bool) : NondeterministicQueryMachine (MachineState CallbackState) :=
+  machine context callback
+    (fun _ req => match req with
+      | .edge .. => if enabled then .pending req else .finished (some false)
+      | .member _ => .pending req) finish
+
+private def retainedRound :=
+  NondeterministicQueryMachine.retain (Equiv.refl _) roundFor false
+
+/-- A fixed round can re-enter with new edge context and still read the original word. -/
+example :
+    let old := retainedRound.run [true] (List.replicate 24 false)
+    let new := (retainedRound.withInit (true, entry context)).run [true] (List.replicate 24 false)
+    (old.1, (answer old.2).map (·.bad)) = (false, some false) ∧
+      (new.1, (answer new.2).map (·.bad)) = (true, some true) := by
+  decide +kernel
+
+example (bits : List Bool) :
+    retainedRound.FirstHalting [true] bits (true, entry context) ↔
+      (roundFor true).FirstHalting [true] bits (entry context) :=
+  NondeterministicQueryMachine.firstHalting_retain (Equiv.refl _) roundFor
+    false true [true] bits (entry context)
 
 end CslibFrontierTests.DoubleCountingSourceRound
