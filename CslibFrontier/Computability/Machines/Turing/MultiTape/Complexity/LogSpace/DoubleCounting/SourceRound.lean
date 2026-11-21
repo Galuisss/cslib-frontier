@@ -8,7 +8,8 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.Predecessor
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.CallReplay
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.BranchReplay
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.FunPropFinite
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.NatLength
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
@@ -67,6 +68,12 @@ inductive Request where
   | edge (source target : ℕ)
   /-- Test membership in the original round for this vertex. -/
   | member (vertex : ℕ)
+
+/-- Every vertex ID in the callback request is within the round's carrier. -/
+@[expose] def Request.InRange (req : Request) (size : ℕ) : Prop :=
+  match req with
+  | .edge u v => u < size ∧ v < size
+  | .member v => v < size
 
 /-- Start with the supplied tally and no completed vertices. -/
 @[expose] def initial (ctx : Context) : State :=
@@ -204,6 +211,74 @@ theorem machine_withInit {τ : Type} (ctx next : Context) (N : NondeterministicQ
     (machine ctx N start finish).withInit (entry next) = machine next N start finish :=
   rfl
 
+private theorem reject_inSpace :
+    ComputableInSpace (fun q => advance q none) encState encState
+      (fun q => (encState q).length) := by
+  have hid := of_inO (ComputableInDegree.id' (enc := encState)).inO_one
+  exact (encState_mk_budget (encState_context_budget hid) (encState_cursor_budget hid)
+    (encState_update_budget hid) (encState_predecessor_budget hid)
+    (budget_const true (.refl _))).of_enc_eq fun _ => rfl
+
+private theorem advance_withoutPredecessor_inSpace :
+    ComputableInSpace
+      (fun (p : State × Bool) => advance { p.1 with predecessor := none } (some p.2))
+      (encPair encState encBool) encState (fun p => (encPair encState encBool p).length) := by
+  have hq := fst encState encBool
+  have hb := snd encState encBool
+  have hc := encState_context_budget hq
+  have hi := encState_cursor_budget hq
+  have hu := encState_update_budget hq
+  have hr := encState_rejected_budget hq
+  have one := budget_const (encIn := encPair encState encBool) (encB := encNat) 1 (.refl _)
+  have hpc := Predecessor.encContext_mk_budget (encContext_size_budget hc)
+    (encContext_source_budget hc) hi (encContext_radius_budget hc) (encContext_expected_budget hc)
+  have hp := budget_optionSome (budget_comp_linear Predecessor.initial_inSpace hpc)
+  have hnext := encState_mk_budget hc (budget_natAdd hi one) hu (budget_const none (.refl _)) hr
+  exact (budget_ite hb hnext (encState_mk_budget hc hi hu hp hr)).of_enc_eq fun ⟨q, b⟩ => by
+    cases b <;> rfl
+
+private theorem advance_withPredecessor_inSpace :
+    ComputableInSpace
+      (fun (p : (State × Bool) × Predecessor.State) =>
+        advance { p.1.1 with predecessor := some p.2 } (some p.1.2))
+      (encPair (encPair encState encBool) Predecessor.encState) encState
+      (fun p => (encPair (encPair encState encBool) Predecessor.encState p).length) := by
+  let encIn := encPair (encPair encState encBool) Predecessor.encState
+  have hargs := fst (encPair encState encBool) Predecessor.encState
+  have hp := snd (encPair encState encBool) Predecessor.encState
+  have hnext := budget_comp_linear Predecessor.advance_inSpace
+    (budget_prod hp (budget_optionSome hargs.snd'))
+  have hc := encState_context_budget hargs.fst'
+  have hi := encState_cursor_budget hargs.fst'
+  have hu := encState_update_budget hargs.fst'
+  have hr := encState_rejected_budget hargs.fst'
+  have one := budget_const (encIn := encIn) (encB := encNat) 1 (.refl _)
+  have hupdate := budget_comp_linear addVertex_inSpace
+    (budget_prod hu (budget_prod (encContext_radius_budget hc)
+      (Predecessor.encState_count_budget hnext)))
+  have hdone := encState_mk_budget hc (budget_natAdd hi one) hupdate
+    (budget_const none (.refl _)) hr
+  have hpending := encState_mk_budget hc hi hu (budget_optionSome hnext) hr
+  refine (budget_ite (budget_comp_linear Predecessor.halted_inSpace hnext)
+    hdone hpending).of_enc_eq ?_
+  rintro ⟨⟨q, hit⟩, p⟩
+  simp only [advance]
+
+/-- Resume the round using the optional reply, updating only its binary scalar registers. -/
+theorem advance_inSpace :
+    ComputableInSpace (fun p : State × Option Bool => advance p.1 p.2)
+      (encPair encState (encOption encBool)) encState
+      (fun p => (encPair encState (encOption encBool) p).length) := by
+  have hid := of_inO (ComputableInDegree.id' (enc := encPair encState encBool)).inO_one
+  have hq := fst encState encBool
+  have hsome := budget_comp_linear
+    (optionElimSnd advance_withoutPredecessor_inSpace advance_withPredecessor_inSpace)
+    (budget_prod hid (encState_predecessor_budget hq))
+  refine (optionElimSnd reject_inSpace hsome).of_enc_eq ?_
+  rintro ⟨⟨ctx, cursor, update, p, rejected⟩, _ | b⟩
+  · rfl
+  · cases p <;> rfl
+
 /-- Re-enter a fixed round controller using only the supplied binary context. -/
 theorem entry_inSpace {τ : Type} (encT : τ ↪ List Bool) :
     ComputableInSpace (entry (τ := τ)) encContext (encMachineState τ encT)
@@ -262,25 +337,85 @@ theorem answer_inSpace {τ : Type} (encT : τ ↪ List Bool) :
   exact (budget_ite (encState_rejected_budget hc) (budget_const none (.refl _))
     (budget_optionSome (encState_update_budget hc))).of_enc_eq fun _ => rfl
 
-private theorem replay_callee {τ : Type} (ctx : Context)
+/-- Input bit and binary selector passed to a native callback step. -/
+abbrev encReadChoice := encPair (encOption encBool) encBool
+
+/-- Advance the suspended caller or the active callee in linear space in their joint encoding. -/
+theorem machine_next_inSpace {τ : Type} (encT : τ ↪ List Bool)
+    (ctx : Context) (N : NondeterministicQueryMachine τ)
+    (start : Context → Request → τ) (finish : τ → Option Bool)
+    (hs : ComputableInSpace (fun q : State => start q.context (request q)) encState encT
+      (fun q => (encState q).length))
+    (hf : ComputableInSpace finish encT (encOption encBool) (fun t => (encT t).length))
+    (hh : ComputableInSpace N.halted encT encBool (fun t => (encT t).length))
+    (hn : ComputableInSpace N.next (encPair encT encReadChoice) encT
+      (fun p => (encPair encT encReadChoice p).length)) :
+    ComputableInSpace (machine ctx N start finish).next
+      (encPair (encMachineState τ encT) encReadChoice) (encMachineState τ encT)
+      (fun p => (encPair (encMachineState τ encT) encReadChoice p).length) := by
+  let encCaller := encPair encState encReadChoice
+  have hcaller := fst encState encReadChoice
+  have hchoice := snd' (snd encState encReadChoice)
+  have henter := encMachineState_mk_budget τ encT hcaller
+    (budget_optionSome (budget_comp_linear hs hcaller))
+  have hreject := encMachineState_mk_budget τ encT (budget_comp_linear reject_inSpace hcaller)
+    (budget_const none (.refl _))
+  have hbetween := budget_ite hchoice hreject henter
+  have hframe := fst encCaller encT
+  have hcallee := snd encCaller encT
+  have hcontroller := fst' hframe
+  have hreadChoice := snd' hframe
+  have hreturn := budget_comp_linear advance_inSpace
+    (budget_prod hcontroller (budget_comp_linear hf hcallee))
+  have hreturned := encMachineState_mk_budget τ encT hreturn (budget_const none (.refl _))
+  have hcontinue := encMachineState_mk_budget τ encT hcontroller
+    (budget_optionSome (budget_comp_linear hn (budget_prod hcallee hreadChoice)))
+  have hactive := budget_ite (budget_comp_linear hh hcallee)
+    (budget_ite (snd' hreadChoice) (budget_comp_linear hreject hframe) hreturned) hcontinue
+  have hmachine := fst (encMachineState τ encT) encReadChoice
+  have hpair := budget_prod
+    (budget_prod (encMachineState_controller_budget τ encT hmachine)
+      (snd (encMachineState τ encT) encReadChoice))
+    (encMachineState_callee_budget τ encT hmachine)
+  refine (budget_comp_linear (optionElimSnd hbetween hactive) hpair).of_enc_eq ?_
+  rintro ⟨⟨q, _ | t⟩, read, choice⟩
+  · cases choice <;> rfl
+  · cases choice <;> cases N.halted t <;> rfl
+
+open NondeterministicQueryMachine in
+/-- Compile one round with a supplied input-dependent initializer and native same-input callbacks.
+The state budget must cover all selector prefixes, including those on rejecting branches. -/
+theorem exists_routines {α τ : Type} (enc : α ↪ List Bool) (encT : τ ↪ List Bool)
+    (ctx : Context) (N : NondeterministicQueryMachine τ)
+    (start : Context → Request → τ) (finish : τ → Option Bool)
+    (contextOf : α → Context) (S : α → ℕ)
+    (hinit : ComputableInSpace contextOf enc encContext S)
+    (hlog : ∀ a, Nat.log2 (enc a).length + 1 ≤ S a)
+    (hs : ComputableInSpace (fun q : State => start q.context (request q)) encState encT
+      (fun q => (encState q).length))
+    (hf : ComputableInSpace finish encT (encOption encBool) (fun t => (encT t).length))
+    (hq : ComputableInSpace N.query encT encNat (fun t => (encT t).length))
+    (hh : ComputableInSpace N.halted encT encBool (fun t => (encT t).length))
+    (hn : ComputableInSpace N.next (encPair encT encReadChoice) encT
+      (fun p => (encPair encT encReadChoice p).length))
+    (hstates : ∃ c, ∀ a bits, (encMachineState τ encT
+      ((machine (contextOf a) N start finish).run (enc a) bits)).length ≤ c * S a) :
+    Nonempty (Routines (machine ctx N start finish) (fun a => entry (contextOf a)) enc S) := by
+  obtain ⟨c, hstates⟩ := hstates
+  refine (machine ctx N start finish).exists_routines (machine_query_inSpace encT _ _ _ _ hq)
+    (machine_next_inSpace encT _ _ _ _ hs hf hh hn) (machine_halted_inSpace encT _ _ _ _)
+    (machine_accept_inSpace encT _ _ _ _) _ S hlog (budget_comp_linear (entry_inSpace encT) hinit)
+    ⟨c, fun a bits => ?_⟩
+  rw [machine_withInit]
+  exact hstates a bits
+
+private theorem step_active {τ : Type} (ctx : Context)
     (N : NondeterministicQueryMachine τ) (start : Context → Request → τ) (finish : τ → Option Bool)
-    (input : List Bool) (q : State) (hq : halted q = false) (bits : List Bool) (s : τ)
-    (hlive : ∀ i < bits.length, N.halted (N.replay input (bits.take i) s) = false) :
-    (machine ctx N start finish).replay input bits ⟨q, some s⟩ =
-      ⟨q, some (N.replay input bits s)⟩ := by
-  induction bits generalizing s with
-  | nil => rfl
-  | cons bit bits ih =>
-    have hs : N.halted s = false := hlive 0 (by simp)
-    simp only [NondeterministicQueryMachine.replay_cons]
-    have hstep : (machine ctx N start finish).step input ⟨q, some s⟩ bit =
-        ⟨q, some (N.step input s bit)⟩ := by
-      simp [NondeterministicQueryMachine.step, NondeterministicQueryMachine.read, machine, hq, hs]
-    rw [hstep]
-    apply ih
-    intro i hi
-    simpa only [List.take_succ_cons, NondeterministicQueryMachine.replay_cons] using
-      hlive (i + 1) (Nat.succ_lt_succ hi)
+    (input : List Bool) (q : State) (hq : halted q = false) (s : τ) (choice : Bool)
+    (hs : N.halted s = false) :
+    (machine ctx N start finish).step input ⟨q, some s⟩ choice =
+      ⟨q, some (N.step input s choice)⟩ := by
+  simp [NondeterministicQueryMachine.step, NondeterministicQueryMachine.read, machine, hq, hs]
 
 /-- Replay a first-halting callback on the original input. One false selector enters the
 call and one returns. The final reply may be negative or may reject. -/
@@ -294,7 +429,9 @@ theorem replay_request {τ : Type} (ctx : Context)
   have henter : (machine ctx N start finish).step input ⟨q, none⟩ false =
       ⟨q, some (start q.context (request q))⟩ := by
     simp [NondeterministicQueryMachine.step, machine, hq]
-  rw [henter, NondeterministicQueryMachine.replay_append, replay_callee _ _ _ _ _ q hq _ _ hcall.2]
+  have hr := (machine ctx N start finish).replay_map_of_live input N (fun s => ⟨q, some s⟩)
+    (step_active ctx N start finish input q hq) bits _ hcall.2
+  rw [henter, NondeterministicQueryMachine.replay_append, hr]
   simp [NondeterministicQueryMachine.replay_cons, NondeterministicQueryMachine.step, machine,
     hq, hcall.1]
 
@@ -373,6 +510,285 @@ private theorem advance_predecessorBounded {q : State} (hlive : halted q = false
         exact ⟨(Predecessor.advance_context _ _).trans hctx,
           Predecessor.advance_bounded hbounded hactive _, Bool.eq_false_iff.mpr hnext⟩
 
+private def remaining {m : Type → Type} [Monad m] {n : ℕ}
+    (edge : Fin n → Fin n → m Bool) (member : Fin n → m Bool)
+    (failCount : m ℕ) (failRound : m RoundUpdate) (q : State) : m RoundUpdate :=
+  let loop := Fin.foldlMFrom (scanVertex edge member q.context.radius)
+  if q.rejected then failRound else
+    match q.predecessor with
+    | none => loop q.update q.cursor
+    | some p =>
+      if hv : q.cursor < n then do
+        let c ← Predecessor.remaining edge member failCount ⟨q.cursor, hv⟩ p
+        loop (q.update.addVertex q.context.radius c) (q.cursor + 1)
+      else pure q.update
+
+private theorem remaining_initial {m : Type → Type} [Monad m] (ctx : Context)
+    (edge : Fin ctx.size → Fin ctx.size → m Bool) (member : MembershipScan m ctx.size)
+    (failCount : m ℕ) (failRound : m RoundUpdate) :
+    remaining edge (member ctx.radius ctx.expected) failCount failRound (initial ctx) =
+      scanNextRound edge member ctx.radius ctx.expected := by
+  simp only [remaining, initial, Bool.false_eq_true, ↓reduceIte, Fin.foldlMFrom_zero, scanNextRound]
+
+private theorem remaining_of_done {m : Type → Type} [Monad m] {n : ℕ}
+    (edge : Fin n → Fin n → m Bool) (member : Fin n → m Bool)
+    (failCount : m ℕ) (failRound : m RoundUpdate) (q : State)
+    (hr : q.rejected = false) (hi : n ≤ q.cursor) :
+    remaining edge member failCount failRound q = pure q.update := by
+  cases hp : q.predecessor <;> simp [remaining, hr, hi.not_gt, hp, Fin.foldlMFrom_of_le _ _ hi]
+
+private theorem remaining_bind {m : Type → Type} [Monad m] [LawfulMonad m] {n : ℕ}
+    (read : Request → m Bool) (failCount : m ℕ) (failRound : m RoundUpdate)
+    (q : State) (hs : q.context.size = n) (hlive : halted q = false)
+    (hp : PredecessorBounded q) :
+    let edge (u v : Fin n) := read (.edge u v)
+    let member (v : Fin n) := read (.member v)
+    remaining edge member failCount failRound q =
+      (read (request q) >>= fun hit =>
+        remaining edge member failCount failRound (advance q (some hit))) := by
+  obtain ⟨hr, hv⟩ := Bool.or_eq_false_iff.mp hlive
+  have hi : q.cursor < n := by simpa [hs] using hv
+  let edge (u v : Fin n) := read (.edge u v)
+  let member (v : Fin n) := read (.member v)
+  change remaining edge member failCount failRound q =
+    (read (request q) >>= fun hit =>
+      remaining edge member failCount failRound (advance q (some hit)))
+  cases hpre : q.predecessor with
+  | none =>
+    simp only [remaining, hr, hpre, Bool.false_eq_true, ↓reduceIte, request]
+    rw [Fin.foldlMFrom_step _ _ hi]
+    simp only [scanVertex, bind_assoc]
+    congr 1
+    funext hit
+    cases hit
+    · simp [advance, hpre, Predecessor.remaining_initial, member, hi, hr]
+    · simp [advance, hpre, hr]
+  | some p =>
+    obtain ⟨hctx, _, hplive⟩ := hp p (by simp [hpre])
+    have hsize : p.context.size = n := by
+      simpa [predecessorContext, hs] using congrArg Predecessor.Context.size hctx
+    obtain ⟨hpr, hpc⟩ := Bool.or_eq_false_iff.mp hplive
+    have hj : p.cursor < n := by simpa [hsize] using hpc
+    conv_lhs => simp only [remaining, hr, hpre, Bool.false_eq_true, ↓reduceIte, dite_eq_left hi]
+    rw [Predecessor.remaining_bind edge member failCount ⟨q.cursor, hi⟩ p hj hpr, bind_assoc]
+    have hread : (if p.memberPhase then member ⟨p.cursor, hj⟩
+        else edge ⟨p.cursor, hj⟩ ⟨q.cursor, hi⟩) = read (request q) := by
+      cases hphase : p.memberPhase <;> simp [request, hpre, hphase, member, edge]
+    rw [hread]
+    congr 1
+    funext hit
+    let next := Predecessor.advance p (some hit)
+    have hnextSize : next.context.size = n := by
+      rw [Predecessor.advance_context, hsize]
+    have hnextReject : next.rejected = false := by
+      cases he : Predecessor.observe p hit <;> simp [next, Predecessor.advance, he, hpr]
+    change (_ >>= _) = remaining edge member failCount failRound (advance q (some hit))
+    by_cases hdone : Predecessor.halted next = true
+    · have hd : n ≤ next.cursor := by
+        simpa [Predecessor.halted, hnextSize, hnextReject] using hdone
+      rw [Predecessor.remaining_of_done edge member failCount _ _ hnextReject hd, pure_bind]
+      simp [advance, hpre, ← show Predecessor.advance p (some hit) = next from rfl,
+        show Predecessor.halted (Predecessor.advance p (some hit)) = true from hdone, hr, remaining]
+    · simp [advance, hpre,
+        show ¬ Predecessor.halted (Predecessor.advance p (some hit)) = true from hdone,
+        hr, remaining, hi]
+
+private def readRequest {τ : Type} (N : NondeterministicQueryMachine τ)
+    (start : Context → Request → τ) (finish : τ → Option Bool)
+    (input : List Bool) (ctx : Context) (req : Request) : StateT (List Bool) Option Bool :=
+  fun
+    | false :: bits => N.readReply finish input (start ctx req) bits
+    | _ => none
+
+private theorem readRequest_length_lt {τ : Type} (N : NondeterministicQueryMachine τ)
+    (start : Context → Request → τ) (finish : τ → Option Bool)
+    (input : List Bool) (ctx : Context) (req : Request)
+    (bits rest : List Bool) (hit : Bool)
+    (hread : (readRequest N start finish input ctx req).run bits = some (hit, rest)) :
+    rest.length < bits.length := by
+  cases bits with
+  | nil => cases hread
+  | cons b bits =>
+    cases b
+    · obtain ⟨callBits, rfl, _, _⟩ := (N.readReply_iff finish input bits _ hit rest).mp hread
+      simp
+      omega
+    · cases hread
+
+private theorem successful_request_iff {τ : Type} (ctx : Context)
+    (N : NondeterministicQueryMachine τ) (start : Context → Request → τ) (finish : τ → Option Bool)
+    (input : List Bool) (q : State) (bits : List Bool) (final : MachineState τ)
+    (hlive : halted q = false) (hh : halted final.controller = true)
+    (ha : (answer final).isSome = true) :
+    let M := machine ctx N start finish
+    M.FirstHalting input bits ⟨q, none⟩ ∧ M.replay input bits ⟨q, none⟩ = final ↔
+      ∃ hit rest, (readRequest N start finish input q.context (request q)).run bits =
+          some (hit, rest) ∧
+        M.FirstHalting input rest ⟨advance q (some hit), none⟩ ∧
+        M.replay input rest ⟨advance q (some hit), none⟩ = final := by
+  let M := machine ctx N start finish
+  let reject : MachineState τ := ⟨advance q none, none⟩
+  have hreject : M.halted reject = true := by simp [M, reject, machine, halted, advance]
+  have hne : reject ≠ final := by
+    intro he
+    rw [← he] at ha
+    cases ha
+  cases bits with
+  | nil =>
+    simp [NondeterministicQueryMachine.FirstHalting, machine, hlive, readRequest, StateT.run]
+  | cons b bits =>
+    dsimp only
+    rw [M.firstHalting_cons_iff, M.replay_cons]
+    change (halted q = false ∧ M.FirstHalting input bits (M.step input ⟨q, none⟩ b)) ∧
+      M.replay input bits (M.step input ⟨q, none⟩ b) = final ↔ _
+    simp only [hlive, true_and]
+    cases b
+    · have henter : M.step input ⟨q, none⟩ false =
+          ⟨q, some (start q.context (request q))⟩ := by
+        simp [M, machine, NondeterministicQueryMachine.step, hlive]
+      rw [henter]
+      apply M.successful_call_iff N input (fun s => ⟨q, some s⟩) finish
+        (fun hit => ⟨advance q (some hit), none⟩) reject final hreject hne hh
+        (fun _ => hlive) (step_active ctx N start finish input q hlive) ?_
+      intro s bit hs
+      cases bit <;> cases he : finish s <;>
+        simp [M, machine, NondeterministicQueryMachine.step, hlive, hs, he, reject]
+    · have henter : M.step input ⟨q, none⟩ true = reject := by
+        simp [M, machine, NondeterministicQueryMachine.step, hlive, reject]
+      rw [henter, M.replay_of_halted input hreject]
+      simp [hne, readRequest, StateT.run]
+
+/-- Interpret the finite round scan with the original input and a stream of selectors.
+A result carries the unused suffix, so equality of return values cannot identify occurrences. -/
+def replayScan {τ : Type} (ctx : Context) (N : NondeterministicQueryMachine τ)
+    (start : Context → Request → τ) (finish : τ → Option Bool)
+    (input bits : List Bool) : Option (RoundUpdate × List Bool) :=
+  (scanNextRound
+    (fun u v : Fin ctx.size => readRequest N start finish input ctx (.edge u v))
+    (fun _ _ v => readRequest N start finish input ctx (.member v))
+    ctx.radius ctx.expected).run bits
+
+private theorem firstHalting_iff_remaining {τ : Type} (ctx : Context)
+    (N : NondeterministicQueryMachine τ) (start : Context → Request → τ) (finish : τ → Option Bool)
+    (input : List Bool) (update : RoundUpdate) (q : State) (bits : List Bool)
+    (hc : q.context = ctx) (hp : PredecessorBounded q) :
+    let M := machine ctx N start finish
+    (M.FirstHalting input bits ⟨q, none⟩ ∧ answer (M.replay input bits ⟨q, none⟩) = some update) ↔
+    (remaining
+      (fun u v : Fin ctx.size => readRequest N start finish input ctx (.edge u v))
+      (fun v => readRequest N start finish input ctx (.member v))
+      (fun _ => none) (fun _ => none) q).run bits = some (update, []) := by
+  let M := machine ctx N start finish
+  let read := readRequest N start finish input ctx
+  let rem := remaining (fun u v : Fin ctx.size => read (.edge u v)) (fun v => read (.member v))
+    (fun _ => none) (fun _ => none)
+  change (M.FirstHalting input bits ⟨q, none⟩ ∧ answer (M.replay input bits ⟨q, none⟩) =
+    some update) ↔ (rem q).run bits = some (update, [])
+  induction bits using (measure (List.length : List Bool → ℕ)).wf.induction generalizing q with
+  | h bits ih =>
+    cases hlive : halted q with
+    | false =>
+      have he : rem q = (read (request q) >>= fun hit => rem (advance q (some hit))) :=
+        remaining_bind read _ _ q (congrArg Context.size hc) hlive hp
+      rw [he]
+      have hrun (hit : Bool) (rest : List Bool)
+          (hr : (read (request q)).run bits = some (hit, rest)) :
+          (read (request q) >>= fun hit => rem (advance q (some hit))).run bits =
+            (rem (advance q (some hit))).run rest := by
+        simpa only [StateT.run, bind, StateT.bind, Option.bind_some] using
+          congrArg (fun value => value >>= fun ⟨b, bs⟩ => (rem (advance q (some b))).run bs) hr
+      have hnext (hit : Bool) (rest : List Bool)
+          (hr : (read (request q)).run bits = some (hit, rest)) :=
+        ih rest (readRequest_length_lt N start finish input ctx _ bits rest hit hr)
+          (q := advance q (some hit)) ((advance_context _ _).trans hc)
+          (advance_predecessorBounded hlive hp _)
+      constructor
+      · rintro ⟨hf, ha⟩
+        let final := M.replay input bits ⟨q, none⟩
+        have hsome : (answer final).isSome = true := by simp [final, ha]
+        obtain ⟨hit, rest, hr, hf', hfinal⟩ :=
+          (successful_request_iff ctx N start finish input q bits final hlive hf.1 hsome).mp
+            ⟨hf, rfl⟩
+        have hr' : (read (request q)).run bits = some (hit, rest) := by simpa [read, hc] using hr
+        rw [hrun hit rest hr']
+        exact (hnext hit rest hr').mp ⟨hf', hfinal ▸ ha⟩
+      · intro h
+        cases hr : (read (request q)).run bits with
+        | none =>
+          have hrunNone :
+              (read (request q) >>= fun hit => rem (advance q (some hit))).run bits = none := by
+            change ((read (request q)).run bits >>= _) = none
+            rw [hr]
+            rfl
+          simp [hrunNone] at h
+        | some pair =>
+          obtain ⟨hit, rest⟩ := pair
+          rw [hrun hit rest hr] at h
+          obtain ⟨hf, ha⟩ := (hnext hit rest hr).mpr h
+          let final := M.replay input rest ⟨advance q (some hit), none⟩
+          have hsome : (answer final).isSome = true := by simp [final, ha]
+          have hr' :
+              (readRequest N start finish input q.context (request q)).run bits =
+                some (hit, rest) := by simpa [read, hc] using hr
+          obtain ⟨hf', hfinal⟩ :=
+            (successful_request_iff ctx N start finish input q bits final hlive hf.1 hsome).mpr
+              ⟨hit, rest, hr', hf, rfl⟩
+          exact ⟨hf', hfinal.symm ▸ ha⟩
+    | true =>
+      have hh : M.halted ⟨q, none⟩ = true := hlive
+      have hnil : M.FirstHalting input bits ⟨q, none⟩ ↔ bits = [] := by
+        cases bits with
+        | nil => simp [NondeterministicQueryMachine.FirstHalting, hh]
+        | cons b bits => simp [M.firstHalting_cons_iff, hh]
+      rw [hnil, M.replay_of_halted input hh]
+      cases hr : q.rejected with
+      | true =>
+        simp [answer, result, hr, rem, remaining, StateT.run]
+      | false =>
+        have hge : ctx.size ≤ q.cursor := by simpa [halted, hr, hc] using hlive
+        have hrem : rem q = pure q.update := remaining_of_done _ _ _ _ _ hr hge
+        rw [hrem]
+        simp [answer, result, hr, StateT.run, pure, StateT.pure, and_comm]
+
+/-- A successful first halt is precisely an occurrence of `scanNextRound` that consumes
+the entire selector list. The equality identifies its full tally and tie flag. -/
+theorem firstHalting_iff_replayScan {τ : Type} (ctx : Context)
+    (N : NondeterministicQueryMachine τ) (start : Context → Request → τ) (finish : τ → Option Bool)
+    (input bits : List Bool) (update : RoundUpdate) :
+    (machine ctx N start finish).FirstHalting input bits (entry ctx) ∧
+        answer ((machine ctx N start finish).run input bits) = some update ↔
+      replayScan ctx N start finish input bits = some (update, []) := by
+  have h := firstHalting_iff_remaining ctx N start finish input update (initial ctx) bits rfl
+    (by simp [PredecessorBounded, initial])
+  rw [remaining_initial ctx _ (fun _ _ v => readRequest N start finish input ctx (.member v))] at h
+  exact h
+
+open NondeterministicQueryMachine in
+/-- At a sufficient native clock, count exactly the selector lists on which the typed scan
+returns a round update and consumes the whole list. Tied updates contribute and rejected
+callbacks do not. -/
+theorem branchCount_eq_encard_replayScan {α τ : Type}
+    {enc : α ↪ List Bool} {S : α → ℕ} {ctx : Context}
+    {N : NondeterministicQueryMachine τ} {start : Context → Request → τ}
+    {finish : τ → Option Bool} {contextOf : α → Context}
+    (R : Routines (machine ctx N start finish) (fun a => entry (contextOf a)) enc S)
+    (a : α) {fuel : ℕ} (hclock : R.machine.RunsInTime (enc a) fuel) :
+    ((Native.countingMachine R.I R.P R.F R.C).branchCount
+      (fun out => decide (out = [true])) fuel (R.machine.initCfg (enc a)) : ℕ∞) =
+      {bits : List Bool | ∃ update,
+        replayScan (contextOf a) N start finish (enc a) bits = some (update, [])}.encard := by
+  rw [R.branchCount_eq_encard_firstHalting a hclock]
+  congr 1
+  ext bits
+  simp only [Set.mem_ofPred_eq, decide_eq_true_eq, List.cons.injEq, and_true]
+  change ((machine (contextOf a) N start finish).FirstHalting (enc a) bits (entry (contextOf a)) ∧
+    (!((machine (contextOf a) N start finish).run (enc a) bits).controller.rejected) = true) ↔ _
+  have he (s : MachineState τ) : (!s.controller.rejected) = true ↔
+      ∃ u, answer s = some u := by
+    cases h : s.controller.rejected <;> simp [answer, result, h]
+  rw [he, ← exists_and_left]
+  exact exists_congr (firstHalting_iff_replayScan (contextOf a) N start finish (enc a) bits)
+
 private def ScalarBounds (ctx : Context) (q : State) : Prop :=
   q.context = ctx ∧ q.cursor ≤ ctx.size ∧
     q.update.tally.count ≤ ctx.expected.count + q.cursor ∧
@@ -448,18 +864,30 @@ theorem run_predecessor_bounds {τ : Type} (ctx : Context)
   intro p hmem
   simpa only [predecessorContext, hc] using hp p hmem
 
+/-- Space for the encoded round caller, including its context, tally and suspended predecessor. -/
+@[expose] def callerStateBound (ctx : Context) : ℕ :=
+  let B := Nat.log2 ctx.size + 1
+  let V := max (ctx.expected.count + ctx.size)
+    (ctx.expected.lengthSum + ctx.size * (ctx.radius + 1))
+  6 * (encContext ctx).length + 18 * B + 12 * (Nat.log2 (V * V) + 1) + 33
+
+/-- The framed caller and a fully encoded callee of length at most `D`. -/
+@[expose] def roundStateBound (ctx : Context) (D : ℕ) : ℕ :=
+  2 * callerStateBound ctx + D + 2
+
 /-- The caller workspace charges its context, the finite indices, and the binary tally
 envelope. The bound includes an active predecessor loop and also holds after rejection. -/
 theorem length_encState_run_le {τ : Type} (ctx : Context)
     (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
     (finish : τ → Option Bool) (input choices : List Bool) :
     let q := ((machine ctx N start finish).run input choices).controller
-    let B := Nat.log2 ctx.size + 1
-    let V := max (ctx.expected.count + ctx.size)
-      (ctx.expected.lengthSum + ctx.size * (ctx.radius + 1))
-    (encState q).length ≤
-      6 * (encContext ctx).length + 18 * B + 12 * (Nat.log2 (V * V) + 1) + 33 := by
-  intro q B V
+    (encState q).length ≤ callerStateBound ctx := by
+  intro q
+  let B := Nat.log2 ctx.size + 1
+  let V := max (ctx.expected.count + ctx.size)
+    (ctx.expected.lengthSum + ctx.size * (ctx.radius + 1))
+  change (encState q).length ≤
+    6 * (encContext ctx).length + 18 * B + 12 * (Nat.log2 (V * V) + 1) + 33
   obtain ⟨hc, hcursor, hcount, hsum, hp⟩ := run_scalarInvariant ctx N start finish input choices
   change q.context = ctx at hc
   change q.cursor ≤ ctx.size at hcursor
@@ -493,12 +921,29 @@ theorem length_encState_run_le {τ : Type} (ctx : Context)
   rw [hc]
   omega
 
-/-- Every suspended callee came from a request on the original round context and input. -/
+private theorem request_inRange {q : State} (hlive : halted q = false)
+    (hp : PredecessorBounded q) : (request q).InRange q.context.size := by
+  have hi : q.cursor < q.context.size := by
+    simpa using (Bool.or_eq_false_iff.mp hlive).2
+  cases hq : q.predecessor with
+  | none => simpa only [request, hq, Request.InRange] using hi
+  | some p =>
+    obtain ⟨hctx, _, hplive⟩ := hp p (by simp [hq])
+    have hj : p.cursor < p.context.size := by
+      simpa using (Bool.or_eq_false_iff.mp hplive).2
+    rw [hctx] at hj
+    change p.cursor < q.context.size at hj
+    cases hphase : p.memberPhase
+    · simpa only [request, hq, hphase, Bool.false_eq_true, ite_false, Request.InRange] using
+        And.intro hj hi
+    · simpa only [request, hq, hphase, ite_true, Request.InRange] using hj
+
+/-- Every suspended callee came from an in-range request on the original round context and input. -/
 theorem run_callee_replay {τ : Type} (ctx : Context)
     (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
     (finish : τ → Option Bool) (input choices : List Bool) :
     ∀ t ∈ ((machine ctx N start finish).run input choices).callee,
-      ∃ req bits, N.replay input bits (start ctx req) = t := by
+      ∃ req bits, req.InRange ctx.size ∧ N.replay input bits (start ctx req) = t := by
   let M := machine ctx N start finish
   change ∀ t ∈ (M.run input choices).callee, _
   induction choices using List.reverseRecOn with
@@ -508,7 +953,8 @@ theorem run_callee_replay {τ : Type} (ctx : Context)
     rw [NondeterministicQueryMachine.run_append, NondeterministicQueryMachine.replay_cons,
       NondeterministicQueryMachine.replay_nil]
     let p := M.run input pre
-    have hctx : p.controller.context = ctx := (run_scalar_bounds ctx N start finish input pre).1
+    obtain ⟨hctx, _, _, _, hpre⟩ := run_scalarInvariant ctx N start finish input pre
+    change p.controller.context = ctx at hctx
     change ∀ t ∈ (M.step input p choice).callee, _
     change ∀ t ∈ p.callee, _ at ih
     by_cases hh : M.halted p = true
@@ -520,16 +966,17 @@ theorem run_callee_replay {τ : Type} (ctx : Context)
       · intro t ht
         simp only [M, NondeterministicQueryMachine.step, machine, hlive, hs,
           Bool.false_eq_true, ite_false, Option.mem_some_iff] at ht
-        exact ⟨request p.controller, [], by simpa only [NondeterministicQueryMachine.replay_nil,
-          ← hctx] using ht⟩
+        have hv := request_inRange hlive hpre
+        exact ⟨request p.controller, [], hctx ▸ hv, by
+          simpa only [NondeterministicQueryMachine.replay_nil, ← hctx] using ht⟩
       · simp [M, NondeterministicQueryMachine.step, machine, hlive, hs]
     | some s =>
       cases hhalt : N.halted s
       · intro t ht
         simp only [M, NondeterministicQueryMachine.step, NondeterministicQueryMachine.read,
           machine, hlive, hs, hhalt, Bool.false_eq_true, ite_false, Option.mem_some_iff] at ht
-        obtain ⟨req, bits, hb⟩ := ih s (by simp [hs])
-        refine ⟨req, bits ++ [choice], ?_⟩
+        obtain ⟨req, bits, hv, hb⟩ := ih s (by simp [hs])
+        refine ⟨req, bits ++ [choice], hv, ?_⟩
         rw [NondeterministicQueryMachine.replay_append, hb]
         simpa [NondeterministicQueryMachine.step, NondeterministicQueryMachine.read,
           NondeterministicQueryMachine.replay_cons, hhalt] using ht
@@ -540,17 +987,15 @@ the supplied same-input callbacks. The bound covers rejected selectors and repli
 theorem length_encMachineState_run_le {τ : Type} (encT : τ ↪ List Bool) (ctx : Context)
     (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
     (finish : τ → Option Bool) (input choices : List Bool) (D : ℕ)
-    (hcallee : ∀ req bits, (encT (N.replay input bits (start ctx req))).length ≤ D) :
-    let B := Nat.log2 ctx.size + 1
-    let V := max (ctx.expected.count + ctx.size)
-      (ctx.expected.lengthSum + ctx.size * (ctx.radius + 1))
+    (hcallee : ∀ req, req.InRange ctx.size → ∀ bits,
+      (encT (N.replay input bits (start ctx req))).length ≤ D) :
     (encMachineState τ encT ((machine ctx N start finish).run input choices)).length ≤
-      2 * (6 * (encContext ctx).length + 18 * B + 12 * (Nat.log2 (V * V) + 1) + 33) + D + 2 := by
+      roundStateBound ctx D := by
   apply length_encMachineState_le
   · exact length_encState_run_le ctx N start finish input choices
   · intro t ht
-    obtain ⟨req, bits, rfl⟩ := run_callee_replay ctx N start finish input choices t ht
-    exact hcallee req bits
+    obtain ⟨req, bits, hv, rfl⟩ := run_callee_replay ctx N start finish input choices t ht
+    exact hcallee req hv bits
 
 private def remainingReplies (q : State) : ℕ :=
   if halted q then 0 else
@@ -599,14 +1044,17 @@ private theorem remainingReplies_advance_lt {q : State} (hp : PredecessorBounded
       · have hlt := Predecessor.advance_progress hl (some hit) (Bool.eq_false_iff.mpr hf)
         simpa [advance, hq, hf] using hlt
 
+/-- A common clock for the round, charging the maximum number of requests and their routing. -/
+@[expose] def roundClock (size clock : ℕ) : ℕ :=
+  (size + 1) * (2 * size + 1) * (clock + 2) + (clock + 1)
+
 /-- The common round clock charges every callback selector and both deterministic routing
 steps. The bound holds for rejecting replies and noncanonical selectors as well. -/
 theorem haltsWithin {τ : Type} (ctx : Context)
     (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
     (finish : τ → Option Bool) (input : List Bool) (clock : ℕ)
-    (hclock : ∀ req, N.HaltsFrom input (start ctx req) clock) :
-    (machine ctx N start finish).HaltsWithin input
-      ((ctx.size + 1) * (2 * ctx.size + 1) * (clock + 2) + (clock + 1)) := by
+    (hclock : ∀ req, req.InRange ctx.size → N.HaltsFrom input (start ctx req) clock) :
+    (machine ctx N start finish).HaltsWithin input (roundClock ctx.size clock) := by
   let M := machine ctx N start finish
   let rank (q : MachineState τ) :=
     if halted q.controller then 0 else remainingReplies q.controller * (clock + 2) +
@@ -636,7 +1084,9 @@ theorem haltsWithin {τ : Type} (ctx : Context)
     cases hq : q.callee with
     | none =>
       cases choice
-      · have hcallee := N.remainingSteps_le input (hclock (request q.controller))
+      · have hv := request_inRange hlive hpre
+        rw [hctx] at hv
+        have hcallee := N.remainingSteps_le input (hclock (request q.controller) hv)
         simpa [rank, M, NondeterministicQueryMachine.step, machine, hlive, hq, hctx] using
           Nat.lt_succ_of_le hcallee
       · simpa [M, NondeterministicQueryMachine.step, machine, hlive, hq] using hreturn none
@@ -645,7 +1095,7 @@ theorem haltsWithin {τ : Type} (ctx : Context)
       · have hm : s ∈ (M.run input pre).callee := by
           change s ∈ q.callee
           simp [hq]
-        obtain ⟨req, bits, hbits⟩ := run_callee_replay ctx N start finish input pre s hm
+        obtain ⟨req, bits, hv, hbits⟩ := run_callee_replay ctx N start finish input pre s hm
         have hr : (N.withInit (start ctx req)).Reachable input s :=
           ⟨bits, by rw [NondeterministicQueryMachine.run_withInit, hbits]⟩
         have ht : N.HaltsFrom input s clock := by
@@ -654,7 +1104,7 @@ theorem haltsWithin {τ : Type} (ctx : Context)
             intro coins hc
             change N.halted ((N.withInit (start ctx req)).run input coins) = true
             rw [NondeterministicQueryMachine.run_withInit]
-            exact hclock req coins hc
+            exact hclock req hv coins hc
           exact (N.withInit (start ctx req)).haltsFrom_of_reachable input hstart hr bits' hlen
         have hlt := N.remainingSteps_step_lt input ⟨clock, ht⟩ hs choice
         simpa [rank, M, NondeterministicQueryMachine.step, NondeterministicQueryMachine.read,
@@ -681,8 +1131,8 @@ theorem haltsWithin {τ : Type} (ctx : Context)
       have hstep := hadvance pre choice hlive
       rw [hrun, List.length_append, List.length_singleton]
       omega
-  have hinit : rank M.init ≤
-      (ctx.size + 1) * (2 * ctx.size + 1) * (clock + 2) + (clock + 1) := by
+  have hinit : rank M.init ≤ roundClock ctx.size clock := by
+    unfold roundClock
     by_cases h : ctx.size = 0
     · simp [rank, M, machine, entry, initial, halted, h]
     · simp [rank, M, machine, entry, initial, halted, h, remainingReplies,

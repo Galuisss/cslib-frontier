@@ -38,6 +38,15 @@ example :
     tieRound.halted q = true ∧ (answer q).map (·.bad) = some true ∧
       (answer q).map (·.tally.count) = some 3 := by decide +kernel
 
+/-- A tied result is a successful scan occurrence with its full updated tally. -/
+example : replayScan context reply start id [] (List.replicate 16 false) =
+    some (⟨⟨3, 1⟩, true⟩, []) := by
+  apply (firstHalting_iff_replayScan context reply start id _ _ _).mp
+  refine ⟨⟨by decide +kernel, ?_⟩, by rfl⟩
+  intro n hn
+  simp only [List.length_replicate] at hn
+  interval_cases n <;> decide +kernel
+
 private def rejectRound := machine context reply
   (fun ctx request => match request with
     | .edge .. => none
@@ -93,8 +102,8 @@ example (choices : List Bool) :
 /-- The encoded prefix includes the full suspended caller and optional callee. -/
 example (choices : List Bool) :
     (encMachineState (Option Bool) (encOption encBool) (tieRound.run [] choices)).length ≤
-      2 * (6 * (encContext context).length + 129) + 4 := by
-  have hcallee (req : Request) (bits : List Bool) :
+      roundStateBound context 2 := by
+  have hcallee (req : Request) (_ : req.InRange context.size) (bits : List Bool) :
       (encOption encBool (reply.replay [] bits (start context req))).length ≤ 2 := by
     cases reply.replay [] bits (start context req) with
     | none => decide
@@ -103,8 +112,8 @@ example (choices : List Bool) :
     [] choices 2 hcallee
 
 /-- The common clock covers wrong routing selectors as well as valid calls. -/
-example : tieRound.HaltsWithin [] 57 :=
-  Turing.DoubleCounting.SourceRound.haltsWithin context reply start id [] 0 (fun _ _ _ => rfl)
+example : tieRound.HaltsWithin [] (roundClock context.size 0) :=
+  Turing.DoubleCounting.SourceRound.haltsWithin context reply start id [] 0 (fun _ _ _ _ => rfl)
 
 example :
     ComputableInSpace (entry (τ := Option Bool)) encContext
@@ -117,5 +126,59 @@ example :
       (encOption Turing.DoubleCounting.encRoundUpdate)
       (fun q => (encMachineState (Option Bool) (encOption encBool) q).length) :=
   answer_inSpace _
+
+private def allMembers (_ : Context) (_ : Request) : Option Bool := some true
+
+private theorem nativeRoutines :
+    Nonempty (NondeterministicQueryMachine.Routines (machine context reply allMembers id)
+      (fun _ : Bool => entry context) encBool (fun _ => 1)) := by
+  open ComputableInSpace in
+  refine exists_routines encBool (encOption encBool) context reply allMembers id
+    (fun _ => context) (fun _ => 1) ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+  · exact constZero context |>.mono_le (fun _ => by decide)
+  · intro b
+    cases b <;> decide
+  · exact (budget_const (some true) (.refl _)).of_enc_eq fun _ => rfl
+  · exact of_inO (ComputableInDegree.id' (enc := encOption encBool)).inO_one
+  · exact (budget_const 0 (.refl _)).of_enc_eq fun _ => rfl
+  · exact (budget_const true (.refl _)).of_enc_eq fun _ => rfl
+  · exact (fst (encOption encBool) (encPair (encOption encBool) encBool)).of_enc_eq fun _ => rfl
+  · refine ⟨roundStateBound context 2, fun a bits => ?_⟩
+    rw [Nat.mul_one]
+    apply length_encMachineState_run_le (D := 2)
+    intro req _ selectors
+    cases h : reply.replay (encBool a) selectors (allMembers context req) with
+    | none => decide
+    | some value => cases value <;> decide
+
+open NondeterministicQueryMachine in
+/-- Three passing membership calls give exactly one native occurrence list for their selectors. -/
+example : ∃ R : Routines (machine context reply allMembers id)
+    (fun _ : Bool => entry context) encBool (fun _ => 1),
+    ∃! indices, ∃ final, Native.replayChoices R.I R.P R.F R.C
+      (R.machine.initCfg (encBool true)) indices = some (List.replicate 6 false, final) ∧
+      final.Halted := by
+  obtain ⟨R⟩ := nativeRoutines
+  refine ⟨R, (R.existsUnique_replay_iff true _).mpr ⟨by decide +kernel, ?_⟩⟩
+  intro n hn
+  simp only [List.length_replicate] at hn
+  interval_cases n <;> decide +kernel
+
+open NondeterministicQueryMachine in
+/-- At a sufficient native clock, count passing occurrences against the complete typed scans. -/
+example : ∃ (R : Routines (machine context reply allMembers id)
+    (fun _ : Bool => entry context) encBool (fun _ => 1)) (fuel : ℕ),
+    ((Native.countingMachine R.I R.P R.F R.C).branchCount
+      (fun out => decide (out = [true])) fuel (R.machine.initCfg (encBool true)) : ℕ∞) =
+    {bits : List Bool | ∃ update,
+      replayScan context reply allMembers id (encBool true) bits = some (update, [])}.encard := by
+  obtain ⟨R⟩ := nativeRoutines
+  have hhalt : ((machine context reply allMembers id).withInit (entry context)).HaltsWithin
+      (encBool true) (roundClock context.size 0) := by
+    rw [machine_withInit]
+    exact Turing.DoubleCounting.SourceRound.haltsWithin context reply allMembers id _ 0
+      (fun _ _ _ _ => rfl)
+  obtain ⟨fuel, hclock⟩ := R.exists_runsInTime true hhalt
+  exact ⟨R, fuel, branchCount_eq_encard_replayScan R true hclock⟩
 
 end CslibFrontierTests.DoubleCountingSourceRound
