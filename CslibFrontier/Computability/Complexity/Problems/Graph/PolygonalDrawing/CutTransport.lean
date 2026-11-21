@@ -139,9 +139,11 @@ theorem IsEmbedding.exists_wall_refinement {G : Graph} {D : PolygonalDrawing G}
     · intro e i g hg
       obtain ⟨j, a, b, ha, hab, hb, hcut, h⟩ := Route.eval_mapAtCuts (c := f) hline (P.route e) i
       have hleft : (E.route e).point i.castSucc = (P.route e).eval j a := by
+        change ((P.route e).mapAtCuts {0} f id).point i.castSucc = (P.route e).eval j a
         simpa only [Route.eval, AffineMap.lineMap_apply_zero, id_eq] using
           (h 0 ⟨le_rfl, zero_le_one⟩).1
       have hright : (E.route e).point i.succ = (P.route e).eval j b := by
+        change ((P.route e).mapAtCuts {0} f id).point i.succ = (P.route e).eval j b
         simpa only [Route.eval, AffineMap.lineMap_apply_one, id_eq] using
           (h 1 ⟨zero_le_one, le_rfl⟩).1
       rw [hleft, hright]
