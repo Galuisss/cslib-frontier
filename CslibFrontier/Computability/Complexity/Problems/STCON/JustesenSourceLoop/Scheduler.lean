@@ -34,6 +34,8 @@ prepared field in its state and uses it to start each scan on the original input
   initializers agree at any requested source.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_replay`: re-entering the fixed
   scheduler agrees with the scheduler initialized for the original word.
+* `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_length_run_le_log`:
+  logarithmic encoded state length on every selector prefix.
 -/
 
 public section
@@ -134,5 +136,70 @@ theorem configurationJustesenSeedScheduler_replay {k : ℕ} {State : Type} [Fint
     SeedSchedulerMachine.machine_withInit empty setup (justesenSeedSchedulerScan ntm c)
       (fun request => justesenSourceLoopEntryOfRequest request field) SourceRoundLoop.reply
   exact congrArg (fun M : NondeterministicQueryMachine _ => (field, M.run w bits)) hentry
+
+/-- Every selector prefix of the fixed retained-field scheduler fits in logarithmically
+many bits in the original input length, including replays that reject. -/
+theorem configurationJustesenSeedScheduler_length_run_le_log {k : ℕ} {State : Type}
+    [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ∃ C, ∀ w bits : List Bool, (encJustesenSeedSchedulerState
+      ((justesenSeedScheduler ntm c).replay w bits
+        (configurationJustesenSeedSchedulerEntry ntm c w))).length ≤
+          C * (Nat.log2 w.length + 1) := by
+  obtain ⟨F, hfield⟩ := length_configurationFieldContext_le_log ntm c
+  obtain ⟨A, hsetup⟩ := length_configurationSeedSearchSetup_le_log ntm c
+  obtain ⟨B, hscan⟩ := configurationJustesenSourceLoop_length_run_le_log ntm c
+  refine ⟨2 * F + 24 * A + B + 22, fun w bits => ?_⟩
+  let setup := configurationSeedSearchSetup ntm c w
+  let field := configurationFieldContext ntm c w
+  let bound := Nat.log2 w.length + 1
+  let n := setup.parameters.search.subdivision.vertexCount
+  let scan := justesenSeedSchedulerScan ntm c
+  let start := fun r => justesenSourceLoopEntryOfRequest r field
+  have hends := configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w
+  have hroot := fun j hj => configurationSeedSearchSetup_originalSourceID_lt_vertexCount
+    ntm c w (position := j) hj
+  have hcap (f : SeedSchedulerFrame) (hs : f.request.setup = setup)
+      (hv : f.Valid)
+      (_ : f.needsScan = true) (choices : List Bool) :
+      (encJustesenSourceLoopState (scan.replay w choices (start f.request))).length ≤
+        B * bound := by
+    rcases f with ⟨⟨saved, rank, source⟩, cursor, answer⟩
+    change saved = setup at hs
+    subst saved
+    have hrank := hv.seed_lt
+    change rank < setup.parameters.search.seedLimit at hrank
+    rw [configurationSeedScheduler_seedLimit ntm c w,
+      (configurationSeedSearchSetup_endpoints ntm c w).1] at hrank
+    let I := configurationInstance ntm c w
+    let seed : Fin (2 ^ codeLength I.n (I.n - 1)) := ⟨rank, hrank⟩
+    have hsource : source < n := hv.source_lt hends.1 hroot
+    let context : JustesenSourceContext :=
+      ⟨configurationJustesenSubdivisionContext ntm c w rank, source, setup.targetID⟩
+    have hentry : start ⟨setup, rank, source⟩ = (justesenSourceLoop ntm c context n).init :=
+      justesenSourceLoopEntryOfRequest_eq ntm c w rank source
+    change (encJustesenSourceLoopState (scan.replay w choices
+      (start ⟨setup, rank, source⟩))).length ≤ _
+    rw [hentry]
+    have hreenter : scan.withInit (justesenSourceLoop ntm c context n).init =
+        justesenSourceLoop ntm c context n :=
+      justesenSourceLoop_withInit ntm c _ context 0 n
+    have h := hscan w seed ⟨source, hsource⟩ ⟨setup.targetID, hends.2⟩ n le_rfl choices
+    rw [← hreenter] at h
+    exact h
+  have hmachine := SeedSchedulerMachine.length_run_le setup scan start SourceRoundLoop.reply
+    encJustesenSourceLoopState w (B * bound) hends.1 hroot hcap bits
+  rw [configurationJustesenSeedScheduler_replay ntm c w bits]
+  change (encPair encFieldContext (SeedSchedulerMachine.encState encJustesenSourceLoopState)
+    (field, (justesenSeedSchedulerFor ntm c setup field).run w bits)).length ≤ _
+  rw [length_encPair]
+  have hF : (encFieldContext field).length ≤ F * bound := hfield w
+  have hA : (encSeedSearchSetup setup).length ≤ A * bound := hsetup w
+  have hM : (SeedSchedulerMachine.encState encJustesenSourceLoopState
+      ((justesenSeedSchedulerFor ntm c setup field).run w bits)).length ≤
+        24 * (encSeedSearchSetup setup).length + B * bound + 21 := hmachine
+  have hconst : 22 ≤ 22 * bound := Nat.le_mul_of_pos_right _ (Nat.succ_pos _)
+  change _ ≤ (2 * F + 24 * A + B + 22) * bound
+  simp only [Nat.add_mul, Nat.mul_assoc]
+  omega
 
 end Cslib.Complexity.STCON

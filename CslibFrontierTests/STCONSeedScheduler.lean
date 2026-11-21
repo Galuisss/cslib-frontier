@@ -223,4 +223,12 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   have h := configurationJustesenSeedScheduler_replay ntm c w bits
   exact ⟨congrArg Prod.fst h, congrArg (fun q => SeedSchedulerMachine.reply q.2) h⟩
 
+/-- The assembled machine has a common length bound on all replays from an original-word entry. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ∃ C, ∀ w bits : List Bool, (encJustesenSeedSchedulerState
+      ((justesenSeedScheduler ntm c).replay w bits
+        (configurationJustesenSeedSchedulerEntry ntm c w))).length ≤
+          C * (Nat.log2 w.length + 1) :=
+  configurationJustesenSeedScheduler_length_run_le_log ntm c
+
 end CslibFrontierTests.STCONSeedScheduler

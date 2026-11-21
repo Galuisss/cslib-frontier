@@ -309,6 +309,19 @@ theorem length_encSeedSchedulerFrame_le (s : SeedSearchSetup) (i cursor u : ℕ)
     ((encSubdivisionSize_vertexCount_length_le s.parameters.search.subdivision).trans hsub)
   cases answer <;> enc_len [encSeedSchedulerFrame_apply, encSeedScanRequest_apply]
 
+/-- A valid frame requests an in-range source if the designated and indexed IDs are valid. -/
+theorem SeedSchedulerFrame.Valid.source_lt {f : SeedSchedulerFrame} (hf : f.Valid)
+    (hsource : f.request.setup.sourceID <
+      f.request.setup.parameters.search.subdivision.vertexCount)
+    (hroot : ∀ j < f.request.setup.parameters.search.subdivision.originalCount,
+      f.request.setup.originalSourceID j <
+        f.request.setup.parameters.search.subdivision.vertexCount) :
+    f.request.sourceID < f.request.setup.parameters.search.subdivision.vertexCount := by
+  obtain ⟨_, hphase⟩ := hf
+  split at hphase
+  · exact hphase.2 ▸ hsource
+  · exact hphase.2 ▸ hroot _ hphase.1
+
 /-- Valid scheduler frames are bounded by their setup once the designated source and indexed
 roots are known to lie in the subdivision. -/
 theorem SeedSchedulerFrame.Valid.length_le {f : SeedSchedulerFrame} (hf : f.Valid)
@@ -318,12 +331,12 @@ theorem SeedSchedulerFrame.Valid.length_le {f : SeedSchedulerFrame} (hf : f.Vali
       f.request.setup.originalSourceID j <
         f.request.setup.parameters.search.subdivision.vertexCount) :
     (encSeedSchedulerFrame f).length ≤ 12 * (encSeedSearchSetup f.request.setup).length + 9 := by
+  have hu := hf.source_lt hsource hroot
   obtain ⟨hi, hphase⟩ := hf
+  apply length_encSeedSchedulerFrame_le _ _ _ _ _ hi.le _ hu.le
   split at hphase
-  · exact length_encSeedSchedulerFrame_le _ _ _ _ _ hi.le
-      (hphase.1 ▸ Nat.zero_le _) (hphase.2 ▸ hsource.le)
-  · exact length_encSeedSchedulerFrame_le _ _ _ _ _ hi.le
-      hphase.1.le (hphase.2 ▸ (hroot _ hphase.1).le)
+  · exact hphase.1 ▸ Nat.zero_le _
+  · exact hphase.1.le
 
 private theorem scanFrame_bounds (s : SeedSearchSetup)
     (hlimit : s.parameters.search.seedLimit = 2 ^ s.parameters.search.seedWidth)
