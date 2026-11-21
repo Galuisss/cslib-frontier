@@ -53,6 +53,23 @@ example :
       (pure ⟨⟨0, 0⟩, 0⟩)) true = 0 := by
   simp [differenceExperiment, ProbComp.eval_uniform]
 
+/-- A repeated message does not hide the collision of the two distinct messages. -/
+example :
+    1 ≤ ((3 : ℝ≥0∞) ^ 2 / 2) *
+      ProbComp.eval (collisionExperiment (fun (_ : Unit) (_ : Bool) => false)
+        (collisionPairReduction false (pure [false, true, false]))) true := by
+  have h := eval_multiQueryExperiment_le_collisionPairReduction
+    (fun (_ : Unit) (_ : Bool) => false) false (pure [false, true, false]) (Q := 3)
+    (by simp)
+  simpa [multiQueryExperiment, ProbComp.eval_uniform] using h
+
+open Turing.MultiTapeTM in
+/-- The actual wrapper on the repeated-message list is strict PPT. -/
+example : IsPPTOn encUnit (encCollisionGuess encBool)
+    (fun _ => collisionPairReduction false (pure [false, true, false])) :=
+  isPPTOn_collisionPairReduction (encM := encBool) (A := fun _ : Unit => pure [false, true, false])
+    (ComputableInPolyTime.const [false, true, false]).isPPTOn false
+
 private def echoGuess (target : Bool) : PredictionAdversary Bool Bool Unit where
   choose _ := pure (false, ())
   guess _ digest := pure ⟨target, digest⟩
