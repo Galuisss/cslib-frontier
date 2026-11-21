@@ -5991,6 +5991,7 @@ public import CslibFrontier.Foundations.Algebra.Negacyclic
 public import CslibFrontier.Foundations.Algebra.Order.Star.Pi
 public import CslibFrontier.Foundations.Algebra.Polynomial.Bivariate
 public import CslibFrontier.Foundations.Algebra.Polynomial.BivariateSwap
+public import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignApproximation
 public import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProduct
 public import CslibFrontier.Foundations.Algebra.Polynomial.LagrangeInversion
 public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicValueBounds

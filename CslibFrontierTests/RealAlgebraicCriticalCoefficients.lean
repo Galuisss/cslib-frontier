@@ -8,6 +8,7 @@ module
 
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
 import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalParameterEvaluation
+import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignApproximation
 import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProduct
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicValueBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
@@ -477,5 +478,16 @@ example :
   have h := Polynomial.eval₂_dyadicSignProduct_neg_le 1 1 (x := x)
     (by norm_num [x]) (by norm_num [x])
   simpa only [p, Nat.mul_one, show (3 : ℝ) ^ 2 = 9 by norm_num] using h
+
+-- The normalized ratio is exact at zero and approximates the negative sign at −3/4.
+example :
+    Polynomial.dyadicSignApprox 1 1 0 = 0 ∧
+      |Polynomial.dyadicSignApprox 1 1 (-(3 / 4)) + 1| ≤ (2 : ℝ) / 9 := by
+  refine ⟨Polynomial.dyadicSignApprox_zero 1 1, ?_⟩
+  have hx : (-(3 / 4) : ℝ) < 0 := by norm_num
+  have h := Polynomial.abs_dyadicSignApprox_sub_sign_le 1 1 (x := -(3 / 4))
+    (Or.inr ⟨by norm_num, by norm_num⟩)
+  rw [sign_neg hx, SignType.coe_neg_one, sub_neg_eq_add] at h
+  simpa only [Nat.mul_one, show (3 : ℝ) ^ 2 = 9 by norm_num, div_eq_mul_inv] using h
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
