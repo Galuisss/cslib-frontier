@@ -66,24 +66,12 @@ private def maxCases : Nat := 8
 
 /-- Run `x`, keeping its effect when it returns `true` and restoring the state otherwise, also
 when it throws. -/
-private def attempt (x : TacticM Bool) : TacticM Bool := do
-  let s ← saveState
-  try
-    if ← x then return true
-    s.restore
-    return false
-  catch _ =>
-    s.restore
-    return false
+private def attempt (x : TacticM Bool) : TacticM Bool :=
+  try commitWhen x catch _ => pure false
 
 /-- The goals `tac` leaves of `g`, or `none`, with the state restored, when it fails. -/
-private def tryTac (tac : TSyntax `tactic) (g : MVarId) : TacticM (Option (List MVarId)) := do
-  let s ← saveState
-  try
-    return some (← evalTacticAt tac g)
-  catch _ =>
-    s.restore
-    return none
+private def tryTac (tac : TSyntax `tactic) (g : MVarId) : TacticM (Option (List MVarId)) :=
+  commitWhenSomeNoEx? (some <$> evalTacticAt tac g)
 
 /-- The simp lemmas of the call followed by the hypotheses `hyps` of the cases split so far. -/
 private def simpLemmas (hyps : Array FVarId) :

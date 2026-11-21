@@ -20,6 +20,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.Work
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.ExtendTapes
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.InputFromTape
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Machine.OutputToTape
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.WordsCfg
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step
 
 /-! # The existing composition machine and its run theorem
@@ -171,17 +172,6 @@ private theorem exists_runPath_markFlag (write : Option Symbol)
       simp [cfg, Function.update_apply]
   · have hspace : run.space ≤ 1 * (2 + 1) := run.space_le_mul_time_add_one
     exact (MultiTapeTM.space_map_embedHom_le ..).trans (by omega)
-
-private theorem wordsCfg_append_words {State' : Type} {outer : List Symbol}
-    (state : Option State') (tapes : Fin k → List Symbol) (word out : List Symbol) :
-    Turing.wordsCfg outer state (Fin.append tapes ![word, []]) out =
-      ⟨state, 1, Fin.append (fun tape => Turing.tapeOfList (tapes tape))
-        ![Turing.tapeOfList word, fun _ => none], fun _ => 0, out⟩ := by
-  refine Cfg.ext rfl rfl
-    ((Fin.comp_append Turing.tapeOfList tapes ![word, []]).trans
-      (congrArg _ (funext fun i => ?_))) rfl rfl
-  match i with
-  | 0 | 1 => simp
 
 private theorem exists_runPath_setFlag (mark : Symbol) (tapes : Fin k → List Symbol)
     (word out outer : List Symbol) :

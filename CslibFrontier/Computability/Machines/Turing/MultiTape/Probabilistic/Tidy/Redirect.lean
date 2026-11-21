@@ -13,6 +13,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilisti
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.OutputToTape
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.RunsWords
 public import Cslib.Foundations.Data.Fin.Tuple
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.WordsCfg
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step
 import CslibFrontier.Probability.PMF.Bind
 import CslibFrontier.Tactic.SuppCases
@@ -286,17 +287,6 @@ private theorem runFrom_markFlag (write : Option Bool)
       MultiTapeTM.update_append_flag WS vip flag (Function.update flag (-1) write)
   · funext l
     simp [cfg, Function.update_apply]
-
-/-- A `wordsCfg` configuration whose last two words are `w` and `[]`, written out. -/
-private theorem wordsCfg_append_words {State' : Type} {outer : List Bool} (q : Option State')
-    (ws : Fin k → List Bool) (w out : List Bool) :
-    wordsCfg outer q (Fin.append ws ![w, []]) out =
-      ⟨q, 1, Fin.append (fun j => tapeOfList (ws j)) ![tapeOfList w, fun _ => none],
-        fun _ => 0, out⟩ := by
-  refine Cfg.ext rfl rfl
-    ((Fin.comp_append tapeOfList ws ![w, []]).trans (congrArg _ (funext fun i => ?_))) rfl rfl
-  match i with
-  | 0 | 1 => simp
 
 /-- If `machine` transforms `ws₀` to `ws₁ a` and emits `emit a` on input `w`, then
 `machine.inputFromWord mark` transforms `Fin.append ws₀ ![w, []]` to `Fin.append (ws₁ a) ![w, []]`

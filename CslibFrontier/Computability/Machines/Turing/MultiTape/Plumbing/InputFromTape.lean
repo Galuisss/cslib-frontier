@@ -15,6 +15,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.Mar
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.Sequential
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.TransformsTapes
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.Tidy.Defs
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.WordsCfg
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Tactic.Step
 import CslibFrontier.Foundations.Data.Fin.Tuple
 
@@ -116,17 +117,6 @@ private lemma exists_runPath_markFlag {input : List Symbol} (write : Option Symb
   · -- `markWork` takes two steps on one tape, every other tape stays where it is
     have : r.space ≤ 1 * (2 + 1) := r.space_le_mul_time_add_one
     exact (space_map_embedHom_le ..).trans (by omega)
-
-/-- A `wordsCfg` configuration whose last two words are `w` and the empty word, written out. -/
-private lemma wordsCfg_append_words {State' : Type*} {outer : List Symbol} (q : Option State')
-    (ws : Fin k → List Symbol) (w out : List Symbol) :
-    wordsCfg outer q (Fin.append ws ![w, []]) out =
-      ⟨q, 1, Fin.append (fun j => tapeOfList (ws j)) ![tapeOfList w, fun _ => none],
-        fun _ => 0, out⟩ := by
-  refine Cfg.ext rfl rfl
-    ((Fin.comp_append tapeOfList ws ![w, []]).trans (congrArg _ (funext fun i => ?_))) rfl rfl
-  match i with
-  | 0 | 1 => simp
 
 section Flag
 

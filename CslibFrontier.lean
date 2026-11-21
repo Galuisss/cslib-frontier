@@ -3771,6 +3771,7 @@ public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.Tra
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.WhileCond
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.WhileInput
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.WordMoves
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Plumbing.WordsCfg
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.PolyTime
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.AcceptCount
