@@ -4589,6 +4589,7 @@ public import CslibFrontier.Computability.Probabilistic.Time
 public import CslibFrontier.Computability.Probabilistic.Traverse
 public import CslibFrontier.Computability.Probabilistic.UniformNat
 public import CslibFrontier.Computability.Probabilistic.UniformNat.ModIndex
+public import CslibFrontier.Computability.Probabilistic.Vector
 public import CslibFrontier.Computability.Program.Assemble
 public import CslibFrontier.Computability.Program.Blocks
 public import CslibFrontier.Computability.Program.Structured
@@ -5300,6 +5301,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.KeyOnly
 public import CslibFrontier.Crypto.Computational.MLDSA.KeySeedSearch
 public import CslibFrontier.Crypto.Computational.MLDSA.MaskSeedQuery
 public import CslibFrontier.Crypto.Computational.MLDSA.MatrixOracle
+public import CslibFrontier.Crypto.Computational.MLDSA.MatrixSampling
 public import CslibFrontier.Crypto.Computational.MLDSA.PriorCommitmentRefresh
 public import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskExpansion
 public import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskSeedGame
