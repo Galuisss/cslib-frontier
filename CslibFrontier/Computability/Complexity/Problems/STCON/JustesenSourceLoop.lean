@@ -34,13 +34,15 @@ membership tally at the designated target.
   loop on the original encoded input with logarithmic workspace and polynomial time.
 * `Cslib.Complexity.STCON.justesenSourceLoop_native_firstHalting_accept_iff`: a
   first-halting selector list returning a verdict has one accepting native occurrence.
+* `Cslib.Complexity.STCON.configurationJustesenSourceLoop_correct`: a returned verdict
+  gives the first nonunique radius or the correct subdivision reachability answer.
 -/
 
 public section
 
 namespace Cslib.Complexity.STCON
 
-open Cslib.Code.JustesenFamily
+open Cslib.Code.JustesenFamily Cslib.DoubleCounting
 open _root_.Turing _root_.Turing.DoubleCounting _root_.Turing.NondeterministicQueryMachine
 open _root_.Turing.MultiTapeTM
 
@@ -290,5 +292,54 @@ theorem justesenSourceLoop_native_firstHalting_accept_iff
   exact (SourceRoundLoop.firstHalting_iff_replayRounds (registers a) round
     justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply member
     justesenSourceMembershipStart MembershipTally.retainedReply (enc a) bits verdict).symm
+
+/-- A completed full-fuel scan returns the first nonunique radius, or a reachability verdict
+with a unique passing transcript at every radius. -/
+theorem configurationJustesenSourceLoop_correct
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n),
+      let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
+      let context : JustesenSourceContext :=
+        ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+      let M := justesenSourceLoop ntm c context n
+      ∀ (bits : List Bool) (verdict : ControllerVerdict), M.FirstHalting w bits M.init →
+        M.run w bits = .inr (some verdict) →
+        match verdict with
+        | .bad radius =>
+          (∀ j < radius, ∃! transcript, Passes edge source j transcript) ∧
+            ¬ (∃! transcript, Passes edge source radius transcript)
+        | .decided hit =>
+          (∀ radius, ∃! transcript, Passes edge source radius transcript) ∧
+            (hit = true ↔ Relation.ReflTransGen edge source target) := by
+  intro I n seed source target edge context M bits verdict hfirst hresult
+  let initial := SourceRoundLoop.start context n
+  let round := justesenRetainedSourceRound ntm c initial
+  let member := justesenSourceMembershipMachine ntm c
+  have hscan := (SourceRoundLoop.firstHalting_iff_replayRounds initial round
+    justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply member
+    justesenSourceMembershipStart MembershipTally.retainedReply w bits verdict).mp
+      ⟨hfirst, hresult⟩
+  have hspec := SourceRoundLoop.replayRounds_correct round justesenRetainedSourceRoundEntry
+    justesenRetainedSourceRoundReply member justesenSourceMembershipStart
+    MembershipTally.retainedReply w (r := edge) (source := source) (target := target) context
+    (by
+      intro fuel radius hpass selectors update rest hreply
+      let r : SourceRoundLoop.Registers JustesenSourceContext :=
+        ⟨context, fuel, radius, expected edge source radius⟩
+      obtain ⟨callBits, _, hhalt, hret⟩ :=
+        (round.readReply_iff justesenRetainedSourceRoundReply w selectors
+          (justesenRetainedSourceRoundEntry r) update rest).mp hreply
+      rw [← firstHalting_withInit, justesenRetainedSourceRound_withInit] at hhalt
+      rw [← run_withInit, justesenRetainedSourceRound_withInit] at hret
+      exact configurationJustesenRetainedSourceRound_correct ntm c w
+        seed source target fuel radius hpass callBits update hhalt hret)
+    (by
+      intro fuel radius _ selectors hit rest hreply
+      exact (justesenSourceMembership_readReply_correct ntm c w seed source target
+        fuel radius selectors hit rest hreply).trans mem_round.symm)
+    hscan
+  cases verdict <;> exact hspec
 
 end Cslib.Complexity.STCON

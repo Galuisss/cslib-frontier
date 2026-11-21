@@ -567,4 +567,40 @@ example {k : ℕ} {State : Type} [Fintype State] {α : Type} {enc : α ↪ List 
   rw [justesenSourceLoop_run_zero] at hret
   cases hret
 
+-- An accepting native replay yields the mathematical verdict on the source subdivision.
+example {k : ℕ} {State : Type} [Fintype State] {α : Type} {enc : α ↪ List Bool} {S : α → ℕ}
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (baseline : JustesenSourceContext) (fuel : ℕ)
+    (contextOf : α → JustesenSourceContext) (limitOf : α → ℕ)
+    (R : Routines (justesenSourceLoop ntm c baseline fuel)
+      (fun a => (justesenSourceLoop ntm c (contextOf a) (limitOf a)).init) enc S)
+    (a : α) (bits : List Bool) :
+    let w := enc a
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n),
+      contextOf a =
+        ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩ →
+      limitOf a = n →
+      (∃! indices, ∃ final,
+        Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg w) indices =
+          some (bits, final) ∧ final.Halted ∧ final.output = [true]) →
+      let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
+      let M := justesenSourceLoop ntm c (contextOf a) n
+      ∃ verdict, M.run w bits = .inr (some verdict) ∧
+        match verdict with
+        | .bad radius =>
+          (∀ j < radius, ∃! transcript, Passes edge source j transcript) ∧
+            ¬ (∃! transcript, Passes edge source radius transcript)
+        | .decided hit =>
+          (∀ radius, ∃! transcript, Passes edge source radius transcript) ∧
+            (hit = true ↔ Relation.ReflTransGen edge source target) := by
+  intro w I n seed source target hcontext hlimit hnative edge M
+  obtain ⟨verdict, hfirst, hresult⟩ :=
+    (justesenSourceLoop_native_firstHalting_accept_iff ntm c R a bits).mp hnative
+  rw [hlimit] at hfirst hresult
+  refine ⟨verdict, hresult, ?_⟩
+  rw [hcontext] at hfirst hresult
+  exact configurationJustesenSourceLoop_correct ntm c w seed source target
+    bits verdict hfirst hresult
+
 end CslibFrontierTests.STCONJustesenTally
