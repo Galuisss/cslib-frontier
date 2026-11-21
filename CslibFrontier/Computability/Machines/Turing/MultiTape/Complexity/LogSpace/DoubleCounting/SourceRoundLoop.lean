@@ -39,7 +39,7 @@ public section
 namespace Turing.DoubleCounting.SourceRoundLoop
 
 open Cslib.DoubleCounting MultiTapeTM ComputableInSpace
-open NondeterministicQueryMachine (readReply successful_call_iff)
+open NondeterministicQueryMachine (encReadChoice readReply successful_call_iff)
 variable {κ ρ μ : Type}
 
 /-- Scalar round registers and data needed to initialize either callback. -/
@@ -541,8 +541,6 @@ local notation "P" => encPair R encRound
 local notation "Q" => encPair R encMember
 local notation "F" => encOption encVerdict
 local notation "E" => encState encContext encRound encMember
-/-- A query answer paired with the selected branch bit. -/
-abbrev encChoice := encPair (encOption encBool) encBool
 
 private theorem round_budget {α : Type} {enc : α ↪ List Bool} {budget : α → ℕ}
     {r : α → Registers κ} {s : α → ρ}
@@ -650,28 +648,28 @@ theorem next_inSpace
     (hroundHalt : ComputableInSpace round.halted encRound encBool (fun s => (encRound s).length))
     (hmemberHalt : ComputableInSpace member.halted encMember encBool
       (fun s => (encMember s).length))
-    (hroundNext : ComputableInSpace round.next (encPair encRound encChoice) encRound
-      (fun p => (encPair encRound encChoice p).length))
-    (hmemberNext : ComputableInSpace member.next (encPair encMember encChoice) encMember
-      (fun p => (encPair encMember encChoice p).length)) :
-    ComputableInSpace (M).next (encPair E encChoice) E
-      (fun p => (encPair E encChoice p).length) := by
-  have hroundFrame := fst P encChoice
-  have hroundRead := snd P encChoice
+    (hroundNext : ComputableInSpace round.next (encPair encRound encReadChoice) encRound
+      (fun p => (encPair encRound encReadChoice p).length))
+    (hmemberNext : ComputableInSpace member.next (encPair encMember encReadChoice) encMember
+      (fun p => (encPair encMember encReadChoice p).length)) :
+    ComputableInSpace (M).next (encPair E encReadChoice) E
+      (fun p => (encPair E encReadChoice p).length) := by
+  have hroundFrame := fst P encReadChoice
+  have hroundRead := snd P encReadChoice
   have hroundRegs := fst' hroundFrame
   have hroundState := snd' hroundFrame
   have hroundBit := snd' hroundRead
   have hreturned := budget_comp_linear
     (returnRound_inSpace encContext encRound encMember _ _ hroundStart hmemberStart)
     (budget_prod hroundRegs (budget_comp_linear hroundReply hroundState))
-  have hroundReject := budget_const (encIn := encPair P encChoice) (encB := E)
+  have hroundReject := budget_const (encIn := encPair P encReadChoice) (encB := E)
     (.inr none) (.refl _)
   have hroundContinue := round_budget encContext encRound encMember hroundRegs
     (budget_comp_linear hroundNext (budget_prod hroundState hroundRead))
   have hround := budget_ite (budget_comp_linear hroundHalt hroundState)
     (budget_ite hroundBit hroundReject hreturned) hroundContinue
-  have hmFrame := fst Q encChoice
-  have hmRead := snd Q encChoice
+  have hmFrame := fst Q encReadChoice
+  have hmRead := snd Q encReadChoice
   have hmRegs := fst' hmFrame
   have hmState := snd' hmFrame
   have hmBit := snd' hmRead
@@ -680,16 +678,16 @@ theorem next_inSpace
     (of_inO (ComputableInO.inr encNat encBool)).of_enc_eq fun _ => rfl
   have hmReply := budget_comp_linear hmemberReply hmState
   have hmHit := budget_comp_linear hdecide (budget_optionGetD false hmReply)
-  have hmNone := budget_const (encIn := encPair Q encChoice) (encB := F) none (.refl _)
+  have hmNone := budget_const (encIn := encPair Q encReadChoice) (encB := F) none (.refl _)
   have hmResult := budget_ite (budget_optionIsSome hmReply) (budget_optionSome hmHit) hmNone
-  have hmReject := budget_const (encIn := encPair Q encChoice) (encB := E)
+  have hmReject := budget_const (encIn := encPair Q encReadChoice) (encB := E)
     (.inr none) (.refl _)
   have hmDone := finish_budget encContext encRound encMember hmResult
   have hmContinue := member_budget encContext encRound encMember hmRegs
     (budget_comp_linear hmemberNext (budget_prod hmState hmRead))
   have hmember := budget_ite (budget_comp_linear hmemberHalt hmState)
     (budget_ite hmBit hmReject hmDone) hmContinue
-  have hfinished := finish_budget encContext encRound encMember (fst F encChoice)
+  have hfinished := finish_budget encContext encRound encMember (fst F encReadChoice)
   refine (sumElimFst (sumElimFst hround hmember) hfinished).of_enc_eq ?_
   rintro ⟨(⟨r, s⟩ | ⟨r, s⟩) | verdict, read, bit⟩
   · cases bit <;> cases round.halted s <;> rfl
@@ -715,10 +713,10 @@ theorem exists_routines {α : Type} (enc : α ↪ List Bool) (S : α → ℕ)
     (hroundHalt : ComputableInSpace round.halted encRound encBool (fun s => (encRound s).length))
     (hmemberHalt : ComputableInSpace member.halted encMember encBool
       (fun s => (encMember s).length))
-    (hroundNext : ComputableInSpace round.next (encPair encRound encChoice) encRound
-      (fun p => (encPair encRound encChoice p).length))
-    (hmemberNext : ComputableInSpace member.next (encPair encMember encChoice) encMember
-      (fun p => (encPair encMember encChoice p).length))
+    (hroundNext : ComputableInSpace round.next (encPair encRound encReadChoice) encRound
+      (fun p => (encPair encRound encReadChoice p).length))
+    (hmemberNext : ComputableInSpace member.next (encPair encMember encReadChoice) encMember
+      (fun p => (encPair encMember encReadChoice p).length))
     (hstates : ∃ c, ∀ a bits, (E ((machine (registers a) round roundStart roundReply
       member memberStart memberReply).run (enc a) bits)).length ≤ c * S a) :
     Nonempty (Routines (M) (fun a => enterRound roundStart (registers a)) enc S) := by
