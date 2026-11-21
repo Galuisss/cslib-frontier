@@ -14,6 +14,7 @@ import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProductBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicValueBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ConjugateProduct
+import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ShiftedLabel
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseIntegerRootLabel
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
 import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomial
@@ -658,5 +659,20 @@ example :
     simp [p, add_eq_zero_iff_eq_neg]
   rw [Polynomial.prod_aeval_aroots_toFinset_eq, hreal, hcomplex]
   norm_num [Finset.filter_singleton]
+
+-- The integer label X vanishes at the source root, so a nonzero shift is needed.
+example : ∃ e : ℕ, e ≤ 1 ∧
+    Polynomial.aeval (0 : ℂ) (Polynomial.shiftedRootLabel 1 e (Polynomial.X : Polynomial ℤ)) ≠
+      0 := by
+  obtain ⟨e, he, h⟩ := Polynomial.exists_aeval_shiftedRootLabel_ne_zero (A := ℂ)
+    (Polynomial.X : Polynomial ℤ) Polynomial.X Polynomial.natDegree_X_le
+  exact ⟨e, he, h 0 (by simp [Polynomial.aroots_X])⟩
+
+-- Every allowed shift reverses the positive sign of the constant label one.
+example (e : ℕ) (he : e ≤ 1) :
+    SignType.sign ((Polynomial.shiftedRootLabel 1 e (1 : Polynomial ℝ)).eval 0) = -1 := by
+  simpa only [Polynomial.eval_one, sign_pos (by norm_num : (0 : ℝ) < 1)] using
+    Polynomial.sign_eval_shiftedRootLabel (g := 1) (x := 0) (by decide : 0 < (1 : ℕ)) he
+      (Or.inl (by norm_num))
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
