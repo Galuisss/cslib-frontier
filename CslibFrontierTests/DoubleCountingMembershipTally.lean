@@ -89,6 +89,27 @@ private def verdict (_ : Unit) : Bool := false
 
 private def negativeContext : Context := ⟨2, 0, 1, 0, ⟨1, 0⟩⟩
 
+/-- The walk entry can consume a variable context in the encoded transition request. -/
+example :
+    let walk : NondeterministicQueryMachine Bool :=
+      { init := false, query := fun _ => 0, next := Prod.fst
+        halted := fun _ => true, accept := id }
+    let enter := fun (context : Bool) (_ : Registers) => context
+    let fuel := fun (_ : Bool) => (some 0 : Option ℕ)
+    let step (p : State Bool × Bool × Option Bool × Bool) :=
+      (machine negativeContext walk (enter p.2.1) fuel).next (p.1, p.2.2)
+    let enc := encPair (encState encBool) (encPair encBool encReadChoice)
+    ComputableInSpace step enc (encState encBool) (fun p => (enc p).length) ∧
+      ∀ context, step (initial negativeContext, context, none, true) =
+        .inr (.inl (⟨negativeContext, 0, Scan.Result.zero⟩, context)) := by
+  intro walk enter fuel step enc
+  refine ⟨?_, ?_⟩
+  · exact next_withParameter_inSpace encBool encBool negativeContext walk enter fuel
+      (fst encBool encRegisters) (fst encBool encReadChoice)
+      (budget_const true (.refl _)) (budget_const (some 0) (.refl _))
+  · intro context
+    rfl
+
 private def negativeBranch : Scan.Branch 2 := fun v =>
   if v = 0 then some [] else none
 
