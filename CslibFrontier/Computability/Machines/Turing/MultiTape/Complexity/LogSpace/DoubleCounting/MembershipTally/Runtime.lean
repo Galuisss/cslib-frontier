@@ -215,8 +215,10 @@ theorem retainedMachine_withInit (ctx newCtx : Context) (newContext : κ) :
     (retainedMachine edge start verdict clock initialWalk context ctx).withInit
       (retainedInitial newContext newCtx) =
     retainedMachine edge start verdict clock initialWalk newContext newCtx := by
-  unfold retainedMachine withRuntimeWalk NondeterministicQueryMachine.withInit
-  rfl
+  unfold retainedMachine
+  rw [show retainedInitial newContext newCtx = retainedStateEquiv.symm (newContext, initial newCtx)
+    from rfl, NondeterministicQueryMachine.retain_withInit]
+  simp only [withRuntimeWalk_withInit]
 
 /-- Replay preserves the retained context and forwards exactly the same selectors and input. -/
 theorem retainedMachine_replay (ctx : Context) (input bits : List Bool) (s : RetainedState κ τ) :
