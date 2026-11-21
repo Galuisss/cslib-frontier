@@ -32,6 +32,8 @@ membership tally at the designated target.
   encoded prefix state, including rejection, has logarithmic length.
 * `Cslib.Complexity.STCON.configurationJustesenSourceLoop_exists_routines`: compile the
   loop on the original encoded input with logarithmic workspace and polynomial time.
+* `Cslib.Complexity.STCON.justesenSourceLoop_native_firstHalting_accept_iff`: a
+  first-halting selector list returning a verdict has one accepting native occurrence.
 -/
 
 public section
@@ -63,6 +65,15 @@ abbrev JustesenSourceLoopState :=
     justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
     (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
     MembershipTally.retainedReply
+
+/-- Zero fuel returns no verdict and never starts a callback. -/
+theorem justesenSourceLoop_run_zero (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (context : JustesenSourceContext) (w bits : List Bool) :
+    (justesenSourceLoop ntm c context 0).run w bits = .inr none := by
+  let M := justesenSourceLoop ntm c context 0
+  change M.replay w bits M.init = .inr none
+  rw [M.replay_of_halted w (by rfl)]
+  rfl
 
 /-- Re-entry changes the retained context and loop limit of the fixed source-loop machine. -/
 theorem justesenSourceLoop_withInit (ntm : MultiTapeNTM k Bool State) (c : ℕ)
@@ -250,5 +261,34 @@ theorem configurationJustesenSourceLoop_exists_routines
       seed source target (limitOf a) hlimit
   obtain ⟨_, htime⟩ := R.exists_runsInTime a hhalt
   exact hd (hnativeSpace a) htime
+
+/-- For each selector list, an accepting native occurrence is unique exactly when the
+re-entered source loop first halts on that list and returns a verdict. A negative verdict
+is a successful return. -/
+theorem justesenSourceLoop_native_firstHalting_accept_iff
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) {α : Type} {enc : α ↪ List Bool}
+    {S : α → ℕ} {contextOf : α → JustesenSourceContext} {limitOf : α → ℕ}
+    {baseline : JustesenSourceContext} {fuel : ℕ}
+    (R : Routines (justesenSourceLoop ntm c baseline fuel)
+      (fun a => (justesenSourceLoop ntm c (contextOf a) (limitOf a)).init) enc S)
+    (a : α) (bits : List Bool) :
+    (∃! indices, ∃ final,
+      Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg (enc a)) indices =
+        some (bits, final) ∧ final.Halted ∧ final.output = [true]) ↔
+      ∃ verdict,
+        let M := justesenSourceLoop ntm c (contextOf a) (limitOf a)
+        M.FirstHalting (enc a) bits M.init ∧ M.run (enc a) bits = .inr (some verdict) := by
+  let initial := SourceRoundLoop.start baseline fuel
+  let registers (a : α) := SourceRoundLoop.start (contextOf a) (limitOf a)
+  let round := justesenRetainedSourceRound ntm c initial
+  let member := justesenSourceMembershipMachine ntm c
+  rw [SourceRoundLoop.native_firstHalting_accept_iff initial round justesenRetainedSourceRoundEntry
+    justesenRetainedSourceRoundReply member justesenSourceMembershipStart
+    MembershipTally.retainedReply registers R a bits]
+  apply exists_congr
+  intro verdict
+  exact (SourceRoundLoop.firstHalting_iff_replayRounds (registers a) round
+    justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply member
+    justesenSourceMembershipStart MembershipTally.retainedReply (enc a) bits verdict).symm
 
 end Cslib.Complexity.STCON
