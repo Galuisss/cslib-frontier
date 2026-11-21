@@ -41,6 +41,11 @@ private def unpad : List Bool → Option (List Bool)
   | true :: x => some x
   | false :: x => unpad x
 
+/-- Decode a measured SHAKE256 address. A missing address, SHAKE128 tag or missing delimiter
+has no SHAKE256 input. -/
+def shake256QueryInput {a : ℕ} (addr : Option (BitString (a + 2))) : Option (List Bool) :=
+  addr.bind fun v => if v 0 then unpad (List.ofFn fun i : Fin (a + 1) => v i.succ) else none
+
 private theorem unpad_word (k : ℕ) (x : List Bool) :
     unpad (List.replicate k false ++ true :: x) = some x := by
   induction k with
@@ -54,6 +59,27 @@ def queryTable (H : Xofs) (a bytes : ℕ) (address : BitString (a + 2)) : BitStr
   | none => 0
   | some x => BitString.ofList (8 * bytes)
       (Keccak.bytesToBitsLE ((if address 0 then H.h256 else H.h128).read x bytes))
+
+/-- When the SHAKE128 streams agree, unequal coherent responses identify a successfully
+decoded SHAKE256 address whose two raw byte reads differ. -/
+theorem shake256QueryInput_of_queryTable_ne {a b : ℕ} {H G : Xofs} (h128 : H.h128 = G.h128)
+    {addr : Option (BitString (a + 2))}
+    (hit : addr.any (fun v => decide (H.queryTable a b v ≠ G.queryTable a b v)) = true) :
+    ∃ raw, shake256QueryInput addr = some raw ∧ H.h256.read raw b ≠ G.h256.read raw b := by
+  obtain _ | v := addr
+  · contradiction
+  change decide (_ ≠ _) = true at hit
+  replace hit := of_decide_eq_true hit
+  simp only [queryTable] at hit
+  cases h : unpad (List.ofFn fun i : Fin (a + 1) => v i.succ) with
+  | none => exact (hit (by rw [h])).elim
+  | some raw =>
+    rw [h] at hit
+    cases tag : v 0 with
+    | false => exact (hit (by simp only [tag, Bool.false_eq_true, ↓reduceIte, h128])).elim
+    | true =>
+      exact ⟨raw, by simp only [shake256QueryInput, Option.bind_some, tag, ↓reduceIte, h],
+        fun eq => hit (by simp only [tag, ↓reduceIte, eq])⟩
 
 /-- A coherent query at each encodable raw word reads the very stream used by FIPS, at
 the full device response length. Shorter reads use its prefix. -/
@@ -167,6 +193,13 @@ private theorem byteAt_install {a b : ℕ} (base : ExtendableOutput) (t : Table 
   by_cases hx : x.length ≤ a <;> by_cases hi : i < b <;>
     simp [hx, hi]
 
+/-- Replace the prefix bytes at every `n`-bit SHAKE256 input with the supplied byte list,
+retaining longer suffixes, other input lengths and SHAKE128. -/
+@[expose] def Xofs.withPrefixLists (H : Xofs) (n : ℕ)
+    (R : BitString n → List Byte) : Xofs :=
+  { H with h256 := H.h256.withPrefixes fun x =>
+      if x.length = n then some (R (BitString.ofList _ x)) else none }
+
 /-- Replace the first `k` bytes at every `n`-bit SHAKE256 input using little-endian register
 words, retaining the other bytes and SHAKE128. -/
 @[expose] def Xofs.withPrefixRegister (H : Xofs) (n k : ℕ)
@@ -175,10 +208,34 @@ words, retaining the other bytes and SHAKE128. -/
       if x.length = n then
         some (((Keccak.fixedBytesEquivBitsLE _).symm (D (BitString.ofList _ x))).toList) else none }
 
+/-- Installing `k`-byte rows directly as lists agrees with installing their little-endian
+bit-string encodings. -/
+theorem Xofs.withPrefixLists_toList (H : Xofs) (n k : ℕ)
+    (R : BitString n → FixedBytes k) :
+    H.withPrefixLists n (fun x => (R x).toList) =
+      H.withPrefixRegister n k (fun x => Keccak.fixedBytesEquivBitsLE k (R x)) := by
+  simp only [Xofs.withPrefixLists, Xofs.withPrefixRegister, Equiv.symm_apply_apply]
+
 /-- Read the first `k` SHAKE256 bytes on every `n`-bit input as little-endian bit strings. -/
 def Xofs.readPrefixRegister (H : Xofs) (n k : ℕ) (x : BitString n) :
     BitString (8 * k) :=
   Keccak.fixedBytesEquivBitsLE _ (fun j => H.h256.byteAt (List.ofFn x) j)
+
+/-- Reading all `k`-byte prefixes at `n`-bit inputs from the current streams and reinstalling
+them preserves every raw query, including SHAKE256 output beyond the prefix. -/
+theorem Xofs.withPrefixRegister_readPrefixRegister (H : Xofs) (n k : ℕ) :
+    H.withPrefixRegister n k (H.readPrefixRegister n k) = H := by
+  cases H with
+  | mk h128 h256 =>
+    unfold Xofs.withPrefixRegister
+    congr 1
+    apply ExtendableOutput.ext_byteAt
+    intro x i
+    by_cases len : x.length = n
+    · by_cases small : i < k <;>
+        simp [Xofs.readPrefixRegister, ExtendableOutput.byteAt_withPrefixes, len,
+          FixedBytes.toList, small, BitString.ofFn_ofList len]
+    · simp [ExtendableOutput.byteAt_withPrefixes, len]
 
 private def prefixCells {a b : ℕ} (n k : ℕ) (ha : n ≤ a)
     (hb : k ≤ b) : BitString n × Fin k ↪
@@ -299,6 +356,22 @@ theorem Xofs.queryTable_withPrefixRegister (H : Xofs) (n k a b : ℕ)
   · rename_i word _
     cases tag : x 0 <;> by_cases h : word.length = n <;>
       simp only [h, Bool.false_eq_true, ↓reduceIte, Xofs.withPrefixRegister,
+        ExtendableOutput.withPrefixes]
+
+/-- A native raw query to an installed byte-list prefix table reads at most one entry. The
+equality also covers SHAKE128, malformed words and requests extending beyond the installed
+prefix. -/
+theorem Xofs.queryTable_withPrefixLists (H : Xofs) (n a b : ℕ)
+    (R : BitString n → List Byte) :
+    (H.withPrefixLists n R).queryTable a b = fun x =>
+      (H.withPrefixLists n fun _ => R (Xofs.prefixLookup n x)).queryTable a b x := by
+  funext x
+  unfold Xofs.queryTable Xofs.prefixLookup
+  split
+  · rfl
+  · rename_i word _
+    cases tag : x 0 <;> by_cases h : word.length = n <;>
+      simp only [h, Bool.false_eq_true, ↓reduceIte, Xofs.withPrefixLists,
         ExtendableOutput.withPrefixes]
 
 end Cslib.Crypto.MLDSA.FIPS204

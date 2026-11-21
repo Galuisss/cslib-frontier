@@ -13,7 +13,6 @@ public import CslibFrontier.Computability.Circuit.Quantum.Oracle.ValueQuery
 import all CslibFrontier.Crypto.Computational.MLDSA.FIPS204
 import all CslibFrontier.Crypto.Computational.MLDSA.RandomXof
 import all CslibFrontier.Crypto.Computational.MLDSA.QuantumSigning
-import CslibFrontier.Probability.PMF.UniformExtend
 
 /-!
 # Coherent access to the ML-DSA commitment digest register
@@ -36,7 +35,7 @@ open Cslib.Probability Cslib.Quantum ExtendableOutput
 /-- Install a literal digest prefix on every SHAKE256 word of the FIPS commitment length,
 including words that are also queried in another role. Long-read suffixes and SHAKE128
 remain in the supplied XOF pair. -/
-def Xofs.withDigestRegister (H : Xofs) (s : Level)
+@[expose] def Xofs.withDigestRegister (H : Xofs) (s : Level)
     (D : BitString s.commitmentInputBits → BitString (8 * digestBytes s)) : Xofs :=
   H.withPrefixRegister s.commitmentInputBits (digestBytes s) D
 
@@ -56,9 +55,10 @@ theorem Xofs.keyGen_withDigestRegister (H : Xofs) (s : Level)
     apply off
     simp only [List.length_append, FixedBytes.length_toList, List.length_cons, List.length_nil]
     cases s <;> decide
-  · intro x hx
+  · intro nonce
     apply off
-    rw [hx]
+    simp only [nonceInput, List.length_append, List.length_take, List.length_drop,
+      Xofs.expandKeySeed, H.h256.length_read, List.length_cons, List.length_nil]
     cases s <;> decide
   · intro x hx
     apply off
@@ -69,6 +69,12 @@ theorem Xofs.keyGen_withDigestRegister (H : Xofs) (s : Level)
 def Xofs.readDigestRegister (H : Xofs) (s : Level) (x : BitString s.commitmentInputBits) :
     BitString (8 * digestBytes s) :=
   H.readPrefixRegister s.commitmentInputBits (digestBytes s) x
+
+/-- Reading all commitment prefixes from the current streams and reinstalling them preserves every
+raw query, including SHAKE256 output beyond the digest. -/
+theorem Xofs.withDigestRegister_readDigestRegister (H : Xofs) (s : Level) :
+    H.withDigestRegister s (H.readDigestRegister s) = H :=
+  H.withPrefixRegister_readPrefixRegister s.commitmentInputBits (digestBytes s)
 
 /-- Draw all SHAKE256 commitment-length digest prefixes independently before key generation.
 The register and the resulting full raw oracle pair have exactly their joint law in the

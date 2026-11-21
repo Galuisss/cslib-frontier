@@ -224,7 +224,9 @@ theorem keyGen_eq_of_mem_sampleSigningMaskSeeds {base : Xofs} {s : Level} {seed 
     lia
   apply Xofs.keyGen_congr_of_reads level setup (agree_off_sampleSigningMaskSeeds h).1
   · exact bytes _ _ (by simp [FixedBytes.toList])
-  · exact fun x hx => bytes x _ (by rw [hx]; decide)
+  · intro i
+    apply bytes
+    simp [nonceInput, Xofs.expandKeySeed, pair.background.h256.length_read]
   · intro x hx
     apply bytes
     rw [hx]
@@ -376,7 +378,7 @@ theorem Xofs.prob_representative_ne_sampleSigningMaskSeeds (base : Xofs) (s : Le
             FixedBytes.toList, List.ofFn_inj]
         rw [eq, ENNReal.le_ofReal_iff_toReal_le (PMF.toOuterMeasure_ne_top _ _) (by positivity),
           prob_uniformOfFintype_embedding_mem_range]
-        simp only [Fintype.card_fin, QuantumSigningForger.card_hedge, Nat.cast_pow, Nat.cast_ofNat,
+        simp only [Fintype.card_fin, FixedBytes.card, Nat.cast_pow, Nat.cast_ofNat,
           le_refl]
 
 namespace QuantumSigningForger
