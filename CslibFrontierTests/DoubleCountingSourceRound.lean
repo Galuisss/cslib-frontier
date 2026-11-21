@@ -15,7 +15,7 @@ set_option linter.privateModule false
 
 namespace CslibFrontierTests.DoubleCountingSourceRound
 
-open Turing Turing.DoubleCounting.SourceRound
+open Turing Turing.DoubleCounting.SourceRound MultiTapeTM
 
 private def context : Context := ⟨3, 0, 0, ⟨2, 0⟩⟩
 
@@ -89,5 +89,17 @@ example (choices : List Bool) :
       q.update.tally.lengthSum ≤ q.cursor := by
   simpa only [round, context, Nat.zero_add, Nat.mul_one] using
     (run_scalar_bounds context callback (fun _ => .pending) finish [] choices).2
+
+/-- The encoded prefix includes the full suspended caller and optional callee. -/
+example (choices : List Bool) :
+    (encMachineState (Option Bool) (encOption encBool) (tieRound.run [] choices)).length ≤
+      2 * (6 * (encContext context).length + 129) + 4 := by
+  have hcallee (req : Request) (bits : List Bool) :
+      (encOption encBool (reply.replay [] bits (start context req))).length ≤ 2 := by
+    cases reply.replay [] bits (start context req) with
+    | none => decide
+    | some flag => cases flag <;> decide
+  exact length_encMachineState_run_le (encOption encBool) context reply start id
+    [] choices 2 hcallee
 
 end CslibFrontierTests.DoubleCountingSourceRound

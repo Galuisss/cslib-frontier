@@ -139,6 +139,10 @@ abbrev encMachineState {τ : Type} (encT : τ ↪ List Bool) :=
 /-- Both numeric loop registers stay in their finite ranges, independently of reply truth. -/
 def Bounded (q : State) : Prop := q.count ≤ q.cursor ∧ q.cursor ≤ q.context.size
 
+/-- The initial predecessor state has tested zero vertices and counted none. -/
+theorem initial_bounded (ctx : Context) : Bounded (initial ctx) := by
+  simp [Bounded, initial]
+
 /-- Every reply, including rejection and ties, preserves the bounded scalar invariant. -/
 theorem advance_bounded {q : State} (hq : Bounded q) (hlive : halted q = false)
     (reply : Option Bool) : Bounded (advance q reply) := by
@@ -382,7 +386,7 @@ theorem Returns.bounded {τ : Type} {ctx : Context} {N : QueryMachine τ}
     {start : State → τ} {answer : τ → Option Bool} {w : List Bool} {q : State}
     (h : Returns ctx N start answer w q) : Bounded q := by
   induction h with
-  | initial => exact ⟨le_rfl, Nat.zero_le _⟩
+  | initial => exact initial_bounded ctx
   | call _ hlive _ _ _ ih => exact advance_bounded ih hlive _
 
 /-- All immutable callback arguments survive every return, including rejection. -/

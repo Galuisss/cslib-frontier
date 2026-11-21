@@ -55,13 +55,9 @@ structure State where
 enc_structure encContext : Context where
   size : encNat, source : encNat, radius : encNat, expected : encTally
 
-/-- The current encoded tally and its tie bit. -/
-enc_structure encUpdate : RoundUpdate where
-  tally : encTally, bad : encBool
-
 /-- Binary outer cursor and tally, with the active predecessor loop if present. -/
 enc_structure encState : State where
-  context : encContext, cursor : encNat, update : encUpdate,
+  context : encContext, cursor : encNat, update : encRoundUpdate,
   predecessor : (encOption Predecessor.encState), rejected : encBool
 
 /-- Arguments of the currently requested same-input callback. -/
@@ -84,6 +80,9 @@ inductive Request where
   match q.predecessor with
   | none => .member q.cursor
   | some p => if p.memberPhase then .member p.cursor else .edge p.cursor q.cursor
+
+private def predecessorContext (q : State) : Predecessor.Context :=
+  ⟨q.context.size, q.context.source, q.cursor, q.context.radius, q.context.expected⟩
 
 /-- Consume one result from the selected callback. The active predecessor loop uses its
 landed reply handler, and every finished count contributes through `RoundUpdate.addVertex`. -/
@@ -280,10 +279,46 @@ private theorem advance_tally_bounds {q : State} (reply : Option Bool)
       · exact ⟨hc, hs⟩
 
 
+private def PredecessorBounded (q : State) : Prop :=
+  ∀ p ∈ q.predecessor, p.context = predecessorContext q ∧
+    Predecessor.Bounded p ∧ Predecessor.halted p = false
+
+private theorem advance_predecessorBounded {q : State} (hlive : halted q = false)
+    (hpre : PredecessorBounded q) (reply : Option Bool) :
+    PredecessorBounded (advance q reply) := by
+  have hsize : 0 < q.context.size := by
+    simp only [halted, Bool.or_eq_false_iff, decide_eq_false_iff_not, Nat.not_le] at hlive
+    exact Nat.zero_lt_of_lt hlive.2
+  cases reply with
+  | none => exact hpre
+  | some hit =>
+    cases hp : q.predecessor with
+    | none =>
+      cases hit
+      · intro p hmem
+        simp only [advance, hp, Bool.false_eq_true, ite_false, Option.mem_some_iff] at hmem
+        subst p
+        exact ⟨by simp [predecessorContext, advance, hp, Predecessor.initial],
+          Predecessor.initial_bounded _,
+          by simp [Predecessor.halted, Predecessor.initial, Nat.not_le.mpr hsize]⟩
+      · simp [PredecessorBounded, advance, hp]
+    | some p =>
+      obtain ⟨hctx, hbounded, hactive⟩ := hpre p (by simp [hp])
+      simp only [PredecessorBounded, advance, hp]
+      split
+      · simp
+      · rename_i hnext
+        intro next hmem
+        rw [Option.mem_some_iff] at hmem
+        subst next
+        exact ⟨(Predecessor.advance_context _ _).trans hctx,
+          Predecessor.advance_bounded hbounded hactive _, Bool.eq_false_iff.mpr hnext⟩
+
 private def ScalarBounds (ctx : Context) (q : State) : Prop :=
   q.context = ctx ∧ q.cursor ≤ ctx.size ∧
     q.update.tally.count ≤ ctx.expected.count + q.cursor ∧
-    q.update.tally.lengthSum ≤ ctx.expected.lengthSum + q.cursor * (ctx.radius + 1)
+    q.update.tally.lengthSum ≤ ctx.expected.lengthSum + q.cursor * (ctx.radius + 1) ∧
+    PredecessorBounded q
 
 private theorem step_scalarBounds {τ : Type} (ctx : Context)
     (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
@@ -295,9 +330,11 @@ private theorem step_scalarBounds {τ : Type} (ctx : Context)
     exact hq
   have hlive := Bool.eq_false_iff.mpr hs
   have hadv (reply : Option Bool) : ScalarBounds ctx (advance q.controller reply) := by
-    obtain ⟨hc, _, ht, hl⟩ := hq
+    obtain ⟨hc, _, ht, hl, hp⟩ := hq
     rw [← hc] at ht hl ⊢
-    exact ⟨advance_context _ _, advance_cursor_le hlive reply, advance_tally_bounds reply ht hl⟩
+    obtain ⟨ht', hl'⟩ := advance_tally_bounds reply ht hl
+    exact ⟨advance_context _ _, advance_cursor_le hlive reply, ht', hl',
+      advance_predecessorBounded hlive hp reply⟩
   obtain ⟨state, callee⟩ := q
   change halted state = false at hlive
   cases callee with
@@ -312,6 +349,20 @@ private theorem step_scalarBounds {τ : Type} (ctx : Context)
       · simpa [NondeterministicQueryMachine.step, machine, hlive, hc] using hadv (finish callee)
       · simpa [NondeterministicQueryMachine.step, machine, hlive, hc] using hadv none
 
+private theorem run_scalarInvariant {τ : Type} (ctx : Context)
+    (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
+    (finish : τ → Option Bool) (input choices : List Bool) :
+    ScalarBounds ctx ((machine ctx N start finish).run input choices).controller := by
+  have replay_bounds (bits : List Bool) (q : MachineState τ) (hq : ScalarBounds ctx q.controller) :
+      ScalarBounds ctx ((machine ctx N start finish).replay input bits q).controller := by
+    induction bits generalizing q with
+    | nil => exact hq
+    | cons b bits ih =>
+      rw [NondeterministicQueryMachine.replay_cons]
+      exact ih _ (step_scalarBounds ctx N start finish input q b hq)
+  exact replay_bounds choices _ (by
+    simp [ScalarBounds, PredecessorBounded, machine, entry, initial])
+
 /-- Every selector prefix retains the original context and bounds the cursor and tally.
 These bounds also apply when a selector or callback rejects. -/
 theorem run_scalar_bounds {τ : Type} (ctx : Context)
@@ -321,13 +372,125 @@ theorem run_scalar_bounds {τ : Type} (ctx : Context)
     q.context = ctx ∧ q.cursor ≤ ctx.size ∧
       q.update.tally.count ≤ ctx.expected.count + q.cursor ∧
       q.update.tally.lengthSum ≤ ctx.expected.lengthSum + q.cursor * (ctx.radius + 1) := by
-  have replay_bounds (bits : List Bool) (q : MachineState τ) (hq : ScalarBounds ctx q.controller) :
-      ScalarBounds ctx ((machine ctx N start finish).replay input bits q).controller := by
-    induction bits generalizing q with
-    | nil => exact hq
-    | cons b bits ih =>
-      rw [NondeterministicQueryMachine.replay_cons]
-      exact ih _ (step_scalarBounds ctx N start finish input q b hq)
-  exact replay_bounds choices _ (by simp [ScalarBounds, machine, entry, initial])
+  obtain ⟨hc, hcursor, hcount, hsum, _⟩ := run_scalarInvariant ctx N start finish input choices
+  exact ⟨hc, hcursor, hcount, hsum⟩
+
+/-- On every branch any retained predecessor state has bounded cursor and count and belongs
+to the current outer vertex. -/
+theorem run_predecessor_bounds {τ : Type} (ctx : Context)
+    (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
+    (finish : τ → Option Bool) (input choices : List Bool) :
+    let q := ((machine ctx N start finish).run input choices).controller
+    ∀ p : Predecessor.State, p ∈ q.predecessor →
+      p.context = ⟨ctx.size, ctx.source, q.cursor, ctx.radius, ctx.expected⟩ ∧
+      Predecessor.Bounded p ∧ Predecessor.halted p = false := by
+  obtain ⟨hc, _, _, _, hp⟩ := run_scalarInvariant ctx N start finish input choices
+  dsimp only
+  intro p hmem
+  simpa only [predecessorContext, hc] using hp p hmem
+
+/-- The caller workspace charges its context, the finite indices, and the binary tally
+envelope. The bound includes an active predecessor loop and also holds after rejection. -/
+theorem length_encState_run_le {τ : Type} (ctx : Context)
+    (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
+    (finish : τ → Option Bool) (input choices : List Bool) :
+    let q := ((machine ctx N start finish).run input choices).controller
+    let B := Nat.log2 ctx.size + 1
+    let V := max (ctx.expected.count + ctx.size)
+      (ctx.expected.lengthSum + ctx.size * (ctx.radius + 1))
+    (encState q).length ≤
+      6 * (encContext ctx).length + 18 * B + 12 * (Nat.log2 (V * V) + 1) + 33 := by
+  intro q B V
+  obtain ⟨hc, hcursor, hcount, hsum, hp⟩ := run_scalarInvariant ctx N start finish input choices
+  change q.context = ctx at hc
+  change q.cursor ≤ ctx.size at hcursor
+  change PredecessorBounded q at hp
+  have hi : (encNat q.cursor).length ≤ B := length_encNat_le_log2 hcursor
+  have hcount' : q.update.tally.count ≤ V :=
+    hcount.trans ((Nat.add_le_add_left hcursor _).trans (le_max_left _ _))
+  have hsq : V ≤ V * V := by cases V <;> simp
+  have hsum' : q.update.tally.lengthSum ≤ V * V :=
+    hsum.trans ((Nat.add_le_add_left (Nat.mul_le_mul_right _ hcursor) _).trans
+      ((le_max_right _ _).trans hsq))
+  have hupdate := length_encRoundUpdate_le hcount' hsum'
+  have hpred : ((encOption Predecessor.encState) q.predecessor).length ≤
+      2 * (encContext ctx).length + 8 * B + 10 := by
+    cases hq : q.predecessor with
+    | none => simp [encOption_none]
+    | some p =>
+      obtain ⟨hctx, hb, _⟩ := hp p (by simp only [hq, Option.mem_some_iff])
+      have hctxLen : (Predecessor.encContext p.context).length ≤
+          (encContext ctx).length + 2 * B + 1 := by
+        rw [hctx]
+        simp only [predecessorContext, hc, Predecessor.encContext_apply,
+          Predecessor.encContextFields, encContext_apply, encContextFields, length_encPair]
+        omega
+      have h := Predecessor.length_encState_le hb
+      have hn : p.context.size = ctx.size := by simp [hctx, predecessorContext, hc]
+      rw [hn] at h
+      rw [encOption_some, List.length_cons]
+      omega
+  simp only [encState_apply, encStateFields, length_encPair, encBool_apply, List.length_singleton]
+  rw [hc]
+  omega
+
+/-- Every suspended callee came from a request on the original round context and input. -/
+theorem run_callee_replay {τ : Type} (ctx : Context)
+    (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
+    (finish : τ → Option Bool) (input choices : List Bool) :
+    ∀ t ∈ ((machine ctx N start finish).run input choices).callee,
+      ∃ req bits, N.replay input bits (start ctx req) = t := by
+  let M := machine ctx N start finish
+  change ∀ t ∈ (M.run input choices).callee, _
+  induction choices using List.reverseRecOn with
+  | nil =>
+    simp [M, NondeterministicQueryMachine.run, machine, entry]
+  | append_singleton pre choice ih =>
+    rw [NondeterministicQueryMachine.run_append, NondeterministicQueryMachine.replay_cons,
+      NondeterministicQueryMachine.replay_nil]
+    let p := M.run input pre
+    have hctx : p.controller.context = ctx := (run_scalar_bounds ctx N start finish input pre).1
+    change ∀ t ∈ (M.step input p choice).callee, _
+    change ∀ t ∈ p.callee, _ at ih
+    by_cases hh : M.halted p = true
+    · rwa [M.step_of_halted input hh]
+    have hlive : halted p.controller = false := Bool.eq_false_iff.mpr hh
+    cases hs : p.callee with
+    | none =>
+      cases choice
+      · intro t ht
+        simp only [M, NondeterministicQueryMachine.step, machine, hlive, hs,
+          Bool.false_eq_true, ite_false, Option.mem_some_iff] at ht
+        exact ⟨request p.controller, [], by simpa only [NondeterministicQueryMachine.replay_nil,
+          ← hctx] using ht⟩
+      · simp [M, NondeterministicQueryMachine.step, machine, hlive, hs]
+    | some s =>
+      cases hhalt : N.halted s
+      · intro t ht
+        simp only [M, NondeterministicQueryMachine.step, NondeterministicQueryMachine.read,
+          machine, hlive, hs, hhalt, Bool.false_eq_true, ite_false, Option.mem_some_iff] at ht
+        obtain ⟨req, bits, hb⟩ := ih s (by simp [hs])
+        refine ⟨req, bits ++ [choice], ?_⟩
+        rw [NondeterministicQueryMachine.replay_append, hb]
+        simpa [NondeterministicQueryMachine.step, NondeterministicQueryMachine.read,
+          NondeterministicQueryMachine.replay_cons, hhalt] using ht
+      · cases choice <;> simp [M, NondeterministicQueryMachine.step, machine, hlive, hs, hhalt]
+
+/-- The complete machine state charges the scalar round envelope and an all-prefix bound for
+the supplied same-input callbacks. The bound covers rejected selectors and replies. -/
+theorem length_encMachineState_run_le {τ : Type} (encT : τ ↪ List Bool) (ctx : Context)
+    (N : NondeterministicQueryMachine τ) (start : Context → Request → τ)
+    (finish : τ → Option Bool) (input choices : List Bool) (D : ℕ)
+    (hcallee : ∀ req bits, (encT (N.replay input bits (start ctx req))).length ≤ D) :
+    let B := Nat.log2 ctx.size + 1
+    let V := max (ctx.expected.count + ctx.size)
+      (ctx.expected.lengthSum + ctx.size * (ctx.radius + 1))
+    (encMachineState τ encT ((machine ctx N start finish).run input choices)).length ≤
+      2 * (6 * (encContext ctx).length + 18 * B + 12 * (Nat.log2 (V * V) + 1) + 33) + D + 2 := by
+  apply length_encMachineState_le
+  · exact length_encState_run_le ctx N start finish input choices
+  · intro t ht
+    obtain ⟨req, bits, rfl⟩ := run_callee_replay ctx N start finish input choices t ht
+    exact hcallee req bits
 
 end Turing.DoubleCounting.SourceRound
