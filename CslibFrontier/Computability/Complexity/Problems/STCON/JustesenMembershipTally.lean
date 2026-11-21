@@ -23,6 +23,8 @@ to every bounded walk, so the typed scan uses the subdivision adjacency for the 
 
 * `Cslib.Complexity.STCON.configurationJustesenMembershipTally_firstHalting_iff`: exact
   first-halting selector and membership-reply correspondence for the weighted tally.
+* `Cslib.Complexity.STCON.configurationJustesenMembershipTally_existsUnique_firstHalting`:
+  one successful selector list at the exact round totals given a unique passing transcript.
 * `Cslib.Complexity.STCON.configurationJustesenMembershipTally_native_firstHalting_iff`:
   one accepting native occurrence list per passing selector list.
 * `Cslib.Complexity.STCON.configurationJustesenMembershipTally_length_run_le_log`:
@@ -94,6 +96,29 @@ theorem configurationJustesenMembershipTally_firstHalting_iff
     (MembershipTally.withRuntimeWalk_firstHalting_iff edge start callbackVerdict 3 initial ctx
       w (configurationJustesenSubdivisionAdjacent ntm c w seed) source target radius expected
       (fun u v => (hcall u v).1) (fun u v => (hcall u v).2) bits hit)
+
+/-- The Justesen tally has exactly one successful first-halting selector list when the
+transcript at the exact round totals is unique. -/
+theorem configurationJustesenMembershipTally_existsUnique_firstHalting
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let size := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin size.vertexCount)
+      (radius : ℕ),
+      let adjacent := configurationJustesenSubdivisionAdjacent ntm c w seed
+      let edge := fun u v => adjacent u v = true
+      (∃! transcript, Passes edge source radius transcript) →
+      let M := configurationJustesenMembershipTally ntm c w seed.val
+        ⟨size.vertexCount, source.val, target.val, radius, expected edge source radius⟩
+      ∃! bits, M.FirstHalting w bits M.init ∧
+        (MembershipTally.retainedReply (M.run w bits)).isSome := by
+  intro I size seed source target radius adjacent edge hpass M
+  have hcall := configurationJustesenSubdivisionEdge_halts_and_agrees ntm c w seed
+  exact MembershipTally.retainedMachine_existsUnique_firstHalting
+    (justesenWeightedSubdivisionCallback ntm)
+    (fun ctx u v => justesenSubdivisionEdgeStart (ctx, u, v)) callbackVerdict 3
+    (tallyWalkInitial ntm c) (configurationJustesenSubdivisionContext ntm c w seed.val)
+    w adjacent source target radius (fun u v => (hcall u v).1) (fun u v => (hcall u v).2) hpass
 
 open NondeterministicQueryMachine in
 /-- A fixed selector list has exactly one accepting native occurrence list precisely when

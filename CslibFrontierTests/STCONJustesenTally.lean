@@ -45,6 +45,28 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     ⟨branch, ⟨rfl, hscan⟩, fun other h =>
       MembershipTally.selectors_injective _ (BoundedWalk.eq_of_selectors_prefix 3) h.1.symm⟩
 
+/-- The exact radius-zero totals give one successful selector list at any valid seed
+and endpoints. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let size := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin size.vertexCount),
+      let params : MembershipTally.Context :=
+        ⟨size.vertexCount, source.val, target.val, 0, ⟨1, 0⟩⟩
+      let base := configurationJustesenMembershipTally ntm c [] 0 ⟨0, 0, 0, 0, ⟨0, 0⟩⟩
+      let ctx := configurationJustesenSubdivisionContext ntm c w seed.val
+      let M := base.withInit (MembershipTally.retainedInitial ctx params)
+      ∃! bits, M.FirstHalting w bits M.init ∧
+        (MembershipTally.retainedReply (M.run w bits)).isSome := by
+  intro I size seed source target params base ctx M
+  dsimp only [M, base, ctx]
+  rw [configurationJustesenMembershipTally_withInit]
+  let adjacent := configurationJustesenSubdivisionAdjacent ntm c w seed
+  simpa only [expected_zero, params, adjacent] using
+    configurationJustesenMembershipTally_existsUnique_firstHalting ntm c w seed source target 0
+      (existsUnique_passes_zero (fun u v => adjacent u v = true) source)
+
 /-- A common polynomial clock and logarithmic state bound apply after re-entry at
 the radius and tally limits. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
