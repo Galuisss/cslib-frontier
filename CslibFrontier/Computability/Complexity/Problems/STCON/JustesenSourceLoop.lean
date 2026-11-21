@@ -36,8 +36,8 @@ membership tally at the designated target.
   first-halting selector list returning a verdict has one accepting native occurrence.
 * `Cslib.Complexity.STCON.configurationJustesenSourceLoop_correct`: a returned verdict
   gives the first nonunique radius or the correct subdivision reachability answer.
-* `Cslib.Complexity.STCON.configurationJustesenSourceLoop_exists_firstHalting`: a
-  full-fuel loop has a first-halting trace returning a verdict.
+* `Cslib.Complexity.STCON.configurationJustesenSourceLoop_existsUnique_firstHalting`:
+  a full-fuel loop has exactly one first-halting selector list returning a verdict.
 -/
 
 public section
@@ -344,8 +344,9 @@ theorem configurationJustesenSourceLoop_correct
     hscan
   cases verdict <;> exact hspec
 
-/-- Every valid full-fuel source scan has a complete first-halting trace with a verdict. -/
-theorem configurationJustesenSourceLoop_exists_firstHalting
+/-- Every valid full-fuel source scan has exactly one first-halting selector list
+that returns a verdict. -/
+theorem configurationJustesenSourceLoop_existsUnique_firstHalting
     (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) :
     let I := configurationInstance ntm c w
     let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
@@ -353,7 +354,7 @@ theorem configurationJustesenSourceLoop_exists_firstHalting
       let context : JustesenSourceContext :=
         ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
       let M := justesenSourceLoop ntm c context n
-      ∃ bits verdict, M.FirstHalting w bits M.init ∧ M.run w bits = .inr (some verdict) := by
+      ∃! bits, ∃ verdict, M.FirstHalting w bits M.init ∧ M.run w bits = .inr (some verdict) := by
   intro I n seed source target context M
   let edge := fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true
   let initial := SourceRoundLoop.start context n
@@ -368,30 +369,67 @@ theorem configurationJustesenSourceLoop_exists_firstHalting
       r = ⟨context, r.fuel, r.radius, expected edge source r.radius⟩ := by
     obtain ⟨hctx, _, _, htally, _⟩ := hr
     rw [← hctx, ← htally]
-  refine SourceRoundLoop.exists_successful_firstHalting initial round
-    justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply member
-    justesenSourceMembershipStart MembershipTally.retainedReply w P
-    (justesenSourceRoundExact_start context edge source) (fun _ hr => hr.2.2.1) ?_ ?_ ?_
-  · intro r hr _ bits update hfirst hreply hbad hcount
+  have hclosed : SourceRoundLoop.Closed round justesenRetainedSourceRoundEntry
+      justesenRetainedSourceRoundReply w P := by
+    intro r hr _ bits update hfirst hreply hbad hcount
     rw [← firstHalting_withInit, hinit r] at hfirst
     rw [← run_withInit, hinit r] at hreply
     exact configurationJustesenRetainedSourceRound_exact_advance ntm c w
       seed source target r hr bits update hfirst hreply hbad hcount
-  · intro r hr
-    have hpass := hr.2.2.2.2 r.radius le_rfl
-    obtain ⟨bits, ⟨update, hfirst, hreply⟩, _⟩ :=
-      configurationJustesenRetainedSourceRound_existsUnique_firstHalting ntm c w
-        seed source target r.fuel r.radius hpass
-    rw [← hnormalized r hr, ← hinit r, firstHalting_withInit] at hfirst
-    rw [← hnormalized r hr, ← hinit r, run_withInit] at hreply
-    exact ⟨bits, update, hfirst, hreply⟩
-  · intro r hr
-    have hpass := hr.2.2.2.2 r.radius le_rfl
-    obtain ⟨bits, ⟨hfirst, hsome⟩, _⟩ :=
-      justesenSourceMembership_existsUnique_firstHalting ntm c w
-        seed source target r.fuel r.radius hpass
-    obtain ⟨hit, hreply⟩ := Option.isSome_iff_exists.mp hsome
-    rw [← hnormalized r hr] at hfirst hreply
-    exact ⟨bits, hit, hfirst, hreply⟩
+  have hround (r : SourceRoundLoop.Registers JustesenSourceContext) (hr : P r) :
+      ∃! bits, ∃ update, round.FirstHalting w bits (justesenRetainedSourceRoundEntry r) ∧
+        justesenRetainedSourceRoundReply
+          (round.replay w bits (justesenRetainedSourceRoundEntry r)) = some update := by
+    have h := configurationJustesenRetainedSourceRound_existsUnique_firstHalting ntm c w
+      seed source target r.fuel r.radius (hr.2.2.2.2 r.radius le_rfl)
+    dsimp only at h
+    rw [← hnormalized r hr, ← hinit r] at h
+    simpa only [firstHalting_withInit, run_withInit, init_withInit] using h
+  have hmember (r : SourceRoundLoop.Registers JustesenSourceContext) (hr : P r) :
+      ∃! bits, member.FirstHalting w bits (justesenSourceMembershipStart r) ∧
+        (MembershipTally.retainedReply
+          (member.replay w bits (justesenSourceMembershipStart r))).isSome := by
+    have h := justesenSourceMembership_existsUnique_firstHalting ntm c w
+      seed source target r.fuel r.radius (hr.2.2.2.2 r.radius le_rfl)
+    dsimp only at h
+    rw [← hnormalized r hr] at h
+    exact h
+  have hp : P initial := justesenSourceRoundExact_start context edge source
+  obtain ⟨bits, verdict, hfirst, hreply⟩ := SourceRoundLoop.exists_successful_firstHalting
+    initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply member
+    justesenSourceMembershipStart MembershipTally.retainedReply w P hp (fun _ hr => hr.2.2.1)
+    hclosed (fun r hr => (hround r hr).exists) (fun r hr => by
+      obtain ⟨choices, hfirst, hsome⟩ := (hmember r hr).exists
+      obtain ⟨hit, hhit⟩ := Option.isSome_iff_exists.mp hsome
+      exact ⟨choices, hit, hfirst, hhit⟩)
+  have hunique := SourceRoundLoop.subsingleton_successful_firstHalting
+    initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply member
+    justesenSourceMembershipStart MembershipTally.retainedReply w P hp hclosed
+    (fun r hr _ _ hl _ hr' => by
+      obtain ⟨left, hleft⟩ := Option.isSome_iff_exists.mp hl.2
+      obtain ⟨right, hright⟩ := Option.isSome_iff_exists.mp hr'.2
+      exact (hround r hr).unique ⟨left, hl.1, hleft⟩ ⟨right, hr'.1, hright⟩)
+    (fun r hr _ _ hl _ hr' => (hmember r hr).unique hl hr')
+  refine ⟨bits, ⟨verdict, hfirst, hreply⟩, ?_⟩
+  rintro other ⟨result, hother, hret⟩
+  have haccept (choices : List Bool) (value : ControllerVerdict)
+      (hresult : M.run w choices = .inr (some value)) : M.accept (M.run w choices) = true := by
+    rw [hresult]
+    rfl
+  exact hunique ⟨hother, haccept other result hret⟩ ⟨hfirst, haccept bits verdict hreply⟩
+
+/-- Every valid full-fuel source scan has a complete first-halting trace with a verdict. -/
+theorem configurationJustesenSourceLoop_exists_firstHalting
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+    ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n),
+      let context : JustesenSourceContext :=
+        ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+      let M := justesenSourceLoop ntm c context n
+      ∃ bits verdict, M.FirstHalting w bits M.init ∧ M.run w bits = .inr (some verdict) := by
+  intro I n seed source target
+  exact (configurationJustesenSourceLoop_existsUnique_firstHalting
+    ntm c w seed source target).exists
 
 end Cslib.Complexity.STCON
