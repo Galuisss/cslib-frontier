@@ -13,6 +13,7 @@ import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProduct
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.AlgebraicValueBounds
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.BranchCutoff
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
+import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomial
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalMinimumValue
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalRootFeasibility
 import CslibFrontier.Foundations.Analysis.SignLabelScore
@@ -510,6 +511,29 @@ example :
     intro h
     have hsign := hneg.mp h (0 : Fin 1)
     norm_num [s] at hsign
+  exact ⟨hmatch.resolve_right (by linarith), hmiss.resolve_left (by linarith)⟩
+
+-- Clearing the denominators gives an integer polynomial that distinguishes the two targets.
+example :
+    let g : Fin 1 → Polynomial ℤ := fun _ => Polynomial.X
+    let y (t : SignType) :=
+      (Polynomial.signLabelPolynomial 1 g (fun _ => t)).eval₂ (Int.castRingHom ℝ) (-(3 / 4))
+    (1 : ℝ) / 2 ≤ y (-1) ∧ y 1 ≤ -(1 : ℝ) / 2 := by
+  intro g y
+  let x : ℝ := -(3 / 4)
+  have hx : x < 0 := by norm_num [x]
+  have hb (i : Fin 1) :
+      let v := (g i).eval₂ (Int.castRingHom ℝ) x
+      v = 0 ∨ (((2 : ℝ) ^ 1)⁻¹ ≤ |v| ∧ |v| ≤ (2 : ℝ) ^ 1) := by
+    norm_num [g, x]
+  obtain ⟨hmatch, hpos⟩ := Polynomial.eval₂_signLabelPolynomial_margin 1 g (fun _ => -1) x hb
+  obtain ⟨hmiss, hneg⟩ := Polynomial.eval₂_signLabelPolynomial_margin 1 g (fun _ => 1) x hb
+  have h₁ : 0 < y (-1) := hpos.mpr fun i => by
+    simp only [g, Polynomial.eval₂_X, sign_neg hx]
+  have h₂ : ¬ 0 < y 1 := by
+    intro h
+    have hsign := hneg.mp h (0 : Fin 1)
+    simp [g, sign_neg hx] at hsign
   exact ⟨hmatch.resolve_right (by linarith), hmiss.resolve_left (by linarith)⟩
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
