@@ -45,11 +45,13 @@ private theorem step_dispatch (input : List Bool) (choice : Bool) (s : σ ⊕ τ
 theorem replay_dispatch (input bits : List Bool) (s : σ ⊕ τ) :
     (left.dispatch right).replay input bits s =
       s.map (left.replay input bits) (right.replay input bits) := by
-  induction bits generalizing s with
-  | nil => cases s <;> rfl
-  | cons choice bits ih =>
-    rw [replay_cons, step_dispatch, ih]
-    cases s <;> rfl
+  cases s with
+  | inl q =>
+    exact List.foldl_hom Sum.inl fun state choice =>
+      step_dispatch left right input choice (.inl state)
+  | inr q =>
+    exact List.foldl_hom Sum.inr fun state choice =>
+      step_dispatch left right input choice (.inr state)
 
 /-- The left-tagged dispatch first halts on precisely the left callback's first-halting lists. -/
 theorem firstHalting_dispatch_inl (input bits : List Bool) (s : σ) :
