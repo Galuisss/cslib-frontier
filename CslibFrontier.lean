@@ -6958,6 +6958,7 @@ public import CslibFrontier.Foundations.LinearAlgebra.Matrix.CoinStep
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Copositive
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.CutRank
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Derivation
+public import CslibFrontier.Foundations.LinearAlgebra.Matrix.DeterminantWeight
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.EndpointIncidence
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.EuclideanOpNorm
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Farkas
@@ -7205,6 +7206,7 @@ public import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.Residu
 public import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.Specialization
 public import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.Trace
 public import CslibFrontier.Foundations.RingTheory.Polynomial.Hermite
+public import CslibFrontier.Foundations.RingTheory.Polynomial.ResultantCoeffNorm
 public import CslibFrontier.Foundations.RingTheory.PowerSeries.Constants
 public import CslibFrontier.Foundations.RingTheory.RootsOfUnity.Principal
 public import CslibFrontier.Foundations.RingTheory.Trace.Reproducing
