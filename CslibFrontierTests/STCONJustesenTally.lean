@@ -432,4 +432,32 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   · rintro other ⟨result, hfirst', hreply', _, _⟩
     exact hunique other ⟨result, hfirst', hreply'⟩
 
+-- Use the shared clock for the actual round and check both callback tags at the loop caps.
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    ∃ C, ∀ w : List Bool,
+      let I := configurationInstance ntm c w
+      let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+      ∀ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source target : Fin n),
+        let adjacency := configurationJustesenSubdivisionContext ntm c w seed.val
+        let ctx : SourceRound.Context := ⟨n, source.val, n, ⟨1 + n * n, n * n * n⟩⟩
+        let N := justesenRoundCallback ntm c
+        let start := justesenRoundCallbackStart adjacency
+        let clock := configurationJustesenRoundCallbackClock ntm c w
+        (SourceRound.machine ctx N start justesenRoundCallbackReply).HaltsWithin w
+            (SourceRound.roundClock n clock) ∧
+          ∀ bits, (encJustesenRoundCallbackState
+              (N.replay w bits (start ctx (.edge source.val target.val)))).length ≤
+                C * (Nat.log2 w.length + 1) ∧
+            (encJustesenRoundCallbackState
+              (N.replay w bits (start ctx (.member target.val)))).length ≤
+                C * (Nat.log2 w.length + 1) := by
+  obtain ⟨C, h⟩ := configurationJustesenRoundCallback_bounds ntm c
+  refine ⟨C, fun w => ?_⟩
+  intro I n seed source target adjacency ctx N start clock
+  have hc := h w seed source n ⟨1 + n * n, n * n * n⟩ le_rfl le_rfl le_rfl
+  exact ⟨SourceRound.haltsWithin ctx N start justesenRoundCallbackReply w clock
+      (fun req hr => (hc req hr).1), fun bits =>
+    ⟨(hc (.edge source.val target.val) ⟨source.isLt, target.isLt⟩).2 bits,
+      (hc (.member target.val) target.isLt).2 bits⟩⟩
+
 end CslibFrontierTests.STCONJustesenTally
