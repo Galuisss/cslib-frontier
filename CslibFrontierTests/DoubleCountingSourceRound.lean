@@ -8,6 +8,7 @@ module
 -- upstream: local-only (test driver)
 
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.SourceRound
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.BranchReplay
 
 /-! Checked scalar traces for the source controller's tie and rejection results. -/
 
@@ -117,5 +118,42 @@ example :
       (encOption Turing.DoubleCounting.encRoundUpdate)
       (fun q => (encMachineState (Option Bool) (encOption encBool) q).length) :=
   answer_inSpace _
+
+private def allMembers (_ : Context) (_ : Request) : Option Bool := some true
+
+private theorem nativeRoutines :
+    Nonempty (NondeterministicQueryMachine.Routines (machine context reply allMembers id)
+      (fun _ : Bool => entry context) encBool (fun _ => 1)) := by
+  open ComputableInSpace in
+  refine exists_routines encBool (encOption encBool) context reply allMembers id
+    (fun _ => context) (fun _ => 1) ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+  · exact constZero context |>.mono_le (fun _ => by decide)
+  · intro b
+    cases b <;> decide
+  · exact (budget_const (some true) (.refl _)).of_enc_eq fun _ => rfl
+  · exact of_inO (ComputableInDegree.id' (enc := encOption encBool)).inO_one
+  · exact (budget_const 0 (.refl _)).of_enc_eq fun _ => rfl
+  · exact (budget_const true (.refl _)).of_enc_eq fun _ => rfl
+  · exact (fst (encOption encBool) (encPair (encOption encBool) encBool)).of_enc_eq fun _ => rfl
+  · refine ⟨2 * (6 * (encContext context).length + 129) + 4, fun a bits => ?_⟩
+    rw [Nat.mul_one]
+    apply length_encMachineState_run_le (D := 2)
+    intro req selectors
+    cases h : reply.replay (encBool a) selectors (allMembers context req) with
+    | none => decide
+    | some value => cases value <;> decide
+
+open NondeterministicQueryMachine in
+/-- Three passing membership calls give exactly one native occurrence list for their selectors. -/
+example : ∃ R : Routines (machine context reply allMembers id)
+    (fun _ : Bool => entry context) encBool (fun _ => 1),
+    ∃! indices, ∃ final, Native.replayChoices R.I R.P R.F R.C
+      (R.machine.initCfg (encBool true)) indices = some (List.replicate 6 false, final) ∧
+      final.Halted := by
+  obtain ⟨R⟩ := nativeRoutines
+  refine ⟨R, (R.existsUnique_replay_iff true _).mpr ⟨by decide +kernel, ?_⟩⟩
+  intro n hn
+  simp only [List.length_replicate] at hn
+  interval_cases n <;> decide +kernel
 
 end CslibFrontierTests.DoubleCountingSourceRound

@@ -282,7 +282,8 @@ theorem advance_inSpace : ComputableInSpace (fun p : State × Option Bool => adv
   | some hit => cases hp : q.memberPhase <;> cases hit <;>
       simp [advance, observe, predecessorStep, hp, pure, bind, Except.pure, Except.bind]
 
-private theorem halted_inSpace : ComputableInSpace halted encState encBool
+/-- Test the rejection bit or completion of the binary predecessor cursor. -/
+theorem halted_inSpace : ComputableInSpace halted encState encBool
     (fun q => (encState q).length) := by
   have hid := of_inO (ComputableInDegree.id' (enc := encState)).inO_one
   have hi := encState_cursor_budget hid

@@ -8,7 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.DoubleCounting.Predecessor
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Routines
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.FunPropFinite
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.NatLength
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
@@ -204,6 +204,74 @@ theorem machine_withInit {τ : Type} (ctx next : Context) (N : NondeterministicQ
     (machine ctx N start finish).withInit (entry next) = machine next N start finish :=
   rfl
 
+private theorem reject_inSpace :
+    ComputableInSpace (fun q => advance q none) encState encState
+      (fun q => (encState q).length) := by
+  have hid := of_inO (ComputableInDegree.id' (enc := encState)).inO_one
+  exact (encState_mk_budget (encState_context_budget hid) (encState_cursor_budget hid)
+    (encState_update_budget hid) (encState_predecessor_budget hid)
+    (budget_const true (.refl _))).of_enc_eq fun _ => rfl
+
+private theorem advance_withoutPredecessor_inSpace :
+    ComputableInSpace
+      (fun (p : State × Bool) => advance { p.1 with predecessor := none } (some p.2))
+      (encPair encState encBool) encState (fun p => (encPair encState encBool p).length) := by
+  have hq := fst encState encBool
+  have hb := snd encState encBool
+  have hc := encState_context_budget hq
+  have hi := encState_cursor_budget hq
+  have hu := encState_update_budget hq
+  have hr := encState_rejected_budget hq
+  have one := budget_const (encIn := encPair encState encBool) (encB := encNat) 1 (.refl _)
+  have hpc := Predecessor.encContext_mk_budget (encContext_size_budget hc)
+    (encContext_source_budget hc) hi (encContext_radius_budget hc) (encContext_expected_budget hc)
+  have hp := budget_optionSome (budget_comp_linear Predecessor.initial_inSpace hpc)
+  have hnext := encState_mk_budget hc (budget_natAdd hi one) hu (budget_const none (.refl _)) hr
+  exact (budget_ite hb hnext (encState_mk_budget hc hi hu hp hr)).of_enc_eq fun ⟨q, b⟩ => by
+    cases b <;> rfl
+
+private theorem advance_withPredecessor_inSpace :
+    ComputableInSpace
+      (fun (p : (State × Bool) × Predecessor.State) =>
+        advance { p.1.1 with predecessor := some p.2 } (some p.1.2))
+      (encPair (encPair encState encBool) Predecessor.encState) encState
+      (fun p => (encPair (encPair encState encBool) Predecessor.encState p).length) := by
+  let encIn := encPair (encPair encState encBool) Predecessor.encState
+  have hargs := fst (encPair encState encBool) Predecessor.encState
+  have hp := snd (encPair encState encBool) Predecessor.encState
+  have hnext := budget_comp_linear Predecessor.advance_inSpace
+    (budget_prod hp (budget_optionSome hargs.snd'))
+  have hc := encState_context_budget hargs.fst'
+  have hi := encState_cursor_budget hargs.fst'
+  have hu := encState_update_budget hargs.fst'
+  have hr := encState_rejected_budget hargs.fst'
+  have one := budget_const (encIn := encIn) (encB := encNat) 1 (.refl _)
+  have hupdate := budget_comp_linear addVertex_inSpace
+    (budget_prod hu (budget_prod (encContext_radius_budget hc)
+      (Predecessor.encState_count_budget hnext)))
+  have hdone := encState_mk_budget hc (budget_natAdd hi one) hupdate
+    (budget_const none (.refl _)) hr
+  have hpending := encState_mk_budget hc hi hu (budget_optionSome hnext) hr
+  refine (budget_ite (budget_comp_linear Predecessor.halted_inSpace hnext)
+    hdone hpending).of_enc_eq ?_
+  rintro ⟨⟨q, hit⟩, p⟩
+  simp only [advance]
+
+/-- Resume the round using the optional reply, updating only its binary scalar registers. -/
+theorem advance_inSpace :
+    ComputableInSpace (fun p : State × Option Bool => advance p.1 p.2)
+      (encPair encState (encOption encBool)) encState
+      (fun p => (encPair encState (encOption encBool) p).length) := by
+  have hid := of_inO (ComputableInDegree.id' (enc := encPair encState encBool)).inO_one
+  have hq := fst encState encBool
+  have hsome := budget_comp_linear
+    (optionElimSnd advance_withoutPredecessor_inSpace advance_withPredecessor_inSpace)
+    (budget_prod hid (encState_predecessor_budget hq))
+  refine (optionElimSnd reject_inSpace hsome).of_enc_eq ?_
+  rintro ⟨⟨ctx, cursor, update, p, rejected⟩, _ | b⟩
+  · rfl
+  · cases p <;> rfl
+
 /-- Re-enter a fixed round controller using only the supplied binary context. -/
 theorem entry_inSpace {τ : Type} (encT : τ ↪ List Bool) :
     ComputableInSpace (entry (τ := τ)) encContext (encMachineState τ encT)
@@ -261,6 +329,78 @@ theorem answer_inSpace {τ : Type} (encT : τ ↪ List Bool) :
   have hc := encMachineState_controller_budget τ encT hid
   exact (budget_ite (encState_rejected_budget hc) (budget_const none (.refl _))
     (budget_optionSome (encState_update_budget hc))).of_enc_eq fun _ => rfl
+
+/-- Input bit and binary selector passed to a native callback step. -/
+abbrev encReadChoice := encPair (encOption encBool) encBool
+
+/-- Advance the suspended caller or the active callee in linear space in their joint encoding. -/
+theorem machine_next_inSpace {τ : Type} (encT : τ ↪ List Bool)
+    (ctx : Context) (N : NondeterministicQueryMachine τ)
+    (start : Context → Request → τ) (finish : τ → Option Bool)
+    (hs : ComputableInSpace (fun q : State => start q.context (request q)) encState encT
+      (fun q => (encState q).length))
+    (hf : ComputableInSpace finish encT (encOption encBool) (fun t => (encT t).length))
+    (hh : ComputableInSpace N.halted encT encBool (fun t => (encT t).length))
+    (hn : ComputableInSpace N.next (encPair encT encReadChoice) encT
+      (fun p => (encPair encT encReadChoice p).length)) :
+    ComputableInSpace (machine ctx N start finish).next
+      (encPair (encMachineState τ encT) encReadChoice) (encMachineState τ encT)
+      (fun p => (encPair (encMachineState τ encT) encReadChoice p).length) := by
+  let encCaller := encPair encState encReadChoice
+  have hcaller := fst encState encReadChoice
+  have hchoice := snd' (snd encState encReadChoice)
+  have henter := encMachineState_mk_budget τ encT hcaller
+    (budget_optionSome (budget_comp_linear hs hcaller))
+  have hreject := encMachineState_mk_budget τ encT (budget_comp_linear reject_inSpace hcaller)
+    (budget_const none (.refl _))
+  have hbetween := budget_ite hchoice hreject henter
+  have hframe := fst encCaller encT
+  have hcallee := snd encCaller encT
+  have hcontroller := fst' hframe
+  have hreadChoice := snd' hframe
+  have hreturn := budget_comp_linear advance_inSpace
+    (budget_prod hcontroller (budget_comp_linear hf hcallee))
+  have hreturned := encMachineState_mk_budget τ encT hreturn (budget_const none (.refl _))
+  have hcontinue := encMachineState_mk_budget τ encT hcontroller
+    (budget_optionSome (budget_comp_linear hn (budget_prod hcallee hreadChoice)))
+  have hactive := budget_ite (budget_comp_linear hh hcallee)
+    (budget_ite (snd' hreadChoice) (budget_comp_linear hreject hframe) hreturned) hcontinue
+  have hmachine := fst (encMachineState τ encT) encReadChoice
+  have hpair := budget_prod
+    (budget_prod (encMachineState_controller_budget τ encT hmachine)
+      (snd (encMachineState τ encT) encReadChoice))
+    (encMachineState_callee_budget τ encT hmachine)
+  refine (budget_comp_linear (optionElimSnd hbetween hactive) hpair).of_enc_eq ?_
+  rintro ⟨⟨q, _ | t⟩, read, choice⟩
+  · cases choice <;> rfl
+  · cases choice <;> cases N.halted t <;> rfl
+
+open NondeterministicQueryMachine in
+/-- Compile one round with a supplied input-dependent initializer and native same-input callbacks.
+The state budget must cover all selector prefixes, including those on rejecting branches. -/
+theorem exists_routines {α τ : Type} (enc : α ↪ List Bool) (encT : τ ↪ List Bool)
+    (ctx : Context) (N : NondeterministicQueryMachine τ)
+    (start : Context → Request → τ) (finish : τ → Option Bool)
+    (contextOf : α → Context) (S : α → ℕ)
+    (hinit : ComputableInSpace contextOf enc encContext S)
+    (hlog : ∀ a, Nat.log2 (enc a).length + 1 ≤ S a)
+    (hs : ComputableInSpace (fun q : State => start q.context (request q)) encState encT
+      (fun q => (encState q).length))
+    (hf : ComputableInSpace finish encT (encOption encBool) (fun t => (encT t).length))
+    (hq : ComputableInSpace N.query encT encNat (fun t => (encT t).length))
+    (hh : ComputableInSpace N.halted encT encBool (fun t => (encT t).length))
+    (hn : ComputableInSpace N.next (encPair encT encReadChoice) encT
+      (fun p => (encPair encT encReadChoice p).length))
+    (hstates : ∃ c, ∀ a bits, (encMachineState τ encT
+      ((machine (contextOf a) N start finish).run (enc a) bits)).length ≤ c * S a) :
+    Nonempty (Routines (machine ctx N start finish) (fun a => entry (contextOf a)) enc S) := by
+  obtain ⟨c, hstates⟩ := hstates
+  refine (machine ctx N start finish).exists_routines (machine_query_inSpace encT _ _ _ _ hq)
+    (machine_next_inSpace encT _ _ _ _ hs hf hh hn) (machine_halted_inSpace encT _ _ _ _)
+    (machine_accept_inSpace encT _ _ _ _) _ S hlog (budget_comp_linear (entry_inSpace encT) hinit)
+    ⟨c, fun a bits => ?_⟩
+  rw [machine_withInit]
+  exact hstates a bits
 
 private theorem replay_callee {τ : Type} (ctx : Context)
     (N : NondeterministicQueryMachine τ) (start : Context → Request → τ) (finish : τ → Option Bool)
