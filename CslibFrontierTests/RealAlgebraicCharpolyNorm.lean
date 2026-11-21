@@ -6,6 +6,7 @@ Authors: Erik Demaine
 module
 -- upstream: local-only (tests)
 
+public import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ParameterExclusion
 public import CslibFrontier.Foundations.LinearAlgebra.Matrix.Charpoly.CoeffNorm
 public import CslibFrontier.Foundations.RingTheory.MvPolynomial.PurePower.CharpolyCoeffNorm
 public import CslibFrontier.Foundations.RingTheory.Polynomial.ResultantCoeffNorm
@@ -63,5 +64,23 @@ private theorem quadraticValueSection : (quadratic.eval (C (-2))).coeffNorm1 ≤
 private theorem quadraticDerivativeResultant :
     (quadratic.resultant quadratic.derivative).coeffNorm1 ≤ 6144 :=
   coeffNorm1_resultant_derivative_le quadratic quadratic_degree quadratic_norm
+
+/-- The computed cutoff and parameter avoid both polynomials for `Y + U`. -/
+theorem linearParameterExclusion :
+    let P : Polynomial (Polynomial ℤ) := X + C X
+    let u : ℝ := 2 ^ parameterExclusionExponent 1 1
+    (P.eval (C 4)).eval₂ (Int.castRingHom ℝ) u ≠ 0 ∧
+      (P.resultant P.derivative).eval₂ (Int.castRingHom ℝ) u ≠ 0 := by
+  intro P u
+  have hp : P ≠ 0 := X_add_C_ne_zero _
+  have hres : P.resultant P.derivative ≠ 0 := by simp [P]
+  have hd : P.natDegree ≤ 1 := (natDegree_add_le _ _).trans (by simp)
+  have hX : (X : Polynomial (Polynomial ℤ)).bivariateCoeffNorm1 ≤ 1 := by
+    simpa only [one_mul, pow_one, bivariateCoeffNorm1_one] using
+      bivariateCoeffNorm1_mul_X_pow_le (1 : Polynomial (Polynomial ℤ)) 1
+  have hC : (C (X : ℤ[X])).bivariateCoeffNorm1 = 1 :=
+    (bivariateCoeffNorm1_C _).trans coeffNorm1_parameter
+  exact eval₂_ne_zero_at_parameterExclusion hp hres hd
+    ((bivariateCoeffNorm1_add_le _ _).trans (Nat.add_le_add hX hC.le))
 
 end CslibFrontierTests.RealAlgebraicCharpolyNorm
