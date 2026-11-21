@@ -40,7 +40,7 @@ example :
     [] [false] Cslib.DoubleCounting.Scan.Result.zero false rfl rfl).1
 
 -- The same choices reject when the expected count is one.
-example : run 1 [false, false] = .inr (.inr none) := rfl
+example : reply (run 1 [false, false]) = none := rfl
 
 -- A selected walk returns through one deterministic boundary step.
 example : run 1 [true, false, false] = .inr (.inr (some true)) := rfl
@@ -106,13 +106,27 @@ private theorem negativeBranch_unique (other : Scan.Branch 2)
   selectors_injective _ (Turing.DoubleCounting.BoundedWalk.eq_of_selectors_prefix 0) h.symm
 
 -- A checked zero-step walk is selected, but the queried vertex is skipped.
-example :
+private theorem negativeReplay :
     let M := withBoundedWalk edge start verdict 0 0 negativeContext
     M.FirstHalting [] negativeSelectors M.init ∧
       M.run [] negativeSelectors = .inr (.inr (some false)) :=
   (withBoundedWalk_firstHalting_iff edge start verdict 0 0 []
     adjacent 0 1 0 ⟨1, 0⟩ negativeSelectors false (fun _ _ => rfl) (fun _ _ => rfl)).mpr
     ⟨negativeBranch, ⟨rfl, negativeScan⟩, fun other h => negativeBranch_unique other h.1⟩
+
+/-- A caller can re-enter the same tally and read the passing negative result. -/
+example :
+    let M := withBoundedWalk edge start verdict 0 0
+      { negativeContext with expected := ⟨0, 0⟩ }
+    reply (M.replay [] negativeSelectors (initial negativeContext)) = some false := by
+  dsimp only
+  rw [← run_withInit, withBoundedWalk_withInit, reply_eq_some_iff]
+  exact negativeReplay.2
+
+example :
+    let E := encState (Turing.DoubleCounting.BoundedWalk.encState (N := 2) encUnit)
+    ComputableInSpace reply E (encOption encBool) (fun s => (E s).length) :=
+  reply_inSpace _
 
 private def budget (input : List Bool) : ℕ :=
   Nat.log2 input.length + boundedWalkStateBound 2 0 negativeContext 0 + 1

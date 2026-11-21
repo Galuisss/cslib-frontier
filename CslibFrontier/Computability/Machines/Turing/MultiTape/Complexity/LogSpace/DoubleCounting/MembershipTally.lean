@@ -145,6 +145,17 @@ private theorem record_inSpace :
     exact encRegisters_mk_budget hc (budget_natSucc hi)
       (encResult_mk_budget (encTally_mk_budget hcount hsum) hhit)
 
+/-- Read the membership bit from a successful tally. A rejected tally or a live state
+has no result. -/
+@[expose] def reply {τ : Type} : State τ → Option Bool
+  | .inr (.inr result) => result
+  | _ => none
+
+/-- A successful reply identifies the terminal state and preserves its membership bit. -/
+theorem reply_eq_some_iff {τ : Type} (s : State τ) (hit : Bool) :
+    reply s = some hit ↔ s = .inr (.inr (some hit)) := by
+  rcases s with r | (pending | result) <;> simp [reply]
+
 /-- Select candidates and call the supplied walk on the original input. At return and at the
 terminal check only the false choice can succeed. A successful negative reply accepts as a
 callback occurrence and carries the terminal value `some false`. -/
@@ -172,9 +183,7 @@ callback occurrence and carries the terminal value `some false`. -/
   halted
     | .inr (.inr _) => true
     | _ => false
-  accept
-    | .inr (.inr hit) => hit.isSome
-    | _ => false
+  accept s := (reply s).isSome
 
 /-- Initialize the empty tally in workspace linear in the encoded query parameters. -/
 theorem initial_inSpace {τ : Type} (encT : τ ↪ List Bool) :
@@ -212,16 +221,23 @@ theorem halted_inSpace {τ : Type} (encT : τ ↪ List Bool) (ctx : Context)
   exact (sumElim hs (sumElim hw hf)).of_enc_eq fun
     | .inl _ | .inr (.inl _) | .inr (.inr _) => rfl
 
+/-- Decode the optional terminal membership bit in linear workspace. -/
+theorem reply_inSpace {τ : Type} (encT : τ ↪ List Bool) :
+    ComputableInSpace reply (encState encT) (encOption encBool)
+      (fun s => (encState encT s).length) := by
+  have hs := budget_const (encIn := encRegisters) (encB := encOption encBool) none (.refl _)
+  have hw := budget_const (encIn := encPair encRegisters encT) (encB := encOption encBool)
+    none (.refl _)
+  have hf := budget_id (enc := encOption encBool) (.refl _)
+  exact (sumElim hs (sumElim hw hf)).of_enc_eq fun
+    | .inl _ | .inr (.inl _) | .inr (.inr _) => rfl
+
 /-- Acceptance is the presence of a membership bit at the terminal boundary. -/
 theorem accept_inSpace {τ : Type} (encT : τ ↪ List Bool) (ctx : Context)
     (walk : NondeterministicQueryMachine τ) (enter : Registers → τ) (result : τ → Option ℕ) :
     ComputableInSpace (machine ctx walk enter result).accept (encState encT) encBool
-      (fun s => (encState encT s).length) := by
-  have hs := budget_const (encIn := encRegisters) (encB := encBool) false (.refl _)
-  have hw := budget_const (encIn := encPair encRegisters encT) (encB := encBool) false (.refl _)
-  have hf := budget_optionIsSome (budget_id (enc := encOption encBool) (.refl _))
-  exact (sumElim hs (sumElim hw hf)).of_enc_eq fun
-    | .inl _ | .inr (.inl _) | .inr (.inr _) => rfl
+      (fun s => (encState encT s).length) :=
+  budget_optionIsSome (reply_inSpace encT)
 
 /-- Stepping a tally uses native linear workspace in its encoded state and supplied read and
 choice, given linear-space walk entry, step, halt, and result operations. -/
@@ -914,6 +930,13 @@ def withBoundedWalk (ctx : Context) :
     NondeterministicQueryMachine (State (BoundedWalk.State N τ)) :=
   machine ctx W enterWalk BoundedWalk.remainingFuel
 
+/-- Changing the query parameters at entry leaves all tally transitions unchanged. -/
+theorem withBoundedWalk_withInit (ctx newContext : Context) :
+    (withBoundedWalk edge start verdict clock fallback ctx).withInit (initial newContext) =
+      withBoundedWalk edge start verdict clock fallback newContext := by
+  unfold withBoundedWalk NondeterministicQueryMachine.withInit
+  rfl
+
 private theorem boundedWalk_replay (input : List Bool)
     (adjacent : Fin N → Fin N → Bool) (source target v : Fin N)
     (radius : ℕ) (expected : Tally) (acc : Scan.Result) (bits : List Bool) (left : ℕ)
@@ -1025,6 +1048,42 @@ private theorem enterWalk_inSpace (encCallee : τ ↪ List Bool) :
     (encContext_radius_budget hc)
   exact BoundedWalk.init_budget edge start verdict clock hregisters
 
+/-- Query the original input at the active bounded-walk position. -/
+theorem withBoundedWalk_query_inSpace (ctx : Context) (encCallee : τ ↪ List Bool)
+    (hq : ComputableInSpace edge.query encCallee encNat (fun s => (encCallee s).length)) :
+    ComputableInSpace (withBoundedWalk edge start verdict clock fallback ctx).query
+      (encState (BoundedWalk.encState encCallee)) encNat
+      (fun s => (encState (BoundedWalk.encState encCallee) s).length) :=
+  query_inSpace _ ctx W enterWalk _ (BoundedWalk.query_inSpace edge start verdict clock
+    ⟨fallback, fallback, 0⟩ encCallee hq)
+
+/-- Detect a terminal tally, including a rejected one, in linear workspace. -/
+theorem withBoundedWalk_halted_inSpace (ctx : Context) (encCallee : τ ↪ List Bool) :
+    ComputableInSpace (withBoundedWalk edge start verdict clock fallback ctx).halted
+      (encState (BoundedWalk.encState encCallee)) encBool
+      (fun s => (encState (BoundedWalk.encState encCallee) s).length) :=
+  halted_inSpace _ ctx W enterWalk _
+
+/-- Step the composed tally in linear workspace, using the supplied adjacency certificates. -/
+theorem withBoundedWalk_next_inSpace (ctx : Context) (encCallee : τ ↪ List Bool)
+    (hstart : ComputableInSpace (fun p : Fin N × Fin N => start p.1 p.2)
+      (encPair (Fin.valEmbedding.trans encNat) (Fin.valEmbedding.trans encNat)) encCallee
+      (fun p => (encPair (Fin.valEmbedding.trans encNat) (Fin.valEmbedding.trans encNat) p).length))
+    (hn : ComputableInSpace edge.next (QueryMachine.encStateRead encCallee) encCallee
+      (fun p => (QueryMachine.encStateRead encCallee p).length))
+    (hh : ComputableInSpace edge.halted encCallee encBool (fun s => (encCallee s).length))
+    (hv : ComputableInSpace verdict encCallee encBool (fun s => (encCallee s).length)) :
+    let E := encState (BoundedWalk.encState (N := N) encCallee)
+    let encStep := encPair E (encPair (encOption encBool) encBool)
+    ComputableInSpace (withBoundedWalk edge start verdict clock fallback ctx).next encStep E
+      (fun p => (encStep p).length) :=
+  next_inSpace _ ctx W enterWalk _
+    (enterWalk_inSpace edge start verdict clock fallback encCallee)
+    (BoundedWalk.next_inSpace edge start verdict clock ⟨fallback, fallback, 0⟩ encCallee
+      hstart hn hh hv)
+    (BoundedWalk.halted_inSpace edge start verdict clock ⟨fallback, fallback, 0⟩ encCallee)
+    (BoundedWalk.remainingFuel_inSpace encCallee)
+
 open NondeterministicQueryMachine in
 /-- Compile a tally for fixed graph dimension and adjacency clock. The query parameters come
 from the original input. The space budget covers all tally, walk and adjacency branches. -/
@@ -1048,25 +1107,13 @@ theorem withBoundedWalk_exists_routines {α : Type} (enc : α ↪ List Bool) (S 
       (fun a => initial (context a)) enc S) := by
   let E := BoundedWalk.encState (N := N) encCallee
   have hinit := budget_comp_linear (initial_inSpace E) hcontext
-  have hqw := BoundedWalk.query_inSpace edge start verdict clock
-    ⟨fallback, fallback, 0⟩ encCallee hq
-  have hnw := BoundedWalk.next_inSpace edge start verdict clock
-    ⟨fallback, fallback, 0⟩ encCallee hstart hn hh hv
-  have hhw := BoundedWalk.halted_inSpace edge start verdict clock
-    ⟨fallback, fallback, 0⟩ encCallee
-  have hresult := BoundedWalk.remainingFuel_inSpace (N := N) encCallee
-  have he := enterWalk_inSpace edge start verdict clock fallback encCallee
   refine (withBoundedWalk edge start verdict clock fallback ctx).exists_routines
-    (query_inSpace E ctx W enterWalk _ hqw)
-    (next_inSpace E ctx W enterWalk _ he hnw hhw hresult)
-    (halted_inSpace E ctx W enterWalk _)
+    (withBoundedWalk_query_inSpace edge start verdict clock fallback ctx encCallee hq)
+    (withBoundedWalk_next_inSpace edge start verdict clock fallback ctx encCallee hstart hn hh hv)
+    (withBoundedWalk_halted_inSpace edge start verdict clock fallback ctx encCallee)
     (accept_inSpace E ctx W enterWalk _) _ S hlog hinit ⟨1, ?_⟩
   intro a bits
-  have hM : (withBoundedWalk edge start verdict clock fallback ctx).withInit
-      (initial (context a)) = withBoundedWalk edge start verdict clock fallback (context a) := by
-    unfold withBoundedWalk NondeterministicQueryMachine.withInit
-    rfl
-  rw [hM, Nat.one_mul]
+  rw [withBoundedWalk_withInit, Nat.one_mul]
   exact (withBoundedWalk_length_run_le edge start verdict clock fallback encCallee
     (context a) (enc a) (calleeBound a) (hcallee a) bits).trans (hstate a)
 
@@ -1092,9 +1139,7 @@ theorem withBoundedWalk_native_firstHalting_iff {α : Type} {enc : α ↪ List B
   have hM : M.withInit startState = withBoundedWalk edge start verdict clock fallback
       ⟨N, source.val, target.val, radius, expected⟩ := by
     dsimp only [M, startState]
-    rw [hcontext]
-    unfold withBoundedWalk NondeterministicQueryMachine.withInit
-    rfl
+    rw [withBoundedWalk_withInit, hcontext]
   have hspec (hit : Bool) :=
     withBoundedWalk_firstHalting_iff edge start verdict clock fallback (enc a) adjacent
       source target radius expected bits hit hclock hedge
@@ -1106,7 +1151,8 @@ theorem withBoundedWalk_native_firstHalting_iff {α : Type} {enc : α ↪ List B
     simpa only [← hM, init_withInit, firstHalting_withInit, run_withInit] using hspec hit
   have accept_iff (s : State (BoundedWalk.State N τ)) :
       M.accept s = true ↔ ∃ hit, s = .inr (.inr (some hit)) := by
-    rcases s with r | (pending | (hit | _)) <;> simp [M, withBoundedWalk, machine]
+    change (reply s).isSome = true ↔ _
+    simp only [Option.isSome_iff_exists, reply_eq_some_iff]
   constructor
   · rintro ⟨_, ⟨final, hreplay, hhalt, hout⟩, _⟩
     obtain ⟨hfirst, houtput⟩ := R.replay_correct a hreplay hhalt
