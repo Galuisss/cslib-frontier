@@ -50,6 +50,30 @@ theorem withRejectingChoice_replay_false (M : QueryMachine σ) (input : List Boo
       NondeterministicQueryMachine.replay_cons, NondeterministicQueryMachine.replay_nil,
       step_false, runFrom_succ]
 
+/-- An arbitrary selector replay either rejects or reaches the deterministic state at the
+same clock. Selectors after the deterministic halt leave the state fixed. -/
+theorem withRejectingChoice_replay_eq_none_or_runFrom (M : QueryMachine σ) (input : List Bool)
+    (s : σ) (bits : List Bool) :
+    M.withRejectingChoice.replay input bits (some s) = none ∨
+      M.withRejectingChoice.replay input bits (some s) = some (M.runFrom input s bits.length) := by
+  induction bits using List.reverseRecOn with
+  | nil => exact Or.inr rfl
+  | append_singleton pre choice ih =>
+    rw [NondeterministicQueryMachine.replay_append, NondeterministicQueryMachine.replay_cons,
+      NondeterministicQueryMachine.replay_nil, List.length_append, List.length_singleton,
+      runFrom_succ]
+    rcases ih with hreject | hrun
+    · rw [hreject]
+      exact Or.inl (M.withRejectingChoice.step_of_halted input (s := none) rfl choice)
+    · rw [hrun]
+      cases choice with
+      | false => exact Or.inr (step_false M input _)
+      | true =>
+        cases hh : M.halted (M.runFrom input s pre.length)
+        · exact Or.inl (by simp [NondeterministicQueryMachine.step, withRejectingChoice, hh])
+        · exact Or.inr (by
+            simp [NondeterministicQueryMachine.step, withRejectingChoice, QueryMachine.step, hh])
+
 private theorem replicate_of_success (M : QueryMachine σ) (input : List Bool)
     (bits : List Bool) (s : Option σ)
     (hfirst : M.withRejectingChoice.FirstHalting input bits s)
