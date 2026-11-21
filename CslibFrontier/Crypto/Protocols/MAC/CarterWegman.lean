@@ -2135,11 +2135,21 @@ for the PRF security game ([BonehShoup2023], Section 7.5.1, Theorem 7.10, p. 274
 def prfNonceToPrfDistinguisher (msgLen : ℕ → ℕ) (seed : ℕ → ProbComp (List Bool))
     (hash : ℕ → List Bool → List Bool → List Bool) (adversary : NonceMACForger) :
     OracleDistinguisher :=
-  cwDistinguisher seed (cwNonceLogHandler msgLen hash) adversary (fun out => out.1.1.2)
+  cwDistinguisher seed (cwNonceLogHandler msgLen hash) adversary
+    (fun out =>
+      let cand := out.1
+      let q := cand.1
+      q.2)
     fun n k out pad =>
-      (out.1.1.1.length == msgLen n) && (out.1.1.2.length == n) &&
-        decide (out.2.map (fun e => e.1.2)).Nodup && !out.2.contains out.1 &&
-        (BitString.listXor n [hash n k out.1.1.1, pad] == out.1.2)
+      let cand := out.1
+      let tr := out.2
+      let q := cand.1
+      let tag := cand.2
+      let msg := q.1
+      let nonce := q.2
+      (msg.length == msgLen n) && (nonce.length == n) &&
+        decide (tr.map (fun e => let q := e.1; q.2)).Nodup && !tr.contains cand &&
+        (BitString.listXor n [hash n k msg, pad] == tag)
 
 /-- `prfNonceToPrfDistinguisher` is uniformly strict oracle-PPT (`IsOraclePPT encBool`) whenever
 `msgLen`, `seed`, `hash`, and `adversary` are uniformly polynomial-time / strict PPT. -/
@@ -3049,12 +3059,17 @@ noncomputable def prfRandomNonceToPrfDistinguisher (msgLen : ℕ → ℕ)
     (hash : ℕ → List Bool → List Bool → List Bool) (adversary : Forger) :
     OracleDistinguisher :=
   cwDistinguisher seed (cwRandomNonceLogHandler msgLen hash) adversary
-    (fun out => unframe out.1.2)
+    (fun out =>
+      let cand := out.1
+      unframe cand.2)
     fun n k out pad =>
-      let nonce := unframe out.1.2
-      let tag := BitString.listXor n [hash n k out.1.1, pad]
-      (out.1.1.length == msgLen n) && (nonce.length == n) && !out.2.contains out.1 &&
-        (encPair encBits encBits (nonce, tag) == out.1.2)
+      let cand := out.1
+      let msg := cand.1
+      let fullTag := cand.2
+      let nonce := unframe fullTag
+      let tag := BitString.listXor n [hash n k msg, pad]
+      (msg.length == msgLen n) && (nonce.length == n) && !out.2.contains cand &&
+        (encPair encBits encBits (nonce, tag) == fullTag)
 
 private theorem isOraclePPTOn_cwRandomNonceLogHandler
     {msgLen : ℕ → ℕ} {hash : ℕ → List Bool → List Bool → List Bool}
