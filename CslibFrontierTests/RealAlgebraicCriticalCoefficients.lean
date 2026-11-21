@@ -17,6 +17,7 @@ import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.SparseIntegerRootLa
 import CslibFrontier.Foundations.Algebra.Polynomial.RealRoot.ThomSign
 import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomial
 import CslibFrontier.Foundations.Algebra.Polynomial.SignLabelPolynomialBounds
+import CslibFrontier.Foundations.Analysis.Complex.ConjugateProduct
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalMinimumValue
 import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalRootFeasibility
 import CslibFrontier.Foundations.Analysis.SignLabelScore
@@ -620,5 +621,23 @@ example :
     have hx₀ : x = 0 := by linarith
     simp [hx₀] at hx₂
   exact ⟨L, hL, x, hx₂, hpos, hneg (-x) (by simp [p, hx₂]) hne⟩
+
+-- The conjugate pair contributes one, leaving the negative real factor.
+open scoped ComplexConjugate in
+example :
+    let S : Finset ℂ := {Complex.I, -Complex.I, -1}
+    (∏ z ∈ S, z) = -1 := by
+  classical
+  intro S
+  have hS : ∀ z ∈ S, conj z ∈ S := by
+    intro z hz
+    simp only [S, Finset.mem_insert, Finset.mem_singleton] at hz
+    rcases hz with rfl | rfl | rfl <;> simp [S]
+  calc
+    _ = (((∏ z ∈ S.filter (fun z => z.im = 0), z.re) *
+        ∏ z ∈ S.filter (fun z => 0 < z.im), Complex.normSq z : ℝ) : ℂ) :=
+      Complex.prod_eq_ofReal_mul_prod_normSq S id hS (fun _ _ => rfl)
+    _ = -1 := by
+      norm_num [S, Finset.filter_insert, Finset.filter_singleton, Complex.normSq_I]
 
 end CslibFrontierTests.RealAlgebraicCriticalCoefficients
