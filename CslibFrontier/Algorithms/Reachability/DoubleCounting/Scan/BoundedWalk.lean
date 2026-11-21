@@ -611,21 +611,15 @@ private theorem firstHalting_selectors (adjacent : Fin N → Fin N → Bool)
       remainingFuel ((M).run input (selectors clock tail)) = some left := by
   have hr := run_selectors edge start verdict clock initial input adjacent hclock hedge tail
   rw [hs] at hr
-  refine ⟨⟨?_, ?_⟩, by rw [hr]; rfl⟩
-  · change (M).halted ((M).run input (selectors clock tail)) = true
-    rw [hr]
-    rfl
-  · obtain ⟨pre, hpre, hlive⟩ :=
-      live_before_stop edge start verdict clock initial input adjacent hclock hedge initial tail hs
-    intro n hn
-    have hle : n ≤ pre.length := by rw [hpre, List.length_append] at hn; simpa using hn
-    rw [hpre, List.take_append_of_le_length hle]
-    by_contra h
-    have hhalt := Bool.eq_true_of_not_eq_false h
-    change (M).halted ((M).replay input (pre.take n) (boundary initial)) = true at hhalt
-    rw [← List.take_append_drop n pre, NondeterministicQueryMachine.replay_append,
-      (M).replay_of_halted input hhalt] at hlive
-    exact Bool.noConfusion (hlive.symm.trans hhalt)
+  refine ⟨?_, by rw [hr]; rfl⟩
+  obtain ⟨pre, hpre, hlive⟩ :=
+    live_before_stop edge start verdict clock initial input adjacent hclock hedge initial tail hs
+  rw [hpre]
+  refine (M).firstHalting_append_singleton input pre false hlive ?_
+  rw [← hpre]
+  change (M).halted ((M).run input (selectors clock tail)) = true
+  rw [hr]
+  rfl
 
 /-- An out-of-range fixed-width destination rejects before any adjacency call. -/
 theorem run_invalid_vertex (bits : List Bool) (hwidth : bits.length = N.size)
