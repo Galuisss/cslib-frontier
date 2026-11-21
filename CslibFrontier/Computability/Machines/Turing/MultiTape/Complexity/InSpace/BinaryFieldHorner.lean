@@ -57,6 +57,15 @@ def HornerInput.evaluate (p : HornerInput) : List Bool :=
   hornerBits (p.modulus.length - 1) (fieldMulMod p.modulus) p.point
     (fun i : Fin p.count => coefficient p i)
 
+/-- Each coefficient supplied to Horner is the fixed-width block at its binary offset. -/
+theorem HornerInput.evaluate_eq (p : HornerInput) :
+    p.evaluate =
+      hornerBits (p.modulus.length - 1) (fieldMulMod p.modulus) p.point
+        (fun i : Fin p.count => BitString.lowBits (p.modulus.length - 1)
+          (p.label >>> ((p.modulus.length - 1) * i.val))) := by
+  unfold HornerInput.evaluate coefficient
+  rfl
+
 private theorem coefficient_inSpace :
     ComputableInSpace (fun p : HornerInput × ℕ => coefficient p.1 p.2)
       (encPair encHornerInput encNat) encCoefficients
