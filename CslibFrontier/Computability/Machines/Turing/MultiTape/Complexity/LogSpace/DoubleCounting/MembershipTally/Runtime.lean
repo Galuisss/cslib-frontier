@@ -40,6 +40,8 @@ tally also loads the adjacency context from its own entry state.
   certificates.
 * `Turing.DoubleCounting.MembershipTally.retainedMachine_exists_routines`: compile the tally
   with input-dependent entry parameters and the all-branch encoded-state bound.
+* `Turing.DoubleCounting.MembershipTally.retainedMachine_native_firstHalting_iff`: one
+  accepting native occurrence list for the selectors of each passing typed tally.
 -/
 
 public section
@@ -413,5 +415,37 @@ theorem retainedMachine_exists_routines {α : Type} (enc : α ↪ List Bool) (S 
     (hstate a)
 
 end RetainedSpace
+
+open NondeterministicQueryMachine in
+/-- Native accepting occurrences record exactly the selectors of passing typed tallies
+at the input's retained context, with one occurrence list per selector list. -/
+theorem retainedMachine_native_firstHalting_iff {α : Type}
+    {enc : α ↪ List Bool} {S : α → ℕ} {N : ℕ}
+    (ctx : Context) (walkContext : α → κ) (params : α → Context)
+    (R : Routines (retainedMachine edge start verdict clock initialWalk context ctx)
+      (fun a => retainedInitial (walkContext a) (params a)) enc S)
+    (a : α) (adjacent : Fin N → Fin N → Bool) (source target : Fin N) (radius : ℕ)
+    (expected : Tally) (bits : List Bool)
+    (hparams : params a = ⟨N, source.val, target.val, radius, expected⟩)
+    (hclock : ∀ u v : Fin N,
+      edge.halted (edge.runFrom (enc a) (start (walkContext a) u.val v.val) clock) = true)
+    (hedge : ∀ u v : Fin N,
+      verdict (edge.runFrom (enc a) (start (walkContext a) u.val v.val) clock) = adjacent u v) :
+    (∃! indices, ∃ final,
+      Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg (enc a)) indices =
+        some (bits, final) ∧ final.Halted ∧ final.output = [true]) ↔
+      ∃! branch, bits = selectors (BoundedWalk.selectors clock) branch ∧
+        ∃ hit, Scan.run adjacent source target radius expected branch = some hit := by
+  apply native_firstHalting_iff_of_reply R a bits retainedReply (BoundedWalk.selectors clock)
+    (BoundedWalk.eq_of_selectors_prefix clock) adjacent source target radius expected (fun _ => rfl)
+  intro hit
+  have hM := retainedMachine_withInit edge start verdict clock initialWalk context ctx (params a)
+    (walkContext a)
+  rw [hparams] at hM
+  have hspec := (retainedMachine_firstHalting_reply_iff edge start verdict clock initialWalk
+    (walkContext a) ⟨N, source.val, target.val, radius, expected⟩ (enc a) bits hit).trans
+    (withRuntimeWalk_firstHalting_iff edge start verdict clock initialWalk (walkContext a)
+      (enc a) adjacent source target radius expected hclock hedge bits hit)
+  simpa only [← hM, init_withInit, firstHalting_withInit, run_withInit, hparams] using hspec
 
 end Turing.DoubleCounting.MembershipTally

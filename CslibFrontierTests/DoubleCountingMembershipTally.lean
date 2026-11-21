@@ -169,34 +169,43 @@ private def expanded : Context := ⟨2, 0, 0, 1, ⟨1, 1⟩⟩
 private def tally :=
   retainedMachine contextEdge start id 0 entry false baseline
 
+private def allEdges (_ _ : Fin 2) := true
+
+private def passingBranch : Scan.Branch 2 := fun v => if v = 1 then some [1] else none
+
+private def passingSelectors := MembershipTally.selectors (BoundedWalk.selectors 0) passingBranch
+
+private theorem passingScan : Scan.run allEdges 0 0 1 ⟨1, 1⟩ passingBranch = some false := by
+  rw [Scan.run_eq_finish, Scan.tallyPrefix_succ allEdges 0 0 1 passingBranch (n := 1) (by decide),
+    Scan.tallyPrefix_succ allEdges 0 0 1 passingBranch (n := 0) (by decide), Scan.tallyPrefix_zero]
+  simp [passingBranch, allEdges, Scan.walkM, Scan.readNext, bind, StateT.bind, pure, StateT.pure,
+    Scan.Result.finish, Scan.Result.recordWalk, Scan.Result.zero, Tally.matches_iff]
+
+private theorem passingBranch_unique (other : Scan.Branch 2)
+    (h : passingSelectors = MembershipTally.selectors (BoundedWalk.selectors 0) other) :
+    other = passingBranch :=
+  selectors_injective _ (BoundedWalk.eq_of_selectors_prefix 0) h.symm
+
 /-- The same tally re-enters with a larger carrier and an adjacency context that permits
 the selected edge. The queried vertex is skipped, so the tally returns a passing negative.
 The clock and encoded-state bounds cover every branch from the new entry. -/
 example :
     let double := tally.withInit (retainedInitial true expanded)
     let enc := encRetainedState encBool encBool
-    let branch : Scan.Branch 2 := fun v => if v = 1 then some [1] else none
-    let bits := MembershipTally.selectors (BoundedWalk.selectors 0) branch
-    (double.FirstHalting [true] bits double.init ∧ retainedReply (double.run [true] bits) =
-      some false) ∧ double.HaltsWithin [true] 23 ∧
+    (double.FirstHalting [true] passingSelectors double.init ∧
+      retainedReply (double.run [true] passingSelectors) = some false) ∧
+      double.HaltsWithin [true] 23 ∧
       ∀ choices, (enc (double.run [true] choices)).length ≤ retainedStateBound 0 expanded 1 1 := by
-  intro double enc branch bits
-  let allEdges (_ _ : Fin 2) := true
-  have hscan : Scan.run allEdges 0 0 1 ⟨1, 1⟩ branch = some false := by
-    rw [Scan.run_eq_finish, Scan.tallyPrefix_succ allEdges 0 0 1 branch (n := 1) (by decide),
-      Scan.tallyPrefix_succ allEdges 0 0 1 branch (n := 0) (by decide), Scan.tallyPrefix_zero]
-    simp [branch, allEdges, Scan.walkM, Scan.readNext, bind, StateT.bind, pure, StateT.pure,
-      Scan.Result.finish, Scan.Result.recordWalk, Scan.Result.zero, Tally.matches_iff]
+  intro double enc
   dsimp only [double, tally]
   rw [retainedMachine_withInit]
   have hsource : expanded.source < expanded.size := by decide
   refine ⟨?_, ?_, ?_⟩
   · apply (retainedMachine_firstHalting_reply_iff contextEdge start id 0 entry true expanded
-      [true] bits false).mpr
+      [true] passingSelectors false).mpr
     exact (withRuntimeWalk_firstHalting_iff contextEdge start id 0 entry true [true]
-      allEdges 0 0 1 ⟨1, 1⟩ (fun _ _ => rfl) (fun _ _ => rfl) bits false).mpr
-      ⟨branch, ⟨rfl, hscan⟩, fun other h =>
-        selectors_injective _ (BoundedWalk.eq_of_selectors_prefix 0) h.1.symm⟩
+      allEdges 0 0 1 ⟨1, 1⟩ (fun _ _ => rfl) (fun _ _ => rfl) passingSelectors false).mpr
+      ⟨passingBranch, ⟨rfl, passingScan⟩, fun other h => passingBranch_unique other h.1⟩
   · refine HaltsWithin.mono _ _
       (retainedMachine_haltsWithin contextEdge start id 0 entry true expanded hsource [true]) ?_
     change 2 * (1 * ((2 : ℕ).size + 0 + 3) + ((2 : ℕ).size + 2) + 2) + 1 ≤ 23
@@ -235,14 +244,18 @@ example :
     budget_comp_linear hquery hentry, budget_comp_linear hhalt hentry,
     budget_comp_linear (retainedReply_inSpace encBool encBool) hentry⟩
 
-/-- A single native compilation handles both input-dependent adjacency contexts. -/
+/-- One native compilation handles both contexts. The passing negative tally has exactly
+one accepting native occurrence list for its selectors. -/
 example :
     let budget (flag : Bool) := Nat.log2 (encBool flag).length + 1 +
       retainedStateBound 0 expanded (encBool flag).length 1
     ∃ R : Routines tally (fun flag => retainedInitial flag expanded) encBool budget,
-      ∀ flag,
+      (∀ flag,
         R.machine.RunsInSpace (encBool flag) (R.k * (2 * (R.c * budget flag) + 1)) ∧
-          ∃ t, R.machine.RunsInTime (encBool flag) t := by
+          ∃ t, R.machine.RunsInTime (encBool flag) t) ∧
+      ∃! indices, ∃ final,
+        Native.replayChoices R.I R.P R.F R.C (R.machine.initCfg (encBool true)) indices =
+          some (passingSelectors, final) ∧ final.Halted ∧ final.output = [true] := by
   intro budget
   have hid : ComputableInSpace id encBool encBool (fun flag => (encBool flag).length) :=
     of_inO ComputableInDegree.id'.inO_one
@@ -264,12 +277,17 @@ example :
       (fun _ _ _ _ _ => by simp only [encBool_apply, List.length_singleton, le_refl])
       (fun _ => Nat.le_add_left _ _)
   obtain ⟨R⟩ := hroutines
-  refine ⟨R, fun flag => ⟨R.runsInSpace flag, ?_⟩⟩
-  apply R.exists_runsInTime flag (time := runtimeWalkClock 0 expanded)
-  dsimp only [tally]
-  rw [retainedMachine_withInit]
-  exact retainedMachine_haltsWithin contextEdge start id 0 entry flag expanded hsource
-    (encBool flag)
+  refine ⟨R, ?_, ?_⟩
+  · intro flag
+    refine ⟨R.runsInSpace flag, R.exists_runsInTime flag (time := runtimeWalkClock 0 expanded) ?_⟩
+    dsimp only [tally]
+    rw [retainedMachine_withInit]
+    exact retainedMachine_haltsWithin contextEdge start id 0 entry flag expanded hsource
+      (encBool flag)
+  · exact (retainedMachine_native_firstHalting_iff contextEdge start id 0 entry false
+      baseline id (fun _ => expanded) R true allEdges 0 0 1 ⟨1, 1⟩ passingSelectors rfl
+      (fun _ _ => rfl) (fun _ _ => rfl)).mpr
+      ⟨passingBranch, ⟨rfl, false, passingScan⟩, fun other h => passingBranch_unique other h.1⟩
 
 end RetainedTally
 
