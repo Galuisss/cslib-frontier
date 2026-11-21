@@ -410,6 +410,31 @@ def selectors (clock : ℕ) : List (Fin N) → List Bool
   | [] => [false, false]
   | v :: vs => (true :: vertex v) ++ List.replicate (clock + 2) false ++ selectors clock vs
 
+/-- A complete walk selector can be a prefix of another only for the same destination list. -/
+theorem eq_of_selectors_prefix (clock : ℕ) {a b : List (Fin N)}
+    (h : selectors clock a <+: selectors clock b) : a = b := by
+  induction a generalizing b with
+  | nil =>
+    cases b with
+    | nil => rfl
+    | cons v vs => simp [selectors] at h
+  | cons u us ih =>
+    cases b with
+    | nil => simp [selectors] at h
+    | cons v vs =>
+      simp only [selectors, List.cons_append, List.cons_prefix_cons, true_and,
+        List.append_assoc] at h
+      have hprefix : vertex u <+: vertex v :=
+        List.prefix_of_prefix_length_le ((List.prefix_append _ _).trans h)
+          (List.prefix_append _ _) (by simp)
+      have hword : vertex u = vertex v := hprefix.eq_of_length (by simp)
+      have huv : u = v := Option.some.inj
+        (((decodeVertex_eq_some_iff _ u).2 rfl).symm.trans
+          ((decodeVertex_eq_some_iff _ v).2 hword))
+      subst v
+      rw [List.prefix_append_right_inj, List.prefix_append_right_inj] at h
+      exact congrArg (u :: ·) (ih h)
+
 private theorem replay_choice_of_live (r : Registers N) (bits : List Bool)
     (s : NondeterministicChoice.State)
     (hlive : ∀ i < bits.length, (C).halted ((C).replay input (bits.take i) s) = false) :

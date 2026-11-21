@@ -70,6 +70,11 @@ example :
     (edge_halts [false]) (edge_agrees [false])]
   simp [walkM, readNext, bind, StateT.bind, pure, StateT.pure]
 
+/-- A complete one-edge selector on the input identifies its destination even in a longer word. -/
+example (tail : List (Fin 3)) (h : selectors (N := 3) 1 [1] <+: selectors 1 tail) :
+    tail = [1] :=
+  (eq_of_selectors_prefix 1 h).symm
+
 /-- Rank three is outside the three-vertex domain. -/
 example :
     (machine edge start verdict 1 moving).run [true] [true, true, true, false] = .done none :=
