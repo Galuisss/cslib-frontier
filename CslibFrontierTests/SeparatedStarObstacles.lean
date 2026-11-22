@@ -23,7 +23,7 @@ open Cslib
 
 private def center (i : Bool) : ℂ := if i then 3 else 0
 private def tip (i : Bool) : ℂ := if i then 4 else 1
-private def leftBound (i : Bool) : ℝ := if i then 5 / 2 else -1
+private noncomputable def leftBound (i : Bool) : ℝ := if i then 5 / 2 else -1
 private def rightBound (i : Bool) : ℝ := if i then 5 else 2
 
 example : IsPathConnected (⋃ i : Bool, segment ℝ (center i) (tip i))ᶜ := by
