@@ -630,6 +630,11 @@ Irit Dinur. “The PCP Theorem by Gap Amplification.” *Journal of the ACM* 54(
 
 Irit Dinur. “Mildly Exponential Reduction from Gap 3SAT to Polynomial-Gap Label-Cover.” *Electronic Colloquium on Computational Complexity*, Report TR16-128, 2016. https://eccc.weizmann.ac.il/report/2016/128/ . Bibliographic metadata checked against the ECCC report record; the report's full text was inspected for Hypothesis 2.5 (p. 5), which has at most $D n$ clauses and fixed soundness $< 0.9$. Used alongside [manurangsiraghavendra2017](#manurangsiraghavendra2017) to document the Gap Exponential Time Hypothesis adaptation (`GapETH`, `rGapETH`) in [FineGrained/GapETH.lean](../CslibFrontier/Computability/Complexity/FineGrained/GapETH.lean).
 
+<a id="dolev1982"></a>
+## dolev1982
+
+Danny Dolev. "The Byzantine Generals Strike Again." *Journal of Algorithms* 3(1), 14–36, 1982. https://doi.org/10.1016/0196-6774(82)90004-9 . Bibliographic metadata checked via secondary indexes on 2026-11-21 UTC; the full journal PDF was not inspected, so no numbered section or theorem locator is asserted. Cited by [ByzantineGraph/Basic.lean](../CslibFrontier/Computability/Distributed/ByzantineGraph/Basic.lean) and [ByzantineGraph/Connectivity.lean](../CslibFrontier/Computability/Distributed/ByzantineGraph/Connectivity.lean) for synchronous Byzantine agreement on incomplete communication graphs and the `n > 3t`, `(2t + 1)`-vertex-connectivity characterization via internally vertex-disjoint path relaying.
+
 <a id="dosasgall2013"></a>
 ## dosasgall2013
 
