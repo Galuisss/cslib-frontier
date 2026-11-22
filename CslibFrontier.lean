@@ -5890,6 +5890,7 @@ public import CslibFrontier.Crypto.Protocols.UC.Linking
 public import CslibFrontier.Crypto.Protocols.UC.Machine
 public import CslibFrontier.Crypto.Protocols.UC.MultiSession
 public import CslibFrontier.Crypto.Protocols.UC.WordInterface
+public import CslibFrontier.Crypto.Protocols.UOV.BlockKey
 public import CslibFrontier.Crypto.Protocols.UOV.Field
 public import CslibFrontier.Crypto.Protocols.VOLE.AdaptiveMulCheck
 public import CslibFrontier.Crypto.Protocols.VOLE.Basic
