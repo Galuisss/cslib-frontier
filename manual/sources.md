@@ -630,6 +630,11 @@ Irit Dinur. “The PCP Theorem by Gap Amplification.” *Journal of the ACM* 54(
 
 Irit Dinur. “Mildly Exponential Reduction from Gap 3SAT to Polynomial-Gap Label-Cover.” *Electronic Colloquium on Computational Complexity*, Report TR16-128, 2016. https://eccc.weizmann.ac.il/report/2016/128/ . Bibliographic metadata checked against the ECCC report record; the report's full text was inspected for Hypothesis 2.5 (p. 5), which has at most $D n$ clauses and fixed soundness $< 0.9$. Used alongside [manurangsiraghavendra2017](#manurangsiraghavendra2017) to document the Gap Exponential Time Hypothesis adaptation (`GapETH`, `rGapETH`) in [FineGrained/GapETH.lean](../CslibFrontier/Computability/Complexity/FineGrained/GapETH.lean).
 
+<a id="dolevlynchpinterstarkweihl1986"></a>
+## dolevlynchpinterstarkweihl1986
+
+Danny Dolev, Nancy A. Lynch, Shlomit S. Pinter, Eugene W. Stark, and William E. Weihl. "Reaching Approximate Agreement in the Presence of Faults." *Journal of the ACM* 33(3), 499–516, 1986. https://doi.org/10.1145/5925.5931 . Bibliographic metadata checked via secondary indexes on 2026-11-22 UTC; the full journal text was not inspected, so no numbered section or theorem locator is asserted. Cited by [ApproxAgreement/TrimmedMidpoint.lean](../CslibFrontier/Computability/Distributed/ApproxAgreement/TrimmedMidpoint.lean) and [ApproxAgreement/Protocol.lean](../CslibFrontier/Computability/Distributed/ApproxAgreement/Protocol.lean), which formalize the trimmed-extremes midpoint operator `midTrim` (`(min + max) / 2` of the trimmed multiset rather than multi-step `reduce`/`select` arithmetic averaging), fixed-horizon synchronous (`3t < n`) and single-hop asynchronous (`5t < n`) protocols, and `2 ≤ n ≤ 3t` impossibility bounds.
+
 <a id="dosasgall2013"></a>
 ## dosasgall2013
 
