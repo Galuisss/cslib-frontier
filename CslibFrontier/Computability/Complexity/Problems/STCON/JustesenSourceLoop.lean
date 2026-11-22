@@ -93,19 +93,11 @@ theorem justesenSourceLoop_parts_inSpace (ntm : MultiTapeNTM k Bool State) (c : 
   let member := justesenSourceMembershipMachine ntm c
   obtain ⟨hrq, hrn, hrh, hrr⟩ := justesenRetainedSourceRound_parts_inSpace ntm c initial
   obtain ⟨hq, hn, hh, hr⟩ := justesenSourceMembershipMachine_parts_inSpace ntm c
-  exact ⟨SourceRoundLoop.query_inSpace encJustesenSourceContext encRound encMember
-      initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
-      member justesenSourceMembershipStart
-      MembershipTally.retainedReply hrq hq,
-    SourceRoundLoop.next_inSpace encJustesenSourceContext encRound encMember
-      initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
-      member justesenSourceMembershipStart
-      MembershipTally.retainedReply justesenRetainedSourceRoundEntry_inSpace
-      justesenSourceMembershipStart_inSpace hrr hr hrh hh hrn hn,
-    SourceRoundLoop.halted_inSpace encJustesenSourceContext encRound encMember
-      initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
-      member justesenSourceMembershipStart MembershipTally.retainedReply,
-    SourceRoundLoop.reply_inSpace encJustesenSourceContext encRound encMember⟩
+  exact SourceRoundLoop.parts_inSpace encJustesenSourceContext encRound encMember
+    initial round justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
+    member justesenSourceMembershipStart MembershipTally.retainedReply
+    justesenRetainedSourceRoundEntry_inSpace justesenSourceMembershipStart_inSpace
+    hrr hr hrq hq hrh hh hrn hn
 
 /-- Zero fuel returns no verdict and never starts a callback. -/
 theorem justesenSourceLoop_run_zero (ntm : MultiTapeNTM k Bool State) (c : ℕ)
