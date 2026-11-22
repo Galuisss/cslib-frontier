@@ -633,7 +633,7 @@ Irit Dinur. “Mildly Exponential Reduction from Gap 3SAT to Polynomial-Gap Labe
 <a id="dolevstrong1983"></a>
 ## dolevstrong1983
 
-Danny Dolev and H. Raymond Strong. "Authenticated Algorithms for Byzantine Agreement." *SIAM Journal on Computing* 12(4), 656–666, 1983. https://doi.org/10.1137/0212045 . Bibliographic metadata checked via secondary indexes on 2026-11-21 UTC; the full journal PDF was not inspected, so no numbered section or theorem locator is asserted. Cited by [Byzantine/DolevStrong.lean](../CslibFrontier/Computability/Distributed/Byzantine/DolevStrong.lean) for `(t + 1)`-round synchronous authenticated Byzantine broadcast over arbitrary process sets with at most two relayed chains per process.
+Danny Dolev and H. Raymond Strong. "Authenticated Algorithms for Byzantine Agreement." *SIAM Journal on Computing* 12(4), 656–666, 1983. https://doi.org/10.1137/0212045 . Bibliographic metadata checked via secondary indexes on 2026-11-21 UTC; the full journal PDF was not inspected, so no numbered section or theorem locator is asserted. Cited by [Byzantine/DolevStrong.lean](../CslibFrontier/Computability/Distributed/Byzantine/DolevStrong.lean), which directly formalizes the two-value-capped `(t + 1)`-round synchronous authenticated broadcast protocol (`extracted.length ≤ 2`, relaying at most two distinct values per process) over arbitrary `[DecidableEq V]` with deterministic sender tie-breaking via `[LinearOrder P]`, models signatures information-theoretically via `AuthProtocol.WellSigned` and `AuthProtocol.Unforgeable` rather than cryptographic primitives, and counts point-to-point `SignedChain` transmissions (each carrying up to `t + 1` signer IDs) in `AuthProtocol.correctMessagesSent`.
 
 <a id="dosasgall2013"></a>
 ## dosasgall2013

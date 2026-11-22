@@ -8,6 +8,7 @@ module
 -- upstream: local-only (tests)
 
 import CslibFrontier.Computability.Distributed.Byzantine.DolevStrong
+import CslibFrontier.Computability.Distributed.Byzantine.NodeBound
 import CslibFrontier.Computability.Distributed.Byzantine.RoundBound
 
 /-! Fischer–Lynch `t + 1` round lower bound and Dolev–Strong authenticated synchronous broadcast

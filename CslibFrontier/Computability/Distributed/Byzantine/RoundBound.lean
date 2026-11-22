@@ -7,7 +7,9 @@ Authors: Samuel Schlesinger
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Distributed.Byzantine.RecursiveOralMessages
+public import CslibFrontier.Computability.Distributed.Byzantine.Basic
+public import Mathlib.Data.Fintype.Card
+import CslibFrontier.Computability.Distributed.Byzantine.RecursiveOralMessages
 import Mathlib.Data.Fintype.EquivFin
 
 /-!
