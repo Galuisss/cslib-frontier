@@ -42,8 +42,9 @@ prepared field in its state and uses it to start each scan on the original input
   a valid requested scan has exactly one first-halting selector list returning a verdict.
 * `Cslib.Complexity.STCON.configurationJustesenSeedSchedulerScan_readReply_correct`:
   parsed scanner replies give the first tie or the reachability verdict for the requested source.
-* `Cslib.Complexity.STCON.configurationJustesenSeedSchedulerScan_readReply_eq_reference`:
-  every parsed reply agrees with the mathematical reference callback.
+* `Cslib.Complexity.STCON.configurationJustesenSeedSchedulerScan_firstHalting_eq_reference` and
+  `Cslib.Complexity.STCON.configurationJustesenSeedSchedulerScan_readReply_eq_reference`:
+  first-halting and parsed replies agree with the mathematical reference callback.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_replay_correct`:
   the unique successful replay returns the least min-isolating seed and decides reachability.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_haltsWithin_clock`:
@@ -237,6 +238,48 @@ theorem configurationJustesenSeedSchedulerScan_existsUnique_firstHalting
   exact (existsUnique_congr (justesenSourceLoop_firstHalting_reply_iff ntm c context n w)).mpr
     (configurationJustesenSourceLoop_existsUnique_firstHalting ntm c w seed source target)
 
+private theorem configurationJustesenSeedSchedulerScan_firstHalting_correct
+    {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (w : List Bool) (frame : SeedSchedulerFrame)
+    (hsetup : frame.request.setup = configurationSeedSearchSetup ntm c w) (hvalid : frame.Valid)
+    (bits : List Bool) (verdict : ControllerVerdict) :
+    let scan := justesenSeedSchedulerScan ntm c
+    let entry := justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w)
+    scan.FirstHalting w bits entry →
+    SourceRoundLoop.reply (scan.replay w bits entry) = some verdict →
+    let I := configurationInstance ntm c w
+    let setup := configurationSeedSearchSetup ntm c w
+    let n := setup.parameters.search.subdivision.vertexCount
+    let target : Fin n := ⟨setup.targetID,
+      (configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w).2⟩
+    let edge := generatedSubdivisionAdj (layeredDigraph I)
+      (configurationSubdivisionIndex ntm c w)
+      (fun j => frame.request.seed.testBit j.val)
+    ∃ source : Fin n, source.val = frame.request.sourceID ∧
+      verdict.Correct edge source target := by
+  intro scan entry hfirst hret I setup n target edge
+  obtain ⟨seed, source, hseed, hsource, hreenter⟩ :=
+    justesenSeedSchedulerScan_withInit_of_valid ntm c w frame hsetup hvalid
+  have hrun : (scan.withInit entry).run w bits = .inr (some verdict) := by
+    rw [NondeterministicQueryMachine.run_withInit]
+    revert hret
+    cases scan.replay w bits entry <;> simp [SourceRoundLoop.reply]
+  change (scan.withInit entry).FirstHalting w bits (scan.withInit entry).init at hfirst
+  rw [hreenter] at hfirst hrun
+  have hcorrect := configurationJustesenSourceLoop_correct ntm c w seed source target
+    bits verdict hfirst hrun
+  refine ⟨source, hsource, ?_⟩
+  have hedge : (fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true) =
+      edge := by
+    funext u v
+    have hbits : (Cslib.BitString.equivFin _).symm seed =
+        fun j => frame.request.seed.testBit j.val := by
+      funext j
+      rw [Cslib.BitString.equivFin_symm_apply, hseed]
+    simp only [configurationJustesenSubdivisionAdjacent, decide_eq_true_eq, hbits, edge]
+    rfl
+  simpa only [hedge] using hcorrect
+
 /-- A parsed scanner reply gives the first radius without a unique passing transcript,
 or gives the correct reachability answer with unique transcripts at every radius.
 The graph uses the seed rank and source recorded by the scheduler frame. -/
@@ -258,32 +301,35 @@ theorem configurationJustesenSeedSchedulerScan_readReply_correct
       (fun j => frame.request.seed.testBit j.val)
     ∃ source : Fin n, source.val = frame.request.sourceID ∧
       verdict.Correct edge source target := by
-  intro I setup n target edge
-  obtain ⟨seed, source, hseed, hsource, hreenter⟩ :=
-    justesenSeedSchedulerScan_withInit_of_valid ntm c w frame hsetup hvalid
-  let scan := justesenSeedSchedulerScan ntm c
-  let entry := justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w)
-  obtain ⟨callBits, _, hfirst, hret⟩ :=
-    (scan.readReply_iff SourceRoundLoop.reply w bits entry verdict rest).mp hreply
-  have hrun : (scan.withInit entry).run w callBits = .inr (some verdict) := by
-    rw [NondeterministicQueryMachine.run_withInit]
-    revert hret
-    cases scan.replay w callBits entry <;> simp [SourceRoundLoop.reply]
-  change (scan.withInit entry).FirstHalting w callBits (scan.withInit entry).init at hfirst
-  rw [hreenter] at hfirst hrun
-  have hcorrect := configurationJustesenSourceLoop_correct ntm c w seed source target
-    callBits verdict hfirst hrun
-  refine ⟨source, hsource, ?_⟩
-  have hedge : (fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true) =
-      edge := by
-    funext u v
-    have hbits : (Cslib.BitString.equivFin _).symm seed =
-        fun j => frame.request.seed.testBit j.val := by
-      funext j
-      rw [Cslib.BitString.equivFin_symm_apply, hseed]
-    simp only [configurationJustesenSubdivisionAdjacent, decide_eq_true_eq, hbits, edge]
-    rfl
-  simpa only [hedge] using hcorrect
+  obtain ⟨trace, _, hfirst, hret⟩ := (NondeterministicQueryMachine.readReply_iff
+    (justesenSeedSchedulerScan ntm c) SourceRoundLoop.reply w bits
+    (justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w))
+    verdict rest).mp hreply
+  exact configurationJustesenSeedSchedulerScan_firstHalting_correct
+    ntm c w frame hsetup hvalid trace verdict hfirst hret
+
+/-- A scanner's first-halting trace and decoded verdict agree with the mathematical
+reference callback on the same request. -/
+theorem configurationJustesenSeedSchedulerScan_firstHalting_eq_reference
+    {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (w : List Bool) (frame : SeedSchedulerFrame)
+    (hsetup : frame.request.setup = configurationSeedSearchSetup ntm c w) (hvalid : frame.Valid)
+    (bits : List Bool) (verdict : ControllerVerdict) :
+    let scan := justesenSeedSchedulerScan ntm c
+    let entry := justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w)
+    scan.FirstHalting w bits entry →
+    SourceRoundLoop.reply (scan.replay w bits entry) = some verdict →
+    configurationSeedSchedulerReferenceScan ntm c w frame.request = some verdict := by
+  intro _ _ hfirst hret
+  obtain ⟨source, hsource, hcorrect⟩ :=
+    configurationJustesenSeedSchedulerScan_firstHalting_correct ntm c w frame hsetup hvalid
+      bits verdict hfirst hret
+  obtain ⟨reference, hscan, href⟩ :=
+    configurationSeedSchedulerReferenceScan_correct ntm c w frame.request
+      (hsource ▸ source.isLt)
+  have heq : source = ⟨frame.request.sourceID, hsource ▸ source.isLt⟩ := Fin.ext hsource
+  rw [heq] at hcorrect
+  rw [hscan, href.eq hcorrect]
 
 /-- Every parsed concrete scan reply agrees with the mathematical reference callback. -/
 theorem configurationJustesenSeedSchedulerScan_readReply_eq_reference
@@ -295,15 +341,12 @@ theorem configurationJustesenSeedSchedulerScan_readReply_eq_reference
       (justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w))
       bits = some (verdict, rest)) :
     configurationSeedSchedulerReferenceScan ntm c w frame.request = some verdict := by
-  obtain ⟨source, hsource, hcorrect⟩ :=
-    configurationJustesenSeedSchedulerScan_readReply_correct ntm c w frame hsetup hvalid
-      bits rest verdict hreply
-  obtain ⟨reference, hscan, href⟩ :=
-    configurationSeedSchedulerReferenceScan_correct ntm c w frame.request
-      (hsource ▸ source.isLt)
-  have heq : source = ⟨frame.request.sourceID, hsource ▸ source.isLt⟩ := Fin.ext hsource
-  rw [heq] at hcorrect
-  rw [hscan, href.eq hcorrect]
+  obtain ⟨trace, _, hfirst, hret⟩ := (NondeterministicQueryMachine.readReply_iff
+    (justesenSeedSchedulerScan ntm c) SourceRoundLoop.reply w bits
+    (justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w))
+    verdict rest).mp hreply
+  exact configurationJustesenSeedSchedulerScan_firstHalting_eq_reference
+    ntm c w frame hsetup hvalid trace verdict hfirst hret
 
 /-- On the original input, exactly one first-halting scheduler replay returns a result.
 That result selects the least min-isolating rank and decides the STCON instance, including
@@ -353,11 +396,9 @@ theorem configurationJustesenSeedScheduler_replay_correct
     (configurationSeedScheduler_seedLimit ntm c w) scan start SourceRoundLoop.reply w oracle
     (by
       intro f hs hv _ trace value hhalt hret
-      have hread := (scan.readReply_iff SourceRoundLoop.reply w (trace ++ [false])
-        (start f.request) value []).mpr ⟨trace, rfl, hhalt, hret⟩
       exact congrArg (fun x => [x])
-        (configurationJustesenSeedSchedulerScan_readReply_eq_reference
-          ntm c w f hs hv (trace ++ [false]) [] value hread))
+        (configurationJustesenSeedSchedulerScan_firstHalting_eq_reference
+          ntm c w f hs hv trace value hhalt hret))
     bits answer hfirst hanswer
   obtain ⟨result, hmath, hmin, hleast, hreach⟩ :=
     configurationSeedSchedulerReference_correct ntm c w

@@ -272,17 +272,25 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   ⟨configurationJustesenSeedSchedulerClock_polyBounded ntm c,
     configurationJustesenSeedScheduler_haltsWithin_clock ntm c w⟩
 
-/-- When candidate zero is present, its designated scan returns a verdict exactly once. -/
+/-- Candidate zero has one designated scan trace returning the reference verdict. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
     (c : ℕ) (w : List Bool) (frame : SeedSchedulerFrame)
     (h : seedSchedulerCandidate (configurationSeedSearchSetup ntm c w) 0 = some frame) :
     let scan := justesenSeedSchedulerScan ntm c
     let entry := justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w)
-    ∃! bits, scan.FirstHalting w bits entry ∧
-      (SourceRoundLoop.reply (scan.replay w bits entry)).isSome := by
+    (∃! bits, scan.FirstHalting w bits entry ∧
+      (SourceRoundLoop.reply (scan.replay w bits entry)).isSome) ∧
+    ∃ bits verdict, scan.FirstHalting w bits entry ∧
+      SourceRoundLoop.reply (scan.replay w bits entry) = some verdict ∧
+      configurationSeedSchedulerReferenceScan ntm c w frame.request = some verdict := by
   obtain ⟨hvalid, hsetup, _⟩ := seedSchedulerCandidate_valid h
-  exact configurationJustesenSeedSchedulerScan_existsUnique_firstHalting
+  have htrace := configurationJustesenSeedSchedulerScan_existsUnique_firstHalting
     ntm c w frame hsetup hvalid
+  obtain ⟨bits, hfirst, hsome⟩ := htrace.exists
+  obtain ⟨verdict, hreply⟩ := Option.isSome_iff_exists.mp hsome
+  exact ⟨htrace, bits, verdict, hfirst, hreply,
+    configurationJustesenSeedSchedulerScan_firstHalting_eq_reference
+      ntm c w frame hsetup hvalid bits verdict hfirst hreply⟩
 
 /-- A negative reply at candidate zero matches the mathematical scanner and rules out a path
 to the setup's target in the subdivision for the all-zero seed. -/
