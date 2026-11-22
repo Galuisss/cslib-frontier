@@ -321,10 +321,8 @@ theorem configurationJustesenRetainedSourceRound_bounds
   intro I n seed source target limit hlimit context r hr M D
   have hsize : context.size = n :=
     configurationJustesenSourceContext_size ntm c w seed.val source.val target.val
-  obtain ⟨_, hrad, hcount, hsum⟩ := SourceRoundLoop.admissible_caps hr
+  obtain ⟨_, hrad, hcount, hsum⟩ := SourceRoundLoop.admissible_caps_le hr hlimit
   rw [hsize] at hcount hsum
-  have hcount' := hcount.trans (Nat.add_le_add_left (Nat.mul_le_mul_right n hlimit) 1)
-  have hsum' := hsum.trans (Nat.mul_le_mul (Nat.mul_le_mul_left n hlimit) hlimit)
   let N := justesenRoundCallback ntm c
   let start := fun k : JustesenSourceContext => justesenRoundCallbackStart k.adjacency
   let clock := configurationJustesenRoundCallbackClock ntm c w
@@ -335,7 +333,7 @@ theorem configurationJustesenRetainedSourceRound_bounds
       N.HaltsFrom w entry clock ∧
         ∀ bits, (encJustesenRoundCallbackState (N.replay w bits entry)).length ≤ D := by
     simp only [SourceRoundLoop.roundContext, hr.1, hsize] at hv ⊢
-    exact hcallback w seed source r.radius r.tally (hrad.trans hlimit) hcount' hsum' req hv
+    exact hcallback w seed source r.radius r.tally hrad hcount hsum req hv
   have hhalt := SourceRoundLoop.retainedRound_haltsWithin JustesenSourceContext.size
     JustesenSourceContext.sourceID N start justesenRoundCallbackReply r w clock
     (fun req hv => (hcall req hv).1)
@@ -377,17 +375,11 @@ theorem configurationJustesenRetainedSourceRound_envelopes_le_log
   have hn : width ≤ B * b := hB w
   have hs : (encNat source.val).length ≤ width := length_encNat_mono source.isLt.le
   have hk : (encNat limit).length ≤ width := length_encNat_mono hl
+  obtain ⟨hcount, hsum⟩ := length_encTally_fields_le_of_caps
+    (tally := ⟨1 + limit * n, n * limit * limit⟩) hl le_rfl le_rfl
+  change (encNat (1 + limit * n)).length ≤ 2 * width + 2 at hcount
+  change (encNat (n * limit * limit)).length ≤ 3 * width at hsum
   have hone : (encNat 1).length = 1 := rfl
-  have hcount : (encNat (1 + limit * n)).length ≤ 2 * width + 2 := by
-    have hmul := length_encNat_mul_le limit n
-    have hadd := length_encNat_add_le_add 1 (limit * n)
-    dsimp only [width] at hk ⊢
-    omega
-  have hsum : (encNat (n * limit * limit)).length ≤ 3 * width := by
-    have hmul := length_encNat_mul_le n limit
-    have hmul' := length_encNat_mul_le (n * limit) limit
-    dsimp only [width] at hk ⊢
-    omega
   have hreg : SourceRoundLoop.registerStateBound encJustesenSourceContext context n limit ≤
       2 * (encJustesenSourceContext context).length + 11 * width + 8 := by
     rw [SourceRoundLoop.registerStateBound]
