@@ -6841,6 +6841,7 @@ public import CslibFrontier.Foundations.Data.BitString.SignWord
 public import CslibFrontier.Foundations.Data.BitString.Single
 public import CslibFrontier.Foundations.Data.BitString.Sum
 public import CslibFrontier.Foundations.Data.BitString.Support
+public import CslibFrontier.Foundations.Data.BitString.Support.Equiv
 public import CslibFrontier.Foundations.Data.BitString.Support.Weight
 public import CslibFrontier.Foundations.Data.BitString.Threshold
 public import CslibFrontier.Foundations.Data.BitString.Weight

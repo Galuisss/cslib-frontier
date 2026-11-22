@@ -12,6 +12,8 @@ public import CslibFrontier.Crypto.Computational.GoldreichLevin.Parameters
 public import CslibFrontier.Foundations.BooleanAnalysis.Fourier
 public import CslibFrontier.Probability.PMF.Event
 import CslibFrontier.Crypto.Computational.GoldreichLevin.Nonuniform
+import CslibFrontier.Foundations.Data.BitString.Parity.DotProduct
+import CslibFrontier.Foundations.Data.BitString.Support.Equiv
 import CslibFrontier.Probability.Concentration
 import CslibFrontier.Probability.PMF.EventBind
 import Mathlib.MeasureTheory.OuterMeasure.Basic
@@ -60,7 +62,7 @@ This module develops both finite list-decoding results on top of `Decoding.lean`
    Using a second independent batch of `m = pruneSampleCount n precision` uniform query points and
    Chernoff–Hoeffding concentration (`PMF.uniform_abs_sum_div_sub_expect_ge_le`), filtering
    `candidates predictor masks` at empirical agreement threshold `(2 * p + 3) / (4 * p)` succeeds
-   with probability at least `3 / 4 ≥ 1 / 2` in returning a list that:
+   with probability at least `1 / 2` in returning a list that:
    - contains every `x : BitString n` with `1 / 2 + 1 / p ≤ agreement predictor x`,
    - contains only strings `x : BitString n` with `1 / 2 + 1 / (2 * p) ≤ agreement predictor x`,
    - has cardinality at most `p ^ 2` on that event (and at most `16 * n * p ^ 4 + 2`
@@ -68,8 +70,6 @@ This module develops both finite list-decoding results on top of `Decoding.lean`
 
 ## Main definitions
 
-* `Cslib.Crypto.GoldreichLevin.supportEquiv`: the bijection `BitString n ≃ Finset (Fin n)` sending
-  `x` to `{i | x i = true}`.
 * `Cslib.Crypto.GoldreichLevin.listMaskCount`: mask count `maskCount n (2 * precision ^ 2)` for
   simultaneous list decoding at correlation `1 / precision`.
 * `Cslib.Crypto.GoldreichLevin.empiricalHits`: count of sample points `j : Fin m` on which
@@ -100,7 +100,8 @@ This module develops both finite list-decoding results on top of `Decoding.lean`
 ## References
 
 * [O. Goldreich, *Computational Complexity: A Conceptual Perspective*][Goldreich2008], Theorem 7.8
-  and Exercise 7.6.
+  (p. 254) and Exercise 7.6 (see also the March 2007 draft `r4.pdf` [Goldreich2007DraftR4],
+  Theorem 7.8 and Exercise 7.6).
 -/
 
 @[expose] public section
@@ -113,14 +114,6 @@ open scoped BigOperators ENNReal
 variable {n k m : ℕ}
 
 /-! ### 1. Parseval identity for inner-product correlations and correlated-string count bound -/
-
-/-- For any bit strings `x r : BitString n`, the parity of `r` on the support
-`{i | x i = true}` of `x` is the Boolean inner product `x ⬝ᵥ r`. -/
-theorem parityOn_filter_eq_dotProduct (x r : BitString n) :
-    parityOn (Finset.univ.filter (fun i => x i = true)) r = x ⬝ᵥ r := by
-  rw [parityOn_eq_sum, dotProduct, Finset.sum_filter]
-  refine Finset.sum_congr rfl fun i _ => ?_
-  cases x i <;> cases r i <;> rfl
 
 /-- The uniform expectation of `score predictor x` over `BitString n` is `agreement predictor x`. -/
 theorem expect_score_eq_agreement (predictor : BitString n → Bool) (x : BitString n) :
@@ -150,22 +143,10 @@ theorem fourierCoeff_signVal_eq_two_mul_agreement_sub_one (predictor : BitString
             BitString.chi ℝ (Finset.univ.filter (fun i => x i = true)) r) =
         fun r : BitString n => 2 * score predictor x r - 1 := by
     funext r
-    rw [BitString.chi_eq_signVal_parityOn, parityOn_filter_eq_dotProduct,
-      signVal_mul_signVal_dotProduct_eq]
+    rw [BitString.chi_eq_signVal_parityOn, ← BitString.dotProduct_eq_parityOn r x,
+      dotProduct_comm r x, signVal_mul_signVal_dotProduct_eq]
   rw [hterm, Finset.expect_sub_distrib, ← Finset.mul_expect, expect_score_eq_agreement,
     Finset.expect_const Finset.univ_nonempty]
-
-/-- The bijection between bit strings `x : BitString n` and coordinate subsets `S : Finset (Fin n)`
-sending `x` to its support `{i | x i = true}`. -/
-def supportEquiv (n : ℕ) : BitString n ≃ Finset (Fin n) where
-  toFun x := Finset.univ.filter (fun i => x i = true)
-  invFun S i := decide (i ∈ S)
-  left_inv x := by
-    funext i
-    simp
-  right_inv S := by
-    ext i
-    simp
 
 /-- **Parseval's identity for inner-product correlations**: the squared correlations
 `(2 * agreement predictor x - 1) ^ 2` summed over all `x : BitString n` equal `1`. -/
@@ -174,11 +155,11 @@ theorem sum_two_mul_agreement_sub_one_sq (predictor : BitString n → Bool) :
   have h : ∀ x : BitString n,
       (2 * agreement predictor x - 1) ^ 2 =
         BitString.fourierCoeff (fun r => BitString.signVal (predictor r))
-          (supportEquiv n x) ^ 2 := by
+          (BitString.supportEquiv x) ^ 2 := by
     intro x
-    rw [supportEquiv, Equiv.coe_fn_mk, fourierCoeff_signVal_eq_two_mul_agreement_sub_one]
+    rw [BitString.supportEquiv_apply, fourierCoeff_signVal_eq_two_mul_agreement_sub_one]
   simp_rw [h]
-  exact (Equiv.sum_comp (supportEquiv n)
+  exact (Equiv.sum_comp BitString.supportEquiv
     (fun S => BitString.fourierCoeff (fun r => BitString.signVal (predictor r)) S ^ 2)).trans
     (BitString.sum_fourierCoeff_sq_signVal predictor)
 
@@ -278,6 +259,23 @@ theorem decode_simultaneous_failure_le (predictor : BitString n → Bool) (ε : 
         dsimp [B]
         ring
 
+/-- General target-bound specialization of `decode_simultaneous_failure_le`: when
+`(n : ℝ) ≤ 16 * δ * ε ^ 4 * (2 ^ k - 1)`, `decode predictor k` fails to contain all
+`(1 / 2 + ε)`-correlated strings with probability at most `ENNReal.ofReal δ`. -/
+theorem decode_simultaneous_failure_le_of_le (predictor : BitString n → Bool) (ε δ : ℝ)
+    (hε : 0 < ε) (hk : 0 < k) (hparam : (n : ℝ) ≤ 16 * δ * ε ^ 4 * (2 ^ k - 1 : ℕ)) :
+    (decode predictor k).toOuterMeasure
+        {list : Finset (BitString n) |
+          ¬ ∀ x : BitString n, 1 / 2 + ε ≤ agreement predictor x → x ∈ list} ≤
+      ENNReal.ofReal δ := by
+  have hsub_pos : (0 : ℝ) < (2 ^ k - 1 : ℕ) := by
+    exact_mod_cast Nat.sub_pos_of_lt (Nat.one_lt_two_pow hk.ne')
+  have hden_pos : 0 < 16 * ε ^ 4 * (2 ^ k - 1 : ℕ) := by positivity
+  have hfrac : (n : ℝ) / (16 * ε ^ 4 * (2 ^ k - 1 : ℕ)) ≤ δ := by
+    rw [div_le_iff₀ hden_pos]
+    linarith
+  exact (decode_simultaneous_failure_le predictor ε hε hk).trans (ENNReal.ofReal_le_ofReal hfrac)
+
 /-- When `(n : ℝ) ≤ 4 * ε ^ 4 * (2 ^ k - 1)`, `decode predictor k` fails to contain all
 `(1 / 2 + ε)`-correlated strings with probability at most `1 / 4`. -/
 theorem decode_simultaneous_failure_le_quarter (predictor : BitString n → Bool) (ε : ℝ)
@@ -286,21 +284,7 @@ theorem decode_simultaneous_failure_le_quarter (predictor : BitString n → Bool
         {list : Finset (BitString n) |
           ¬ ∀ x : BitString n, 1 / 2 + ε ≤ agreement predictor x → x ∈ list} ≤
       (1 / 4 : ℝ≥0∞) := by
-  have h2k : 1 < 2 ^ k := Nat.one_lt_two_pow hk.ne'
-  have hsub_pos : (0 : ℝ) < (2 ^ k - 1 : ℕ) := by
-    exact_mod_cast Nat.sub_pos_of_lt h2k
-  have hden_pos : 0 < 16 * ε ^ 4 * (2 ^ k - 1 : ℕ) := by positivity
-  have hfrac : (n : ℝ) / (16 * ε ^ 4 * (2 ^ k - 1 : ℕ)) ≤ 1 / 4 := by
-    rw [div_le_iff₀ hden_pos]
-    linarith
-  calc
-    (decode predictor k).toOuterMeasure
-        {list : Finset (BitString n) |
-          ¬ ∀ x : BitString n, 1 / 2 + ε ≤ agreement predictor x → x ∈ list}
-      ≤ ENNReal.ofReal ((n : ℝ) / (16 * ε ^ 4 * (2 ^ k - 1 : ℕ))) :=
-        decode_simultaneous_failure_le predictor ε hε hk
-    _ ≤ ENNReal.ofReal (1 / 4) := ENNReal.ofReal_le_ofReal hfrac
-    _ = (1 / 4 : ℝ≥0∞) := by simp
+  simpa using decode_simultaneous_failure_le_of_le predictor ε (1 / 4) hε hk (by linarith)
 
 /-- When `(n : ℝ) ≤ 8 * ε ^ 4 * (2 ^ k - 1)`, `decode predictor k` fails to contain all
 `(1 / 2 + ε)`-correlated strings with probability at most `1 / 2`. -/
@@ -310,21 +294,7 @@ theorem decode_simultaneous_failure_le_half (predictor : BitString n → Bool) (
         {list : Finset (BitString n) |
           ¬ ∀ x : BitString n, 1 / 2 + ε ≤ agreement predictor x → x ∈ list} ≤
       (1 / 2 : ℝ≥0∞) := by
-  have h2k : 1 < 2 ^ k := Nat.one_lt_two_pow hk.ne'
-  have hsub_pos : (0 : ℝ) < (2 ^ k - 1 : ℕ) := by
-    exact_mod_cast Nat.sub_pos_of_lt h2k
-  have hden_pos : 0 < 16 * ε ^ 4 * (2 ^ k - 1 : ℕ) := by positivity
-  have hfrac : (n : ℝ) / (16 * ε ^ 4 * (2 ^ k - 1 : ℕ)) ≤ 1 / 2 := by
-    rw [div_le_iff₀ hden_pos]
-    linarith
-  calc
-    (decode predictor k).toOuterMeasure
-        {list : Finset (BitString n) |
-          ¬ ∀ x : BitString n, 1 / 2 + ε ≤ agreement predictor x → x ∈ list}
-      ≤ ENNReal.ofReal ((n : ℝ) / (16 * ε ^ 4 * (2 ^ k - 1 : ℕ))) :=
-        decode_simultaneous_failure_le predictor ε hε hk
-    _ ≤ ENNReal.ofReal (1 / 2) := ENNReal.ofReal_le_ofReal hfrac
-    _ = (1 / 2 : ℝ≥0∞) := by simp
+  simpa using decode_simultaneous_failure_le_of_le predictor ε (1 / 2) hε hk (by linarith)
 
 /-- **Simultaneous list-decoding success bound (`ℝ≥0∞`)**: when
 `(n : ℝ) ≤ 8 * ε ^ 4 * (2 ^ k - 1)`, `decode predictor k` outputs a list containing every
@@ -358,15 +328,8 @@ theorem decode_simultaneous_success_toReal_ge_half (predictor : BitString n → 
       ((decode predictor k).toOuterMeasure
         {list : Finset (BitString n) |
           ∀ x : BitString n, 1 / 2 + ε ≤ agreement predictor x → x ∈ list}).toReal := by
-  let S : Set (Finset (BitString n)) :=
-    {list | ∀ x : BitString n, 1 / 2 + ε ≤ agreement predictor x → x ∈ list}
-  have hfail : (decode predictor k).toOuterMeasure Sᶜ ≤ (1 / 2 : ℝ≥0∞) :=
-    decode_simultaneous_failure_le_half predictor ε hε hk hparam
-  have hfail_real : ((decode predictor k).toOuterMeasure Sᶜ).toReal ≤ 1 / 2 := by
-    refine le_trans (ENNReal.toReal_mono (by simp) hfail) ?_
-    norm_num
-  have htot := Probability.PMF.toOuterMeasure_toReal_add_compl (decode predictor k) S
-  linarith
+  simpa [one_div] using ENNReal.toReal_mono (Probability.PMF.toOuterMeasure_ne_top _ _)
+    (decode_simultaneous_success_ge_half predictor ε hε hk hparam)
 
 /-! ### 3. Explicit parameter schedule for simultaneous list decoding -/
 
@@ -469,15 +432,8 @@ theorem decode_listMaskCount_simultaneous_success_toReal_ge_half (predictor : Bi
         {list : Finset (BitString n) |
           ∀ x : BitString n, 1 / 2 + 1 / (precision : ℝ) ≤ agreement predictor x →
             x ∈ list}).toReal := by
-  have hp : (0 : ℝ) < precision := Nat.cast_pos.mpr hprec
-  have hparam := listMaskCount_sufficient n hprec
-  have h8 : (n : ℝ) ≤ 8 * (1 / (precision : ℝ)) ^ 4 * (2 ^ listMaskCount n precision - 1 : ℕ) := by
-    have hnonneg :
-        0 ≤ 4 * (1 / (precision : ℝ)) ^ 4 * (2 ^ listMaskCount n precision - 1 : ℕ) := by
-      positivity
-    linarith
-  exact decode_simultaneous_success_toReal_ge_half predictor (1 / (precision : ℝ)) (by positivity)
-    (listMaskCount_pos n precision) h8
+  simpa [one_div] using ENNReal.toReal_mono (Probability.PMF.toOuterMeasure_ne_top _ _)
+    (decode_listMaskCount_simultaneous_success_ge_half predictor hprec)
 
 /-! ### 4. Pruned simultaneous list decoding (`decodePruned`) -/
 
@@ -866,20 +822,7 @@ theorem decodePruned_simultaneous_success_toReal_ge_half (predictor : BitString 
             1 / 2 + 1 / (precision : ℝ) ≤ agreement predictor x → x ∈ list) ∧
           (∀ x ∈ list, 1 / 2 + 1 / (2 * (precision : ℝ)) ≤ agreement predictor x) ∧
           list.card ≤ precision ^ 2}).toReal := by
-  let p :=
-    decodePruned predictor (listMaskCount n precision) (pruneSampleCount n precision)
-      (2 * precision + 3) (4 * precision)
-  let S : Set (Finset (BitString n)) :=
-    {list |
-      (∀ x : BitString n, 1 / 2 + 1 / (precision : ℝ) ≤ agreement predictor x → x ∈ list) ∧
-      (∀ x ∈ list, 1 / 2 + 1 / (2 * (precision : ℝ)) ≤ agreement predictor x) ∧
-      list.card ≤ precision ^ 2}
-  have hfail : p.toOuterMeasure Sᶜ ≤ (1 / 2 : ℝ≥0∞) :=
-    decodePruned_simultaneous_failure_le_half predictor hprec
-  have hfail_real : (p.toOuterMeasure Sᶜ).toReal ≤ 1 / 2 := by
-    refine le_trans (ENNReal.toReal_mono (by simp) hfail) ?_
-    norm_num
-  have htot := Probability.PMF.toOuterMeasure_toReal_add_compl p S
-  linarith
+  simpa [one_div] using ENNReal.toReal_mono (Probability.PMF.toOuterMeasure_ne_top _ _)
+    (decodePruned_simultaneous_success_ge_half predictor hprec)
 
 end Cslib.Crypto.GoldreichLevin

@@ -23,7 +23,7 @@ import CslibFrontier.Probability.PMF.Bind
 import CslibFrontier.Tactic.PPT
 
 /-!
-# Polynomial-time word and oracle-PPT list decoders for Goldreich–Levin (Goldreich 2007, Thm. 7.8)
+# Polynomial-time word and oracle-PPT list decoders for Goldreich–Levin (Goldreich 2008, Thm. 7.8)
 
 This module lifts the finite simultaneous Goldreich–Levin list decoders of
 `CslibFrontier.Crypto.Computational.GoldreichLevin.ListDecoding` (`decode` and `decodePruned`) to:
@@ -82,7 +82,8 @@ This module lifts the finite simultaneous Goldreich–Levin list decoders of
 
 * [O. Goldreich, L. Levin, *A Hard-Core Predicate for All One-Way Functions*][GoldreichLevin1989]
 * [O. Goldreich, *Computational Complexity: A Conceptual Perspective*][Goldreich2008], Theorem 7.8
-  and Exercise 7.6.
+  (p. 254) and Exercise 7.6 (see also the March 2007 draft `r4.pdf` [Goldreich2007DraftR4],
+  Theorem 7.8 and Exercise 7.6).
 -/
 
 @[expose] public section
@@ -382,21 +383,8 @@ theorem wordListDecode_simultaneous_success_toReal_ge_half (predictor : List Boo
               List.ofFn x ∈ L) ∧
           L.Nodup ∧
           L.length ≤ 16 * n * precision ^ 4 + 2}).toReal := by
-  have h := wordListDecode_simultaneous_success_ge_half predictor n precision hprec
-  have hlt :
-      (((uniformList (listMaskCount n precision * n)).map
-          (wordListDecode predictor n precision)).toOuterMeasure
-        {L : List (List Bool) |
-          (∀ x : BitString n,
-            1 / 2 + 1 / (precision : ℝ) ≤
-              agreement (fun query => predictor (List.ofFn query)) x →
-              List.ofFn x ∈ L) ∧
-          L.Nodup ∧
-          L.length ≤ 16 * n * precision ^ 4 + 2}) ≠ ⊤ := by
-    exact ne_of_lt (lt_of_le_of_lt (Probability.PMF.toOuterMeasure_le_one _ _) ENNReal.one_lt_top)
-  have hmono := ENNReal.toReal_mono hlt h
-  have hhalf : (1 / 2 : ℝ≥0∞).toReal = 1 / 2 := by norm_num
-  rwa [hhalf] at hmono
+  simpa [one_div] using ENNReal.toReal_mono (Probability.PMF.toOuterMeasure_ne_top _ _)
+    (wordListDecode_simultaneous_success_ge_half predictor n precision hprec)
 
 /-- Count empirical hits of `candidate` against `predictor` over a list of sample rows. -/
 def wordEmpiricalHits (predictor : List Bool → Bool) (sampleRows : List (List Bool))
@@ -490,8 +478,7 @@ theorem polyTime_wordPruneCandidates {α : Type} {input : α ↪ List Bool}
       (encPair input encBits) encUnary := hnum.comp h1
   have hden' : ComputableInPolyTime (fun p : α × List Bool => den p.1)
       (encPair input encBits) encUnary := hden.comp h1
-  exact .of_tidy (ComputableTidilyInPolyTime.unary_le'
-    (hlen.unary_mul' hnum').tidy (hden'.unary_mul' hhits).tidy)
+  exact ComputableInPolyTime.unary_le' (hlen.unary_mul' hnum') (hden'.unary_mul' hhits)
 
 /-- Two-stage pruned polynomial-time Goldreich–Levin word list decoder: generate candidate words
 from `masks` using `listMaskCount dimension precision` masks, then prune them on
@@ -760,7 +747,8 @@ theorem lookupReply_map_of_mem (predictor : List Bool → Bool)
   unfold lookupReply
   have hlt : queries.idxOf query < queries.length := List.idxOf_lt_length_of_mem hq
   have hlt' : queries.idxOf query < (queries.map predictor).length := by simp [hlt]
-  rw [List.getD_eq_getElem _ _ hlt', List.getElem_map, List.getElem_idxOf hlt]
+  rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hlt', Option.getD_some,
+    List.getElem_map, List.getElem_idxOf hlt]
 
 /-- `wordCandidate` depends on `predictor` only at queries in `candidateQueries`. -/
 theorem wordCandidate_congr {predictor₁ predictor₂ : List Bool → Bool} (dimension : ℕ)
@@ -872,7 +860,7 @@ theorem isOraclePPTOn_queryBatchStep :
     IsOraclePPTOn (encPair (encList encBits) encBits) encBits
       (fun pair => queryBatchStep pair.1 pair.2) := by
   unfold queryBatchStep
-  refine (IsOraclePPTOn.query_take' () (by fun_prop) (by fun_prop)).map_with' ?_
+  refine (IsOraclePPTOn.query_take () (by fun_prop) (by fun_prop)).map_with ?_
   have hrep : ComputableInPolyTime (fun p : (List (List Bool) × List Bool) × List Bool => p.1.2)
       (encPair (encPair (encList encBits) encBits) encBits) encBits :=
     (ComputableInPolyTime.fst _ _).snd'
@@ -892,7 +880,7 @@ noncomputable def queryBatch (queries : List (List Bool)) : WordOracleComp Unit 
 theorem isOraclePPTOn_queryBatch :
     IsOraclePPTOn (encList encBits) encBits queryBatch := by
   unfold queryBatch
-  refine IsOraclePPTOn.iterateWith_of_bounded_growth'
+  refine IsOraclePPTOn.iterateWith_of_bounded_growth
     (by fun_prop) (by fun_prop) isOraclePPTOn_queryBatchStep
     (growth := fun _ => 1) (.const 1) ?_
   intro queries replies next hnext
@@ -997,8 +985,8 @@ theorem isOraclePPTOn_oracleListDecode :
     ComputableInPolyTime.snd _ _
   have hq : IsOraclePPTOn (encPair encListDecodeParams encBits) encBits
       (fun pm => queryBatch (listDecodeQueries pm.1.dimension pm.1.precision pm.2)) :=
-    isOraclePPTOn_queryBatch.preprocess' (polyTime_listDecodeQueries hdim hprec hmasks)
-  refine hq.map_with' ?_
+    isOraclePPTOn_queryBatch.preprocess (polyTime_listDecodeQueries hdim hprec hmasks)
+  refine hq.map_with ?_
   have hpm : ComputableInPolyTime
       (fun pmr : (ListDecodeParams × List Bool) × List Bool => pmr.1)
       (encPair (encPair encListDecodeParams encBits) encBits)
@@ -1133,9 +1121,9 @@ theorem isOraclePPTOn_oracleListDecodePruned :
   have hq : IsOraclePPTOn (encPair (encPair encListDecodeParams encBits) encBits) encBits
       (fun pms => queryBatch
         (listDecodePrunedQueries pms.1.1.dimension pms.1.1.precision pms.1.2 pms.2)) :=
-    isOraclePPTOn_queryBatch.preprocess'
+    isOraclePPTOn_queryBatch.preprocess
       (polyTime_listDecodePrunedQueries hdim2 hprec2 hmasks2 hsamples2)
-  refine hq.map_with' ?_
+  refine hq.map_with ?_
   have hpms3 : ComputableInPolyTime
       (fun pmsr : ((ListDecodeParams × List Bool) × List Bool) × List Bool => pmsr.1)
       (encPair (encPair (encPair encListDecodeParams encBits) encBits) encBits)
@@ -1187,7 +1175,7 @@ theorem runWith_oracleListDecodePruned_predictorOracle (predictor : List Bool �
     wordListDecodePruned_lookupReply_map, PMF.map_comp]
   rfl
 
-/-- **Pruned simultaneous oracle-PPT list decoding (`ℝ≥0∞`, Goldreich 2007 Theorem 7.8)**: for
+/-- **Pruned simultaneous oracle-PPT list decoding (`ℝ≥0∞`, Goldreich 2008 Theorem 7.8)**: for
 every Boolean oracle `B : BitString p.dimension → Bool` (with no efficiency assumption on `B`) and
 `0 < p.precision`, running `oracleListDecodePruned p` against `bitStringOracle B` succeeds with
 probability at least `1 / 2` in returning a duplicate-free list `L` that:
@@ -1231,21 +1219,7 @@ theorem oracleListDecodePruned_bitStringOracle_simultaneous_success_toReal_ge_ha
               1 / 2 + 1 / (2 * (p.precision : ℝ)) ≤ agreement B x) ∧
           L.Nodup ∧
           L.length ≤ p.precision ^ 2}).toReal := by
-  have h := oracleListDecodePruned_bitStringOracle_simultaneous_success_ge_half p hprec B
-  have hlt :
-      (((ProbOracleComp.runWith (bitStringOracle B) (oracleListDecodePruned p) ()).map
-          Prod.fst).toOuterMeasure
-        {L : List (List Bool) |
-          (∀ x : BitString p.dimension,
-            1 / 2 + 1 / (p.precision : ℝ) ≤ agreement B x → List.ofFn x ∈ L) ∧
-          (∀ x : BitString p.dimension,
-            List.ofFn x ∈ L →
-              1 / 2 + 1 / (2 * (p.precision : ℝ)) ≤ agreement B x) ∧
-          L.Nodup ∧
-          L.length ≤ p.precision ^ 2}) ≠ ⊤ := by
-    exact ne_of_lt (lt_of_le_of_lt (Probability.PMF.toOuterMeasure_le_one _ _) ENNReal.one_lt_top)
-  have hmono := ENNReal.toReal_mono hlt h
-  have hhalf : (1 / 2 : ℝ≥0∞).toReal = 1 / 2 := by norm_num
-  rwa [hhalf] at hmono
+  simpa [one_div] using ENNReal.toReal_mono (Probability.PMF.toOuterMeasure_ne_top _ _)
+    (oracleListDecodePruned_bitStringOracle_simultaneous_success_ge_half p hprec B)
 
 end Cslib.Crypto.GoldreichLevin
