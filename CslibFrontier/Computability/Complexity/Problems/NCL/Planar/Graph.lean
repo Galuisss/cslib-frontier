@@ -21,14 +21,13 @@ means existence of a continuous polygonal embedding, with self-loops and paralle
 
 ## Main definitions
 
-* `AndOrGraph.incidenceGraph`: the numbered incidence multigraph.
-* `AndOrGraph.IsPlanar`: existence of a polygonal embedding.
+* `AndOrGraph.incidenceGraph` extracts the numbered incidence multigraph.
+* `AndOrGraph.IsPlanar` states existence of a polygonal embedding.
 
 ## Main results
 
-* `AndOrGraph.incidenceGraph_endpoints`: all incident endpoints are declared.
-* `AndOrGraph.incidenceGraph_eq_drawing`: port extraction agrees with a complete drawing.
-* `Word.isPlanar_compile`: closed well-typed plane words compile to planar multigraphs.
+* `AndOrGraph.incidenceGraph_endpoints` shows that all incident endpoints are declared.
+* `Word.isPlanar_compile` proves planarity of closed well-typed plane-word compilations.
 
 ## References
 
@@ -140,7 +139,7 @@ private theorem portVertex_eq_of_drawing (g : AndOrGraph) (hb : g.Bounded)
     simpa only [portVertex, hf, Option.map_some, Option.getD_some] using congrArg Fin.val heq
 
 /-- The graph extracted from valid ports is the graph of any complete incidence drawing. -/
-theorem incidenceGraph_eq_drawing (g : AndOrGraph) (hg : g.Valid)
+private theorem incidenceGraph_eq_drawing (g : AndOrGraph) (hg : g.Valid)
     (D : GridDrawing.Closed g.graph) : g.incidenceGraph = D.incidenceGraph := by
   have hc := portCount_eq_two_mul g hg.1 hg.2.2
   have hm : g.edgeCount ≤ (g.vertices.flatMap Vertex.ports).length := by omega

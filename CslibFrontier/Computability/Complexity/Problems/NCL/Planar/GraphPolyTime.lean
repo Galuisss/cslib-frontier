@@ -20,8 +20,8 @@ counts are capped by this unary list-length bound before constructing a range.
 
 ## Main results
 
-* `AndOrGraph.computableInPolyTime_incidenceGraph`: incidence extraction under the binary
-  graph encodings runs in polynomial time on every raw input.
+* `AndOrGraph.computableInPolyTime_incidenceGraph` certifies incidence extraction in polynomial
+  time under the binary graph encodings, on every raw input.
 -/
 
 public section
@@ -67,9 +67,7 @@ theorem computableInPolyTime_incidenceGraph :
       encAndOrGraph encUnary := by
     convert hm using 1
     funext g
-    split_ifs with h
-    · exact (Nat.min_eq_right h).symm
-    · rfl
+    split_ifs <;> omega
   have hr : ComputableInPolyTime (fun g : AndOrGraph =>
       (List.range (g.vertices.flatMap Vertex.ports).length).take
         (if g.edgeCount ≤ (g.vertices.flatMap Vertex.ports).length then g.edgeCount else 0))

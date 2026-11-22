@@ -8,7 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Complexity.Problems.NCL.QBF.Planarized.Bits
-public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Reachability
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.PlaneWord.Reachability
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Diagram.PlaneReachability
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List
 
@@ -20,14 +20,14 @@ instances of the three plane-word decision problems. Their membership agrees wit
 
 ## Main definitions
 
-* `Cslib.Complexity.NCL.PlanarAndOrNCL.reduce`,
-  `Cslib.Complexity.NCL.PlanarAndOrNCLEdge.reduce`,
-  `Cslib.Complexity.NCL.PlanarAndOrNCLEdgeToEdge.reduce`: the three planar source reductions.
+* `Cslib.Complexity.NCL.PlaneWordAndOrNCL.reduce`,
+  `Cslib.Complexity.NCL.PlaneWordAndOrNCLEdge.reduce`,
+  `Cslib.Complexity.NCL.PlaneWordAndOrNCLEdgeToEdge.reduce`: the three planar source reductions.
 
 ## Main results
 
-* `Cslib.Complexity.NCL.PlanarAndOrNCL.reduce_mem_iff` and its edge variants: correctness.
-* `Cslib.Complexity.NCL.PlanarAndOrNCL.computableInPolyTime_reduce` and its edge variants:
+* `Cslib.Complexity.NCL.PlaneWordAndOrNCL.reduce_mem_iff` and its edge variants: correctness.
+* `Cslib.Complexity.NCL.PlaneWordAndOrNCL.computableInPolyTime_reduce` and its edge variants:
   polynomial-time emission.
 * `Cslib.Complexity.NCL.QBF.Planarized.num_output`,
   `Cslib.Complexity.NCL.QBF.Planarized.num_tryIn`,
@@ -86,14 +86,14 @@ namespace Cslib.Complexity.NCL
 
 open Diagram QBF.Planarized _root_.Turing.MultiTapeTM
 
-namespace PlanarAndOrNCL
+namespace PlaneWordAndOrNCL
 
 /-- The planar fixed-target source instance with explicit canonical configurations. -/
-@[expose] def reduce (x : PrenexCNF) : PlanarAndOrNCL.Instance :=
+@[expose] def reduce (x : PrenexCNF) : PlaneWordAndOrNCL.Instance :=
   ⟨word x, initialBits x, targetBits x⟩
 
 /-- The planar fixed-target source instance accepts exactly the source language. -/
-theorem reduce_mem_iff (x : PrenexCNF) : reduce x ∈ PlanarAndOrNCL ↔ x ∈ TQBFCNF :=
+theorem reduce_mem_iff (x : PrenexCNF) : reduce x ∈ PlaneWordAndOrNCL ↔ x ∈ TQBFCNF :=
   (Diagram.mem_plane_AndOrNCL_iff Prim.interp (diagram x) (checkPlane_word x)
     (graphData_valid x) (initial x).orient (target x).orient).trans
       ((and_iff_right (initial x).legal).trans (reachable_iff_mem_TQBFCNF x))
@@ -101,20 +101,20 @@ theorem reduce_mem_iff (x : PrenexCNF) : reduce x ∈ PlanarAndOrNCL ↔ x ∈ T
 /-- Emit the planar fixed-target source instance in polynomial time. -/
 @[fun_prop]
 theorem computableInPolyTime_reduce :
-    ComputableInPolyTime reduce encPrenexCNF encPlanarAndOrNCL := by
+    ComputableInPolyTime reduce encPrenexCNF encPlaneWordAndOrNCL := by
   unfold reduce
   fun_prop
 
-end PlanarAndOrNCL
+end PlaneWordAndOrNCL
 
-namespace PlanarAndOrNCLEdge
+namespace PlaneWordAndOrNCLEdge
 
 /-- The planar configuration-to-edge source instance tracking the output record. -/
-@[expose] def reduce (x : PrenexCNF) : PlanarAndOrNCLEdge.Instance :=
+@[expose] def reduce (x : PrenexCNF) : PlaneWordAndOrNCLEdge.Instance :=
   ⟨word x, initialBits x, (diagram x).num (output x)⟩
 
 /-- The planar configuration-to-edge instance accepts exactly the source language. -/
-theorem reduce_mem_iff (x : PrenexCNF) : reduce x ∈ PlanarAndOrNCLEdge ↔ x ∈ TQBFCNF :=
+theorem reduce_mem_iff (x : PrenexCNF) : reduce x ∈ PlaneWordAndOrNCLEdge ↔ x ∈ TQBFCNF :=
   (Diagram.mem_plane_AndOrNCLEdge_iff Prim.interp (diagram x) (checkPlane_word x)
     (graphData_valid x) (initial x).orient (output x)).trans
       ((and_iff_right (initial x).legal).trans (canReverse_iff_mem_TQBFCNF x))
@@ -122,22 +122,22 @@ theorem reduce_mem_iff (x : PrenexCNF) : reduce x ∈ PlanarAndOrNCLEdge ↔ x �
 /-- Emit the planar configuration-to-edge source instance in polynomial time. -/
 @[fun_prop]
 theorem computableInPolyTime_reduce :
-    ComputableInPolyTime reduce encPrenexCNF encPlanarAndOrNCLEdge := by
+    ComputableInPolyTime reduce encPrenexCNF encPlaneWordAndOrNCLEdge := by
   unfold reduce
   simp only [num_output]
   fun_prop
 
-end PlanarAndOrNCLEdge
+end PlaneWordAndOrNCLEdge
 
-namespace PlanarAndOrNCLEdgeToEdge
+namespace PlaneWordAndOrNCLEdgeToEdge
 
 /-- The planar directional source instance from inactive try to satisfied sat. -/
-@[expose] def reduce (x : PrenexCNF) : PlanarAndOrNCLEdgeToEdge.Instance :=
+@[expose] def reduce (x : PrenexCNF) : PlaneWordAndOrNCLEdgeToEdge.Instance :=
   ⟨word x, ⟨(diagram x).num (tryIn x), false⟩, ⟨(diagram x).num (satOut x), false⟩⟩
 
 /-- The planar directional source instance accepts exactly the source language. -/
 theorem reduce_mem_iff (x : PrenexCNF) :
-    reduce x ∈ PlanarAndOrNCLEdgeToEdge ↔ x ∈ TQBFCNF :=
+    reduce x ∈ PlaneWordAndOrNCLEdgeToEdge ↔ x ∈ TQBFCNF :=
   (Diagram.mem_plane_AndOrNCLEdgeToEdge_iff Prim.interp (diagram x) (checkPlane_word x)
     (graphData_valid x) (tryIn x) (satOut x) false false).trans
       (exists_reachable_sat_iff_mem_TQBFCNF x)
@@ -145,11 +145,11 @@ theorem reduce_mem_iff (x : PrenexCNF) :
 /-- Emit the planar directional source instance in polynomial time. -/
 @[fun_prop]
 theorem computableInPolyTime_reduce :
-    ComputableInPolyTime reduce encPrenexCNF encPlanarAndOrNCLEdgeToEdge := by
+    ComputableInPolyTime reduce encPrenexCNF encPlaneWordAndOrNCLEdgeToEdge := by
   unfold reduce
   simp only [num_tryIn, num_satOut]
   fun_prop
 
-end PlanarAndOrNCLEdgeToEdge
+end PlaneWordAndOrNCLEdgeToEdge
 
 end Cslib.Complexity.NCL

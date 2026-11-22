@@ -3006,6 +3006,8 @@ public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Bits
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.BlueCrossover
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Circuit
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Crossover
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Graph
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.GraphPolyTime
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.GridDrawing.Basic
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.GridDrawing.Cell
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.GridDrawing.Composition
@@ -3027,6 +3029,10 @@ public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Interfa
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.MixedCrossover
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.PSPACE
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Planarize
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.PlaneWord.Hardness
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.PlaneWord.PSPACE
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.PlaneWord.Reachability
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.PlaneWord.Reduction
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Reachability
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.RedCrossover
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Reduction

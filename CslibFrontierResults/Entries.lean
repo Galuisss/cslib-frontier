@@ -961,12 +961,13 @@ register_result "ncl-planar-and-or-pspace-complete" where
     Cslib.Complexity.NCL.PlanarAndOrNCLEdge_pspaceComplete,
     Cslib.Complexity.NCL.PlanarAndOrNCLEdgeToEdge_pspaceComplete
   ]
-  scope := "The three reachability problems use closed, well-typed words of adjacent single \
-    AND/OR vertices, with no swap instructions; configurations use one bit per compiled edge. \
-    Deterministic polynomial-time reductions from alternating prenex CNF emit loop-free \
-    multigraphs; parallel edges are allowed. PSPACE membership reuses general AND/OR \
-    reachability. Every checked word's actual compiled incidence graph admits a standard \
-    continuous planar orthogonal drawing, with its original finite edge numbering."
+  scope := "Configuration-to-configuration, configuration-to-edge and directional edge-to-edge \
+    reachability on finite AND/OR multigraphs whose incidence graph has a continuous polygonal \
+    embedding. The problems use the general binary graph encodings, admit self-loops and \
+    parallel edges, and require no drawing in the input. Planarity is in NP via bounded rotation \
+    certificates, and the three reachability problems are in PSPACE. Deterministic polynomial-time \
+    reductions from alternating prenex CNF compile PlaneWordAndOrNCL instances into loop-free \
+    graphs with continuous planar orthogonal grid drawings."
 
 register_result "alternation-apspace-exp" where
   title := "Chandra–Kozen–Stockmeyer: APSPACE equals EXP"
