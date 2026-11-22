@@ -20,14 +20,16 @@ for every coin sequence and that any static deterministic fallback can stall for
 t = 1` (`exists_nonterminating_of_fixed_coin`), Ben-Or [BenOr1983] achieves probability-1
 termination whenever `2 * t < Fintype.card P` by sampling fresh random coins in Stage 2.
 
-Because no process flips its phase-`r` coin until after Stage-1 and Stage-2 messages of phase `r`
-have been broadcast and collected, the asynchronous quorums `strat r st` of phase `r` are fixed
-before the phase-`r` coin draw is revealed—even against an adaptive scheduler `strat` that
-inspects the full global state `st : P → ProcState` left by all prior coin flips.
+`probRun` models randomized execution against a **pre-coin per-phase state-adaptive scheduler**
+`strat : ℕ → (P → ProcState) → PhaseSchedule P`: at the boundary of phase `r`, the scheduler
+inspects the global state `st` (reflecting all coin draws from phases `0 .. r - 1`) and commits all
+processes' Stage-1 and Stage-2 quorums `strat r st` before the phase-`r` coin vector is sampled
+from `coinLaw`. (Cross-phase full-information asynchronous schedulers—where fast processes advance
+into phase `r + 1` and reveal their phase-`r` local coin draws via phase-`(r + 1)` messages before
+slow processes finish collecting their phase-`r` quorums—are outside this per-phase Markov model.)
 
-`probRun` models this sequential Markov process over an arbitrary per-phase coin distribution
-`coinLaw : PMF (P → Bool)`. Whenever `coinLaw` places mass at least `p` on both unanimous coin
-vectors `fun _ => true` and `fun _ => false`:
+Whenever `coinLaw : PMF (P → Bool)` places mass at least `p` on both unanimous coin vectors
+`fun _ => true` and `fun _ => false`:
 
 1. `phaseStep_lucky_coin` guarantees at least one of those two constant vectors aligns every
    process onto a common estimate at the end of phase `r`, bounding single-phase non-unanimity
@@ -68,14 +70,12 @@ Instantiating `coinLaw` yields both standard randomized consensus regimes:
   `¬ AllDecided` after `k + 1` phases.
 * `Cslib.Distributed.BenOr.tendsto_probRun_not_allDecided`: non-decision probability tends to `0`
   as the phase count tends to `∞` whenever `0 < p`.
-* `Cslib.Distributed.BenOr.probRun_commonCoin_not_unanimous_le`,
-  `Cslib.Distributed.BenOr.probRun_commonCoin_not_allDecided_le`,
-  `Cslib.Distributed.BenOr.tendsto_probRun_commonCoin_not_allDecided`: `(1 / 2) ^ k` tail bounds
-  and probability-1 termination under a common fair coin.
-* `Cslib.Distributed.BenOr.probRun_localCoin_not_unanimous_le`,
-  `Cslib.Distributed.BenOr.probRun_localCoin_not_allDecided_le`,
+* `Cslib.Distributed.BenOr.probRun_commonCoin_not_allDecided_le`,
+  `Cslib.Distributed.BenOr.tendsto_probRun_commonCoin_not_allDecided`: `(1 / 2) ^ k` tail bound and
+  probability-1 termination under a common fair coin.
+* `Cslib.Distributed.BenOr.probRun_localCoin_not_allDecided_le`,
   `Cslib.Distributed.BenOr.tendsto_probRun_localCoin_not_allDecided`: `(1 - (1 / 2) ^ |P|) ^ k`
-  tail bounds and probability-1 termination under independent local fair coins.
+  tail bound and probability-1 termination under independent local fair coins.
 
 ## References
 
@@ -93,8 +93,9 @@ open Cslib.Probability.PMF Filter
 /-! ### Sequential probabilistic execution and coin laws -/
 
 /-- State distribution after `k` phases of Ben-Or's protocol from initial inputs `inp`. At the
-start of each phase `r`, the adaptive scheduler `strat r st` selects that phase's asynchronous
-quorums from the current global state `st`, before a fresh coin vector is sampled from `coinLaw`. -/
+boundary of each phase `r`, the pre-coin per-phase state-adaptive scheduler `strat r st` commits
+all processes' Stage-1 and Stage-2 quorums from the current global state `st`, before the phase-`r`
+coin vector is sampled from `coinLaw`. -/
 noncomputable def probRun {P : Type*} [Fintype P] (t : ℕ)
     (coinLaw : PMF (P → Bool))
     (strat : ℕ → (P → ProcState) → PhaseSchedule P)
@@ -218,9 +219,9 @@ private lemma singlePhase_not_allDecided_eq_zero {P : Type*} [Fintype P] {t : �
 /-! ### Parametric multi-phase tail bounds and probability-1 termination -/
 
 /-- **Parametric non-unanimity tail bound:** if `coinLaw` assigns probability at least `p` to both
-constant coin vectors `fun _ => true` and `fun _ => false`, then against any adaptive valid
-scheduler `strat` with `2 * t < |P|`, the probability that process estimates are not unanimous
-after `k` phases is at most `(1 - p) ^ k`. -/
+constant coin vectors `fun _ => true` and `fun _ => false`, then against any pre-coin per-phase
+state-adaptive valid scheduler `strat` with `2 * t < |P|`, the probability that process estimates
+are not unanimous after `k` phases is at most `(1 - p) ^ k`. -/
 theorem probRun_not_unanimous_le {P : Type*} [Fintype P] {t : ℕ}
     (ht : 2 * t < Fintype.card P) {coinLaw : PMF (P → Bool)} {p : ℝ≥0∞}
     (hcoin : ∀ b : Bool, p ≤ coinLaw (fun _ => b))
@@ -297,7 +298,7 @@ theorem probRun_not_allDecided_le {P : Type*} [Fintype P] {t : ℕ}
 
 /-- **Parametric probability-1 termination:** whenever `0 < p` and `∀ b, p ≤ coinLaw (fun _ => b)`,
 the probability that processes have not all decided a common value after `m` phases converges to
-`0` as `m → ∞`. -/
+`0` as `m → ∞` against any pre-coin per-phase state-adaptive valid scheduler `strat`. -/
 theorem tendsto_probRun_not_allDecided {P : Type*} [Fintype P] {t : ℕ}
     (ht : 2 * t < Fintype.card P) {coinLaw : PMF (P → Bool)} {p : ℝ≥0∞}
     (hp : 0 < p) (hcoin : ∀ b : Bool, p ≤ coinLaw (fun _ => b))
@@ -323,19 +324,9 @@ private lemma one_sub_half_ennreal : (1 : ℝ≥0∞) - (1 / 2 : ℝ≥0∞) = 1
     exact ENNReal.inv_two_add_inv_two
   exact ENNReal.sub_eq_of_eq_add (by simp) htwo.symm
 
-/-- **Common-coin non-unanimity bound:** after `k` phases under `commonCoinLaw P`, the probability
-that estimates are not unanimous is at most `(1 / 2) ^ k`. -/
-theorem probRun_commonCoin_not_unanimous_le {P : Type*} [Fintype P] {t : ℕ}
-    (ht : 2 * t < Fintype.card P) {strat : ℕ → (P → ProcState) → PhaseSchedule P}
-    (inp : P → Bool) (k : ℕ) (hv : ∀ r < k, ∀ st, (strat r st).Valid t) :
-    (probRun t (commonCoinLaw P) strat inp k).toOuterMeasure {st | ¬ IsUnanimous st} ≤
-      (1 / 2 : ℝ≥0∞) ^ k := by
-  simpa only [one_sub_half_ennreal] using
-    probRun_not_unanimous_le ht (half_le_commonCoinLaw P) inp k hv
-
 /-- **Common-coin termination bound:** after `k + 1` phases under `commonCoinLaw P` with
-`2 * t < |P|`, the probability that processes have not all decided a common value is at most
-`(1 / 2) ^ k`. -/
+`2 * t < |P|` against any pre-coin per-phase state-adaptive valid scheduler `strat`, the
+probability that processes have not all decided a common value is at most `(1 / 2) ^ k`. -/
 theorem probRun_commonCoin_not_allDecided_le {P : Type*} [Fintype P] {t : ℕ}
     (ht : 2 * t < Fintype.card P) {strat : ℕ → (P → ProcState) → PhaseSchedule P}
     (inp : P → Bool) (k : ℕ) (hv : ∀ r < k + 1, ∀ st, (strat r st).Valid t) :
@@ -345,8 +336,8 @@ theorem probRun_commonCoin_not_allDecided_le {P : Type*} [Fintype P] {t : ℕ}
     probRun_not_allDecided_le ht (half_le_commonCoinLaw P) inp k hv
 
 /-- **Common-coin probability-1 termination:** under a common fair coin with `2 * t < |P|`, the
-probability of non-decision after `m` phases tends to `0` as `m → ∞` against any adaptive valid
-scheduler. -/
+probability of non-decision after `m` phases tends to `0` as `m → ∞` against any pre-coin
+per-phase state-adaptive valid scheduler. -/
 theorem tendsto_probRun_commonCoin_not_allDecided {P : Type*} [Fintype P] {t : ℕ}
     (ht : 2 * t < Fintype.card P) {strat : ℕ → (P → ProcState) → PhaseSchedule P}
     (hv : ∀ r st, (strat r st).Valid t) (inp : P → Bool) :
@@ -358,19 +349,10 @@ theorem tendsto_probRun_commonCoin_not_allDecided {P : Type*} [Fintype P] {t : �
 
 /-! ### Independent local fair coins (`≤ (1 - (1 / 2) ^ |P|) ^ k`) -/
 
-/-- **Local-coin non-unanimity bound ([BenOr1983]):** after `k` phases under independent local fair
-coins (`localCoinLaw P`), the probability that estimates are not unanimous is at most
-`(1 - (1 / 2) ^ |P|) ^ k`. -/
-theorem probRun_localCoin_not_unanimous_le {P : Type*} [Fintype P] {t : ℕ}
-    (ht : 2 * t < Fintype.card P) {strat : ℕ → (P → ProcState) → PhaseSchedule P}
-    (inp : P → Bool) (k : ℕ) (hv : ∀ r < k, ∀ st, (strat r st).Valid t) :
-    (probRun t (localCoinLaw P) strat inp k).toOuterMeasure {st | ¬ IsUnanimous st} ≤
-      (1 - (1 / 2 : ℝ≥0∞) ^ Fintype.card P) ^ k :=
-  probRun_not_unanimous_le ht (fun b => (localCoinLaw_apply (fun _ => b)).ge) inp k hv
-
 /-- **Local-coin termination bound ([BenOr1983]):** after `k + 1` phases under independent local
-fair coins with `2 * t < |P|`, the probability that processes have not all decided a common value
-is at most `(1 - (1 / 2) ^ |P|) ^ k`. -/
+fair coins with `2 * t < |P|` against any pre-coin per-phase state-adaptive valid scheduler `strat`,
+the probability that processes have not all decided a common value is at most
+`(1 - (1 / 2) ^ |P|) ^ k`. -/
 theorem probRun_localCoin_not_allDecided_le {P : Type*} [Fintype P] {t : ℕ}
     (ht : 2 * t < Fintype.card P) {strat : ℕ → (P → ProcState) → PhaseSchedule P}
     (inp : P → Bool) (k : ℕ) (hv : ∀ r < k + 1, ∀ st, (strat r st).Valid t) :
@@ -380,7 +362,7 @@ theorem probRun_localCoin_not_allDecided_le {P : Type*} [Fintype P] {t : ℕ}
 
 /-- **Local-coin probability-1 termination ([BenOr1983]):** under independent local fair coins with
 `2 * t < |P|`, the probability of non-decision after `m` phases tends to `0` as `m → ∞` against any
-adaptive valid scheduler. -/
+pre-coin per-phase state-adaptive valid scheduler. -/
 theorem tendsto_probRun_localCoin_not_allDecided {P : Type*} [Fintype P] {t : ℕ}
     (ht : 2 * t < Fintype.card P) {strat : ℕ → (P → ProcState) → PhaseSchedule P}
     (hv : ∀ r st, (strat r st).Valid t) (inp : P → Bool) :

@@ -435,14 +435,17 @@ theorem phaseStep_lucky_coin {P : Type*} [Fintype P] (t : ℕ) (sched : PhaseSch
       Option.eq_none_iff_forall_ne_some.mpr fun b' hb' => hex ⟨j, b', hb'⟩
     exact stage2Update_est_of_all_none hnone
 
-private lemma phaseStep_of_q1_est_eq {P : Type*} [Fintype P] {t : ℕ} {sched : PhaseSchedule P}
+/-- From any state where all processes hold estimate `b`, one valid phase preserves estimate `b` on
+every process and sets every undecided process's decision register to `some b`, independent of
+`coins`. -/
+theorem phaseStep_of_est_eq {P : Type*} [Fintype P] {t : ℕ} {sched : PhaseSchedule P}
     (ht : 2 * t < Fintype.card P) (hv : sched.Valid t) (coins : P → Bool)
-    {st : P → ProcState} {b : Bool} (hest : ∀ j, ∀ k ∈ sched.q1 j, (st k).est = b) (p : P) :
+    {st : P → ProcState} {b : Bool} (hest : ∀ p, (st p).est = b) (p : P) :
     (phaseStep t sched coins st p).est = b ∧
       ((st p).decided = none → (phaseStep t sched coins st p).decided = some b) := by
   let prop : P → Option Bool := fun j => stage1Proposal st (sched.q1 j)
   have hprop : ∀ j, prop j = some b := fun j =>
-    stage1Proposal_of_forall_est ht (hv.card_q1 j) (hest j)
+    stage1Proposal_of_forall_est ht (hv.card_q1 j) (fun k _ => hest k)
   have huniq : ∀ j₁ j₂ b₁ b₂, prop j₁ = some b₁ → prop j₂ = some b₂ → b₁ = b₂ := by
     intro j₁ j₂ b₁ b₂ h₁ h₂
     rw [hprop j₁, Option.some.injEq] at h₁
@@ -456,16 +459,6 @@ private lemma phaseStep_of_q1_est_eq {P : Type*} [Fintype P] {t : ℕ} {sched : 
     (proposalCount_pos_iff prop (sched.q2 p) b).mp (by omega)
   refine ⟨stage2Update_est_of_unique huniq hex, fun hd => ?_⟩
   exact (stage2Update_decided_eq_some_iff_of_none huniq hd b).mpr hge
-
-/-- From any state where all processes hold estimate `b`, one valid phase preserves estimate `b` on
-every process and sets every undecided process's decision register to `some b`, independent of
-`coins`. -/
-theorem phaseStep_of_est_eq {P : Type*} [Fintype P] {t : ℕ} {sched : PhaseSchedule P}
-    (ht : 2 * t < Fintype.card P) (hv : sched.Valid t) (coins : P → Bool)
-    {st : P → ProcState} {b : Bool} (hest : ∀ p, (st p).est = b) (p : P) :
-    (phaseStep t sched coins st p).est = b ∧
-      ((st p).decided = none → (phaseStep t sched coins st p).decided = some b) :=
-  phaseStep_of_q1_est_eq ht hv coins (fun _ k _ => hest k) p
 
 /-- `IsUnanimous` is preserved across any valid phase under arbitrary coins. -/
 theorem IsUnanimous.phaseStep {P : Type*} [Fintype P] {t : ℕ} {sched : PhaseSchedule P}
@@ -500,8 +493,7 @@ theorem phaseStep_lock_in {P : Type*} [Fintype P] {t : ℕ} {sched : PhaseSchedu
   rw [Finset.mem_inter, Finset.mem_filter] at hj
   exact stage2Update_est_of_unique huniq ⟨j, hj.2, hj.1.2⟩
 
-/-- Write-once monotonicity across a single phase. -/
-theorem phaseStep_decided_stable {P : Type*} [Fintype P] {t : ℕ} {sched : PhaseSchedule P}
+private lemma phaseStep_decided_stable {P : Type*} [Fintype P] {t : ℕ} {sched : PhaseSchedule P}
     {coins : P → Bool} {st : P → ProcState} {p : P} {b : Bool}
     (hd : (st p).decided = some b) :
     (phaseStep t sched coins st p).decided = some b :=
@@ -567,25 +559,13 @@ theorem phaseStep_allDecided_of_est_eq {P : Type*} [Fintype P] {t : ℕ} {sched 
     subst hdb
     exact phaseStep_decided_stable hd
 
-/-- **Unanimous validity (1-phase fast path):** if all initial inputs equal `b` (or more generally,
-every Stage-1 quorum in phase `0` sees only `b`), then every process decides `b` at the end of
-phase `0` (`r = 1`), regardless of `coins`. -/
-theorem run_validity_of_q1 {P : Type*} [Fintype P] {t : ℕ} {sched : ℕ → PhaseSchedule P}
-    (ht : 2 * t < Fintype.card P) (hv₀ : (sched 0).Valid t) (coins : ℕ → P → Bool)
-    {inp : P → Bool} {b : Bool} (hinp : ∀ j, (∃ p, j ∈ (sched 0).q1 p) → inp j = b) (p : P) :
-    (run t sched coins inp 1 p).decided = some b ∧
-      (run t sched coins inp 1 p).est = b := by
-  have h := phaseStep_of_q1_est_eq ht hv₀ (coins 0) (st := initState inp)
-    (fun j k hk => hinp k ⟨j, hk⟩) p
-  exact ⟨h.2 rfl, h.1⟩
-
 /-- **Unanimous validity:** if all processes start with input `b`, every process decides `b` after
 phase `0` (`r = 1`), without depending on any coin value. -/
 theorem run_validity {P : Type*} [Fintype P] {t : ℕ} {sched : ℕ → PhaseSchedule P}
     (ht : 2 * t < Fintype.card P) (hv₀ : (sched 0).Valid t) (coins : ℕ → P → Bool)
     {inp : P → Bool} {b : Bool} (hinp : ∀ p, inp p = b) (p : P) :
     (run t sched coins inp 1 p).decided = some b :=
-  (run_validity_of_q1 ht hv₀ coins (fun j _ => hinp j) p).1
+  (phaseStep_of_est_eq ht hv₀ (coins 0) hinp p).2 rfl
 
 /-- **Next-phase global decision:** once any process `p` has decided `b` by phase `r`, every
 process `q` has decided `b` by phase `r + 1`. -/
