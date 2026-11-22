@@ -2065,8 +2065,12 @@ register_result "rompel-uowhf" where
     AdversaryInaccessibleEntropyFamily), and hence every uniform one-way function on bit strings, \
     gives a target collision-resistant keyed hash family on all bit strings against uniform \
     strict PPT adversaries that commit to a target before seeing the key. `rompelHash` is secure \
-    for every shrinking collision grid. Each one-bit step takes a fresh subkey, so keys are \
-    polynomial but not as compact as the source's O(|y| log t) bound. Asymptotic security."
+    for every shrinking collision grid; amplification yields `(Nat.log 2 n + 1)`-bit shrinkage, \
+    `rompelCompression` uses Shoup's XOR-masking cascade with one shared `O(|y| log t)` key \
+    across candidates (`rompelCompression_keyLen_le`), and `rompelHash` wraps `rompelCompression` \
+    in the `(n + 1)`-level `KeyedCompressionFamily.treeHash`. Qualitative asymptotic polynomial \
+    scope: dense two-universal matrices in `EntropyReduction` rather than Theorem 5.1's Toeplitz \
+    degree."
 
 register_result "resolution" where
   title := "Haken: pigeonhole formulas require long resolution proofs"
