@@ -5926,50 +5926,62 @@ register_result "sperner-2d-ppad-completeness" where
     completeness and d-dimensional circuit Sperner are not formalized."
 
 register_result "lwe-normal-form-decision" where
-  title := "Reduction of general Decision LWE to Decision LWE in normal form"
+  title := "Decision LWE normal-form reduction from error secret to uniform secret"
   topic := "cryptography"
   sources := [
-    { paper := Peikert2016, theorem := "Normal form", locator := "§4.2.1, p. 23" }
+    { paper := Peikert2016, theorem := "Normal form",
+      locator := "Section 4.2.1, p. 23 (February 17, 2016 author PDF)" }
   ]
   theorems := [
     Cslib.Crypto.PrimeLWE.decisionNormalForm
   ]
-  scope := "Proved finite inequalities bounding the standard Decision LWE distinguishing \
-    advantage by the normal-form advantage (plus the probability of a singular top block). \
-    The reduction is executed on explicitly encoded words via `decisionNormalForm`. \
-    The underlying reduction uses `gaussInv?` and lacks a formalized PPT closure \
-    (an open M07 objective)."
+  scope := "Finite inequality over prime ZMod q bounding an m-sample error-secret \
+    Decision LWE distinguisher's advantage (realEnsembleErrorSecret vs uniformEnsemble) by \
+    the (n + m)-sample uniform-secret Decision LWE advantage of reduceNormalDecision D \
+    (realEnsemble vs uniformEnsemble) plus the singularity probability Pr[det A = 0] of a \
+    uniform n × n matrix over ZMod q, on framed-integer matrix encodings (encMatrix). \
+    Uses determinant/adjugate inversion (gaussInv?); native polynomial-time inversion and \
+    asymptotic IsPPTOn closure remain open (#3673 M07)."
 
 register_result "lwe-normal-form-search" where
-  title := "Reduction of general Search LWE to Search LWE in normal form"
+  title := "Search LWE normal-form reduction from error secret to uniform secret"
   topic := "cryptography"
   sources := [
-    { paper := Peikert2016, theorem := "Normal form", locator := "§4.2.1, p. 23" }
+    { paper := Peikert2016, theorem := "Normal form",
+      locator := "Section 4.2.1, p. 23 (February 17, 2016 author PDF)" }
   ]
   theorems := [
     Cslib.Crypto.PrimeLWE.searchNormalForm
   ]
-  scope := "Proved finite inequalities bounding the standard Search LWE success probability \
-    by the normal-form success probability (plus the singular top block probability). \
-    Executed on explicitly encoded words via `searchNormalForm`. Like the decision reduction, \
-    it lacks a formalized PPT closure for `gaussInv?` (an open M07 objective)."
+  scope := "Finite inequality over prime ZMod q bounding an m-sample error-secret \
+    Search LWE solver's success probability (searchGameErrorSecret) by the (n + m)-sample \
+    uniform-secret Search LWE success probability of reduceNormalSearch (searchGame) plus \
+    the singularity probability Pr[det A = 0] of a uniform n × n matrix over ZMod q, on \
+    framed-integer matrix and vector encodings (encMatrix, encZModVec). Uses \
+    determinant/adjugate inversion (gaussInv?); native polynomial-time inversion and \
+    asymptotic IsPPTOn closure remain open (#3673 M07)."
 
 register_result "lwe-search-to-decision" where
-  title := "Search-to-Decision reduction for LWE"
+  title := "Concrete search-to-decision reduction for prime-modulus LWE"
   topic := "cryptography"
   sources := [
     { paper := Regev2009, theorem := "Lemmas 4.1 & 4.2",
-      locator := "pp. 30-31 & p. 31 (May 2, 2009 version)" }
+      locator := "pp. 30–31 (May 2, 2009 author PDF)" }
   ]
   theorems := [
     Cslib.Crypto.PrimeLWE.searchToDecision
   ]
-  scope := "Concrete Search-to-Decision reduction showing that an adversary breaking
-    Decision LWE over a prime modulus can be used to construct a solver for Search LWE.
-    The result bounds the success probability using Chernoff-Hoeffding bounds and a
-    union bound over coordinate trials. The asymptotic PPT (IsPPTOn) SearchLWE ->
-    DecisionLWE corollary is not proved because uniform ZMod q sampling for
-    non-powers-of-2 is not perfectly PPT."
+  scope := "Quantitative finite adaptation over arbitrary prime ZMod q and noise law: \
+    given a fixed-batch m-sample Decision LWE distinguisher with absolute averaged \
+    acceptance gap ε = Game.advantage (over a uniform secret), reduceSearchToDecision \
+    recovers the secret in searchGame from a fresh sample budget of \
+    searchSamples n q N m = (n * q + 1) * N * m framed-integer matrix samples (encMatrix) \
+    with probability at least 1 - (n * q + 1) * (2 * exp (-N * ε ^ 2 / 8)), via fresh \
+    per-trial secret re-randomization, Hoeffding's inequality, and a union bound. \
+    Unlike Regev Lemma 4.1 (non-negligible fraction of good secrets) and Lemma 4.2 \
+    (strong all-secret distinguisher with prime 2 ≤ p ≤ poly(n) and efficient recovery), \
+    exact uniform ZMod q sampling and noncomputable argmax selection leave native \
+    IsPPTOn security open (#3673 M07)."
 
 register_result "branching-vector-recurrence" where
   title := "Search-tree branching-vector recurrences and separated node-work bounds"

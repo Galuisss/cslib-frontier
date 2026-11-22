@@ -1737,10 +1737,6 @@ OpenAI. *Exact Derandomization of Logarithmic Space: L = RL = BPL*. Preprint, 23
 
 OpenAI. *The Exponential Time Hypothesis is False*. Manuscript dated 17 October 2026, revised 25 October 2026. Source revision `7ef5c0cc5ca4b0e072b7a050fca09ab24bc6fa3a`. [PDF](https://github.com/openai/math/blob/7ef5c0cc5ca4b0e072b7a050fca09ab24bc6fa3a/preprints/The-Exponential-Time-Hypothesis-is-False-October-25-2026/paper.pdf); [primary TeX](https://github.com/openai/math/blob/7ef5c0cc5ca4b0e072b7a050fca09ab24bc6fa3a/preprints/The-Exponential-Time-Hypothesis-is-False-October-25-2026/build/main_full_version.tex). The interpolation-route statement, metadata and label were checked in freshly retrieved TeX on 2026-11-02; full proof and PDF pagination were not independently audited.
 
-<a id="peikert2016"></a>
-## peikert2016
-
-Chris Peikert. *A Decade of Lattice Cryptography*. Foundations and Trends in Theoretical Computer Science 10(4), 283–424, 2016. https://doi.org/10.1561/0400000074 . Consulted for the equivalence between LWE normal form (secret key drawn from the error distribution) and the standard LWE problem (Section 4.2.1, page 23).
 <a id="papadimitriou94ppad"></a>
 ## papadimitriou94ppad
 
@@ -1750,6 +1746,11 @@ Christos H. Papadimitriou. "On the Complexity of the Parity Argument and Other I
 ## pedersen1991
 
 Torben Pryds Pedersen. "Non-Interactive and Information-Theoretic Secure Verifiable Secret Sharing." *Advances in Cryptology — CRYPTO '91*, LNCS 576, 129–140, Springer, 1992. https://doi.org/10.1007/3-540-46766-1_9 . Publisher's PDF, https://link.springer.com/content/pdf/10.1007/3-540-46766-1_9.pdf , fetched on 2026-11-18 UTC (SHA-256 `79c0634a04b7bc869715770519eca9dcfcb3011012dbff054b9487b187558b18`): a 12-page scan of the complete printed pp. 129–140 (PDF page = printed page − 128). Read on 2026-11-18: Section 2 (p. 130: primes `q | p − 1`, `G_q` the order-`q` subgroup of `Z_p^*`, `g` a generator) and all of Section 3 (p. 131): `g` and `h` are chosen so that nobody knows `log_g h`, by a trusted center or a coin-flipping protocol; the commitment is `E(s, t) = g^s h^t` for `s ∈ Z_q` and random `t ∈ Z_q`; Theorem 3.1 states that for uniform `t` the commitment is uniform on `G_q` (first sentence) and that `s ≠ s'` with `E(s, t) = E(s', t')` gives `t ≠ t' mod q` and `log_g h = (s − s')/(t' − t) mod q` (second sentence). The theorem states no game or computational assumption, and the first sentence needs `h ≠ 1`, which the condition on `log_g h` implies. Sections 4–6 were not checked.
+
+<a id="peikert2016"></a>
+## peikert2016
+
+Chris Peikert. *A Decade of Lattice Cryptography*. Foundations and Trends in Theoretical Computer Science 10(4), 283–424, 2016. https://doi.org/10.1561/0400000074 ; author PDF dated February 17, 2016 at https://web.eecs.umich.edu/~cpeikert/pubs/lattice-survey.pdf . Consulted in the February 17, 2016 author PDF: Section 4.2.1, unnumbered "Normal form" paragraph, printed p. 23, for the reduction from error-secret (normal-form) LWE on `m` samples to uniform-secret LWE on `n + m` samples by inverting the top `n × n` block, losing the singular-block probability (`NormalForm.lean` formalizes the finite game inequalities on framed-integer encodings without certifying polynomial-time inversion).
 
 <a id="pighizzini2009"></a>
 ## pighizzini2009
@@ -1801,6 +1802,11 @@ Bruce Reed, Kaleigh Smith and Adrian Vetta. "Finding Odd Cycle Transversals." *O
 
 Oded Regev. *Lattices in Computer Science*, Lecture 3: "CVP Algorithm" (scribe: E. Kaplan). Lecture notes, Tel Aviv University, Fall 2004. https://cims.nyu.edu/~regev/teaching/lattices_fall_2004/ln/cvp.pdf . Inspected on 2026-11-08: §1 (the nearest-plane algorithm with `δ = 3/4` LLL, input `B ∈ ℤ^{m×n}`, `t ∈ ℤᵐ`), Claims 4–5, and Lemma 6 (`‖x − t‖ ≤ 2^{n/2} ‖y − t‖` for the output `x` and a closest lattice point `y`). The notes attribute the factor `2 (2/√3)ⁿ` to Babai's algorithm and present `2^{n/2}` for simplicity.
 
+<a id="regev2009"></a>
+## regev2009
+
+Oded Regev. "On lattices, learning with errors, random linear codes, and cryptography." *Journal of the ACM* 56(6), Article 34 (1–40), 2009. https://doi.org/10.1145/1568318.1568324 ; author PDF dated May 2, 2009 at https://cims.nyu.edu/~regev/papers/qcrypto.pdf . Consulted in the May 2, 2009 author PDF: Lemma 4.1 (pp. 30–31, non-negligible fraction of good secrets from uniform-secret advantage) and Lemma 4.2 (p. 31, efficient search from an all-secret distinguisher for prime `2 ≤ p ≤ poly(n)`). `SearchToDecision.lean` formalizes a quantitative finite-parameter adaptation for arbitrary prime `q` using a fixed-batch distinguisher's absolute averaged acceptance gap, fresh per-trial secret re-randomization over `(n * q + 1) * N * m` samples, and an explicit Hoeffding bound, without an `IsPPTOn` certificate.
+
 <a id="reingold2008"></a>
 ## reingold2008
 
@@ -1810,11 +1816,6 @@ Omer Reingold. “Undirected Connectivity in Log-Space.” *Journal of the ACM* 
 ## reynolds02
 
 John C. Reynolds. “Separation Logic: A Logic for Shared Mutable Data Structures.” *LICS 2002*, 55–74. https://doi.org/10.1109/LICS.2002.1029817 ; author PDF https://www.cs.cmu.edu/~jcr/seplogic.pdf . The standard locality/separating-conjunction principle was consulted; the local finite-support model is an adaptation.
-
-<a id="regev2009"></a>
-## regev2009
-
-Oded Regev. "On lattices, learning with errors, random linear codes, and cryptography." *Journal of the ACM* 56(6), 1–40, 2009. https://doi.org/10.1145/1568318.1568324 . Consulted for the equivalence of search and decision LWE (Lemma 4.1-4.2, pages 30-31).
 
 <a id="rompel90"></a>
 ## rompel90

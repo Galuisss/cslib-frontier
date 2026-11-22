@@ -59,13 +59,26 @@ statement is given here.
 ## References
 
 * [O. Regev, *On lattices, learning with errors, random linear codes, and cryptography*][Regev2009]
-  (May 2, 2009 version), Lemma 4.1 (pp. 30-31) and Lemma 4.2 (p. 31). This fixed-batch
-  averaged-acceptance-gap
-  theorem differs from Regev by explicitly mapping matrix encodings, using a fresh re-randomization
-  per trial, quantifying over arbitrary finite parameters (without asymptotics), giving
-  an explicit Hoeffding bound constant (instead of Chernoff limits), and leaving open the remaining
-  computational resource gap (the uniform noncomputable choice of the max-accepting guess).
-* [C. Peikert, *A Decade of Lattice Cryptography*][Peikert2016], Section 4.2.1.
+  (May 2, 2009 author PDF, `https://cims.nyu.edu/~regev/papers/qcrypto.pdf`), Lemma 4.1
+  (pp. 30–31) and Lemma 4.2 (p. 31). Regev's Lemma 4.1 shows that an asymptotic uniform-secret
+  distinguisher succeeds on a non-negligible fraction of fixed secrets, and Lemma 4.2 assumes a
+  strong distinguisher succeeding for *all* secrets together with a prime modulus
+  `2 ≤ p ≤ poly(n)` to obtain a polynomial-time search reduction. By contrast, `searchToDecision`
+  is a quantitative finite-parameter adaptation:
+  1. It takes a fixed-batch `m`-sample distinguisher's absolute averaged acceptance gap
+     (`Game.advantage` over a uniform secret) directly rather than an all-secret distinguisher or
+     a good-secret fraction;
+  2. It re-randomizes the secret freshly in every trial (`rerandomizeSecret`) across a fresh
+     sample budget of `searchSamples n q N m = (n * q + 1) * N * m` framed binary matrix words
+     (`encMatrix`);
+  3. It applies to any finite prime `q` (without `q ≤ poly(n)`), any dimensions `n, m`, any noise
+     law on `ZMod q`, and any trial count `N`, with the explicit Hoeffding constant
+     `1 - (n * q + 1) * (2 * exp (-N * ε ^ 2 / 8))`;
+  4. It leaves native `IsPPTOn` efficiency open because `reduceSearchToDecision` draws exact
+     uniform residues in `ZMod q` (which fair-coin machines cannot sample exactly for odd primes
+     `q`) and selects maximizing guesses via noncomputable `guessSecret` (`Classical.choose`).
+* [C. Peikert, *A Decade of Lattice Cryptography*][Peikert2016] (February 17, 2016 author PDF,
+  `https://web.eecs.umich.edu/~cpeikert/pubs/lattice-survey.pdf`), Section 4.2 (p. 23).
 -/
 
 public section
@@ -566,11 +579,11 @@ theorem searchToDecision {n m q : ℕ} [Fact (Nat.Prime q)] {noise : PMF (ZMod q
   have hR : distinguishingGame
       (realEnsemble (fun _ => n) (fun _ => m) (fun _ => q) (fun _ => noise) 0) adversary =
         realLaw noise D := by
-    simp only [distinguishingGame, realEnsemble, realLaw, pmf_norm]
+    simp only [distinguishingGame_eq_bind, realEnsemble, realLaw, pmf_norm]
     rfl
   have hU : distinguishingGame (uniformEnsemble (fun _ => n) (fun _ => m) (fun _ => q) 0)
       adversary = uniformLaw D := by
-    simp only [distinguishingGame, uniformEnsemble, uniformLaw, pmf_norm]
+    simp only [distinguishingGame_eq_bind, uniformEnsemble, uniformLaw, pmf_norm]
     rfl
   rw [Game.coe_advantage, Game.coe_succProbability, Game.coe_succProbability, hR, hU,
     Game.coe_succProbability]

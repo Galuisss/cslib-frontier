@@ -22,8 +22,9 @@ import CslibFrontier.Probability.PMF.Uniform
 /-!
 # LWE Normal Form reduction
 
-The reduction shows that `SearchLWE` and `DecisionLWE` with a uniform secret
-reduce to their normal-form variants where the secret is drawn from the error distribution.
+Decision and search LWE in normal form — where the secret is drawn from the error distribution —
+reduce to their standard uniform-secret variants, losing the probability that a uniform `n × n`
+matrix over `ZMod q` is singular.
 
 Given `n + m` samples `[A * s + e | A]`, the reduction splits `A` into a top `n × n` block `A₁`
 and a bottom block `A₂`. When `A₁` is invertible it outputs the `m` samples
@@ -49,8 +50,10 @@ polynomial-time algorithm, the asymptotic PPT (`IsPPTOn`) statement is not forma
 ## References
 
 * [O. Regev, *On lattices, learning with errors, random linear codes, and cryptography*][Regev2009]
-* [C. Peikert, *A Decade of Lattice Cryptography*][Peikert2016], Section 4.2.1 for the reduction
-  transpose and singularity loss mapping.
+  (May 2, 2009 author PDF).
+* [C. Peikert, *A Decade of Lattice Cryptography*][Peikert2016] (February 17, 2016 author PDF),
+  Section 4.2.1, unnumbered "Normal form" paragraph (printed p. 23), for the reduction from
+  `m`-sample error-secret LWE to `(n + m)`-sample uniform-secret LWE and its singular-block loss.
 -/
 
 public section
@@ -382,10 +385,11 @@ private theorem distinguishingGame_reduceNormalDecision (noise : PMF (ZMod q))
         (PMF.uniformOfFintype (Matrix (Fin m) (Fin n) (ZMod q))).bind fun A' =>
           (PMF.pi fun _ : Fin m => noise).bind fun e2 =>
             ProbComp.eval (adversary (encMatrix _ _ _ (publicMatrix A' e1 e2))) := by
-    simp only [distinguishingGame, realEnsembleErrorSecret, publicMatrixLawErrorSecret, pmf_norm]
+    simp only [distinguishingGame_eq_bind, realEnsembleErrorSecret, publicMatrixLawErrorSecret,
+      pmf_norm]
   rw [herr, ← bind_split noise (PMF.uniformOfFintype (Fin n → ZMod q))
     (fun A' e1 e2 => ProbComp.eval (adversary (encMatrix _ _ _ (publicMatrix A' e1 e2))))]
-  simp only [distinguishingGame, realEnsemble, publicMatrixLaw, pmf_norm,
+  simp only [distinguishingGame_eq_bind, realEnsemble, publicMatrixLaw, pmf_norm,
     eval_reduceNormalDecision_publicMatrix]
 
 private theorem toReal_distinguishingGame_reduceNormalDecision (noise : PMF (ZMod q))
