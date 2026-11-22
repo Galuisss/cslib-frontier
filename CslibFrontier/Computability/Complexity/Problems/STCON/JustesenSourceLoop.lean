@@ -398,11 +398,11 @@ theorem configurationJustesenSourceLoop_existsUnique_firstHalting
     (fun r hr _ _ hl _ hr' => (hmember r hr).unique hl hr')
   refine ⟨bits, ⟨verdict, hfirst, hreply⟩, ?_⟩
   rintro other ⟨result, hother, hret⟩
-  have haccept (choices : List Bool) (value : ControllerVerdict)
-      (hresult : M.run w choices = .inr (some value)) : M.accept (M.run w choices) = true := by
-    rw [hresult]
-    rfl
-  exact hunique ⟨hother, haccept other result hret⟩ ⟨hfirst, haccept bits verdict hreply⟩
+  have haccept := SourceRoundLoop.machine_accept_iff initial round
+    justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply member
+    justesenSourceMembershipStart MembershipTally.retainedReply
+  exact hunique ⟨hother, (haccept _).mpr ⟨result, hret⟩⟩
+    ⟨hfirst, (haccept _).mpr ⟨verdict, hreply⟩⟩
 
 /-- Every valid full-fuel source scan has a complete first-halting trace with a verdict. -/
 theorem configurationJustesenSourceLoop_exists_firstHalting
