@@ -38,6 +38,10 @@ frozen reference spokes. Free subdivision vertices are not added as obstacles. -
 noncomputable def frozenReferenceObstacle (I : FixedRotationInput) : Set ℂ :=
   ⋃ v : Fin I.graph.vertices.length, frozenStar I v.val
 
+private theorem original_mem_iff_lt {I : FixedRotationInput} (hI : Valid I) (v : ℕ) :
+    v ∈ I.graph.vertices ↔ v < I.graph.vertices.length :=
+  (iff_of_eq (congrArg (fun vs : List ℕ => v ∈ vs) hI.1)).trans List.mem_range
+
 /-- Membership in the frozen obstacle is membership in an original center or in an
 indexed frozen spoke. Both orientations use their actual stored route supports. -/
 theorem mem_frozenReferenceObstacle_iff {I : FixedRotationInput} (hI : Valid I) {z : ℂ} :
@@ -50,14 +54,14 @@ theorem mem_frozenReferenceObstacle_iff {I : FixedRotationInput} (hI : Valid I) 
   · intro hz
     obtain ⟨v, hv⟩ := Set.mem_iUnion.mp hz
     rcases hv with hv | hv
-    · exact Or.inl ⟨v.val, hI.1 ▸ List.mem_range.mpr v.isLt, hv⟩
+    · exact Or.inl ⟨v.val, (original_mem_iff_lt hI v.val).mpr v.isLt, hv⟩
     · obtain ⟨d, hd⟩ := Set.mem_iUnion.mp hv
       exact Or.inr ⟨d.val, d.property.2, hd⟩
   · rintro (⟨v, hv, h⟩ | ⟨d, hd, h⟩)
-    · exact Set.mem_iUnion.mpr ⟨⟨v, List.mem_range.mp (hI.1 ▸ hv)⟩, Or.inl h⟩
+    · exact Set.mem_iUnion.mpr ⟨⟨v, (original_mem_iff_lt hI v).mp hv⟩, Or.inl h⟩
     · have hv := RotationSystem.vertex_mem
-        (fun v hv => hI.1 ▸ List.mem_range.mpr (hI.2.1 v hv)) d
-      refine Set.mem_iUnion.mpr ⟨⟨d.vertex, List.mem_range.mp (hI.1 ▸ hv)⟩, Or.inr ?_⟩
+        (fun v hv => (original_mem_iff_lt hI v).mpr (hI.2.1 v hv)) d
+      refine Set.mem_iUnion.mpr ⟨⟨d.vertex, (original_mem_iff_lt hI d.vertex).mp hv⟩, Or.inr ?_⟩
       exact Set.mem_iUnion.mpr ⟨⟨d, rfl, hd⟩, h⟩
 
 private theorem spoke_support (I : FixedRotationInput) (d : Dart I.graph) :
@@ -74,7 +78,7 @@ private theorem spoke_support (I : FixedRotationInput) (d : Dart I.graph) :
   rw [Route.support_line, ← hcenter, ← hleaf]
   cases hb : d.2
   · rfl
-  · exact segment_symm _ _
+  · exact segment_symm ℝ _ _
 
 /-- The protected reference set is compact, being a finite union of points and closed
 segments. -/
@@ -106,7 +110,7 @@ theorem frozenReferenceObstacle_compl_isPathConnected {I : FixedRotationInput}
   obtain ⟨right, hright, hsep, hstrip⟩ := exists_frozen_reference_strips hI
   obtain ⟨R, _, hbound⟩ := (frozenReferenceObstacle_isCompact I).isBounded.subset_ball_lt 0 0
   let V := Fin I.graph.vertices.length
-  have hmem (v : V) : v.val ∈ I.graph.vertices := hI.1 ▸ List.mem_range.mpr v.isLt
+  have hmem (v : V) : v.val ∈ I.graph.vertices := (original_mem_iff_lt hI v.val).mpr v.isLt
   have hcenter (v : V) : referencePoint I v.val ∈ frozenStar I v.val := Or.inl rfl
   refine isPathConnected_compl_iUnion_starConvex_of_separated_rectangles
     (fun v : V => frozenStar I v.val) (fun v => referencePoint I v.val)
