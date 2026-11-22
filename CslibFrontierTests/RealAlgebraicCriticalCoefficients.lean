@@ -9,6 +9,7 @@ module
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
 import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalParameterEvaluation
 import CslibFrontier.Computability.Complexity.RealAlgebraic.DyadicSignEvaluation
+import CslibFrontier.Computability.Complexity.RealAlgebraic.SignLabelEvaluation
 import CslibFrontier.Computability.Complexity.RealAlgebraic.SparseDerivativeTestEvaluation
 import CslibFrontier.Computability.Complexity.RealAlgebraic.UnivariateDerivativeEvaluation
 import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignApproximation
@@ -52,6 +53,18 @@ open Cslib Cslib.Complexity Cslib.Complexity.RealAlgebraic Turing.MultiTapeTM
 open MvPolynomial MvPolynomial.CriticalSystem MvPolynomial.PurePower
 
 private instance : Fact (Nat.Prime 101) := ⟨by decide⟩
+
+-- The two fourth powers are 1 and -1 modulo 17, so the cleared denominator is zero.
+example : (signLabelResidue 17 0 1 (fun _ => 3) (fun _ => 0) : ZMod 17) = 1 := by
+  let : Fact (Nat.Prime 17) := ⟨by decide⟩
+  rw [signLabelResidue_cast (p := 17) 0 (fun _ : Fin 1 => Polynomial.C 3) (fun _ => 0) 0
+    (fun _ => 3) (fun _ => 0) (by intro i; simp) (by intro i; simp)]
+  simp only [Polynomial.signLabelPolynomial, Polynomial.eval₂_sub, Polynomial.eval₂_pow,
+    Polynomial.eval₂_mul, Polynomial.eval₂_C, Polynomial.eval₂_finsetSum,
+    Polynomial.eval₂_finsetProd, Polynomial.eval₂_add, Polynomial.eval₂_comp,
+    Polynomial.eval₂_neg, Polynomial.eval₂_dyadicSignProduct, Int.coe_castRingHom,
+    Finset.univ_unique]
+  decide
 
 -- At -1 the product vanishes, so the cleared values are additive inverses.
 example : (signTestDenominatorResidue 101 1 1 100 : ZMod 101) = 33 ∧
