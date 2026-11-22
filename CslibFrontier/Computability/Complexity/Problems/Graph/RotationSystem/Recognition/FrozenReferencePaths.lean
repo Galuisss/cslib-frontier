@@ -187,8 +187,7 @@ private theorem vertex_mem_obstacle_iff {I : FixedRotationInput} (hI : Valid I)
         apply Or.inl
         rw [← hvd]
         exact RotationSystem.vertex_mem hdeclared d
-      · have htag : b = !d.2 := by
-          cases b <;> cases d.2 <;> simp_all
+      · have htag : b = !d.2 := Bool.eq_not_of_ne he
         rw [htag] at hb
         exact Or.inr ⟨d, hd, hb.symm.trans hends.2⟩
   · rintro (hv' | ⟨d, hd, hv'⟩)
