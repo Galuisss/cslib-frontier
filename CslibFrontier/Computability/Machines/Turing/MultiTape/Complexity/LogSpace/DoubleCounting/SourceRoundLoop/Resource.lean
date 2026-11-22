@@ -66,16 +66,23 @@ theorem start_admissible (context : κ) (size limit : ℕ) :
     Admissible context size limit (start context limit) := by
   simp [Admissible, start]
 
+/-- Bound both counters and the tally with an upper bound on the loop limit. -/
+theorem admissible_caps_le {context : κ} {size limit limit' : ℕ} {r : Registers κ}
+    (hr : Admissible context size limit r) (hlimit : limit ≤ limit') :
+    r.fuel ≤ limit' ∧ r.radius ≤ limit' ∧
+      r.tally.count ≤ 1 + limit' * size ∧ r.tally.lengthSum ≤ size * limit' * limit' := by
+  obtain ⟨_, htotal, hcount, hsum⟩ := hr
+  have hk : r.radius ≤ limit' := by omega
+  exact ⟨by omega, hk,
+    hcount.trans (Nat.add_le_add_left (Nat.mul_le_mul_right _ hk) _),
+    hsum.trans (Nat.mul_le_mul (Nat.mul_le_mul_left _ hk) hk)⟩
+
 /-- Bound both counters and the tally using the fixed loop limit. -/
 theorem admissible_caps {context : κ} {size limit : ℕ} {r : Registers κ}
     (hr : Admissible context size limit r) :
     r.fuel ≤ limit ∧ r.radius ≤ limit ∧
-      r.tally.count ≤ 1 + limit * size ∧ r.tally.lengthSum ≤ size * limit * limit := by
-  obtain ⟨_, htotal, hcount, hsum⟩ := hr
-  have hk : r.radius ≤ limit := by omega
-  exact ⟨by omega, hk,
-    hcount.trans (Nat.add_le_add_left (Nat.mul_le_mul_right _ hk) _),
-    hsum.trans (Nat.mul_le_mul (Nat.mul_le_mul_left _ hk) hk)⟩
+      r.tally.count ≤ 1 + limit * size ∧ r.tally.lengthSum ≤ size * limit * limit :=
+  admissible_caps_le hr le_rfl
 
 /-- Encoded workspace for the retained context, loop fuel, radius and current tally. -/
 @[expose] def registerStateBound (encContext : κ ↪ List Bool) (context : κ) (size limit : ℕ) : ℕ :=
