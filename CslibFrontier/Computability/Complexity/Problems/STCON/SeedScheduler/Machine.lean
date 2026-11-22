@@ -33,8 +33,8 @@ skipped designated root.
 * `SeedSchedulerMachine.step_liveScan`: a live scan takes the callback's step on the same input.
 * `SeedSchedulerMachine.firstHalting_scan_iff`: split a successful scan and the resumed trace.
 * `SeedSchedulerMachine.firstHalting_skip_iff`: split a skipped root's false selector and suffix.
-* `SeedSchedulerMachine.haltsWithin`: one clock for all branches given the scanner clock.
 * `SeedSchedulerMachine.exists_successful_firstHalting`: assemble successful scan traces.
+* `SeedSchedulerMachine.haltsWithin`: one clock for all branches given the scanner clock.
 -/
 
 public section
@@ -355,8 +355,8 @@ theorem haltsWithin {σ : Type} (setup : SeedSearchSetup) (scan : Nondeterminist
           simp only [List.length_cons] at hlen
           exact afterStep selector none rest (by omega)
   intro bits hlen
-  change M.halted (M.replay input bits
-    ((seedSchedulerCandidate setup 0).elim (.inr (some none)) (enter start))) = true
+  change M.halted (M.replay input bits M.init) = true
+  rw [machine_init]
   cases hentry : seedSchedulerCandidate setup 0 with
   | none => exact terminal (some none) bits
   | some f =>
@@ -423,10 +423,7 @@ theorem exists_successful_firstHalting {σ : Type} (setup : SeedSearchSetup)
     change (reply (M.replay input bits M.init)).isSome
     rw [hreply]
     rfl
-  change ∃ bits answer, M.FirstHalting input bits
-      ((seedSchedulerCandidate setup 0).elim (.inr (some none)) (enter start)) ∧
-    M.replay input bits ((seedSchedulerCandidate setup 0).elim (.inr (some none)) (enter start)) =
-      .inr (some answer)
+  rw [machine_init]
   cases hentry : seedSchedulerCandidate setup 0 with
   | none => exact ⟨[], none, terminal none⟩
   | some frame =>
