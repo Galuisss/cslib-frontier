@@ -8,6 +8,9 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedSearchSetup
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.Sum
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.Cases
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.InSpace.FunPropFinite
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.NatLength
 import CslibFrontier.Tactic.EncLen
 
@@ -33,6 +36,10 @@ certificates for subsequent native loop compilation.
 ## Main results
 
 * `seedScanRequest_inSpace`: native linear-space request construction.
+* `seedSchedulerCandidate_budget` and `SeedSchedulerFrame.needsScan_budget`: construct the
+  designated frame and check whether to call the scanner under the caller's workspace budget.
+* `seedSchedulerStep_noReply_inSpace`: skip a designated root or reject a missing verdict
+  in space linear in the frame's encoded length.
 * `seedSchedulerStep_progress`: each continuing transition stays in bounds and advances
   the seed or the source phase.
 * `runSeedSchedulerFor_eq`: agreement with the indexed search, including list multiplicity.
@@ -132,6 +139,39 @@ def seedSchedulerCandidate (s : SeedSearchSetup) (seed : ℕ) : Option SeedSched
 def SeedSchedulerFrame.needsScan (f : SeedSchedulerFrame) : Bool :=
   f.answer.isNone || f.request.sourceID != f.request.setup.sourceID
 
+/-- The seed-limit check and optional designated frame use the shared budget of the setup and
+candidate seed producers. -/
+theorem seedSchedulerCandidate_budget {α : Type} {enc : α ↪ List Bool} {S : α → ℕ}
+    {setup : α → SeedSearchSetup} {seed : α → ℕ}
+    (hsetup : ComputableInSpace setup enc encSeedSearchSetup S)
+    (hseed : ComputableInSpace seed enc encNat S) :
+    ComputableInSpace (fun a => seedSchedulerCandidate (setup a) (seed a))
+      enc (encOption encSeedSchedulerFrame) S := by
+  have hsearch := encSeedSearchParameters_search_budget
+    (encSeedSearchSetup_parameters_budget hsetup)
+  have hlimit := encSeedSearchSize_seedLimit_budget hsearch
+  have hsource := encSeedSearchSetup_sourceID_budget hsetup
+  have hrequest := encSeedScanRequest_mk_budget hsetup hseed hsource
+  have hframe := encSeedSchedulerFrame_mk_budget hrequest
+    ((constZero (encB := encNat) 0).mono_le fun _ => Nat.zero_le _)
+    ((constZero (encB := encOption encBool) none).mono_le fun _ => Nat.zero_le _)
+  exact budget_iteProp (budget_natLt hseed hlimit) (budget_optionSome hframe)
+    ((constZero (encB := encOption encSeedSchedulerFrame) none).mono_le fun _ => Nat.zero_le _)
+
+/-- Testing whether a frame needs a scan uses the budget of the frame producer. -/
+theorem SeedSchedulerFrame.needsScan_budget {α : Type} {enc : α ↪ List Bool} {S : α → ℕ}
+    {frame : α → SeedSchedulerFrame}
+    (hframe : ComputableInSpace frame enc encSeedSchedulerFrame S) :
+    ComputableInSpace (fun a => (frame a).needsScan) enc encBool S := by
+  have hrequest := encSeedSchedulerFrame_request_budget hframe
+  have hsource := encSeedScanRequest_sourceID_budget hrequest
+  have hdesignated := encSeedSearchSetup_sourceID_budget (encSeedScanRequest_setup_budget hrequest)
+  have hanswer := encSeedSchedulerFrame_answer_budget hframe
+  exact (budget_boolOr (budget_boolNot (budget_optionIsSome hanswer))
+    (budget_boolNot (budget_natEq hsource hdesignated))).of_enc_eq fun a => by
+      simp only [SeedSchedulerFrame.needsScan, bne, beq_eq_decide]
+      cases (frame a).answer <;> simp
+
 private def seedSchedulerRoot (f : SeedSchedulerFrame) (position : ℕ) (answer : Bool) :
     SeedSchedulerFrame ⊕ Option Bool :=
   let s := f.request.setup
@@ -139,6 +179,30 @@ private def seedSchedulerRoot (f : SeedSchedulerFrame) (position : ℕ) (answer 
     .inl (seedSchedulerFrame s f.request.seed (some (position, answer))
       (s.originalSourceID position))
   else .inr (some answer)
+
+private theorem seedSchedulerRoot_budget {α : Type} {enc : α ↪ List Bool} {S : α → ℕ}
+    {frame : α → SeedSchedulerFrame} {position : α → ℕ} {answer : α → Bool}
+    (hframe : ComputableInSpace frame enc encSeedSchedulerFrame S)
+    (hposition : ComputableInSpace position enc encNat S)
+    (hanswer : ComputableInSpace answer enc encBool S) :
+    ComputableInSpace (fun a => seedSchedulerRoot (frame a) (position a) (answer a))
+      enc (encSum encSeedSchedulerFrame (encOption encBool)) S := by
+  have hrequest := encSeedSchedulerFrame_request_budget hframe
+  have hsetup := encSeedScanRequest_setup_budget hrequest
+  have hseed := encSeedScanRequest_seed_budget hrequest
+  have hsearch := encSeedSearchParameters_search_budget
+    (encSeedSearchSetup_parameters_budget hsetup)
+  have hcount := encSubdivisionSize_originalCount_budget
+    (encSeedSearchSize_subdivision_budget hsearch)
+  have hsource := budget_comp_linear originalSourceID_inSpace (budget_prod hsetup hposition)
+  have hnext := encSeedSchedulerFrame_mk_budget
+    (encSeedScanRequest_mk_budget hsetup hseed hsource) hposition (budget_optionSome hanswer)
+  have hcontinue := budget_comp_linear
+    (of_inO (ComputableInO.inl encSeedSchedulerFrame (encOption encBool))) hnext
+  have hfinish := budget_comp_linear
+    (of_inO (ComputableInO.inr encSeedSchedulerFrame (encOption encBool)))
+    (budget_optionSome hanswer)
+  exact budget_iteProp (budget_natLt hposition hcount) hcontinue hfinish
 
 /-- Process one indexed skip or one completed scan. The outer `none` rejects the branch.
 A terminal `.inr none` means seed exhaustion. A terminal answer belongs to the current seed,
@@ -163,9 +227,39 @@ where
   nextSeed (f : SeedSchedulerFrame) : SeedSchedulerFrame ⊕ Option Bool :=
     (seedSchedulerCandidate f.request.setup (f.request.seed + 1)).elim (.inr none) Sum.inl
 
+/-- Encode a scheduler step as an optional continuation frame or optional terminal answer.
+The outer option records branch failure and the sum tag distinguishes continuing from terminal. -/
+abbrev encSeedSchedulerStepResult :=
+  encOption (encSum encSeedSchedulerFrame (encOption encBool))
+
+/-- With no verdict, skip an indexed designated root or reject a requested scan.
+This step uses space linear in the encoded input frame. -/
+theorem seedSchedulerStep_noReply_inSpace :
+    ComputableInSpace (fun frame => seedSchedulerStep frame none)
+      encSeedSchedulerFrame encSeedSchedulerStepResult
+      (fun f => (encSeedSchedulerFrame f).length) := by
+  let E := encPair encSeedSchedulerFrame encBool
+  have hframe := fst encSeedSchedulerFrame encBool
+  have hcursor := budget_natSucc (encSeedSchedulerFrame_cursor_budget hframe)
+  have hroot := seedSchedulerRoot_budget hframe hcursor (snd encSeedSchedulerFrame encBool)
+  have hsome : ComputableInSpace
+      (fun p : SeedSchedulerFrame × Bool =>
+        if p.1.needsScan then none else some (seedSchedulerRoot p.1 (p.1.cursor + 1) p.2))
+      E encSeedSchedulerStepResult (fun p => (E p).length) :=
+    budget_ite (SeedSchedulerFrame.needsScan_budget hframe)
+      (budget_const none (.refl _)) (budget_optionSome hroot)
+  have hnone := budget_const (encIn := encSeedSchedulerFrame) (encB := encSeedSchedulerStepResult)
+    none (.refl _)
+  have hid := budget_id (enc := encSeedSchedulerFrame) (.refl _)
+  have hinput := budget_prod hid (encSeedSchedulerFrame_answer_budget hid)
+  exact (budget_comp_linear (optionElimSnd hnone hsome) hinput).of_enc_eq fun f => by
+    cases ha : f.answer with
+    | none => simp [seedSchedulerStep, ha]
+    | some answer => cases hs : f.needsScan <;> simp [seedSchedulerStep, ha, hs]
+
 /-- The seed is below its exclusive limit. The designated phase uses cursor zero and the
 designated source. An indexed phase uses a bounded cursor and its corresponding source. -/
-def SeedSchedulerFrame.Valid (f : SeedSchedulerFrame) : Prop :=
+@[expose] def SeedSchedulerFrame.Valid (f : SeedSchedulerFrame) : Prop :=
   let s := f.request.setup
   f.request.seed < s.parameters.search.seedLimit ∧
     match f.answer with
@@ -253,6 +347,11 @@ theorem seedSchedulerStep_progress {f g : SeedSchedulerFrame} {reply : Option Co
           obtain ⟨hv, hs, hi, hj⟩ := nextRoot
             (by simpa [seedSchedulerStep, SeedSchedulerFrame.needsScan, ha, heq] using h)
           exact ⟨hv, hs, .inr ⟨hi, .inr hj⟩⟩
+
+/-- A frame that requests a scan rejects a missing verdict. -/
+theorem seedSchedulerStep_noReply_of_needsScan (f : SeedSchedulerFrame)
+    (hscan : f.needsScan = true) : seedSchedulerStep f none = none := by
+  cases ha : f.answer <;> simp [seedSchedulerStep, ha, hscan]
 
 /-- Run the binary scheduler on the initialized carrier. The frame exposes the retained
 registers for resource accounting. A scanner can use just its request field. -/
