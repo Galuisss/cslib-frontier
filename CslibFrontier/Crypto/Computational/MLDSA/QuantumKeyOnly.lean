@@ -7,6 +7,7 @@ Authors: Samuel Schlesinger
 module
 -- upstream: candidate
 
+public import CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitmentRegister
 public import CslibFrontier.Crypto.Computational.MLDSA.SharedDigest
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.RandomOracle
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Oracle
@@ -86,18 +87,11 @@ theorem expanded_grid_table_law :
         ← restriction, PMF.map_comp, PMF.map_comp]
       rfl
 
-private def shakeBytes (word : List Bool) : FixedBytes (digestBytes s) := fun i =>
-  (Keccak.bitSponge Keccak.shake256Layout [true, true, true, true] word (digestBytes s)).get
-    (i.cast (Keccak.length_bitSponge ..).symm)
-
-/-- SHAKE256 as a fixed-width Boolean oracle for the FIPS commitment operation. -/
-def shakeTable (x : BitString s.commitmentInputBits) : BitString (8 * digestBytes s) :=
-  Keccak.fixedBytesEquivBitsLE _ (shakeBytes s (List.ofFn x))
-
 /-- The oracle word involves neither truncation nor padding on a verifier input. Substituting
-the SHAKE table yields FIPS 204 byte verification at the supplied matrix `A`. -/
-theorem verify_shakeTable_iff (bytes : List Byte) (A : PublicMatrix s) (f : Forgery) :
-    interpret (m := Id) (pointReply s (shakeTable s))
+the SHAKE256 commitment-digest register yields FIPS 204 byte verification at the supplied
+matrix `A`. -/
+theorem verify_readDigestRegister_iff (bytes : List Byte) (A : PublicMatrix s) (f : Forgery) :
+    interpret (m := Id) (pointReply s (Xofs.shake.readDigestRegister s))
       (SharedDigest.verify s bytes A f) = true ↔
       verifyWithExpansion s (fun _ => some A) bytes f.message f.context f.signature =
         some true := by
@@ -105,11 +99,10 @@ theorem verify_shakeTable_iff (bytes : List Byte) (A : PublicMatrix s) (f : Forg
   · exact SharedDigest.verify_shakeReply_iff s bytes A f
   · intro p hp _
     funext i
-    simp only [pointReply, hp, ite_true, shakeTable, Equiv.symm_apply_apply,
-      BitString.ofFn_ofList (commitmentInput_length s _ hp), shakeBytes,
-      SharedDigest.shakeReply, commitmentDigest, Xofs.commitmentDigest, shake_h256_read,
-      List.get_eq_getElem, Fin.val_cast]
-    rfl
+    simp only [pointReply, hp, ite_true, Xofs.readDigestRegister_apply, Equiv.symm_apply_apply,
+      BitString.ofFn_ofList (commitmentInput_length s _ hp), SharedDigest.shakeReply,
+      commitmentDigest, Xofs.commitmentDigest, List.get_eq_getElem]
+    exact (ExtendableOutput.getElem_read _ _ i.isLt).symm
 
 /-- Full matrix response in row, column, coefficient, bit order. Twenty-three low bits
 recover the entire canonical representative modulo the FIPS modulus. -/

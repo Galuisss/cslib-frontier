@@ -41,8 +41,8 @@ example (s : Level) :
   expanded_grid_table_law s
 
 example (s : Level) (bytes : List Byte) (A : PublicMatrix s) (f : Forgery) :
-    OracleComp.interpret (m := Id) (pointReply s (shakeTable s))
+    OracleComp.interpret (m := Id) (pointReply s (Xofs.shake.readDigestRegister s))
       (SharedDigest.verify s bytes A f) = true ↔
       verifyWithExpansion s (fun _ => some A) bytes f.message f.context f.signature =
         some true :=
-  verify_shakeTable_iff s bytes A f
+  verify_readDigestRegister_iff s bytes A f
