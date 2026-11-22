@@ -452,6 +452,11 @@ Gregory J. Chaitin. *Information-Theoretic Limitations of Formal Systems*. Journ
 
 Amit Chakrabarti. *Data Stream Algorithms: Lecture Notes*. Dartmouth College, latest update July 1, 2025. https://www.cs.dartmouth.edu/~ac/Teach/data-streams-lecnotes.pdf . Locators checked against that PDF on 2026-11-07 UTC: Unit 1 (Section 1.1 for the MAJORITY and FREQUENT problems, Algorithm 1 and Theorem 1.3.1 for Misra–Gries, Exercise 1-1 for the `(m − m̂)/k` sharpening), Section 2.4 (the median trick) and Section 5.3 (Algorithms 7–8 and equations (5.1)–(5.7) for the Count-Sketch).
 
+<a id="chandylamport1985"></a>
+## chandylamport1985
+
+K. Mani Chandy and Leslie Lamport. "Distributed Snapshots: Determining Global States of Distributed Systems." *ACM Transactions on Computer Systems* 3(1), 63–75, 1985. https://doi.org/10.1145/214451.214456 . Bibliographic metadata checked only; the full PDF text was not inspected in this pass, and no internal section or theorem numbers are asserted. Cited in [ChandyLamport/Basic.lean](../CslibFrontier/Computability/Distributed/ChandyLamport/Basic.lean), [ChandyLamport/Snapshot.lean](../CslibFrontier/Computability/Distributed/ChandyLamport/Snapshot.lean), and [ChandyLamport/Correctness.lean](../CslibFrontier/Computability/Distributed/ChandyLamport/Correctness.lean) for the asynchronous point-to-point FIFO message-passing model, the marker-sending and marker-receiving snapshot rules, consistent-cut causal permutation and reachability (`chandyLamport_perm_mTr`, `chandyLamport_consistent_cut`), stable-property detection (`stablePred_transfer`), and snapshot completion liveness on strongly connected communication graphs (`snapshot_liveness`). In the LTS formalization, `SnapEvent.recvMarker` executes the marker-sending or marker-receiving rule atomically upon head-delivery of `.marker`, `FairChannels` expresses weak FIFO head-delivery fairness (witnessed constructively for `System.InputEnabled` systems), and `SnapEvent.stutter` extends finite quiescent runs to infinite executions while keeping `sys.lts` free of stuttering so `sys.lts.IsTerminal` captures genuine deadlock.
+
 <a id="changkannan06"></a>
 ## changkannan06
 
