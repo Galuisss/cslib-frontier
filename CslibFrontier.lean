@@ -2751,6 +2751,7 @@ public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDra
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Germs
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.HorizontalTransport
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Neighborhood
+public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.PathTransport
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Points
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Relocation
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Restoration
@@ -2764,9 +2765,11 @@ public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDra
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.RestorationSimplicity
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Restriction
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Rotation
+public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.RouteSupports
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.SegmentArrangement
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.SplitLayout
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.SplitOrder
+public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.SquareMove
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Star
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.VertexPlacement
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.VertexTransport
@@ -3010,6 +3013,8 @@ public import CslibFrontier.Computability.Complexity.Problems.STCON.Completeness
 public import CslibFrontier.Computability.Complexity.Problems.STCON.Header
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenBoundedWalk
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenMembershipTally
+public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceContext
+public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceContext.Scheduler
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision.Replay
 public import CslibFrontier.Computability.Complexity.Problems.STCON.Layered
@@ -3019,6 +3024,7 @@ public import CslibFrontier.Computability.Complexity.Problems.STCON.LayeredQuery
 public import CslibFrontier.Computability.Complexity.Problems.STCON.Reduction
 public import CslibFrontier.Computability.Complexity.Problems.STCON.Search
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler
+public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler.Correct
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler.Machine
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedSearchParameters
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedSearchSetup
@@ -5305,6 +5311,7 @@ public import CslibFrontier.Crypto.Computational.MLDSA.PriorCommitmentRefresh
 public import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskExpansion
 public import CslibFrontier.Crypto.Computational.MLDSA.PrivateMaskSeedGame
 public import CslibFrontier.Crypto.Computational.MLDSA.ProgrammedContinuation
+public import CslibFrontier.Crypto.Computational.MLDSA.PublicKeyHash
 public import CslibFrontier.Crypto.Computational.MLDSA.PublicPairSigning
 public import CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitment
 public import CslibFrontier.Crypto.Computational.MLDSA.QuantumCommitmentRegister
@@ -5316,8 +5323,13 @@ public import CslibFrontier.Crypto.Computational.MLDSA.RandomXofMatrix
 public import CslibFrontier.Crypto.Computational.MLDSA.RejNTTExhaustion
 public import CslibFrontier.Crypto.Computational.MLDSA.RejNTTProgramming
 public import CslibFrontier.Crypto.Computational.MLDSA.RejectedCommitmentWrites
+public import CslibFrontier.Crypto.Computational.MLDSA.RepresentativeOverlap
 public import CslibFrontier.Crypto.Computational.MLDSA.ResponseBinding
 public import CslibFrontier.Crypto.Computational.MLDSA.SecretExpansionLaw
+public import CslibFrontier.Crypto.Computational.MLDSA.SecretRowPrediction
+public import CslibFrontier.Crypto.Computational.MLDSA.SecretRowServices
+public import CslibFrontier.Crypto.Computational.MLDSA.SharedKeyGame
+public import CslibFrontier.Crypto.Computational.MLDSA.SharedSecretExpansion
 public import CslibFrontier.Crypto.Computational.MLDSA.SignedExtraction
 public import CslibFrontier.Crypto.Computational.MLDSA.SignedMatrix
 public import CslibFrontier.Crypto.Computational.MLDSA.Signing
@@ -5568,6 +5580,7 @@ public import CslibFrontier.Crypto.Primitives.BlockCipher.LengthPrependedCBCMAC
 public import CslibFrontier.Crypto.Primitives.BlockCipher.Modes
 public import CslibFrontier.Crypto.Primitives.ByteString
 public import CslibFrontier.Crypto.Primitives.ByteString.Blocks
+public import CslibFrontier.Crypto.Primitives.ByteString.Uniform
 public import CslibFrontier.Crypto.Primitives.CorrelationRobust
 public import CslibFrontier.Crypto.Primitives.Garbling.Adaptive
 public import CslibFrontier.Crypto.Primitives.Garbling.Arithmetic.AffineLabel
@@ -5587,6 +5600,7 @@ public import CslibFrontier.Crypto.Primitives.Garbling.Foundations
 public import CslibFrontier.Crypto.Primitives.Garbling.FreeXOR
 public import CslibFrontier.Crypto.Primitives.Garbling.FreeXOR.Efficient
 public import CslibFrontier.Crypto.Primitives.Garbling.FreeXOR.Propagate
+public import CslibFrontier.Crypto.Primitives.Garbling.FreeXOR.Reduction
 public import CslibFrontier.Crypto.Primitives.Garbling.FreeXOR.Scheme
 public import CslibFrontier.Crypto.Primitives.Garbling.FreeXOR.Simulator
 public import CslibFrontier.Crypto.Primitives.Garbling.Games
@@ -5680,6 +5694,8 @@ public import CslibFrontier.Crypto.Primitives.SLHDSA.Address
 public import CslibFrontier.Crypto.Primitives.SLHDSA.HashCalls
 public import CslibFrontier.Crypto.Primitives.SLHDSA.Parameters
 public import CslibFrontier.Crypto.Primitives.SLHDSA.WOTS.Digits
+public import CslibFrontier.Crypto.Primitives.UHF.Computational
+public import CslibFrontier.Crypto.Primitives.UHF.Difference
 public import CslibFrontier.Crypto.Primitives.UHF.Finite
 public import CslibFrontier.Crypto.Primitives.UHF.PairwiseUnpredictability
 public import CslibFrontier.Crypto.Primitives.UHF.PolynomialPrediction
@@ -5873,6 +5889,7 @@ public import CslibFrontier.Crypto.Protocols.UC.JointState
 public import CslibFrontier.Crypto.Protocols.UC.Linking
 public import CslibFrontier.Crypto.Protocols.UC.Machine
 public import CslibFrontier.Crypto.Protocols.UC.MultiSession
+public import CslibFrontier.Crypto.Protocols.UC.WordInterface
 public import CslibFrontier.Crypto.Protocols.UOV.Field
 public import CslibFrontier.Crypto.Protocols.VOLE.AdaptiveMulCheck
 public import CslibFrontier.Crypto.Protocols.VOLE.Basic
@@ -6370,6 +6387,7 @@ public import CslibFrontier.Foundations.Analysis.LpNormMeasure
 public import CslibFrontier.Foundations.Analysis.MarkovBrothersInequality
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CoordinateDerivative
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalCoercive
+public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalDeterminantFeasibility
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalMinimumValue
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalRootFeasibility
 public import CslibFrontier.Foundations.Analysis.MvPolynomial.CriticalValueCutoff
@@ -7051,6 +7069,7 @@ public import CslibFrontier.Foundations.Data.MvPolynomial.ParameterCoeffNorm
 public import CslibFrontier.Foundations.Data.MvPolynomial.ParameterDegree
 public import CslibFrontier.Foundations.Data.MvPolynomial.PartialDerivatives
 public import CslibFrontier.Foundations.Data.MvPolynomial.PartialEval
+public import CslibFrontier.Foundations.Data.MvPolynomial.PolynomialEvaluationBounds
 public import CslibFrontier.Foundations.Data.MvPolynomial.PowerSum
 public import CslibFrontier.Foundations.Data.MvPolynomial.ReproducingKernel
 public import CslibFrontier.Foundations.Data.MvPolynomial.SchwartzZippel
@@ -7271,6 +7290,7 @@ public import CslibFrontier.Foundations.Geometry.Polygonal.SegmentCuts
 public import CslibFrontier.Foundations.Geometry.Polygonal.SegmentOrder
 public import CslibFrontier.Foundations.Geometry.Polygonal.SegmentRays
 public import CslibFrontier.Foundations.Geometry.Polygonal.SlopeDetour
+public import CslibFrontier.Foundations.Geometry.Polygonal.SquareMove
 public import CslibFrontier.Foundations.Geometry.Polygonal.Translation
 public import CslibFrontier.Foundations.Geometry.Polygonal.Trisection
 public import CslibFrontier.Foundations.Geometry.Polyhedra
