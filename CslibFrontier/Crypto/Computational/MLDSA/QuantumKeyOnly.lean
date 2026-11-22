@@ -10,10 +10,10 @@ module
 public import CslibFrontier.Crypto.Computational.MLDSA.SharedDigest
 public import CslibFrontier.Computability.Circuit.Quantum.Oracle.RandomOracle
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Probabilistic.Oracle
+public import CslibFrontier.Probability.Product
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Frame.Basic
 import CslibFrontier.Foundations.Data.BitString.List.LowBits
 import CslibFrontier.Probability.PMF.Bind
-import CslibFrontier.Probability.Product
 import CslibFrontier.Languages.Probabilistic.Norm
 import CslibFrontier.Crypto.Game.Order
 import CslibFrontier.Tactic.PMFSwap
