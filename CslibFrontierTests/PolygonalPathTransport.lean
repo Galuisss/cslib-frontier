@@ -67,6 +67,7 @@ example :
   have hopen : IsPathConnected Kᶜ := by
     have heq : Kᶜ = Complex.reCLM.toLinearMap ⁻¹' Set.Ioi (3 / 2) := by
       ext z
+      change (¬ z.re ≤ (3 / 2 : ℝ)) ↔ (3 / 2 : ℝ) < z.re
       exact not_le
     rw [heq]
     refine ((convex_Ioi (𝕜 := ℝ) _).linear_preimage Complex.reCLM.toLinearMap).isPathConnected
