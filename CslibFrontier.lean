@@ -2751,6 +2751,7 @@ public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDra
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Germs
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.HorizontalTransport
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Neighborhood
+public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.PathTransport
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Points
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Relocation
 public import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.Restoration
@@ -3024,6 +3025,7 @@ public import CslibFrontier.Computability.Complexity.Problems.STCON.Reduction
 public import CslibFrontier.Computability.Complexity.Problems.STCON.Search
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler.Correct
+public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler.Machine
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedSearchParameters
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedSearchSetup
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SubdivisionCall
@@ -5693,6 +5695,7 @@ public import CslibFrontier.Crypto.Primitives.SLHDSA.HashCalls
 public import CslibFrontier.Crypto.Primitives.SLHDSA.Parameters
 public import CslibFrontier.Crypto.Primitives.SLHDSA.WOTS.Digits
 public import CslibFrontier.Crypto.Primitives.UHF.Computational
+public import CslibFrontier.Crypto.Primitives.UHF.Difference
 public import CslibFrontier.Crypto.Primitives.UHF.Finite
 public import CslibFrontier.Crypto.Primitives.UHF.PairwiseUnpredictability
 public import CslibFrontier.Crypto.Primitives.UHF.PolynomialPrediction
@@ -8792,3 +8795,5 @@ public import CslibFrontier.Tactic.Space
 public import CslibFrontier.Tactic.SuppCases
 public import CslibFrontier.Tactic.SuppCases.Init
 public import CslibFrontier.Tactic.Synthesis
+public import CslibFrontier.Tactic.WramOmega
+public import CslibFrontier.Tactic.WramOmega.Init
