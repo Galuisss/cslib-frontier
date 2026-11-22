@@ -785,6 +785,11 @@ Alan Frieze and Michał Karoński. *Introduction to Random Graphs*. Cambridge Un
 
 D. R. Fulkerson. "Note on Dilworth's Decomposition Theorem for Partially Ordered Sets." *Proceedings of the American Mathematical Society* 7(4), 701–702, 1956. https://doi.org/10.1090/S0002-9939-1956-0078334-6 . Bibliographic metadata from search summaries, checked on 2026-11-08. The publisher PDF returned HTTP 403 and was not inspected. The Dilworth module credits this note with the reduction of Dilworth's theorem to König's theorem through the bipartite graph of the strict order, following the customary attribution; the paper's own formulation is unverified.
 
+<a id="gaspers26"></a>
+## gaspers26
+
+Serge Gaspers. *Path Decompositions of Sparse Graphs via Gaussian Sweeps and Faster Exponential Algorithms*. arXiv:2611.05146 (November 2026), https://arxiv.org/abs/2611.05146 ; MIT-licensed Lean 4 companion archived at Zenodo release v1, https://doi.org/10.5281/zenodo.23883489 . Checked directly against the arXiv LaTeX source and Zenodo release archive on 2026-11-22: the `c₃ = (3/(4π)) arccos(5/6) ≈ 0.139822` certificate-free median-switched Gaussian vertex sweep for subcubic graphs (`CubicPathwidth/C3/`). Only the `C3` geometry, connector lemma, and switched interval-bag decomposition are adapted in `CslibFrontier/Computability/Circuit/Frontier/Layouts/Switched/`; the interval-to-cutwidth conversion for cubic multigraphs (allowing parallel edges), exact `457597/100000` / `183/40` / `278798/100000` bounds, concentration proof via `unitKernelRow`, and frontier lower-bound endpoints are original to this library.
+
 <a id="gentry09"></a>
 ## gentry09
 
