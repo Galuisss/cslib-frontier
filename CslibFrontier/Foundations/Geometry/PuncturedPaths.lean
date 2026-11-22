@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Init
 public import Mathlib.Analysis.Normed.Module.Connected
+import Mathlib.Analysis.Convex.PathConnected
 import Mathlib.Analysis.LocallyConvex.WithSeminorms
 import Mathlib.Topology.Connected.LocallyPathConnected
 
@@ -34,7 +35,7 @@ private theorem isPathConnected_punctured_ball (hrank : 1 < Module.rank ℝ E)
   let f (p : E × ℝ) := q + p.2 • p.1
   have hdirs : IsPathConnected directions := isPathConnected_sphere hrank 0 zero_le_one
   have hrad : IsPathConnected radius :=
-    (convex_Ioo 0 r).isPathConnected (Set.nonempty_Ioo.mpr hr)
+    Convex.isPathConnected (convex_Ioo (𝕜 := ℝ) 0 r) (Set.nonempty_Ioo.mpr hr)
   have hf : Continuous f := continuous_const.add (continuous_snd.smul continuous_fst)
   have himage : f '' Set.prod directions radius = Metric.ball q r \ {q} := by
     ext z
@@ -74,7 +75,7 @@ theorem isPathConnected_sdiff_finite_of_isOpen (hrank : 1 < Module.rank ℝ E)
     {U F : Set E} (hU : IsOpen U) (hconn : IsPathConnected U) (hF : F.Finite) :
     IsPathConnected (U \ F) := by
   classical
-  letI : Nontrivial E := (rank_pos_iff_nontrivial (R := ℝ)).1 (zero_lt_one.trans hrank)
+  have : Nontrivial E := (rank_pos_iff_nontrivial (R := ℝ)).1 (zero_lt_one.trans hrank)
   let V := U \ F
   have hV : IsOpen V := hU.sdiff hF.isClosed
   obtain ⟨a, ha⟩ : V.Nonempty :=
