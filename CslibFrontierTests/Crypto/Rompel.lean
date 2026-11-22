@@ -8,6 +8,7 @@ import CslibFrontier.Crypto.Computational.Rompel
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat.Eq
 import CslibFrontier.Computability.Probabilistic.Oracle.Composition
 import CslibFrontier.Tactic.PPT
+import CslibFrontierTests.Crypto.KeyedHashFixture
 
 /-!
 # Tests for Rompel target collision-resistant hashing and digital signatures
@@ -98,28 +99,77 @@ example :
   refine shoupStepInput_shoupPackMasks (fun w => w.take 2) (fun w hw => by simp [hw])
     (by decide) (by decide) _ _
 
-example (b s t iStar : ℕ) (step : List Bool → List Bool)
-    (hstep : ∀ w, w.length = b + s → (step w).length = b)
-    (hi_pos : 1 ≤ iStar) (hit : iStar ≤ t) (x : List Bool) :
-    (BitString.uniformList (shoupMasksLen b t)).map (shoupPackMasks b s t iStar step x) =
-      BitString.uniformList (shoupMasksLen b t) :=
-  uniformList_map_shoupPackMasks b s t iStar step hstep hi_pos hit x
+/-- Finite-domain bijection check of `shoupPackMasks` at `(b = 2, s = 1, t = 2,
+iStar = 2)` (`shoupMasksLen 2 2 = 4`): `shoupPackMasks` induces a bijection on `BitString 4`, and
+`uniformList_map_shoupPackMasks` preserves the exact uniform mass `(1 / 16)` at any mask word. -/
+example :
+    let step : List Bool → List Bool :=
+      fun w => [w.headD false != w.getD 2 false, w.getD 1 false]
+    let x := [true, false, true, true]
+    Function.Bijective
+        (fun b : BitString 4 => BitString.ofList 4 (shoupPackMasks 2 1 2 2 step x (List.ofFn b))) ∧
+      ((BitString.uniformList (shoupMasksLen 2 2)).map (shoupPackMasks 2 1 2 2 step x))
+          [true, false, true, false] =
+        (BitString.uniformList 4) [true, false, true, false] := by
+  intro step x
+  have hunif :
+      (BitString.uniformList (shoupMasksLen 2 2)).map (shoupPackMasks 2 1 2 2 step x) =
+        BitString.uniformList 4 :=
+    uniformList_map_shoupPackMasks 2 1 2 2 _ (fun _ _ => rfl) (by decide) (by decide) _
+  have hmap :
+      (PMF.uniformOfFintype (BitString 4)).map
+          (fun b => BitString.ofList 4 (shoupPackMasks 2 1 2 2 step x (List.ofFn b))) =
+        PMF.uniformOfFintype (BitString 4) := by
+    have h4 : shoupMasksLen 2 2 = 4 := rfl
+    conv_rhs => rw [← BitString.uniformList_ofList 4, ← hunif, h4]
+    simp only [BitString.uniformList, PMF.map_comp, Function.comp_def]
+  have hsurj :
+      Function.Surjective
+        (fun b : BitString 4 =>
+          BitString.ofList 4 (shoupPackMasks 2 1 2 2 step x (List.ofFn b))) := by
+    intro y
+    have hy : y ∈ ((PMF.uniformOfFintype (BitString 4)).map
+        (fun b => BitString.ofList 4 (shoupPackMasks 2 1 2 2 step x (List.ofFn b)))).support := by
+      rw [hmap]
+      exact PMF.mem_support_uniformOfFintype y
+    obtain ⟨b, _, hb⟩ := (PMF.mem_support_map_iff _ _ _).mp hy
+    exact ⟨b, hb⟩
+  exact ⟨Finite.surjective_iff_bijective.mp hsurj, congrFun (congrArg DFunLike.coe hunif) _⟩
 
-example {baseKeyLen outLen s t L : ℕ → ℕ} {h : ℕ → List Bool → List Bool → List Bool}
-    (hbase : ComputableInPolyTime baseKeyLen encUnary encUnary)
-    (hout : ComputableInPolyTime outLen encUnary encUnary)
-    (hs : ComputableInPolyTime s encUnary encUnary)
-    (ht : ComputableInPolyTime t encUnary encUnary)
-    (hh : ComputableInPolyTime (fun p : ℕ × List Bool × List Bool => h p.1 p.2.1 p.2.2)
-      (encKeyedInput encBits) encBits)
-    (hs_pos : ∀ n, 1 ≤ s n)
-    (hb_le : ∀ n, outLen n ≤ L n) (hL_le : ∀ n, L n ≤ outLen n + t n * s n)
-    (h_len : ∀ n k w, k.length = baseKeyLen n → w.length = outLen n + s n →
-      (h n k w).length = outLen n)
-    (hTCR : TargetCollisionResistantOn baseKeyLen h (fun m w => w.length == outLen m + s m)) :
-    TargetCollisionResistantOn (shoupComposeKeyLen baseKeyLen outLen t)
-      (shoupComposeEval baseKeyLen outLen s t h) (fun m x => x.length == L m) :=
-  targetCollisionResistantOn_shoupCompose hbase hout hs ht hh hs_pos hb_le hL_le h_len hTCR
+/-- Concrete instantiation of `targetCollisionResistantOn_shoupCompose`: stretching the halving
+family `rompelCompression G` (`2 * B` bits → `B` bits, where `1 ≤ B` for every `n`) across
+`n + 3` Shoup cascade steps yields target collision resistance on `(n + 4) * B`-bit inputs under
+compact `rompelKeyLen G n + (Nat.log 2 (n + 3) + 1) * B`-bit keys. -/
+example (G : ShrinkingCollisionGrid) :
+    TargetCollisionResistantOn
+      (shoupComposeKeyLen (rompelKeyLen G) (rompelBlockLen G) (fun n => n + 3))
+      (shoupComposeEval (rompelKeyLen G) (rompelBlockLen G) (rompelBlockLen G)
+        (fun n => n + 3) (rompelCompressionEval G))
+      (fun n x => x.length == (n + 4) * rompelBlockLen G n) := by
+  have hb_pos : ∀ n, 1 ≤ rompelBlockLen G n := fun n => by
+    have hk := G.gridCount_pos n
+    have ho := G.le_outLen n
+    exact Nat.mul_pos (by omega) (by omega)
+  have hvalid :
+      (fun (m : ℕ) (w : List Bool) => w.length == rompelBlockLen G m + rompelBlockLen G m) =
+        (rompelCompression G).validInput := by
+    funext m w
+    simp [KeyedCompressionFamily.validInput, rompelCompression, Nat.two_mul]
+  have hTCR : TargetCollisionResistantOn (rompelKeyLen G) (rompelCompressionEval G)
+      (fun m w => w.length == rompelBlockLen G m + rompelBlockLen G m) :=
+    hvalid ▸ G.targetCollisionResistant_rompelCompression
+  exact targetCollisionResistantOn_shoupCompose
+    (computableInPolyTime_rompelKeyLen G)
+    (computableInPolyTime_rompelBlockLen G)
+    (computableInPolyTime_rompelBlockLen G)
+    (ComputableInPolyTime.id'.unary_add' (.const 3))
+    (computableInPolyTime_rompelCompressionEval G)
+    hb_pos
+    (fun n => by
+      simpa only [one_mul] using Nat.mul_le_mul_right (rompelBlockLen G n) (by omega : 1 ≤ n + 4))
+    (fun n => by ring_nf; exact le_rfl)
+    (fun n _ _ _ _ => length_rompelCompressionEval G n _ _)
+    hTCR
 
 /-! ### 2. Unconditional pigeonhole non-vacuity of `exists_rompelCascadeInput_collision` -/
 
@@ -178,11 +228,17 @@ def zeroFlipFinder (G : ShrinkingCollisionGrid) : TargetCollisionFinder where
 
 theorem isPPT_zeroFlipFinder (G : ShrinkingCollisionGrid) : (zeroFlipFinder G).IsPPT where
   choose := by
-    dsimp only [zeroFlipFinder]
-    ppt
+    have hlen := ComputableInPolyTime.unary_mul' (ComputableInPolyTime.const 2)
+      (computableInPolyTime_rompelBlockLen G)
+    exact (((ComputableInPolyTime.bitsReplicate false).comp hlen).prod
+      (ComputableInPolyTime.const [])).isPPTOn
   find := by
-    dsimp only [zeroFlipFinder]
-    ppt
+    have hp := ComputableInPolyTime.fst encUnary (encPair encBits encBits)
+    have hlen := ComputableInPolyTime.unary_mul' (ComputableInPolyTime.const 2)
+      ((computableInPolyTime_rompelBlockLen G).comp hp)
+    exact (ComputableInPolyTime.bitsAppend (ComputableInPolyTime.const [true])
+      ((ComputableInPolyTime.bitsReplicate false).comp
+        (hlen.unary_sub' (ComputableInPolyTime.const 1)))).isPPTOn
 
 example (G : ShrinkingCollisionGrid) :
     IsPPT encBits (rompelCompressionInverter G (zeroFlipFinder G)) :=
@@ -262,8 +318,8 @@ noncomputable def leakNonNScheme (S : SignatureScheme) : WordSignatureScheme whe
       have hqKeys := ComputableInPolyTime.snd encUnary (encPair encBits encBits)
       have hfst := (hqN.prod hqKeys.fst').trans henc
       exact (hfst.prod hqKeys.snd').of_enc_eq fun _ => rfl
-    exact S.keyGen_ppt.map_with
-      (f := fun n keys => (encPair encUnary encBits (n, keys.1), keys.2)) hpost
+    exact S.keyGen_ppt.map_with (f := fun n (keys : List Bool × List Bool) =>
+      (encPair encUnary encBits (n, keys.1), keys.2)) hpost
   sign_ppt := S.sign_ppt
   verify_polyTime := by
     let VIn := List Bool × List Bool × List Bool
@@ -325,7 +381,6 @@ theorem succProbability_leakNonNScheme_longMsgForger (S : SignatureScheme) (n : 
         ProbComp.eval ((leakNonNScheme S).toSignatureScheme.eufCmaGame longMsgForger n) =
           PMF.pure false := by
       simp only [SignatureScheme.eufCmaGame, WordSignatureScheme.toSignatureScheme_keyGen,
-        WordSignatureScheme.toSignatureScheme_signingOracle,
         WordSignatureScheme.toSignatureScheme_verify, leakNonNScheme, longMsgForger,
         OracleComp.interpret_pure, StateT.run_pure, ProbComp.eval_bind, ProbComp.eval_map,
         ProbComp.eval_pure, PMF.pure_bind, hbeq, Bool.false_and, PMF.bind_const]
@@ -355,13 +410,12 @@ theorem eufCMA_toSignatureScheme_leakNonNScheme {S : SignatureScheme} (hS : S.EU
         (fun p : ℕ × List Bool => (p.1, encPair encUnary encBits (p.1, p.2)))
         (encPair encUnary encBits) (encPair encUnary encBits) :=
       (ComputableInPolyTime.fst _ _).prod henc
-    exact hadversary.on.preprocess' hprep
+    exact hadversary.on.preprocess hprep
   have heq : ∀ n,
       ProbComp.eval ((leakNonNScheme S).toSignatureScheme.eufCmaGame adversary n) =
         ProbComp.eval (S.eufCmaGame wrapped n) := by
     intro n
     simp only [SignatureScheme.eufCmaGame, WordSignatureScheme.toSignatureScheme_keyGen,
-      WordSignatureScheme.toSignatureScheme_signingOracle,
       WordSignatureScheme.toSignatureScheme_verify, leakNonNScheme, wrapped, ProbComp.eval_bind,
       ProbComp.eval_map, ProbComp.eval_pure, PMF.bind_map, Function.comp_def]
     congr 1 with keys : 1
@@ -379,19 +433,6 @@ theorem exists_toSignatureScheme_eufCMA_and_not_wordEUFCMA {f : List Bool → Li
   exact ⟨leakNonNScheme S, eufCMA_toSignatureScheme_leakNonNScheme hS, not_eufCMA_leakNonNScheme S⟩
 
 /-! ### 6. Concrete `TCRSignature.wordScheme` and adaptive multi-query `replayCfg` checks -/
-
-/-- Constant `KeyedHashFamily` with `keyLen n = n` and `digestLen n = n + 1` for concrete checks. -/
-def testHash : KeyedHashFamily where
-  keyLen n := n
-  digestLen n := n + 1
-  eval n _ _ := List.replicate (n + 1) false
-  keyLen_polyTime := .id'
-  digestLen_polyTime := ComputableInPolyTime.id'.unary_add' (.const 1)
-  le_digestLen _ := Nat.le_succ _
-  polyTime :=
-    (((ComputableInPolyTime.fst encUnary (encPair encBits encBits)).unary_add' (.const 1)).trans
-      (ComputableInPolyTime.bitsReplicate false)).of_enc_eq fun _ => rfl
-  length_eq _ _ _ _ := List.length_replicate
 
 /-- Toy deterministic `SignatureScheme` checking `pk.length == msg.length` and
 `sig.length == msg.length`. -/
@@ -419,23 +460,27 @@ noncomputable def testFixedSig : SignatureScheme where
     simp [hmsg]
 
 def sampleWordPk : List Bool :=
-  encPair encUnary encBits (2, List.replicate (TCRSignature.otsParam testHash 2) false)
+  encPair encUnary encBits
+    (2, List.replicate (TCRSignature.otsParam zeroKeyedHashFamily 2) false)
 
 def sampleWordSig : List Bool :=
-  let m := TCRSignature.otsMsg testHash 2 [true, false] [false, false, false]
+  let m := TCRSignature.otsMsg zeroKeyedHashFamily 2 [true, false] [false, false, false]
   encPair encBits encBits ([true, false], m)
 
 -- `TCRSignature.wordScheme` verifies 0-bit, 1-bit, and 5-bit messages at `n = 2`, and rejects
 -- malformed hash-key lengths:
 example :
-    (TCRSignature.wordScheme testFixedSig testHash).verify sampleWordPk [] sampleWordSig = true ∧
-    (TCRSignature.wordScheme testFixedSig testHash).verify sampleWordPk [true] sampleWordSig =
-      true ∧
-    (TCRSignature.wordScheme testFixedSig testHash).verify sampleWordPk
+    (TCRSignature.wordScheme testFixedSig zeroKeyedHashFamily).verify
+      sampleWordPk [] sampleWordSig = true ∧
+    (TCRSignature.wordScheme testFixedSig zeroKeyedHashFamily).verify
+      sampleWordPk [true] sampleWordSig = true ∧
+    (TCRSignature.wordScheme testFixedSig zeroKeyedHashFamily).verify sampleWordPk
       [true, false, true, true, false] sampleWordSig = true ∧
-    (TCRSignature.wordScheme testFixedSig testHash).verify sampleWordPk [true]
+    (TCRSignature.wordScheme testFixedSig zeroKeyedHashFamily).verify sampleWordPk [true]
       (encPair encBits encBits
-        ([true], TCRSignature.otsMsg testHash 2 [true, false] [false, false, false])) = false := by
+        ([true],
+          TCRSignature.otsMsg zeroKeyedHashFamily 2 [true, false] [false, false, false])) =
+      false := by
   decide +kernel
 
 /-- Control states for a concrete 2-query adaptive `MultiTapePTM` whose second query copies the

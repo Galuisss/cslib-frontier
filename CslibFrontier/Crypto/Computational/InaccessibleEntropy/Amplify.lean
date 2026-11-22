@@ -76,12 +76,14 @@ and 5.5), this module formalizes STEPS 1–3 of `[HHRVW2020]`, Section 5.1.5, Pr
 
 ## Main results
 
-* `Cslib.Crypto.AdversaryInaccessibleEntropyFamily.exists_shrinkingCollisionGrid`: STEPS 1–3 of
-  Theorem 5.1 from Definition 3.9 (`AdversaryInaccessibleEntropyFamily`).
-* `Cslib.Crypto.InaccessibleEntropyFamily.exists_shrinkingCollisionGrid`: specialization to a fixed
-  `InaccessibleEntropyFamily`.
-* `Cslib.Crypto.OneWay.exists_shrinkingCollisionGrid`: STEPS 1–3 of Theorem 5.1 composed with
-  Theorem 4.5 (`OneWay.exists_inaccessibleEntropyFamily`).
+* `Cslib.Crypto.AdversaryInaccessibleEntropyFamily.exists_shrinkingCollisionGrid_log`,
+  `Cslib.Crypto.InaccessibleEntropyFamily.exists_shrinkingCollisionGrid_log`,
+  `Cslib.Crypto.OneWay.exists_shrinkingCollisionGrid_log`: STEPS 1–3 of Theorem 5.1 from Definition
+  3.9, fixed `InaccessibleEntropyFamily`, and `OneWay` with `shrinkLen n = Nat.log 2 n + 1`.
+* `Cslib.Crypto.AdversaryInaccessibleEntropyFamily.exists_shrinkingCollisionGrid`,
+  `Cslib.Crypto.InaccessibleEntropyFamily.exists_shrinkingCollisionGrid`,
+  `Cslib.Crypto.OneWay.exists_shrinkingCollisionGrid`: `Nonempty ShrinkingCollisionGrid` (`1 ≤
+  shrinkLen n`) corollaries.
 
 ## References
 
@@ -564,29 +566,43 @@ theorem AdversaryInaccessibleEntropyFamily.exists_shrinkingCollisionGrid_log
       exact amp_randomCollisionGame_succProbability_le F accSet hself hN₀ B hn
   }, fun _ => rfl⟩
 
-/-- **`[HHRVW2020]`, Section 5.1.5, Proof of Theorem 5.1, STEPS 1–3 (pp. 30–31) from Definition
-3.9**: every `AdversaryInaccessibleEntropyFamily` yields a uniform polynomial-time
-`ShrinkingCollisionGrid` of strictly `(Nat.log 2 n + 1)`-bit shrinking hash candidates. -/
+/-- Specialization of `AdversaryInaccessibleEntropyFamily.exists_shrinkingCollisionGrid_log` to a
+fixed `InaccessibleEntropyFamily`, preserving `G.shrinkLen n = Nat.log 2 n + 1`. -/
+theorem InaccessibleEntropyFamily.exists_shrinkingCollisionGrid_log
+    (F : InaccessibleEntropyFamily) :
+    ∃ G : ShrinkingCollisionGrid, ∀ n, G.shrinkLen n = Nat.log 2 n + 1 :=
+  F.toAdversaryInaccessibleEntropyFamily.exists_shrinkingCollisionGrid_log
+
+/-- **`[HHRVW2020]`, Section 4.2, Theorem 4.5 (p. 21) composed with Section 5.1.5, Theorem 5.1,
+STEPS 1–3 (pp. 30–31)**: every uniform `OneWay` function yields a uniform polynomial-time
+`ShrinkingCollisionGrid` with `G.shrinkLen n = Nat.log 2 n + 1`. -/
+theorem OneWay.exists_shrinkingCollisionGrid_log {f : List Bool → List Bool} (hf : OneWay f) :
+    ∃ G : ShrinkingCollisionGrid, ∀ n, G.shrinkLen n = Nat.log 2 n + 1 :=
+  let ⟨F⟩ := hf.exists_inaccessibleEntropyFamily
+  F.exists_shrinkingCollisionGrid_log
+
+/-- `Nonempty ShrinkingCollisionGrid` (`1 ≤ shrinkLen n`) corollary of
+`AdversaryInaccessibleEntropyFamily.exists_shrinkingCollisionGrid_log`, forgetting the explicit
+`Nat.log 2 n + 1` shrinkage equation. -/
 theorem AdversaryInaccessibleEntropyFamily.exists_shrinkingCollisionGrid
     (F : AdversaryInaccessibleEntropyFamily) :
     Nonempty ShrinkingCollisionGrid :=
   let ⟨G, _⟩ := F.exists_shrinkingCollisionGrid_log
   ⟨G⟩
 
-/-- Specialization of `AdversaryInaccessibleEntropyFamily.exists_shrinkingCollisionGrid` to a fixed
+/-- `Nonempty ShrinkingCollisionGrid` (`1 ≤ shrinkLen n`) specialization of
+`AdversaryInaccessibleEntropyFamily.exists_shrinkingCollisionGrid` to a fixed
 `InaccessibleEntropyFamily`. -/
 theorem InaccessibleEntropyFamily.exists_shrinkingCollisionGrid (F : InaccessibleEntropyFamily) :
     Nonempty ShrinkingCollisionGrid :=
   F.toAdversaryInaccessibleEntropyFamily.exists_shrinkingCollisionGrid
 
-/-- **`[HHRVW2020]`, Section 4.2, Theorem 4.5 (p. 21) composed with Section 5.1.5, Theorem 5.1,
-STEPS 1–3 (pp. 30–31)**: every uniform `OneWay` function yields a uniform polynomial-time
-`ShrinkingCollisionGrid` of `(Nat.log 2 n + 1)`-bit shrinking hash candidates admitting, for every
-uniform strict-PPT adversary `B`, an in-range candidate sequence that is collision-resistant on
-random inputs against `B`. -/
+/-- `Nonempty ShrinkingCollisionGrid` (`1 ≤ shrinkLen n`) corollary of
+`OneWay.exists_shrinkingCollisionGrid_log`, forgetting the explicit `Nat.log 2 n + 1` shrinkage
+equation. -/
 theorem OneWay.exists_shrinkingCollisionGrid {f : List Bool → List Bool} (hf : OneWay f) :
     Nonempty ShrinkingCollisionGrid :=
-  let ⟨F⟩ := hf.exists_inaccessibleEntropyFamily
-  F.exists_shrinkingCollisionGrid
+  let ⟨G, _⟩ := hf.exists_shrinkingCollisionGrid_log
+  ⟨G⟩
 
 end Cslib.Crypto

@@ -8,10 +8,13 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Crypto.Computational.SchnorrSignature.EncodedROM
+public import CslibFrontier.Crypto.Computational.SchnorrEavesdrop
 public import CslibFrontier.Crypto.Computational.Signature.WordRandomOracle
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.BitString
 import CslibFrontier.Computability.Probabilistic.OracleSimulation
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Plain
+import CslibFrontier.Languages.Probabilistic.Oracle.InterpNorm
 import CslibFrontier.Tactic.PPT
 import CslibFrontier.Tactic.EncLen
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Lists
@@ -55,8 +58,8 @@ theorem are separate steps (#2568).
 * `schnorrForkRun`: the guarded replay run against `schnorrForkStep`.
 * `schnorrForkFinish`: the final check.
 * `schnorrForkPass`: one native pass.
-* `forkIndexCode`, `forkRunWords`, `transcriptWords`: the native code of a named fork index, the
-  words a pass returns for one typed run, and the native view of a typed transcript.
+* `forkIndexCode`, `forkRunWords`: the native code of a named fork index and the words a pass
+  returns for one typed run.
 
 ## Main results
 
@@ -234,8 +237,8 @@ theorem computableInPolyTime_schnorrForkStep :
       (encList encBits) := by fun_prop
   have hcount : ComputableInPolyTime (fun x : StepInput => x.2.2.count)
       encStepInput encUnary := by fun_prop
-  have hanswer := ComputableTidilyInPolyTime.getElem? (encA := encBits) hanswers.tidy hcount.tidy
-  have hmiss := ComputableInPolyTime.optionElimWithInput hanswer.computableInPolyTime
+  have hanswer := ComputableInPolyTime.getElem? (encA := encBits) hanswers hcount
+  have hmiss := ComputableInPolyTime.optionElimWithInput hanswer
     (hskip.comp (hid.prod (ComputableInPolyTime.const [])))
     (body := fun x c => forkFreshFrom (x, c)) hfresh
   have hhit : ComputableInPolyTime (fun p : StepInput × SchnorrForkEntry =>
@@ -252,7 +255,7 @@ theorem computableInPolyTime_schnorrForkStep :
   have hsign' := hsign.comp (hid.prod hread)
   have hguard : ComputableInPolyTime (fun x : StepInput => x.2.1.1) encStepInput
       encBool := by fun_prop
-  exact .of_tidy (ComputableTidilyInPolyTime.cond hguard.tidy hhash.tidy hsign'.tidy)
+  exact (ComputableInPolyTime.ite' hguard hhash hsign')
 
 /-! ### The native pass -/
 
@@ -373,10 +376,9 @@ theorem isPPTOn_schnorrForkRun {k : ℕ} {Control : Type} [Finite Control]
         (encPair encSchnorrForkBanks (encPair (encPair encBool encBits) encSchnorrForkState)) := by
       fun_prop
     exact (hstep.comp hprep).isPPTOn
-  have hprepare : ComputableTidilyInPolyTime
+  have hprepare : ComputableInPolyTime
       (fun caller : SchnorrForkPassInput => (caller.secParam, caller.publicKey, caller.tape))
       encSchnorrForkPassInput encReplayInput := by
-    apply ComputableInPolyTime.tidy
     fun_prop
   have hrun := (isOraclePPTOn_savedWordReplay machine c e keyC keyD).run_interpret_preprocess
     (input := encSchnorrForkPassInput) (operationEncoding := encBool)
@@ -387,7 +389,7 @@ theorem isPPTOn_schnorrForkRun {k : ℕ} {Control : Type} [Finite Control]
     (initial := fun _ => (⟨[], [], 0, 0⟩ : SchnorrForkState))
     (resources := fun caller word =>
       40 * ((encSchnorrForkPassInput caller).length + word.length + 1))
-    hprepare hhandler (ComputableTidilyInPolyTime.const _)
+    hprepare hhandler (ComputableInPolyTime.const _)
     (fun caller state => ForkInvariant caller.banks state) (fun _ _ => by simp)
     (by fun_prop) ?_
   · exact hrun
@@ -600,11 +602,6 @@ private def positionTag : Option ℕ → ℕ
   | none => 0
   | some i => i + 1
 
-/-- The native view of a typed transcript. -/
-@[expose] def transcriptWords :
-    List Bool × BitString m × List Bool → List Bool × List Bool × List Bool
-  | (t, c, z) => (t, List.ofFn c, z)
-
 /-- The native view of a typed table entry. -/
 private def nativeEntry : List Bool × BitString m × Option ℕ → SchnorrForkEntry
   | (x, c, position) => ⟨x, List.ofFn c, positionTag position⟩
@@ -624,19 +621,19 @@ private noncomputable def typedRawStep (request : Bool × List Bool) :
           (BitString m)) (Sum.inl msg))
       (fun word => OracleComp.query (spec := ForgerSpec (List Bool) (List Bool)
           (List Bool × List Bool) (BitString m)) (Sum.inr word)))
-      (wordQuery ⟨List.ofFn, List.ofFn_injective⟩ request.1 request.2))
+      (wordQuery (encBitString m) request.1 request.2))
 
 private theorem typedRawStep_false (word : List Bool) :
     typedRawStep (m := m) (false, word) =
       encPair encBits encBits <$>
         ForkingReduction.handler (FiatShamir.signer (encPair encBits encBits)) (Sum.inl word) := by
-  simp only [typedRawStep, wordQuery, interpret_query, sumHandler, interpret_map]
+  simp only [typedRawStep, wordQuery, interp_norm]
 
 private theorem typedRawStep_true (word : List Bool) :
     typedRawStep (m := m) (true, word) =
       List.ofFn <$>
         ForkingReduction.handler (FiatShamir.signer (encPair encBits encBits)) (Sum.inr word) := by
-  simp only [typedRawStep, wordQuery, interpret_query, sumHandler, interpret_map]
+  simp only [typedRawStep, wordQuery, interp_norm]
   rfl
 
 /-- A native table lookup agrees with the typed one. -/
@@ -757,18 +754,15 @@ private theorem run_nativeHandler (trs : List (List Bool × BitString m × List 
           (nativeState st used) = pure (reply, nativeState st₁ (used + 1)) := by
         rw [← hstep]
         rfl
-      simp only [interpret_bind, interpret_query, StateT.run_bind, ProbComp.eval_bind, hq,
-        ProbComp.eval_pure, PMF.pure_bind]
+      simp only [interp_norm, pmf_norm, hq]
       rw [heval]
       simp only [runWithAnswers_bind, hrun₁, List.drop_drop, hcount₁]
-    · simpa only [interpret_bind, interpret_query, StateT.run_bind, runWithAnswers_bind, hrun₁,
-        List.drop_drop, hcount₁, Nat.add_comm] using hsamples'
-    · simp only [interpret_bind, interpret_query, StateT.run_bind, runWithAnswers_bind, hrun₁,
-        List.drop_drop, List.length_append]
+    · simpa only [interp_norm, runWithAnswers_bind, hrun₁, List.drop_drop, hcount₁,
+        Nat.add_comm] using hsamples'
+    · simp only [interp_norm, runWithAnswers_bind, hrun₁, List.drop_drop, List.length_append]
       rw [Nat.add_comm queries₁.length, ← hcount₁, hcount']
       omega
-    · simp only [interpret_bind, interpret_query, StateT.run_bind, runWithAnswers_bind, hrun₁,
-        List.drop_drop, List.length_append]
+    · simp only [interp_norm, runWithAnswers_bind, hrun₁, List.drop_drop, List.length_append]
       rw [Nat.add_comm queries₁.length, ← hcount₁]
       omega
 
@@ -796,7 +790,7 @@ private theorem run_interpret_handler_forge {k : ℕ} {Control : Type}
     (y : F.Carrier d) (coins : List Bool) (st : TypedState m) :
     (interpret (ForkingReduction.handler (FiatShamir.signer (Z := List Bool)
         (encPair encBits encBits)))
-      ((F.schnorrDecodedForger d (savedCoinForger machine ⟨List.ofFn, List.ofFn_injective⟩
+      ((F.schnorrDecodedForger d (savedCoinForger machine (encBitString m)
         c e keyC keyD n)).forge y coins)).run st =
       Prod.map (Prod.map id (Decoder.bits.pair Decoder.bits).decode) id <$>
         (interpret typedRawStep (rawReplay machine c e keyC keyD (n, F.encode d y, coins))).run
@@ -879,7 +873,8 @@ private theorem schnorrForkFinish_nativeState (d : F.Desc) (hm : 2 ^ m ≤ F.ord
       simp only [ForkingReduction.finish, FiatShamir.check, hlookup]
     simp only [hfind, Option.map_some, Option.elim_some, nativeEntry, hrun,
       OracleComp.runWithAnswers_pure, List.append_nil]
-    simp only [ForkingReduction.verdict, FiatShamir.check, schnorrWordSigma, hcontains]
+    simp only [ForkingReduction.verdict, FiatShamir.check, schnorrWordSigma, schnorrSigVerifyBits,
+      hcontains]
     cases position with
     | none => simp [positionTag, forkIndexCode, OracleComp.validIndex]
     | some j =>
@@ -902,8 +897,8 @@ private theorem schnorrForkFinish_nativeState (d : F.Desc) (hm : 2 ^ m ≤ F.ord
       simp only [ForkingReduction.finish, FiatShamir.check, hlookup]
     simp only [hfind, Option.map_none, Option.elim_none, hrun, OracleComp.runWithAnswers_map_query,
       hnext, hget]
-    simp only [ForkingReduction.verdict, FiatShamir.check, schnorrWordSigma, hcontains,
-      List.length_map, List.length_append, List.length_singleton, ← hcount,
+    simp only [ForkingReduction.verdict, FiatShamir.check, schnorrWordSigma, schnorrSigVerifyBits,
+      hcontains, List.length_map, List.length_append, List.length_singleton, ← hcount,
       forkIndexCode_validIndex]
 
 end Agreement
@@ -924,7 +919,7 @@ theorem eval_schnorrForkPass {m k : ℕ} {Control : Type}
       PMF.pure (forkRunWords (OracleComp.forkingAlgorithm default
         (savedCoinBudget c e keyC keyD n + 1)
         (FiatShamir.forkingProgram (encPair encBits encBits) (F.schnorrWordSigma d hm)
-          (F.schnorrDecodedForger d (savedCoinForger machine ⟨List.ofFn, List.ofFn_injective⟩
+          (F.schnorrDecodedForger d (savedCoinForger machine (encBitString m)
             c e keyC keyD n))) (y, coins, trs) answers)) := by
   have hR := isQueryBounded_savedWordReplay machine
     (fun op word => OracleComp.query (spec := RawWordSpec) (op, word))
