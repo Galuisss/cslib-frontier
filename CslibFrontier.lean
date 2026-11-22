@@ -3111,6 +3111,7 @@ public import CslibFrontier.Computability.Complexity.RealAlgebraic.QuotientTrace
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.ResidueEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.SignLabelEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.SparseDerivativeTestEvaluation
+public import CslibFrontier.Computability.Complexity.RealAlgebraic.SparseRootLabelEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.TraceExponential
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.TranslatedCoefficientEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.TranslatedPoint
