@@ -126,4 +126,49 @@ example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ �
   exact ⟨budget_comp_linear hq hstate, budget_comp_linear hh hstate,
     budget_comp_linear hr hstate, budget_comp_linear ha hstate⟩
 
+open MultiTapeTM in
+/-- The initial scheduler state can use the workspace of a variable setup producer. -/
+example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ ↪ List Bool)
+    (call : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
+    (readVerdict : σ → Option ControllerVerdict)
+    (hstart : ComputableInSpace start encSeedScanRequest encScan
+      (fun r => (encSeedScanRequest r).length))
+    {prepare : α → SeedSearchSetup} (hsetup : ComputableInSpace prepare enc encSeedSearchSetup S) :
+    ComputableInSpace (fun a => (machine (prepare a) call start readVerdict).init)
+      enc (encState encScan) S :=
+  init_budget encScan call start readVerdict hstart hsetup
+
+open MultiTapeTM ComputableInSpace in
+/-- Compose resumption with a retained frame and a separately produced scanner verdict. -/
+example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ ↪ List Bool)
+    (start : SeedScanRequest → σ)
+    (hstart : ComputableInSpace start encSeedScanRequest encScan
+      (fun r => (encSeedScanRequest r).length))
+    {current : α → SeedSchedulerFrame} {returned : α → Option ControllerVerdict}
+    (hcurrent : ComputableInSpace current enc encSeedSchedulerFrame S)
+    (hreturned : ComputableInSpace returned enc
+      (encOption Turing.DoubleCounting.SourceRoundLoop.encVerdict) S) :
+    ComputableInSpace (fun a => resume start (current a) (returned a)) enc (encState encScan) S :=
+  budget_comp_linear (resume_inSpace encScan start hstart) (budget_prod hcurrent hreturned)
+
+open MultiTapeTM ComputableInSpace NondeterministicQueryMachine in
+/-- A caller can supply the scheduler's state and selector input at a shared budget. -/
+example {α σ : Type} {enc : α ↪ List Bool} {S : α → ℕ} (encScan : σ ↪ List Bool)
+    (call : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
+    (readVerdict : σ → Option ControllerVerdict)
+    (hstart : ComputableInSpace start encSeedScanRequest encScan
+      (fun r => (encSeedScanRequest r).length))
+    (hhalt : ComputableInSpace call.halted encScan encBool (fun s => (encScan s).length))
+    (hreply : ComputableInSpace readVerdict encScan
+      (encOption Turing.DoubleCounting.SourceRoundLoop.encVerdict) (fun s => (encScan s).length))
+    (hnext : ComputableInSpace call.next (encPair encScan encReadChoice) encScan
+      (fun p => (encPair encScan encReadChoice p).length))
+    {current : α → State σ} {readChoice : α → Option Bool × Bool}
+    (hcurrent : ComputableInSpace current enc (encState encScan) S)
+    (hread : ComputableInSpace readChoice enc encReadChoice S) :
+    ComputableInSpace (fun a => (machine setup call start readVerdict).next
+      (current a, readChoice a)) enc (encState encScan) S :=
+  budget_comp_linear (next_inSpace encScan setup call start readVerdict hstart hhalt hreply hnext)
+    (budget_prod hcurrent hread)
+
 end CslibFrontierTests.STCONSeedSchedulerMachine
