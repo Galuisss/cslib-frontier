@@ -222,6 +222,11 @@ Richard Bellman. “Dynamic Programming Treatment of the Travelling Salesman Pro
 
 Charles H. Bennett. *Time/Space Trade-Offs for Reversible Computation*. SIAM Journal on Computing 18(4), 766–776, 1989. https://doi.org/10.1137/0218053 . Bibliographic metadata only; the paper was not inspected in this pass. The manual credits it with the recursive checkpointing strategy as described in [ltv98](#ltv98), Sections 6 and 7.
 
+<a id="benor1983"></a>
+## benor1983
+
+Michael Ben-Or. "Another Advantage of Free Choice (Extended Abstract): Completely Asynchronous Agreement Protocols." *Proceedings of the Second Annual ACM Symposium on Principles of Distributed Computing (PODC '83)*, 27–30, 1983. https://doi.org/10.1145/800221.806707 . Bibliographic metadata checked via secondary indexes on 2026-11-22 UTC; the full conference PDF was not inspected, so no numbered section or theorem locator is asserted. Cited by [BenOr/Basic.lean](../CslibFrontier/Computability/Distributed/BenOr/Basic.lean) and [BenOr/Liveness.lean](../CslibFrontier/Computability/Distributed/BenOr/Liveness.lean) for the two-stage asynchronous crash-fault binary consensus protocol (`2 * t < |P|`, `|P| - t` quorums, strict majority Stage-1 proposals, Stage-2 adoption threshold `1` and decision threshold `t + 1` with non-halting write-once decisions) and probability-1 termination under random Stage-2 coin flips.
+
 <a id="bensassonkopparty12"></a>
 ## bensassonkopparty12
 
