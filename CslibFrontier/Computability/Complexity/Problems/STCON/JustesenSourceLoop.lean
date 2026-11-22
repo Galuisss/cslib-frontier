@@ -9,7 +9,6 @@ module
 
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceRound
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.PolyClock
-import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.HaltingTime
 
 /-!
 # Justesen source loop
@@ -240,27 +239,14 @@ theorem configurationJustesenSourceLoop_exists_routines
       (fun a => SourceRoundLoop.start (contextOf a) (limitOf a)) hregisters (fun _ => le_rfl)
       justesenRetainedSourceRoundEntry_inSpace justesenSourceMembershipStart_inSpace hrr hmr
       hrq hmq hrh hmh hrn hmn ⟨C, hstates⟩
-  let L := R.k * (2 * R.c + 1)
-  have hnativeSpace (a : α) :
-      R.machine.RunsInSpace (enc a) (L * (Nat.log2 (enc a).length + 1)) := by
-    apply (R.runsInSpace a).mono
-    dsimp only [L]
-    rw [Nat.mul_assoc R.k, Nat.add_mul, Nat.one_mul, ← Nat.mul_assoc 2 R.c]
-    exact Nat.mul_le_mul_left _ (Nat.add_le_add_left (Nat.succ_le_succ (Nat.zero_le _)) _)
-  let : Finite R.SI := R.finiteI
-  let : ∀ b, Finite (R.SP b) := R.finiteP
-  let : Finite R.SF := R.finiteF
-  obtain ⟨d, hd⟩ := R.machine.exists_runsInTime_polynomial_of_runsInSpace_log L
-  refine ⟨R, L, d, fun a => ⟨hnativeSpace a, ?_⟩⟩
+  refine ⟨R, R.exists_logSpace_polyClock
+    (time := fun a => configurationJustesenSourceLoopClock ntm c (enc a)) ?_⟩
+  intro a
   obtain ⟨seed, source, target, hctx, hlimit⟩ := hvalid a
-  have hhalt : (M.withInit (entry a)).HaltsWithin (enc a)
-      (configurationJustesenSourceLoopClock ntm c (enc a)) := by
-    dsimp only [M, entry]
-    rw [justesenSourceLoop_withInit, hctx]
-    exact configurationJustesenSourceLoop_haltsWithin_clock ntm c (enc a)
-      seed source target (limitOf a) hlimit
-  obtain ⟨_, htime⟩ := R.exists_runsInTime a hhalt
-  exact hd (hnativeSpace a) htime
+  dsimp only [M, entry]
+  rw [justesenSourceLoop_withInit, hctx]
+  exact configurationJustesenSourceLoop_haltsWithin_clock ntm c (enc a)
+    seed source target (limitOf a) hlimit
 
 /-- For each selector list, an accepting native occurrence is unique exactly when the
 re-entered source loop first halts on that list and returns a verdict. A negative verdict
