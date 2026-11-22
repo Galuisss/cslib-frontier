@@ -333,4 +333,17 @@ example {k : ℕ} {State α : Type} [Fintype State] (ntm : MultiTapeNTM k Bool S
       enc encJustesenSeedSchedulerState S :=
   budget_comp_linear (justesenSeedScheduler_next_inSpace ntm c) (budget_prod hs hi)
 
+open NondeterministicQueryMachine in
+/-- The compiled scheduler recognizes the abstract scheduler's accepted inputs within
+the same native space and time bounds. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    let M := justesenSeedScheduler ntm c
+    let entry := configurationJustesenSeedSchedulerEntry ntm c
+    ∃ R : Routines M entry encBits (fun w => Nat.log2 w.length + 1), ∃ L d, ∀ w,
+      R.machine.RunsInSpace w (L * (Nat.log2 w.length + 1)) ∧
+      R.machine.RunsInTime w (polyClock d w.length) ∧
+      (R.machine.Accepts w ↔ (M.withInit (entry w)).Accepts w) := by
+  obtain ⟨R, L, d, h⟩ := configurationJustesenSeedScheduler_exists_routines ntm c
+  exact ⟨R, L, d, fun w => ⟨(h w).1, (h w).2, R.accepts_iff w⟩⟩
+
 end CslibFrontierTests.STCONSeedScheduler
