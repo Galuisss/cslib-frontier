@@ -27,6 +27,8 @@ returns the reachability answer for the configuration instance.
   to the initialized scheduler and its scanner requests.
 * `configurationSeedSchedulerReferenceScan_correct` gives the exact verdict for any bounded
   source in the generated subdivision.
+* `configurationSeedSchedulerReference_correct` gives the least valid seed and reachability
+  answer for the mathematical reference scanner.
 -/
 
 public section
@@ -180,5 +182,33 @@ theorem configurationSeedSchedulerReferenceScan_correct
   rw [configurationSeedSchedulerReferenceScan, dite_eq_left hsource]
   exact runController_correct (m := Id) (r := edge) (s := source) (target := target)
     (fun _ _ => rfl) (fun _ _ _ => rfl)
+
+/-- The search with the mathematical reference scanner has one result, selecting the
+least min-isolating rank and deciding the original configuration instance. -/
+theorem configurationSeedSchedulerReference_correct
+    {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (input : List Bool) :
+    let I := configurationInstance ntm c input
+    let setup := configurationSeedSearchSetup ntm c input
+    let hs := (configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c input).1
+    let hr := fun _ hp =>
+      configurationSeedSearchSetup_originalSourceID_lt_vertexCount ntm c input hp
+    ∃ result, runSeedSchedulerFor setup hs hr
+        (fun frame => [configurationSeedSchedulerReferenceScan ntm c input frame.request]) =
+          [some result] ∧
+      (layeredDigraph I).IsMinIsolating (generatedWeight (fun j => result.seed.val.testBit j.val)) ∧
+      (∀ i : Fin (2 ^ setup.parameters.search.seedWidth), i < result.seed →
+        ¬ (layeredDigraph I).IsMinIsolating (generatedWeight (fun j => i.val.testBit j.val))) ∧
+      (result.reachable = true ↔ I ∈ STCON) := by
+  intro I setup hs hr
+  refine configurationSeedScheduler_correct (m := List) ntm c input
+    (fun request => [configurationSeedSchedulerReferenceScan ntm c input request]) ?_
+  intro seed source
+  obtain ⟨verdict, hscan, hcorrect⟩ := configurationSeedSchedulerReferenceScan_correct
+    ntm c input ⟨setup, seed.val, source.val⟩ source.isLt
+  refine ⟨verdict, congrArg (fun x => [x]) hscan, ?_⟩
+  cases verdict with
+  | bad j => exact hcorrect.2
+  | decided hit => exact hcorrect
 
 end Cslib.Complexity.STCON

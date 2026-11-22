@@ -283,17 +283,25 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   ⟨configurationJustesenSeedSchedulerClock_polyBounded ntm c,
     configurationJustesenSeedScheduler_haltsWithin_clock ntm c w⟩
 
-/-- When candidate zero is present, its designated scan returns a verdict exactly once. -/
+/-- Candidate zero has one designated scan trace returning the reference verdict. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
     (c : ℕ) (w : List Bool) (frame : SeedSchedulerFrame)
     (h : seedSchedulerCandidate (configurationSeedSearchSetup ntm c w) 0 = some frame) :
     let scan := justesenSeedSchedulerScan ntm c
     let entry := justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w)
-    ∃! bits, scan.FirstHalting w bits entry ∧
-      (SourceRoundLoop.reply (scan.replay w bits entry)).isSome := by
+    (∃! bits, scan.FirstHalting w bits entry ∧
+      (SourceRoundLoop.reply (scan.replay w bits entry)).isSome) ∧
+    ∃ bits verdict, scan.FirstHalting w bits entry ∧
+      SourceRoundLoop.reply (scan.replay w bits entry) = some verdict ∧
+      configurationSeedSchedulerReferenceScan ntm c w frame.request = some verdict := by
   obtain ⟨hvalid, hsetup, _⟩ := seedSchedulerCandidate_valid h
-  exact configurationJustesenSeedSchedulerScan_existsUnique_firstHalting
+  have htrace := configurationJustesenSeedSchedulerScan_existsUnique_firstHalting
     ntm c w frame hsetup hvalid
+  obtain ⟨bits, hfirst, hsome⟩ := htrace.exists
+  obtain ⟨verdict, hreply⟩ := Option.isSome_iff_exists.mp hsome
+  exact ⟨htrace, bits, verdict, hfirst, hreply,
+    configurationJustesenSeedSchedulerScan_firstHalting_eq_reference
+      ntm c w frame hsetup hvalid bits verdict hfirst hreply⟩
 
 /-- A negative reply at candidate zero matches the mathematical scanner and rules out a path
 to the setup's target in the subdivision for the all-zero seed. -/
@@ -332,5 +340,22 @@ example {k : ℕ} {State α : Type} [Fintype State] (ntm : MultiTapeNTM k Bool S
   obtain ⟨hq, hh, ha⟩ := justesenSeedScheduler_observations_inSpace ntm c
   exact ⟨ComputableInSpace.budget_comp_linear hq hs,
     ComputableInSpace.budget_comp_linear hh hs, ComputableInSpace.budget_comp_linear ha hs⟩
+
+open Cslib.Complexity in
+/-- The retained scheduler returns the original machine's decision on its unique successful
+trace, for any input on which the simulated machine obeys its space bound. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) (hspace : ntm.RunsInSpace w (c * (Nat.log2 w.length + 1))) :
+    let M := justesenSeedScheduler ntm c
+    let entry := configurationJustesenSeedSchedulerEntry ntm c w
+    let reply := fun trace => SeedSchedulerMachine.reply (M.replay w trace entry).2
+    ∃ (answer : SeedSchedulerMachine.Answer) (bits : List Bool),
+      (answer.reachable = true ↔ ntm.Accepts w) ∧
+      M.FirstHalting w bits entry ∧ reply bits = some (some answer) ∧
+      ∀ other, M.FirstHalting w other entry → (reply other).isSome → other = bits := by
+  obtain ⟨answer, bits, _, _, _, hreach, hfirst, hreply, hunique⟩ :=
+    configurationJustesenSeedScheduler_replay_correct ntm c w
+  exact ⟨answer, bits, hreach.trans (configurationInstance_mem_iff ntm c hspace),
+    hfirst, hreply, hunique⟩
 
 end CslibFrontierTests.STCONSeedScheduler
