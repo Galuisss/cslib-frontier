@@ -287,7 +287,7 @@ theorem tokenSys_exists_completing_fair_execution :
   have htr₀ : tokenSys.snapLts.Tr S₀ (.initiateSnapshot 0) S₁ := ⟨by decide, rfl⟩
   have hwf₀ : tokenSys.WellFormedSnapChan S₀ := fun _ _ _ => rfl
   have hwf₁ : tokenSys.WellFormedSnapChan S₁ :=
-    tokenSys.wellFormedSnapChan_tr S₀ (.initiateSnapshot 0) S₁ htr₀ hwf₀
+    tokenSys.wellFormedSnapChan_mTr (LTS.MTr.single tokenSys.snapLts htr₀) hwf₀
   obtain ⟨ss', xs', hss'0, hexec', hfair'⟩ :=
     tokenSys_inputEnabled.exists_fair_snapOmegaExecution hwf₁
   let ss : ωSequence (SnapGlobalState (Fin 3) ℕ Unit) := S₀ ::ω ss'

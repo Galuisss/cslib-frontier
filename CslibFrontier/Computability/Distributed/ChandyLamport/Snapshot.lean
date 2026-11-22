@@ -63,9 +63,10 @@ underlying `sys.lts` has no stuttering action, so `sys.lts.IsTerminal` expresses
   `Cslib.Distributed.ChandyLamport.System.snapStates`,
   `Cslib.Distributed.ChandyLamport.System.validSnapTrace`: LTS of the Chandy–Lamport augmented
   system and its executable trace runners.
-* `Cslib.Distributed.ChandyLamport.System.IsPreSnapshot`,
-  `Cslib.Distributed.ChandyLamport.IsSnapshotComplete`: pre-snapshot initial condition and
-  snapshot-completion predicate.
+* `Cslib.Distributed.ChandyLamport.System.WellFormedSnapChan`,
+  `Cslib.Distributed.ChandyLamport.System.IsPreSnapshot`,
+  `Cslib.Distributed.ChandyLamport.IsSnapshotComplete`: channel well-formedness, pre-snapshot
+  initial condition, and snapshot-completion predicate.
 * `Cslib.Distributed.ChandyLamport.System.SnapInv`: inductive single-marker and FIFO cut invariant.
 
 ## Main results
@@ -175,28 +176,6 @@ theorem unmarker_eq_takeBeforeMarker_append_dropAfterMarker {M : Type*}
     cases w with
     | app m => simp [takeBeforeMarker, dropAfterMarker, ih]
     | marker => rfl
-
-theorem takeBeforeMarker_of_notMem {M : Type*} {ws : List (WireMsg M)}
-    (h : .marker ∉ ws) : takeBeforeMarker ws = unmarker ws := by
-  induction ws with
-  | nil => rfl
-  | cons w ws ih =>
-    cases w with
-    | app m =>
-      simp only [List.mem_cons, reduceCtorEq, false_or] at h
-      simp [takeBeforeMarker, ih h]
-    | marker => exact absurd List.mem_cons_self h
-
-theorem dropAfterMarker_of_notMem {M : Type*} {ws : List (WireMsg M)}
-    (h : .marker ∉ ws) : dropAfterMarker ws = [] := by
-  induction ws with
-  | nil => rfl
-  | cons w ws ih =>
-    cases w with
-    | app m =>
-      simp only [List.mem_cons, reduceCtorEq, false_or] at h
-      exact ih h
-    | marker => exact absurd List.mem_cons_self h
 
 theorem takeBeforeMarker_append_marker_of_notMem {M : Type*} {ws : List (WireMsg M)}
     (h : .marker ∉ ws) : takeBeforeMarker (ws ++ [.marker]) = unmarker ws := by
@@ -708,12 +687,58 @@ theorem snapTr_appInternal_of_tr [DecidableEq P] [DecidableRel sys.graph.Adj]
 
 /-! ### Pre-snapshot condition and single-marker FIFO cut invariant -/
 
+/-- An augmented state has well-formed channels if every non-edge of `sys.graph` is empty. -/
+@[expose] def WellFormedSnapChan (S_aug : SnapGlobalState P S M) : Prop :=
+  ∀ u v, ¬ sys.graph.Adj u v → S_aug.chan u v = []
+
+instance instDecidableWellFormedSnapChan [Fintype P] [DecidableRel sys.graph.Adj]
+    (S_aug : SnapGlobalState P S M) : Decidable (sys.WellFormedSnapChan S_aug) :=
+  inferInstanceAs (Decidable (∀ _ _, _))
+
+private theorem wellFormedSnapChan_tr [DecidableEq P] [DecidableRel sys.graph.Adj] :
+    sys.snapLts.TrInv sys.WellFormedSnapChan := by
+  rintro S₁ a _ ⟨hen, rfl⟩ hwf u v huv
+  cases a with
+  | stutter => exact hwf u v huv
+  | initiateSnapshot p =>
+    have hnd : ¬ (u = p ∧ sys.graph.Adj p v) := by rintro ⟨rfl, ha⟩; exact huv ha
+    simp [stepSnap, applyInitiate, hnd, hwf u v huv]
+  | recvMarker src dest =>
+    have hnp : ¬ (u = src ∧ v = dest) := by rintro ⟨rfl, rfl⟩; exact huv hen.1
+    have hnd : ¬ (u = dest ∧ sys.graph.Adj dest v) := by rintro ⟨rfl, ha⟩; exact huv ha
+    simp only [stepSnap, applyRecvMarker]
+    cases (S₁.proc dest).snapState <;> simp [hnp, hnd, hwf u v huv]
+  | app e =>
+    cases e with
+    | internal p st' sent =>
+      simp only [stepSnap, SnapGlobalState.applyApp]
+      rcases eq_or_ne u p with rfl | hu
+      · have hout : outgoingTo sent v = [] :=
+          outgoingTo_eq_nil_of_forall_ne fun m hm => huv (hen.2 (v, m) hm)
+        simp [hwf u v huv, hout]
+      · simp [hu, hwf u v huv]
+    | recv src dest msg st' sent =>
+      have hnp : ¬ (u = src ∧ v = dest) := by rintro ⟨rfl, rfl⟩; exact huv hen.1
+      simp only [stepSnap, SnapGlobalState.applyApp, hnp, ↓reduceIte]
+      rcases eq_or_ne u dest with rfl | hu
+      · have hout : outgoingTo sent v = [] :=
+          outgoingTo_eq_nil_of_forall_ne fun m hm => huv (hen.2.2.2 (v, m) hm)
+        simp [hwf u v huv, hout]
+      · simp [hu, hwf u v huv]
+
+/-- Non-edge wire channels remain empty across any finite execution of `sys.snapLts`. -/
+theorem wellFormedSnapChan_mTr [DecidableEq P] [DecidableRel sys.graph.Adj]
+    {S₁ S₂ : SnapGlobalState P S M} {xl : List (SnapEvent P S M)}
+    (hmtr : sys.snapLts.MTr S₁ xl S₂) (hwf : sys.WellFormedSnapChan S₁) :
+    sys.WellFormedSnapChan S₂ :=
+  LTS.mtrInv_of_trInv sys.wellFormedSnapChan_tr S₁ xl S₂ hmtr hwf
+
 /-- Pre-snapshot initial condition: no process has recorded yet (`snapState = none`), no `.marker`s
-are in flight, and non-edge channels are empty. -/
+are in flight, and non-edge channels are empty (`WellFormedSnapChan`). -/
 @[expose] def IsPreSnapshot (S_aug : SnapGlobalState P S M) : Prop :=
   (∀ p, (S_aug.proc p).snapState = none) ∧
   (∀ u v, .marker ∉ S_aug.chan u v) ∧
-  (∀ u v, ¬ sys.graph.Adj u v → S_aug.chan u v = [])
+  sys.WellFormedSnapChan S_aug
 
 instance instDecidableIsPreSnapshot [Fintype P] [DecidableEq M]
     [DecidableRel sys.graph.Adj] (S_aug : SnapGlobalState P S M) :
@@ -804,9 +829,13 @@ theorem enabledSnap_recvMarker_spec {S₁ : SnapGlobalState P S M} {src dest : P
       notMem_tail_of_head_marker_of_countP_le_one hhead_sd (hinv.markerCount src dest)
   exact ⟨hadj_sd, hsrc_some, t_sd, ht_sd, hnotm_tail⟩
 
+/-- `SnapInv` is preserved by every single transition of `sys.snapLts`. -/
 theorem snapInv_tr [DecidableEq P] [DecidableRel sys.graph.Adj] :
     sys.snapLts.TrInv sys.SnapInv := by
   rintro S₁ a _ ⟨hen, rfl⟩ hinv
+  have hwf₂ : sys.WellFormedSnapChan (sys.stepSnap S₁ a) :=
+    sys.wellFormedSnapChan_tr S₁ a (sys.stepSnap S₁ a) ⟨hen, rfl⟩
+      (fun u v huv => (hinv.nonEdge u v huv).1)
   cases a with
   | stutter => exact hinv
   | app e =>
@@ -814,17 +843,10 @@ theorem snapInv_tr [DecidableEq P] [DecidableRel sys.graph.Adj] :
     | internal p st' sent =>
       refine ⟨?_, ?_, ?_, ?_⟩
       · intro u v huv
-        obtain ⟨hch, hrec⟩ := hinv.nonEdge u v huv
-        refine ⟨?_, ?_⟩
-        · simp only [stepSnap, SnapGlobalState.applyApp]
-          rcases eq_or_ne u p with rfl | hu
-          · have hout : outgoingTo sent v = [] :=
-              outgoingTo_eq_nil_of_forall_ne fun m hm => huv (hen.2 (v, m) hm)
-            simp [hch, hout]
-          · simp [hu, hch]
-        · intro hv_some
-          simp only [stepSnap, SnapGlobalState.applyApp] at hv_some ⊢
-          rcases eq_or_ne v p with rfl | hv <;> simp_all
+        refine ⟨hwf₂ u v huv, fun hv_some => ?_⟩
+        have hrec := (hinv.nonEdge u v huv).2
+        simp only [stepSnap, SnapGlobalState.applyApp] at hv_some ⊢
+        rcases eq_or_ne v p with rfl | hv <;> simp_all
       · intro u v
         simp only [stepSnap, SnapGlobalState.applyApp]
         rcases eq_or_ne u p with rfl | hu
@@ -883,24 +905,16 @@ theorem snapInv_tr [DecidableEq P] [DecidableRel sys.graph.Adj] :
         · simp [hp]
       refine ⟨?_, ?_, ?_, ?_⟩
       · intro u v huv
-        have hnp : ¬ (u = src ∧ v = dest) := by rintro ⟨rfl, rfl⟩; exact huv hen.1
-        obtain ⟨hch, hrec⟩ := hinv.nonEdge u v huv
-        refine ⟨?_, ?_⟩
-        · simp only [stepSnap, SnapGlobalState.applyApp, hnp, ↓reduceIte]
-          rcases eq_or_ne u dest with rfl | hu
-          · have hout : outgoingTo sent v = [] :=
-              outgoingTo_eq_nil_of_forall_ne fun m hm => huv (hen.2.2.2 (v, m) hm)
-            simp [hch, hout]
-          · simp [hu, hch]
-        · intro hv_some
-          simp only [stepSnap, SnapGlobalState.applyApp] at hv_some ⊢
-          rcases eq_or_ne v dest with rfl | hv
-          · simp only [↓reduceIte] at hv_some ⊢
-            have hdone := hrec hv_some
-            have husrc : u ≠ src := fun h => by subst h; exact huv hen.1
-            simp [hv_some, husrc, hdone]
-          · simp only [hv, ↓reduceIte] at hv_some ⊢
-            exact hrec hv_some
+        refine ⟨hwf₂ u v huv, fun hv_some => ?_⟩
+        have hrec := (hinv.nonEdge u v huv).2
+        simp only [stepSnap, SnapGlobalState.applyApp] at hv_some ⊢
+        rcases eq_or_ne v dest with rfl | hv
+        · simp only [↓reduceIte] at hv_some ⊢
+          have hdone := hrec hv_some
+          have husrc : u ≠ src := fun h => by subst h; exact huv hen.1
+          simp [hv_some, husrc, hdone]
+        · simp only [hv, ↓reduceIte] at hv_some ⊢
+          exact hrec hv_some
       · intro u v
         simp only [stepSnap, SnapGlobalState.applyApp]
         have hcnt_pop :
@@ -982,10 +996,8 @@ theorem snapInv_tr [DecidableEq P] [DecidableRel sys.graph.Adj] :
   | initiateSnapshot p =>
     refine ⟨?_, ?_, ?_, ?_⟩
     · intro u v huv
-      have hnd : ¬ (u = p ∧ sys.graph.Adj p v) := by rintro ⟨rfl, ha⟩; exact huv ha
-      obtain ⟨hch, hrec⟩ := hinv.nonEdge u v huv
-      refine ⟨by simp [stepSnap, applyInitiate, hnd, hch], ?_⟩
-      intro hv_some
+      refine ⟨hwf₂ u v huv, fun hv_some => ?_⟩
+      have hrec := (hinv.nonEdge u v huv).2
       simp only [stepSnap, applyInitiate] at hv_some ⊢
       rcases eq_or_ne v p with rfl | hv
       · simp [huv]
@@ -1045,11 +1057,8 @@ theorem snapInv_tr [DecidableEq P] [DecidableRel sys.graph.Adj] :
         intro h; subst h; rw [hdest] at hsrc_some; simp at hsrc_some
       refine ⟨?_, ?_, ?_, ?_⟩
       · intro u v huv
-        have hnp : ¬ (u = src ∧ v = dest) := by rintro ⟨rfl, rfl⟩; exact huv hadj_sd
-        have hnd : ¬ (u = dest ∧ sys.graph.Adj dest v) := by rintro ⟨rfl, ha⟩; exact huv ha
-        obtain ⟨hch, hrec⟩ := hinv.nonEdge u v huv
-        refine ⟨by simp [stepSnap, applyRecvMarker, hdest, hnd, hnp, hch], ?_⟩
-        intro hv_some
+        refine ⟨hwf₂ u v huv, fun hv_some => ?_⟩
+        have hrec := (hinv.nonEdge u v huv).2
         simp only [stepSnap, applyRecvMarker, hdest] at hv_some ⊢
         rcases eq_or_ne v dest with rfl | hv
         · simp [huv]
@@ -1121,10 +1130,8 @@ theorem snapInv_tr [DecidableEq P] [DecidableRel sys.graph.Adj] :
     | some s_d =>
       refine ⟨?_, ?_, ?_, ?_⟩
       · intro u v huv
-        have hnp : ¬ (u = src ∧ v = dest) := by rintro ⟨rfl, rfl⟩; exact huv hadj_sd
-        obtain ⟨hch, hrec⟩ := hinv.nonEdge u v huv
-        refine ⟨by simp [stepSnap, applyRecvMarker, hdest, hnp, hch], ?_⟩
-        intro hv_some
+        refine ⟨hwf₂ u v huv, fun hv_some => ?_⟩
+        have hrec := (hinv.nonEdge u v huv).2
         simp only [stepSnap, applyRecvMarker, hdest] at hv_some ⊢
         rcases eq_or_ne v dest with rfl | hv
         · have husrc : u ≠ src := fun h => by subst h; exact huv hadj_sd

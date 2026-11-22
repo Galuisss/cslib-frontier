@@ -107,6 +107,8 @@ preserving emission order. -/
 theorem outgoingTo_nil {P M : Type*} [DecidableEq P] (dest : P) :
     outgoingTo ([] : List (P × M)) dest = [] := rfl
 
+/-- Payload `m` appears in `outgoingTo sent dest` if and only if `(dest, m) ∈ sent`. -/
+@[simp]
 theorem mem_outgoingTo_iff {P M : Type*} [DecidableEq P] {sent : List (P × M)} {dest : P} {m : M} :
     m ∈ outgoingTo sent dest ↔ (dest, m) ∈ sent := by
   simp only [outgoingTo, List.mem_filterMap, Prod.exists]
@@ -119,6 +121,7 @@ theorem mem_outgoingTo_iff {P M : Type*} [DecidableEq P] {sent : List (P × M)} 
   · intro hmem
     exact ⟨dest, m, hmem, by simp⟩
 
+/-- `outgoingTo sent dest` is empty when no entry of `sent` targets `dest`. -/
 theorem outgoingTo_eq_nil_of_forall_ne {P M : Type*} [DecidableEq P]
     {sent : List (P × M)} {dest : P} (h : ∀ m, (dest, m) ∉ sent) :
     outgoingTo sent dest = [] := by
@@ -323,7 +326,7 @@ instance instDecidableWellFormedChan [Fintype P] [DecidableRel sys.graph.Adj]
     (s : GlobalState P S M) : Decidable (sys.WellFormedChan s) :=
   inferInstanceAs (Decidable (∀ _ _, _))
 
-theorem wellFormedChan_tr [DecidableEq P] : sys.lts.TrInv sys.WellFormedChan := by
+private theorem wellFormedChan_tr [DecidableEq P] : sys.lts.TrInv sys.WellFormedChan := by
   rintro s e _ ⟨hen, rfl⟩ hwf u v huv
   rw [GlobalState.applyEvent_chan, hwf u v huv]
   by_cases hu : u = e.actor

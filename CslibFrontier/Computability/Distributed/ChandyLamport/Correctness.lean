@@ -144,7 +144,7 @@ theorem project_chan_eq_preInFlight_append_postInFlight {P S M : Type*}
   · simp only [↓reduceIte]
     exact unmarker_eq_takeBeforeMarker_append_dropAfterMarker (S_aug.chan u v)
 
-theorem preInFlight_eq_unmarker_of_unrecorded {P S M : Type*}
+private theorem preInFlight_eq_unmarker_of_unrecorded {P S M : Type*}
     {S_aug : SnapGlobalState P S M} {u v : P}
     (hunrec : (S_aug.proc u).snapState = none) (hnotm : .marker ∉ S_aug.chan u v) :
     preInFlight S_aug u v = unmarker (S_aug.chan u v) := by
@@ -153,7 +153,7 @@ theorem preInFlight_eq_unmarker_of_unrecorded {P S M : Type*}
   rw [preInFlight, hany]
   simp [hunrec]
 
-theorem preInFlight_eq_nil_of_recorded_of_notMem {P S M : Type*}
+private theorem preInFlight_eq_nil_of_recorded_of_notMem {P S M : Type*}
     {S_aug : SnapGlobalState P S M} {u v : P}
     (hrec : (S_aug.proc u).snapState.isSome = true) (hnotm : .marker ∉ S_aug.chan u v) :
     preInFlight S_aug u v = [] := by
@@ -164,7 +164,7 @@ theorem preInFlight_eq_nil_of_recorded_of_notMem {P S M : Type*}
   rw [preInFlight, hany]
   simp [hnone]
 
-theorem postInFlight_eq_nil_of_unrecorded {P S M : Type*}
+private theorem postInFlight_eq_nil_of_unrecorded {P S M : Type*}
     {S_aug : SnapGlobalState P S M} {u v : P}
     (hunrec : (S_aug.proc u).snapState = none) (hnotm : .marker ∉ S_aug.chan u v) :
     postInFlight S_aug u v = [] := by
@@ -1254,6 +1254,7 @@ every vertex `u` by a directed path (`Relation.ReflTransGen G.Adj u v`). -/
 @[expose] def StronglyConnected {P : Type*} (G : Digraph P) : Prop :=
   ∀ u v : P, Relation.ReflTransGen G.Adj u v
 
+/-- The complete directed graph `⊤` is strongly connected. -/
 theorem stronglyConnected_top (P : Type*) : StronglyConnected (⊤ : Digraph P) :=
   fun _ _ => Relation.ReflTransGen.single trivial
 
@@ -1263,6 +1264,8 @@ variable {P S M : Type*} (sys : System P S M)
 
 /-! #### Monotonicity of recorded process states and completed channel recorders -/
 
+/-- Once process `p` records `snapState = some s_p`, every subsequent transition of `sys.snapLts`
+preserves `snapState = some s_p` (write-once local snapshot). -/
 theorem snapState_stable_tr [DecidableEq P] [DecidableRel sys.graph.Adj]
     {S₁ S₂ : SnapGlobalState P S M} {a : SnapEvent P S M} {p : P} {s_p : S}
     (htr : sys.snapLts.Tr S₁ a S₂) (hs : (S₁.proc p).snapState = some s_p) :
@@ -1285,7 +1288,7 @@ theorem snapState_stable_tr [DecidableEq P] [DecidableRel sys.graph.Adj]
         simp
       · simp [hpd, hs]
 
-theorem snapState_isSome_omega [DecidableEq P] [DecidableRel sys.graph.Adj]
+private theorem snapState_isSome_omega [DecidableEq P] [DecidableRel sys.graph.Adj]
     {ss : ωSequence (SnapGlobalState P S M)} {xs : ωSequence (SnapEvent P S M)}
     (hexec : sys.snapLts.OmegaExecution ss xs) {p : P} {k j : ℕ} (hkj : k ≤ j)
     (hs : ((ss k).proc p).snapState.isSome = true) :
@@ -1298,6 +1301,8 @@ theorem snapState_isSome_omega [DecidableEq P] [DecidableRel sys.graph.Adj]
   | succ d ih =>
     exact sys.snapState_stable_tr (hexec (k + d)) (ih (Nat.le_add_right k d))
 
+/-- Once process `p` has recorded (`snapState.isSome`) and finalized incoming recorder
+`chanRec q = .done saved`, every subsequent transition of `sys.snapLts` preserves `.done saved`. -/
 theorem chanRec_done_stable_tr [DecidableEq P] [DecidableRel sys.graph.Adj]
     {S₁ S₂ : SnapGlobalState P S M} {a : SnapEvent P S M} {q p : P} {saved : List M}
     (htr : sys.snapLts.Tr S₁ a S₂)
@@ -1331,7 +1336,7 @@ theorem chanRec_done_stable_tr [DecidableEq P] [DecidableRel sys.graph.Adj]
         rcases eq_or_ne q src with rfl | hqs <;> simp_all [ChannelRec.msgs]
       · simp [hpd, hd]
 
-theorem chanRec_isDone_omega [DecidableEq P] [DecidableRel sys.graph.Adj]
+private theorem chanRec_isDone_omega [DecidableEq P] [DecidableRel sys.graph.Adj]
     {ss : ωSequence (SnapGlobalState P S M)} {xs : ωSequence (SnapEvent P S M)}
     (hexec : sys.snapLts.OmegaExecution ss xs) {q p : P} {k j : ℕ} (hkj : k ≤ j)
     (hs : ((ss k).proc p).snapState.isSome = true)
@@ -1591,41 +1596,6 @@ there exist `st'` and `sent` satisfying `sys.recv` and respecting `sys.graph`. -
   ∀ src dest, sys.graph.Adj src dest → ∀ st msg,
     ∃ st' sent, sys.recv src dest st msg st' sent ∧ ∀ rm ∈ sent, sys.graph.Adj dest rm.1
 
-/-- An augmented state has well-formed channels if every non-edge of `sys.graph` is empty. -/
-@[expose] def WellFormedSnapChan (S_aug : SnapGlobalState P S M) : Prop :=
-  ∀ u v, ¬ sys.graph.Adj u v → S_aug.chan u v = []
-
-theorem wellFormedSnapChan_tr [DecidableEq P] [DecidableRel sys.graph.Adj] :
-    sys.snapLts.TrInv sys.WellFormedSnapChan := by
-  rintro S₁ a _ ⟨hen, rfl⟩ hwf u v huv
-  cases a with
-  | stutter => exact hwf u v huv
-  | initiateSnapshot p =>
-    have hnd : ¬ (u = p ∧ sys.graph.Adj p v) := by rintro ⟨rfl, ha⟩; exact huv ha
-    simp [stepSnap, applyInitiate, hnd, hwf u v huv]
-  | recvMarker src dest =>
-    have hnp : ¬ (u = src ∧ v = dest) := by rintro ⟨rfl, rfl⟩; exact huv hen.1
-    have hnd : ¬ (u = dest ∧ sys.graph.Adj dest v) := by rintro ⟨rfl, ha⟩; exact huv ha
-    simp only [stepSnap, applyRecvMarker]
-    cases (S₁.proc dest).snapState <;> simp [hnp, hnd, hwf u v huv]
-  | app e =>
-    cases e with
-    | internal p st' sent =>
-      simp only [stepSnap, SnapGlobalState.applyApp]
-      rcases eq_or_ne u p with rfl | hu
-      · have hout : outgoingTo sent v = [] :=
-          outgoingTo_eq_nil_of_forall_ne fun m hm => huv (hen.2 (v, m) hm)
-        simp [hwf u v huv, hout]
-      · simp [hu, hwf u v huv]
-    | recv src dest msg st' sent =>
-      have hnp : ¬ (u = src ∧ v = dest) := by rintro ⟨rfl, rfl⟩; exact huv hen.1
-      simp only [stepSnap, SnapGlobalState.applyApp, hnp, ↓reduceIte]
-      rcases eq_or_ne u dest with rfl | hu
-      · have hout : outgoingTo sent v = [] :=
-          outgoingTo_eq_nil_of_forall_ne fun m hm => huv (hen.2.2.2 (v, m) hm)
-        simp [hwf u v huv, hout]
-      · simp [hu, hwf u v huv]
-
 end System
 
 /-! #### Round-robin channel-draining scheduler -/
@@ -1718,7 +1688,8 @@ private lemma drainEdges_spec {P S M : Type*} [DecidableEq P]
         obtain ⟨a', S₁', hsome, htr₀, hdel₀⟩ := deliverHeadStep_spec sys hinp hadj hne_uv
         rw [hdel, Option.some.injEq, Prod.mk.injEq] at hsome
         rcases hsome with ⟨rfl, rfl⟩
-        have hwf₁ : sys.WellFormedSnapChan S₁ := sys.wellFormedSnapChan_tr S_aug a₀ S₁ htr₀ hwf
+        have hwf₁ : sys.WellFormedSnapChan S₁ :=
+          sys.wellFormedSnapChan_mTr (LTS.MTr.single sys.snapLts htr₀) hwf
         obtain ⟨hmtr, hwf₂, hmem⟩ := ih S₁ hwf₁
         refine ⟨.stepL htr₀ hmtr, hwf₂, fun src dest hin hne => ?_⟩
         by_cases hsame : src = u ∧ dest = v
