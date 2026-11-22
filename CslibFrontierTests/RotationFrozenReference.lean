@@ -12,6 +12,8 @@ import CslibFrontier.Computability.Complexity.Problems.Graph.RotationSystem.Reco
 import CslibFrontier.Foundations.Geometry.Polygonal.LineEnds
 import CslibFrontier.Computability.Complexity.Problems.Graph.PolygonalDrawing.CutTransport
 import CslibFrontier.Foundations.Geometry.Polygonal.CutTransport
+import CslibFrontier.Foundations.Geometry.PuncturedPaths
+import Mathlib.LinearAlgebra.Complex.FiniteDimensional
 import Mathlib.Tactic.NormNum
 
 /-! Ordinary clients keep both loop ends, parallel occurrences, unused fresh leaves, a fixed
@@ -252,5 +254,15 @@ example :
   intro z hz
   exact (mem_frozenReferenceObstacle_iff valid_bothFixed).mpr
     (Or.inr ⟨loopLast, by decide +kernel, hz⟩)
+
+-- Additional occupied points can be excluded without disconnecting the frozen complement.
+example :
+    IsPathConnected ((frozenReferenceObstacle bothFixed)ᶜ \ ({-1, -2} : Set ℂ)) := by
+  apply Cslib.isPathConnected_sdiff_finite_of_isOpen
+  · rw [Complex.rank_real_complex]
+    exact Nat.one_lt_ofNat
+  · exact (frozenReferenceObstacle_isCompact bothFixed).isClosed.isOpen_compl
+  · exact frozenReferenceObstacle_compl_isPathConnected valid_bothFixed
+  · exact (Set.finite_singleton _).insert _
 
 end Cslib.Tests.RotationFrozenReference
