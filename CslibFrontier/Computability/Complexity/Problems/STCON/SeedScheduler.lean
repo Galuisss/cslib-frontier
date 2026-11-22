@@ -136,6 +136,12 @@ def seedSchedulerCandidate (s : SeedSearchSetup) (seed : ℕ) : Option SeedSched
     some (seedSchedulerFrame s seed none s.sourceID)
   else none
 
+/-- A rank below the seed limit enters the designated scan. -/
+theorem seedSchedulerCandidate_eq_some {s : SeedSearchSetup} {seed : ℕ}
+    (h : seed < s.parameters.search.seedLimit) :
+    seedSchedulerCandidate s seed = some (seedSchedulerFrame s seed none s.sourceID) := by
+  simp [seedSchedulerCandidate, h]
+
 /-- The designated call always scans. An indexed frame skips the designated source. -/
 def SeedSchedulerFrame.needsScan (f : SeedSchedulerFrame) : Bool :=
   f.answer.isNone || f.request.sourceID != f.request.setup.sourceID
