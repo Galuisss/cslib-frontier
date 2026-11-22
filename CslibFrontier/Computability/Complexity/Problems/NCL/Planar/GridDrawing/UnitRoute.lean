@@ -89,6 +89,26 @@ private theorem support_segmentUnitWalk (a b : Orthogonal.Point) (h : a.1 = b.1 
     (segmentUnitWalk a b h).support = Orthogonal.segmentWalk a b := by
   simp only [segmentUnitWalk, SimpleGraph.Walk.support_copy, SimpleGraph.Walk.support_ofSupport]
 
+private theorem segmentWalk_trace (p q : GridRouting.Point)
+    (h : p.1 = q.1 ∨ p.2 = q.2) (u : Orthogonal.Point)
+    (hu : u ∈ Orthogonal.segmentWalk (integerPoint p) (integerPoint q)) :
+    ∃ x : GridRouting.Point, integerPoint x = u ∧
+      min p.1 q.1 ≤ x.1 ∧ x.1 ≤ max p.1 q.1 ∧
+      min p.2 q.2 ≤ x.2 ∧ x.2 ≤ max p.2 q.2 := by
+  have haxis : (integerPoint p).1 = (integerPoint q).1 ∨
+      (integerPoint p).2 = (integerPoint q).2 :=
+    h.imp (congrArg Int.ofNat) (congrArg Int.ofNat)
+  have hm : Orthogonal.realPoint u ∈
+      Orthogonal.support (Orthogonal.segmentWalk (integerPoint p) (integerPoint q)) :=
+    .inl ⟨u, hu, rfl⟩
+  rw [Orthogonal.support_segmentWalk haxis, Orthogonal.realPoint_mem_segment_iff haxis] at hm
+  dsimp only [integerPoint] at hm
+  refine ⟨(u.1.toNat, u.2.toNat), ?_, ?_⟩
+  · dsimp only [integerPoint]
+    exact Prod.ext (by omega) (by omega)
+  · dsimp only
+    omega
+
 /-- Every consecutive pair in the support of a unit-grid walk has Manhattan length one. -/
 private theorem unit_walk_support {a b : Orthogonal.Point} (w : unitGraph.Walk a b) :
     ∀ e ∈ w.support.consecutivePairs, Orthogonal.length e.1 e.2 = 1 := by
@@ -126,32 +146,16 @@ private theorem unitWalk_trace {p q : Point} (P : Path p q) (u : Orthogonal.Poin
   induction P with
   | horizontal x x' y =>
     rw [unitWalk, GridDrawing.support_segmentUnitWalk] at hu
-    have hm : Orthogonal.realPoint u ∈
-        Orthogonal.support (Orthogonal.segmentWalk (integerPoint (x, y)) (integerPoint (x', y))) :=
-      .inl ⟨u, hu, rfl⟩
-    rw [Orthogonal.support_segmentWalk (a := integerPoint (x, y))
-      (b := integerPoint (x', y)) (.inr rfl),
-      Orthogonal.realPoint_mem_segment_iff (a := integerPoint (x, y))
-        (b := integerPoint (x', y)) (.inr rfl)] at hm
-    refine ⟨(u.1.toNat, u.2.toNat), ?_, ?_⟩
-    · dsimp only [integerPoint] at hm ⊢
-      exact Prod.ext (by omega) (by omega)
-    · dsimp only [integerPoint, Contains] at hm ⊢
-      omega
+    obtain ⟨v, hv, hm⟩ := segmentWalk_trace (x, y) (x', y) (.inr rfl) u hu
+    refine ⟨v, hv, ?_⟩
+    dsimp only [Contains] at hm ⊢
+    omega
   | vertical x y y' h =>
     rw [unitWalk, GridDrawing.support_segmentUnitWalk] at hu
-    have hm : Orthogonal.realPoint u ∈
-        Orthogonal.support (Orthogonal.segmentWalk (integerPoint (x, y)) (integerPoint (x, y'))) :=
-      .inl ⟨u, hu, rfl⟩
-    rw [Orthogonal.support_segmentWalk (a := integerPoint (x, y))
-      (b := integerPoint (x, y')) (.inl rfl),
-      Orthogonal.realPoint_mem_segment_iff (a := integerPoint (x, y))
-        (b := integerPoint (x, y')) (.inl rfl)] at hm
-    refine ⟨(u.1.toNat, u.2.toNat), ?_, ?_⟩
-    · dsimp only [integerPoint] at hm ⊢
-      exact Prod.ext (by omega) (by omega)
-    · dsimp only [integerPoint, Contains] at hm ⊢
-      omega
+    obtain ⟨v, hv, hm⟩ := segmentWalk_trace (x, y) (x, y') (.inl rfl) u hu
+    refine ⟨v, hv, ?_⟩
+    dsimp only [Contains] at hm ⊢
+    omega
   | comp r s ihr ihs =>
     rw [unitWalk, SimpleGraph.Walk.mem_support_append_iff] at hu
     rcases hu with hu | hu

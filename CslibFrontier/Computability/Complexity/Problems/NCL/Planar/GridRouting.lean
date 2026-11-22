@@ -164,6 +164,25 @@ theorem OrderedRouting.row_le {n : ℕ} {source target : Fin n → ℕ}
     rw [r.lower_height] at this
     omega
 
+private theorem OrderedRouting.upper_lower_disjoint {n : ℕ} {source target : Fin n → ℕ}
+    (r : OrderedRouting source target) {i j : Fin n} (hij : i ≠ j) (p : Point)
+    (hi : (r.upper i).Contains p)
+    (hj : n + 1 ≤ p.2 ∧ (r.lower j).Contains (p.1, p.2 - (n + 1))) : False := by
+  have hy := (r.upper i).row_le hi
+  rw [r.upper_height] at hy
+  have heq : p.2 = n + 1 := by omega
+  have hj' : p.1 = (r.lower j).source := by
+    simpa only [heq, Nat.sub_self, Elbow.top_iff] using hj.2
+  have hu : (r.upper j).Contains p := by
+    rw [← r.join_eq] at hj'
+    cases p with
+    | mk x y =>
+      simp only at heq hj' ⊢
+      subst y
+      rw [← r.upper_height j, hj']
+      exact (r.upper j).target_mem
+  exact r.upper_disjoint hij p ⟨hi, hu⟩
+
 /-- The joined routes remain pairwise disjoint, including at the joining row. -/
 theorem OrderedRouting.disjoint {n : ℕ} {source target : Fin n → ℕ}
     (r : OrderedRouting source target) {i j : Fin n} (hij : i ≠ j) (p : Point) :
@@ -171,34 +190,8 @@ theorem OrderedRouting.disjoint {n : ℕ} {source target : Fin n → ℕ}
   rintro ⟨hi, hj⟩
   rcases hi with hi | ⟨hiy, hi⟩ <;> rcases hj with hj | ⟨hjy, hj⟩
   · exact r.upper_disjoint hij p ⟨hi, hj⟩
-  · have hy := (r.upper i).row_le hi
-    rw [r.upper_height] at hy
-    have heq : p.2 = n + 1 := by omega
-    have hj' : p.1 = (r.lower j).source := by
-      simpa only [heq, Nat.sub_self, Elbow.top_iff] using hj
-    have hu : (r.upper j).Contains p := by
-      rw [← r.join_eq] at hj'
-      cases p with
-      | mk x y =>
-        simp only at heq hj' ⊢
-        subst y
-        rw [← r.upper_height j, hj']
-        exact (r.upper j).target_mem
-    exact r.upper_disjoint hij p ⟨hi, hu⟩
-  · have hy := (r.upper j).row_le hj
-    rw [r.upper_height] at hy
-    have heq : p.2 = n + 1 := by omega
-    have hi' : p.1 = (r.lower i).source := by
-      simpa only [heq, Nat.sub_self, Elbow.top_iff] using hi
-    have hu : (r.upper i).Contains p := by
-      rw [← r.join_eq] at hi'
-      cases p with
-      | mk x y =>
-        simp only at heq hi' ⊢
-        subst y
-        rw [← r.upper_height i, hi']
-        exact (r.upper i).target_mem
-    exact r.upper_disjoint hij p ⟨hu, hj⟩
+  · exact r.upper_lower_disjoint hij p hi ⟨hjy, hj⟩
+  · exact r.upper_lower_disjoint hij.symm p hj ⟨hiy, hi⟩
   · exact r.lower_disjoint hij (p.1, p.2 - (n + 1)) ⟨hi, hj⟩
 
 /-- The sum of all endpoint columns, a bound for every endpoint. -/
