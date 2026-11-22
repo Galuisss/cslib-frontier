@@ -44,6 +44,8 @@ prepared field in its state and uses it to start each scan on the original input
   construct the original-word entry within the logarithmic workspace budget.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_haltsWithin_clock`:
   a common polynomial selector clock for every branch.
+* `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_exists_routines`:
+  compile the retained scheduler on the original word with log space and polynomial time.
 -/
 
 public section
@@ -357,5 +359,32 @@ theorem configurationJustesenSeedScheduler_haltsWithin_clock {k : ℕ} {State : 
     (justesenSeedSchedulerFor ntm c setup field).halted at hhalt
   rw [hhalt]
   exact hscheduler bits hlen
+
+open NondeterministicQueryMachine in
+/-- Compile the fixed retained-field scheduler on the original input. All native
+branches use logarithmic visited-cell space and stop within a uniform polynomial clock. -/
+theorem configurationJustesenSeedScheduler_exists_routines {k : ℕ} {State : Type}
+    [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    let M := justesenSeedScheduler ntm c
+    let entry := configurationJustesenSeedSchedulerEntry ntm c
+    let S := fun w : List Bool => Nat.log2 w.length + 1
+    ∃ R : Routines M entry encBits S, ∃ L d, ∀ w,
+      R.machine.RunsInSpace w (L * S w) ∧ R.machine.RunsInTime w (polyClock d w.length) := by
+  intro M entry S
+  obtain ⟨hq, hh, ha⟩ := justesenSeedScheduler_observations_inSpace ntm c
+  obtain ⟨C, hprefix⟩ := configurationJustesenSeedScheduler_length_run_le_log ntm c
+  have hsize : ∀ w bits, (encJustesenSeedSchedulerState
+      ((M.withInit (entry w)).run (encBits w) bits)).length ≤ C * S w := by
+    intro w bits
+    simpa only [run_withInit, encBits_apply] using hprefix w bits
+  obtain ⟨R⟩ : Nonempty (Routines M entry encBits S) :=
+    M.exists_routines hq (justesenSeedScheduler_next_inSpace ntm c) hh ha entry S
+      (fun w => by simp only [encBits_apply, S, le_refl])
+      (configurationJustesenSeedSchedulerEntry_inSpace ntm c) ⟨C, hsize⟩
+  obtain ⟨L, d, hbounds⟩ := R.exists_logSpace_polyClock
+    (time := configurationJustesenSeedSchedulerClock ntm c)
+    (fun w => by simpa only [encBits_apply] using
+      configurationJustesenSeedScheduler_haltsWithin_clock ntm c w)
+  exact ⟨R, L, d, fun w => by simpa only [encBits_apply] using hbounds w⟩
 
 end Cslib.Complexity.STCON
