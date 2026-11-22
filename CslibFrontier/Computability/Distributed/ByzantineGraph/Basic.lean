@@ -27,9 +27,9 @@ its local state via `update r i s m`, where `m j hji` is the message received al
 current state `s`. When the processes in `F : Finset P` are faulty, a faulty neighbour `j ∈ F`
 injects `adv r j i hji` along each incident edge `hji : G.Adj j i`. Because `adv` is indexed only
 by actual edges of `G`, `SolvesByzantineAgreement` has no vacuity on sparse or edgeless graphs even
-when `Msg` is empty. As in `Cslib.Distributed.Byzantine.Protocol`, termination is at a fixed uniform
-round `R`: protocols whose decision round varies with the execution are not modelled directly
-(for finite `P` and `Msg`, König's lemma yields a uniform round bound).
+when `Msg` is empty. As in `Cslib.Distributed.Byzantine.Protocol`, termination is at a fixed
+uniform round `R`: protocols whose decision round varies with the execution are not modelled
+directly (for finite `P` and `Msg`, König's lemma yields a uniform round bound).
 
 Three simulation and covering tools connect `GraphProtocol` to the complete-graph theory of
 `CslibFrontier.Computability.Distributed.Byzantine.Basic` and
@@ -73,8 +73,6 @@ Three simulation and covering tools connect `GraphProtocol` to the complete-grap
 * `Cslib.Distributed.ByzantineGraph.GraphProtocol.adaptiveState_eq_state`,
   `Cslib.Distributed.ByzantineGraph.GraphProtocol.SolvesByzantineAgreement.adaptive`: rushing
   adversaries are no stronger than fixed edge-message tables.
-* `Cslib.Distributed.ByzantineGraph.GraphProtocol.SolvesByzantineAgreement.mono`: tolerating `t`
-  faults implies tolerating fewer.
 * `Cslib.Distributed.ByzantineGraph.GraphProtocol.solvesByzantineAgreement_ownInput`: at most one
   process solves Byzantine agreement on any graph against any number of faults.
 * `Cslib.Distributed.ByzantineGraph.GraphProtocol.solvesByzantineAgreement_toSupergraph_iff`:
@@ -514,10 +512,12 @@ end GraphProtocol
 
 /-- On the complete simple graph `⊤`, `GraphProtocol ⊤` and `Cslib.Distributed.Byzantine.Protocol`
 admit solutions for the exact same fault thresholds `t` and round bounds `R`. -/
-theorem exists_solvesByzantineAgreement_top_iff.{u} {P : Type u} [DecidableEq P] (t R : ℕ) :
-    (∃ (S M : Type u) (π : GraphProtocol (⊤ : SimpleGraph P) S M),
+theorem exists_solvesByzantineAgreement_top_iff.{u, v, w} {P : Type u} [DecidableEq P]
+    (t R : ℕ) :
+    (∃ (S : Type v) (M : Type w) (π : GraphProtocol (⊤ : SimpleGraph P) S M),
         π.SolvesByzantineAgreement t R) ↔
-      ∃ (S M : Type u) (π : Byzantine.Protocol P S M), π.SolvesByzantineAgreement t R := by
+      ∃ (S : Type v) (M : Type w) (π : Byzantine.Protocol P S M),
+        π.SolvesByzantineAgreement t R := by
   constructor
   · rintro ⟨S, M, π, h⟩
     exact ⟨S, Option M, π.toProtocol, (π.solvesByzantineAgreement_toProtocol_iff t R).mpr h⟩

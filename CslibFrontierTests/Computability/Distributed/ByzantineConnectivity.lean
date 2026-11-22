@@ -56,7 +56,8 @@ example : graphOM1.SolvesByzantineAgreement 1 2 :=
   (GraphProtocol.solvesByzantineAgreement_ofProtocol_iff (Byzantine.om1 (Fin 4)) 1 2).mpr
     (Byzantine.solvesByzantineAgreement_om1 (by decide) le_rfl)
 
--- Round-trip and fault-monotonicity checks on `toProtocol` and `exists_solvesByzantineAgreement_top_iff`.
+-- Round-trip, fault-monotonicity, and independent-universe checks on `toProtocol` and
+-- `exists_solvesByzantineAgreement_top_iff.{u, v, w}`.
 example : graphOM1.toProtocol.SolvesByzantineAgreement 0 2 :=
   ((graphOM1.solvesByzantineAgreement_toProtocol_iff 1 2).mpr
     ((GraphProtocol.solvesByzantineAgreement_ofProtocol_iff (Byzantine.om1 (Fin 4)) 1 2).mpr
@@ -66,6 +67,13 @@ example : ∃ (S M : Type) (π : GraphProtocol (⊤ : SimpleGraph (Fin 4)) S M),
     π.SolvesByzantineAgreement 1 2 :=
   (exists_solvesByzantineAgreement_top_iff (P := Fin 4) 1 2).mpr
     ⟨_, _, Byzantine.om1 (Fin 4), Byzantine.solvesByzantineAgreement_om1 (by decide) le_rfl⟩
+
+theorem top_iff_universes.{u, v, w} {P : Type u} [DecidableEq P] (t R : ℕ) :
+    (∃ (S : Type v) (M : Type w) (π : GraphProtocol (⊤ : SimpleGraph P) S M),
+        π.SolvesByzantineAgreement t R) ↔
+      ∃ (S : Type v) (M : Type w) (π : Byzantine.Protocol P S M),
+        π.SolvesByzantineAgreement t R :=
+  exists_solvesByzantineAgreement_top_iff.{u, v, w} t R
 
 -- Concrete execution of `graphOM1` against an equivocating process `3` on mixed inputs.
 def topEquivocate : ℕ → ∀ j i : Fin 4, (⊤ : SimpleGraph (Fin 4)).Adj j i → Fin 4 → Bool :=
@@ -301,8 +309,9 @@ example : ∀ i : Fin 4,
   decide
 
 -- Supergraph simulation (`k5Minus ≤ ⊤`) and rushing-adversary agreement on `k5Minus`.
-example : ((purifiedOM 1 k5MinusRoutes).toSupergraph (le_top : k5Minus ≤ ⊤)).SolvesByzantineAgreement
-    1 8 :=
+example :
+    ((purifiedOM 1 k5MinusRoutes).toSupergraph (le_top : k5Minus ≤ ⊤)).SolvesByzantineAgreement
+      1 8 :=
   ((purifiedOM 1 k5MinusRoutes).solvesByzantineAgreement_toSupergraph_iff le_top 1 8).mpr
     (solvesByzantineAgreement_purifiedOM 1 k5MinusRoutes (by simp) (by simp [epochLen]))
 

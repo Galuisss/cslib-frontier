@@ -16,8 +16,13 @@ import CslibFrontier.Algorithms.Lean.MaxFlow.Menger
 # The `2t + 1` vertex-connectivity characterization for Byzantine agreement
 
 General-graph synchronous deterministic Byzantine agreement against `t` static Byzantine faults is
-solvable on a finite graph `G : SimpleGraph P` if and only if `|P| ≤ 1` or both `|P| > 3t` and `G`
-is `(2t + 1)`-vertex-connected ([Dolev1982]; [FischerLynchMerritt1985]).
+solvable on a finite graph `G : SimpleGraph P` if and only if `|P| ≤ 1` or both `3t < |P|` and `G`
+is `(2t + 1)`-vertex-connected: `GraphProtocol.ownInput` handles `|P| ≤ 1` without communication;
+sufficiency for `3t < |P|` and `(2t + 1)`-vertex-connected `G` combines disjoint-path purification
+([Dolev1982]) with recursive oral messages ([LamportShostakPease1982]) across paths supplied by
+Menger's theorem ([Menger1927]); and impossibility when `2 ≤ |P| ≤ 3t` or `G` is not
+`(2t + 1)`-vertex-connected follows from the node and connectivity bounds ([Dolev1982];
+[PeaseShostakLamport1980]) via the covering-network proofs of [FischerLynchMerritt1985].
 
 ## Impossibility on graphs of connectivity at most `2t`
 
@@ -43,8 +48,8 @@ graphs at `t = 0` and complete graphs of order `2 ≤ |P| ≤ 2t + 1`.
 
 ## Sufficiency via internally vertex-disjoint path purification
 
-Given a routing table `routes : DisjointPaths G (2 * t + 1)` of `2t + 1` pairwise internally
-vertex-disjoint simple paths between every pair of distinct processes, `purifiedOM t routes`
+Given a routing table `routes : DisjointPaths G (2 * t + 1)` of `2t + 1` simple paths with pairwise
+disjoint internal vertices between every pair of distinct processes, `purifiedOM t routes`
 simulates `t + 1` virtual rounds of `Cslib.Distributed.Byzantine.om` in epochs of
 `epochLen P = max 1 (|P| - 1)` physical rounds. Within each epoch, processes forward their simulated
 `OM(t)` trees along simple walks of length at most `epochLen P`; at the end of the epoch, each
@@ -61,8 +66,9 @@ equivalence `exists_solvesByzantineAgreement_iff`.
 
 ## Main definitions
 
-* `Cslib.Distributed.ByzantineGraph.DisjointPaths`: routing system of `k` pairwise internally
-  vertex-disjoint simple paths between every pair of distinct processes in `G`.
+* `Cslib.Distributed.ByzantineGraph.DisjointPaths`: routing system of `k` simple paths with
+  pairwise disjoint internal vertices between every pair of distinct processes in `G` (distinct
+  paths on non-adjacent pairs; adjacent pairs may repeat the direct edge `[u, v]`).
 * `Cslib.Distributed.ByzantineGraph.epochLen`: physical round length `max 1 (|P| - 1)` of one
   multi-hop relay epoch.
 * `Cslib.Distributed.ByzantineGraph.PurifiedOMState`: process state in `purifiedOM` (`omTree` and
@@ -95,6 +101,8 @@ equivalence `exists_solvesByzantineAgreement_iff`.
   problems*][FischerLynchMerritt1985]
 * [L. Lamport, R. Shostak, M. Pease, *The Byzantine generals problem*][LamportShostakPease1982]
 * [K. Menger, *Zur allgemeinen Kurventheorie*][Menger1927]
+* [M. Pease, R. Shostak, L. Lamport, *Reaching agreement in the presence of
+  faults*][PeaseShostakLamport1980]
 -/
 
 public section
@@ -246,8 +254,13 @@ end GraphProtocol
 
 /-! ### Purified `OM(t)` along `2t + 1` internally vertex-disjoint paths -/
 
-/-- A routing system of `k` pairwise internally vertex-disjoint simple paths in `G` between every
-ordered pair of distinct vertices. -/
+/-- A routing system of `k` simple paths in `G` with pairwise disjoint internal vertices between
+every ordered pair of distinct vertices. Because `SimpleGraph.InternallyDisjoint` constrains only
+vertices strictly outside `{u, v}`, non-adjacent pairs have `k` distinct paths
+(`SimpleGraph.injective_of_internallyDisjoint_of_not_adj`), whereas adjacent pairs `u — v` may
+repeat the direct edge `[u, v]` (which has no internal vertices to corrupt, and why
+`k < Fintype.card P` appears explicitly alongside `Nonempty (DisjointPaths G k)` in
+`isVertexConnected_iff_card_gt_and_nonempty_disjointPaths`). -/
 structure DisjointPaths {P : Type*} (G : SimpleGraph P) (k : ℕ) where
   /-- `path u v huv m`: the `m`-th path from `u` to `v`. -/
   path : ∀ u v : P, u ≠ v → Fin k → G.Walk u v
@@ -679,10 +692,54 @@ private theorem card_le_one_or_of_solvesByzantineAgreement {P S M : Type*} [Fint
     · by_contra hconn
       exact π.not_solvesByzantineAgreement_of_not_isVertexConnected (by omega) hconn h
 
-/-- **Topological characterization of synchronous Byzantine agreement at fixed round bound**
-([Dolev1982]; [FischerLynchMerritt1985]): for any `R ≥ (t + 1) * epochLen P`, some protocol on `G`
-solves Byzantine agreement against `t` faults in `R` rounds if and only if `|P| ≤ 1` or both
-`3t < |P|` and `G` is `(2t + 1)`-vertex-connected. -/
+private def uliftProtocol.{u, s₀, m₀, v, w} {P : Type u} {G : SimpleGraph P}
+    {S : Type s₀} {M : Type m₀} (π : GraphProtocol G S M) :
+    GraphProtocol G (ULift.{v} S) (ULift.{w} M) where
+  init i b := .up (π.init i b)
+  send r i s j hij := .up (π.send r i s.down j hij)
+  update r i s m := .up (π.update r i s.down fun j hji => (m j hji).down)
+  output i s := π.output i s.down
+
+private theorem uliftProtocol_state.{u, s₀, m₀, v, w} {P : Type u} [DecidableEq P]
+    {G : SimpleGraph P} {S : Type s₀} {M : Type m₀} (π : GraphProtocol G S M)
+    (F : Finset P) (adv : ℕ → ∀ j i : P, G.Adj j i → ULift.{w} M) (x : P → Bool) :
+    ∀ r i, ((uliftProtocol.{u, s₀, m₀, v, w} π).state F adv x r i).down =
+      π.state F (fun r j i hji => (adv r j i hji).down) x r i
+  | 0, _ => rfl
+  | r + 1, i => by
+    dsimp only [GraphProtocol.state]
+    change π.update r i ((uliftProtocol π).state F adv x r i).down _ =
+      π.update r i (π.state F _ x r i) _
+    congr 1
+    · exact uliftProtocol_state π F adv x r i
+    · funext j hji
+      by_cases hj : j ∈ F
+      · simp only [hj, ↓reduceIte]
+      · simp only [hj, ↓reduceIte]
+        exact congrArg (fun s => π.send r j s i hji) (uliftProtocol_state π F adv x r j)
+
+private theorem solvesByzantineAgreement_ulift.{u, s₀, m₀, v, w} {P : Type u} [DecidableEq P]
+    {G : SimpleGraph P} {S : Type s₀} {M : Type m₀} {π : GraphProtocol G S M} {t R : ℕ}
+    (h : π.SolvesByzantineAgreement t R) :
+    (uliftProtocol.{u, s₀, m₀, v, w} π).SolvesByzantineAgreement t R where
+  agreement F hF adv x i hi j hj := by
+    change π.output i ((uliftProtocol π).state F adv x R i).down =
+      π.output j ((uliftProtocol π).state F adv x R j).down
+    rw [uliftProtocol_state, uliftProtocol_state]
+    exact h.agreement F hF _ x i hi j hj
+  validity F hF adv x b hb i hi := by
+    change π.output i ((uliftProtocol π).state F adv x R i).down = b
+    rw [uliftProtocol_state]
+    exact h.validity F hF _ x b hb i hi
+
+/-- **Topological characterization of synchronous Byzantine agreement at fixed round bound.** For
+any `R ≥ (t + 1) * epochLen P`, some protocol on `G` solves Byzantine agreement against `t` faults
+in `R` rounds if and only if `|P| ≤ 1` or both `3t < |P|` and `G` is `(2t + 1)`-vertex-connected:
+`GraphProtocol.ownInput` handles `|P| ≤ 1`, `purifiedOM` handles `3t < |P|` on `(2t + 1)`-connected
+graphs ([Dolev1982]; [LamportShostakPease1982]; [Menger1927]), and the node and connectivity bounds
+exclude `2 ≤ |P| ≤ 3t` and graphs of connectivity at most `2t` ([Dolev1982];
+[PeaseShostakLamport1980]; [FischerLynchMerritt1985]). Whether fewer than `(t + 1) * epochLen P`
+rounds suffice on a specific graph is not addressed here. -/
 theorem exists_solvesByzantineAgreement_of_le_iff.{u} {P : Type u} [Fintype P] [DecidableEq P]
     (G : SimpleGraph P) (t : ℕ) {R : ℕ} (hR : (t + 1) * epochLen P ≤ R) :
     (∃ (S M : Type u) (π : GraphProtocol G S M), π.SolvesByzantineAgreement t R) ↔
@@ -692,31 +749,21 @@ theorem exists_solvesByzantineAgreement_of_le_iff.{u} {P : Type u} [Fintype P] [
     exact card_le_one_or_of_solvesByzantineAgreement h
   · rintro (h1 | ⟨hn, hconn⟩)
     · have : Subsingleton P := Fintype.card_le_one_iff_subsingleton.mp h1
-      let π₀ : GraphProtocol G (ULift.{u} Bool) PUnit.{u + 1} :=
-        { init := fun _ b => .up b
-          send := fun _ _ _ _ _ => .unit
-          update := fun _ _ s _ => s
-          output := fun _ s => s.down }
-      have hst : ∀ F adv x r i, (π₀.state F adv x r i).down = x i := by
-        intro F adv x r i
-        induction r with
-        | zero => rfl
-        | succ _ ih => exact ih
-      refine ⟨ULift.{u} Bool, PUnit.{u + 1}, π₀, ?_, ?_⟩
-      · intro F _ adv x i _ j _
-        rw [Subsingleton.elim i j]
-      · intro F _ adv x v hv i hi
-        exact (hst F adv x R i).trans (hv i hi)
+      exact ⟨ULift.{u} Bool, ULift.{u} Unit, uliftProtocol (GraphProtocol.ownInput G),
+        solvesByzantineAgreement_ulift (GraphProtocol.solvesByzantineAgreement_ownInput G t R)⟩
     · classical
       obtain ⟨-, ⟨routes⟩⟩ :=
         (isVertexConnected_iff_card_gt_and_nonempty_disjointPaths G (2 * t + 1)).mp hconn
       exact ⟨PurifiedOMState P, List P → List P → Bool, purifiedOM t routes,
         solvesByzantineAgreement_purifiedOM t routes hn hR⟩
 
-/-- **Complete topological characterization of synchronous Byzantine agreement** ([Dolev1982];
-[FischerLynchMerritt1985]): some protocol on `G` solves Byzantine agreement against `t` faults in
-some fixed round count `R` if and only if `|P| ≤ 1` or both `3t < |P|` and `G` is
-`(2t + 1)`-vertex-connected. -/
+/-- **Complete topological characterization of synchronous Byzantine agreement.** Some protocol on
+`G` solves Byzantine agreement against `t` faults in some fixed round count `R` if and only if
+`|P| ≤ 1` or both `3t < |P|` and `G` is `(2t + 1)`-vertex-connected: `GraphProtocol.ownInput`
+handles `|P| ≤ 1`, `purifiedOM` handles `3t < |P|` on `(2t + 1)`-connected graphs ([Dolev1982];
+[LamportShostakPease1982]; [Menger1927]), and the node and connectivity bounds exclude
+`2 ≤ |P| ≤ 3t` and graphs of connectivity at most `2t` ([Dolev1982]; [PeaseShostakLamport1980];
+[FischerLynchMerritt1985]). -/
 theorem exists_solvesByzantineAgreement_iff.{u} {P : Type u} [Fintype P] [DecidableEq P]
     (G : SimpleGraph P) (t : ℕ) :
     (∃ (S M : Type u) (R : ℕ) (π : GraphProtocol G S M), π.SolvesByzantineAgreement t R) ↔
