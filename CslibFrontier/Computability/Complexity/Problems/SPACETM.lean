@@ -377,7 +377,7 @@ theorem pspaceHard : PSPACEHard encSPACETMInstance SPACETM := by
   intro α enc A hA
   obtain ⟨k, hk⟩ := mem_PSPACE_iff_exists_mem_DSPACE.mp hA
   obtain ⟨c₁, c₂, t, hdec⟩ := hk
-  exact polyTimeReducible (p := fun n => n ^ k) (.of_tidy (.unary_pow k)) hdec
+  exact polyTimeReducible (p := fun n => n ^ k) (by fun_prop) hdec
 
 /-- **`SPACETM` is `PSPACE`-complete** in the native visited-space model under polynomial-time
 many-one reductions (after Arora–Barak Chapter 4, display (2) and Exercise 4 §3). -/

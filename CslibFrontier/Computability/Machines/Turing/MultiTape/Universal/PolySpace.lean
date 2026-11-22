@@ -322,7 +322,7 @@ private lemma listMax_le_length_encList_encUnary (x : List ℕ) :
 to `eInS` and `eOut`. -/
 theorem computableInPolySpace_budgetedUniversal :
     ComputableInPolySpace budgetedUniversal eInS eOut := by
-  obtain ⟨c, hc, hl⟩ := computableTidilyInO_budgetedUniversal.computableInO
+  obtain ⟨c, hc, hl⟩ := computableInO_budgetedUniversal
   refine ComputableInPolySpace.of_inSpace
     (PolyBounded.of_forall_le 76 1 fun ⟨d, x, t, b⟩ => ?_) ⟨_, c, hc, hl⟩
   have hB := budgetSpace_le d x b t
@@ -645,9 +645,9 @@ theorem exists_spaceBoundedUniversal_eq_singleton_true_iff (s n : ℕ) {b T : �
 @[fun_prop]
 theorem computableInPolyTime_init :
     ComputableInPolyTime init eDesc eCfg :=
-  ComputableInPolyTime.of_tidy (init_inO.computableTidilyInPolyTime
+  init_inO.computableInPolyTime
     (PolyBounded.of_forall_le 1 2 fun _ => by simp)
-    (PolyBounded.of_forall_le 1 1 fun _ => by simp))
+    (PolyBounded.of_forall_le 1 1 fun _ => by simp)
 
 /-- `step` is computable in polynomial time on contexts `eCtx`. -/
 @[fun_prop]
