@@ -8,10 +8,24 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Complexity.Problems.CSP.Basic
-import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
+public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
 
 /-!
-# Declared CSPs
+# Declared-variable CSP instances
+
+This module packages constraint satisfaction instances with an explicit variable-index upper bound
+`numVars` as `DeclaredCSP Rel` and defines its canonical multi-tape encoding `encDeclaredCSP`:
+`numVars` is encoded in unary (`encUnary`) so variable-indexed recursion and allocation scale in the
+declared universe size, while `formula` uses the framed binary-variable CSP encoding
+`encCSP encRel encNat`.
+
+## Main definitions
+
+* `Cslib.Complexity.DeclaredCSP`: structure pairing `numVars : ℕ` and `formula : CSP Rel ℕ`.
+* `Cslib.Complexity.encDeclaredCSP`: canonical bit encoding via `encUnary` and
+  `encCSP encRel encNat`.
+* `Cslib.Complexity.DeclaredCSP.WellFormed`, `Cslib.Complexity.DeclaredCSP.wellFormed`:
+  propositional and executable checks that all occurring variables lie below `numVars`.
 -/
 
 public section
@@ -21,64 +35,41 @@ namespace Cslib.Complexity
 open Cslib.Logic.PL
 open Turing.MultiTapeTM
 
-/-- A Constraint Satisfaction Problem equipped with an explicit number of declared variables. -/
+/-- A constraint satisfaction problem instance equipped with an explicit upper bound `numVars` on
+its declared variable indices (`0, …, numVars - 1`). -/
 structure DeclaredCSP (Rel : Type) where
+  /-- Number of declared variables (`0, …, numVars - 1`). -/
   numVars : ℕ
+  /-- The CSP formula over natural-number variable labels. -/
   formula : CSP Rel ℕ
   deriving Repr
 
-/-- Canonical bit encoding of `DeclaredCSP`. -/
-@[expose]
-def encDeclaredCSP {Rel : Type} (encRel : Rel ↪ List Bool) : DeclaredCSP Rel ↪ List Bool :=
-  ⟨fun x => encPair encUnary (encCSP encRel encNat) (x.numVars, x.formula), fun x y h => by
-    have h' := (encPair encUnary (encCSP encRel encNat)).injective h
-    cases x; cases y; simp_all⟩
+section EncDeclaredCSP
 
-@[simp] theorem encDeclaredCSP_apply {Rel : Type} {encRel : Rel ↪ List Bool} (x : DeclaredCSP Rel) :
-    encDeclaredCSP encRel x = encPair encUnary (encCSP encRel encNat) (x.numVars, x.formula) :=
-  rfl
+variable {Rel : Type}
 
-private theorem computableInDegree_fields {Rel : Type} (encRel : Rel ↪ List Bool) :
-    ComputableInDegree (fun x : DeclaredCSP Rel => (x.numVars, x.formula))
-      (encDeclaredCSP encRel) (encPair encUnary (encCSP encRel encNat)) 1 1 :=
-  ComputableInDegree.of_eq fun _ => rfl
+/-- Canonical bit encoding of `DeclaredCSP`: unary variable bound `encUnary` followed by the
+framed binary-variable CSP encoding `encCSP encRel encNat`. -/
+enc_structure encDeclaredCSP (encRel : Rel ↪ List Bool) : DeclaredCSP Rel where
+  numVars : encUnary,
+  formula : (encCSP encRel encNat)
 
-@[scoped fun_prop]
-theorem encDeclaredCSP_numVars_polyTime {Rel : Type} {γ : Type}
-    {encIn : γ ↪ List Bool} {encRel : Rel ↪ List Bool} {g : γ → DeclaredCSP Rel}
-    (hg : ComputableInPolyTime g encIn (encDeclaredCSP encRel)) :
-    ComputableInPolyTime (fun x => (g x).numVars) encIn encUnary :=
-  ComputableInPolyTime.fst encUnary (encCSP encRel encNat) |>.comp <|
-    (computableInDegree_fields encRel).computableInPolyTime |>.comp hg
+end EncDeclaredCSP
 
-@[scoped fun_prop]
-theorem encDeclaredCSP_formula_polyTime {Rel : Type} {γ : Type}
-    {encIn : γ ↪ List Bool} {encRel : Rel ↪ List Bool} {g : γ → DeclaredCSP Rel}
-    (hg : ComputableInPolyTime g encIn (encDeclaredCSP encRel)) :
-    ComputableInPolyTime (fun x => (g x).formula) encIn (encCSP encRel encNat) :=
-  ComputableInPolyTime.snd encUnary (encCSP encRel encNat) |>.comp <|
-    (computableInDegree_fields encRel).computableInPolyTime |>.comp hg
-
-@[scoped fun_prop]
-theorem encDeclaredCSP_mk_polyTime {Rel : Type} {γ : Type}
-    {encIn : γ ↪ List Bool} {encRel : Rel ↪ List Bool}
-    {numVars : γ → ℕ} {formula : γ → CSP Rel ℕ}
-    (hnumVars : ComputableInPolyTime numVars encIn encUnary)
-    (hformula : ComputableInPolyTime formula encIn (encCSP encRel encNat)) :
-    ComputableInPolyTime (fun x => DeclaredCSP.mk (numVars x) (formula x))
-      encIn (encDeclaredCSP encRel) := by
-  have hd : ComputableInDegree (fun p : ℕ × CSP Rel ℕ => DeclaredCSP.mk p.1 p.2)
-    (encPair encUnary (encCSP encRel encNat)) (encDeclaredCSP encRel) 1 1 :=
-      ComputableInDegree.of_eq fun _ => rfl
-  exact hd.computableInPolyTime.comp (hnumVars.prod hformula)
+attribute [fun_prop]
+  encDeclaredCSP_numVars_polyTime
+  encDeclaredCSP_formula_polyTime
+  encDeclaredCSP_mk_polyTime
 
 namespace DeclaredCSP
 
 variable {Rel : Type}
 
+/-- Every variable occurring in `x.formula` lies in `{0, …, x.numVars - 1}`. -/
 @[expose] def WellFormed (x : DeclaredCSP Rel) : Prop :=
   ∀ v ∈ x.formula.vars, v < x.numVars
 
+/-- Executable Boolean check for `WellFormed`. -/
 @[expose] def wellFormed (x : DeclaredCSP Rel) : Bool :=
   x.formula.vars.all fun v => decide (v < x.numVars)
 

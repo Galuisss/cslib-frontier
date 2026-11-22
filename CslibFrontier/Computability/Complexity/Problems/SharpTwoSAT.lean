@@ -36,16 +36,18 @@ import Mathlib.Data.Nat.Choose.Basic
 /-!
 # `#2SAT` is `#P`-complete under counting Turing reductions
 
-Valiant's theorem ([Valiant 1979][Valiant1979Enumeration], §4, problem 7 and Theorem 1, p. 414): counting the satisfying assignments of
-a `2-CNF` formula (`SharpTwoSAT`) belongs to `#P` and is `#P`-hard under polynomial-time counting
-Turing reductions (`CountingTuringComplete encCNF SharpTwoSAT`).
+Valiant's theorem ([Valiant 1979][Valiant1979Enumeration], §4, problem 7 and Theorem 1, p. 414):
+counting the satisfying assignments of a `2-CNF` formula (`SharpTwoSAT`) belongs to `#P` and is
+`#P`-hard under polynomial-time counting Turing reductions
+(`CountingTuringComplete encCNF SharpTwoSAT`).
 
-The original source establishes this hardness for MONOTONE 2-SAT via bipartite matchings
-(reductions 6-7, p. 415), and uses a function-value oracle (§2, p. 411). Our formalization establishes
-it for general `2-CNF` formulas over occurring variables (mapping back to the stronger monotone source
-result) and uses a standard bit-oracle convention (`AnswersBits`). The direct clause-indicator/chain
-gadget (`valiantTwoSAT`) and its finite-difference interpolation proof below are an original adaptation
-for general `2-CNF`, not the bipartite matching reductions presented in the 1979 paper.
+The original source establishes `#P`-completeness for monotone `2-SAT` via bipartite matchings
+(reductions 6–7, p. 415) under a function-value oracle (§2, p. 411), which in turn implies
+hardness of general `2-SAT`. Our formalization proves `#P`-completeness directly for general
+`2-CNF` formulas over occurring variables under the library's bit-oracle convention
+(`AnswersBits`). The direct clause-indicator/chain gadget (`valiantTwoSAT`) and its
+division-free finite-difference interpolation proof below are an original adaptation for general
+`2-CNF`, replacing the bipartite matching reductions of the 1979 paper.
 
 ## Main definitions
 
@@ -954,22 +956,20 @@ private theorem computableInPolyTime_zVar :
     ComputableInPolyTime (fun p : ℕ × ℕ => zVar p.1 p.2)
       (encPair encUnary encUnary) encNat := by
   unfold zVar
-  exact ComputableTidilyInPolyTime.unary_to_binary.computableInPolyTime.comp
-    (by fun_prop)
+  exact ComputableInPolyTime.unary_to_binary.comp (by fun_prop)
 
 private theorem computableInPolyTime_uVar :
     ComputableInPolyTime (fun p : (ℕ × ℕ) × ℕ => uVar p.1.1 p.1.2 p.2)
       (encPair (encPair encUnary encUnary) encUnary) encNat := by
   unfold uVar
-  exact ComputableTidilyInPolyTime.unary_to_binary.computableInPolyTime.comp
-    (by fun_prop)
+  exact ComputableInPolyTime.unary_to_binary.comp (by fun_prop)
 
 private theorem computableInPolyTime_valiantVarTauts :
     ComputableInPolyTime valiantVarTauts encCNF encCNF := by
   unfold valiantVarTauts
-  have hd : ComputableTidilyInPolyTime (CNF.distinctVars (V := ℕ)) encCNF (encList encNat) :=
-    SAT.computableInPolyTime_distinctVars.tidy
-  have hmap : ComputableTidilyInPolyTime
+  have hd : ComputableInPolyTime (CNF.distinctVars (V := ℕ)) encCNF (encList encNat) :=
+    SAT.computableInPolyTime_distinctVars
+  have hmap : ComputableInPolyTime
       (fun v : ℕ => ([(2 * v, true), (2 * v, false)] : Clause ℕ))
       encNat (encClause encNat) := by
     have hv : ComputableInPolyTime (fun v : ℕ => 2 * v) encNat encNat := by
@@ -978,41 +978,40 @@ private theorem computableInPolyTime_valiantVarTauts :
       convert h using 1
       funext v
       omega
-    have hvt := hv.tidy
     fun_prop
-  exact (ComputableTidilyInPolyTime.map hmap |>.comp hd).computableInPolyTime
+  exact (ComputableInPolyTime.map hmap).comp hd
 
 private theorem computableInPolyTime_valiantClauseGadget :
     ComputableInPolyTime (fun p : ℕ × (Clause ℕ × ℕ) => valiantClauseGadget p.1 p.2)
       (encPair encUnary (encPair (encClause encNat) encUnary)) encCNF := by
   unfold valiantClauseGadget
-  have hz : ComputableTidilyInPolyTime
+  have hz : ComputableInPolyTime
       (fun p : ℕ × (Clause ℕ × ℕ) => zVar p.1 p.2.2)
       (encPair encUnary (encPair (encClause encNat) encUnary)) encNat :=
-    (computableInPolyTime_zVar.comp
+    computableInPolyTime_zVar.comp
       ((ComputableInPolyTime.fst _ _).prod
-        ((ComputableInPolyTime.snd _ _).comp (ComputableInPolyTime.snd _ _)))).tidy
-  have hlit : ComputableTidilyInPolyTime
+        ((ComputableInPolyTime.snd _ _).comp (ComputableInPolyTime.snd _ _)))
+  have hlit : ComputableInPolyTime
       (fun p : ℕ × (Clause ℕ × ℕ) =>
         p.2.1.map fun l => [(zVar p.1 p.2.2, false), (2 * l.1, !l.2)])
       (encPair encUnary (encPair (encClause encNat) encUnary)) encCNF := by
-    have hlist : ComputableTidilyInPolyTime
+    have hlist : ComputableInPolyTime
         (fun p : ℕ × (Clause ℕ × ℕ) => p.2.1)
         (encPair encUnary (encPair (encClause encNat) encUnary))
         (encList (encPair encNat encBool)) :=
-      (ComputableTidilyInPolyTime.fst _ _).comp (ComputableTidilyInPolyTime.snd _ _)
-    have hbody : ComputableTidilyInPolyTime
+      (ComputableInPolyTime.fst _ _).comp (ComputableInPolyTime.snd _ _)
+    have hbody : ComputableInPolyTime
         (fun q : (ℕ × (Clause ℕ × ℕ)) × Literal ℕ =>
           ([(zVar q.1.1 q.1.2.2, false), (2 * q.2.1, !q.2.2)] : Clause ℕ))
         (encPair (encPair encUnary (encPair (encClause encNat) encUnary))
           (encPair encNat encBool))
         (encClause encNat) := by
-      have hz' : ComputableTidilyInPolyTime
+      have hz' : ComputableInPolyTime
           (fun q : (ℕ × (Clause ℕ × ℕ)) × Literal ℕ => zVar q.1.1 q.1.2.2)
           (encPair (encPair encUnary (encPair (encClause encNat) encUnary))
             (encPair encNat encBool)) encNat :=
-        hz.comp (ComputableTidilyInPolyTime.fst _ _)
-      have hv2 : ComputableTidilyInPolyTime
+        hz.comp (ComputableInPolyTime.fst _ _)
+      have hv2 : ComputableInPolyTime
           (fun q : (ℕ × (Clause ℕ × ℕ)) × Literal ℕ => 2 * q.2.1)
           (encPair (encPair encUnary (encPair (encClause encNat) encUnary))
             (encPair encNat encBool)) encNat := by
@@ -1026,12 +1025,12 @@ private theorem computableInPolyTime_valiantClauseGadget :
                 (encPair encNat encBool)) encNat :=
             (ComputableInPolyTime.fst _ _).comp (ComputableInPolyTime.snd _ _)
           exact ComputableInPolyTime.binary_add' hv hv
-        convert h.tidy using 1
+        convert h using 1
         funext q
         omega
       fun_prop
-    exact ComputableTidilyInPolyTime.mapWithInput hlist hbody
-  have haux : ComputableTidilyInPolyTime
+    exact ComputableInPolyTime.mapWithInput hlist hbody
+  have haux : ComputableInPolyTime
       (fun p : ℕ × (Clause ℕ × ℕ) =>
         if p.1 = 0 then [[(zVar p.1 p.2.2, false)]]
         else if p.1 = 1 then [[(zVar p.1 p.2.2, true), (zVar p.1 p.2.2, false)]]
@@ -1041,99 +1040,114 @@ private theorem computableInPolyTime_valiantClauseGadget :
             (List.range (p.1 - 2)).map fun j =>
               [(uVar p.1 p.2.2 j, true), (uVar p.1 p.2.2 (j + 1), false)])
       (encPair encUnary (encPair (encClause encNat) encUnary)) encCNF := by
-    have hu0 : ComputableTidilyInPolyTime
+    have hu0 : ComputableInPolyTime
         (fun p : ℕ × (Clause ℕ × ℕ) => uVar p.1 p.2.2 0)
         (encPair encUnary (encPair (encClause encNat) encUnary)) encNat :=
-      (computableInPolyTime_uVar.comp
+      computableInPolyTime_uVar.comp
         (((ComputableInPolyTime.fst _ _).prod
           ((ComputableInPolyTime.snd _ _).comp (ComputableInPolyTime.snd _ _))).prod
-          (ComputableInPolyTime.const 0))).tidy
-    have hchain : ComputableTidilyInPolyTime
+          (ComputableInPolyTime.const 0))
+    have hchain : ComputableInPolyTime
         (fun p : ℕ × (Clause ℕ × ℕ) =>
           (List.range (p.1 - 2)).map fun j =>
             [(uVar p.1 p.2.2 j, true), (uVar p.1 p.2.2 (j + 1), false)])
         (encPair encUnary (encPair (encClause encNat) encUnary)) encCNF := by
-      have hr : ComputableTidilyInPolyTime
+      have hr : ComputableInPolyTime
           (fun p : ℕ × (Clause ℕ × ℕ) => List.range (p.1 - 2))
           (encPair encUnary (encPair (encClause encNat) encUnary)) (encList encUnary) := by
         fun_prop
-      have hb : ComputableTidilyInPolyTime
+      have hb : ComputableInPolyTime
           (fun q : (ℕ × (Clause ℕ × ℕ)) × ℕ =>
             ([(uVar q.1.1 q.1.2.2 q.2, true),
               (uVar q.1.1 q.1.2.2 (q.2 + 1), false)] : Clause ℕ))
           (encPair (encPair encUnary (encPair (encClause encNat) encUnary)) encUnary)
           (encClause encNat) := by
-        have hu1 : ComputableTidilyInPolyTime
+        have hu1 : ComputableInPolyTime
             (fun q : (ℕ × (Clause ℕ × ℕ)) × ℕ => uVar q.1.1 q.1.2.2 q.2)
             (encPair (encPair encUnary (encPair (encClause encNat) encUnary)) encUnary) encNat :=
-          (computableInPolyTime_uVar.comp
+          computableInPolyTime_uVar.comp
             ((((ComputableInPolyTime.fst _ _).comp (ComputableInPolyTime.fst _ _)).prod
               ((ComputableInPolyTime.snd _ _).comp
                 ((ComputableInPolyTime.snd _ _).comp (ComputableInPolyTime.fst _ _)))).prod
-              (ComputableInPolyTime.snd _ _))).tidy
-        have hu2 : ComputableTidilyInPolyTime
+              (ComputableInPolyTime.snd _ _))
+        have hu2 : ComputableInPolyTime
             (fun q : (ℕ × (Clause ℕ × ℕ)) × ℕ => uVar q.1.1 q.1.2.2 (q.2 + 1))
             (encPair (encPair encUnary (encPair (encClause encNat) encUnary)) encUnary) encNat :=
-          (computableInPolyTime_uVar.comp
+          computableInPolyTime_uVar.comp
             ((((ComputableInPolyTime.fst _ _).comp (ComputableInPolyTime.fst _ _)).prod
               ((ComputableInPolyTime.snd _ _).comp
                 ((ComputableInPolyTime.snd _ _).comp (ComputableInPolyTime.fst _ _)))).prod
-              ((ComputableTidilyInPolyTime.unary_add.comp
-                ((ComputableTidilyInPolyTime.snd _ _).prod
-                  (ComputableTidilyInPolyTime.const 1))).computableInPolyTime))).tidy
+              (ComputableInPolyTime.unary_add.comp
+                ((ComputableInPolyTime.snd _ _).prod
+                  (ComputableInPolyTime.const 1))))
         fun_prop
-      exact ComputableTidilyInPolyTime.mapWithInput hr hb
-    have hbranch : ComputableTidilyInPolyTime
+      exact ComputableInPolyTime.mapWithInput hr hb
+    let E := encPair encUnary (encPair (encClause encNat) encUnary)
+    have hzt : ComputableInPolyTime (fun p : ℕ × (Clause ℕ × ℕ) => (zVar p.1 p.2.2, true))
+        E (encPair encNat encBool) := hz.prod (ComputableInPolyTime.const true)
+    have hzf : ComputableInPolyTime (fun p : ℕ × (Clause ℕ × ℕ) => (zVar p.1 p.2.2, false))
+        E (encPair encNat encBool) := hz.prod (ComputableInPolyTime.const false)
+    have hu0f : ComputableInPolyTime (fun p : ℕ × (Clause ℕ × ℕ) => (uVar p.1 p.2.2 0, false))
+        E (encPair encNat encBool) := hu0.prod (ComputableInPolyTime.const false)
+    have hcl0 : ComputableInPolyTime
+        (fun p : ℕ × (Clause ℕ × ℕ) => ([[(zVar p.1 p.2.2, false)]] : CNF ℕ)) E encCNF :=
+      (hzf.cons' (ComputableInPolyTime.const ([] : Clause ℕ))).cons'
+        (ComputableInPolyTime.const ([] : CNF ℕ))
+    have hcl1 : ComputableInPolyTime
+        (fun p : ℕ × (Clause ℕ × ℕ) =>
+          ([[(zVar p.1 p.2.2, true), (zVar p.1 p.2.2, false)]] : CNF ℕ)) E encCNF :=
+      (hzt.cons' (hzf.cons' (ComputableInPolyTime.const ([] : Clause ℕ)))).cons'
+        (ComputableInPolyTime.const ([] : CNF ℕ))
+    have hbranch : ComputableInPolyTime
         (fun p : ℕ × (Clause ℕ × ℕ) =>
           [[(zVar p.1 p.2.2, true), (zVar p.1 p.2.2, false)],
               [(zVar p.1 p.2.2, true), (uVar p.1 p.2.2 0, false)]] ++
             (List.range (p.1 - 2)).map fun j =>
               [(uVar p.1 p.2.2 j, true), (uVar p.1 p.2.2 (j + 1), false)])
-        (encPair encUnary (encPair (encClause encNat) encUnary)) encCNF := by
-      fun_prop
-    have hr0 : ComputableTidilyInPolyTime
-        (fun p : ℕ × (Clause ℕ × ℕ) => decide (p.1 = 0))
-        (encPair encUnary (encPair (encClause encNat) encUnary)) encBool :=
-      (ComputableInPolyTime.unary_eq'
-        (ComputableInPolyTime.fst _ _) (ComputableInPolyTime.const 0)).tidy
-    have hr1 : ComputableTidilyInPolyTime
-        (fun p : ℕ × (Clause ℕ × ℕ) => decide (p.1 = 1))
-        (encPair encUnary (encPair (encClause encNat) encUnary)) encBool :=
-      (ComputableInPolyTime.unary_eq'
-        (ComputableInPolyTime.fst _ _) (ComputableInPolyTime.const 1)).tidy
-    exact ComputableTidilyInPolyTime.ite_decide hr0 (by fun_prop)
-      (ComputableTidilyInPolyTime.ite_decide hr1 (by fun_prop) hbranch)
-  exact ((ComputableTidilyInPolyTime.listAppend (encClause encNat)).comp
-    (hlit.prod haux)).computableInPolyTime
+        E encCNF :=
+      ComputableInPolyTime.listAppend'
+        ((hzt.cons' (hzf.cons' (ComputableInPolyTime.const ([] : Clause ℕ)))).cons'
+          ((hzt.cons' (hu0f.cons' (ComputableInPolyTime.const ([] : Clause ℕ)))).cons'
+            (ComputableInPolyTime.const ([] : CNF ℕ))))
+        hchain
+    have hr0 : ComputableInPolyTime
+        (fun p : ℕ × (Clause ℕ × ℕ) => decide (p.1 = 0)) E encBool :=
+      ComputableInPolyTime.decide_eq'
+        (ComputableInPolyTime.fst _ _) (ComputableInPolyTime.const (encOut := encUnary) 0)
+    have hr1 : ComputableInPolyTime
+        (fun p : ℕ × (Clause ℕ × ℕ) => decide (p.1 = 1)) E encBool :=
+      ComputableInPolyTime.decide_eq'
+        (ComputableInPolyTime.fst _ _) (ComputableInPolyTime.const (encOut := encUnary) 1)
+    exact ComputableInPolyTime.ite_decide hr0 hcl0
+      (ComputableInPolyTime.ite_decide hr1 hcl1 hbranch)
+  exact (ComputableInPolyTime.listAppend (encClause encNat)).comp (hlit.prod haux)
 
 private theorem computableInPolyTime_valiantTwoSAT :
     ComputableInPolyTime (fun p : CNF ℕ × ℕ => valiantTwoSAT p.1 p.2)
       (encPair encCNF encUnary) encCNF := by
   unfold valiantTwoSAT
-  have htaut : ComputableTidilyInPolyTime (fun p : CNF ℕ × ℕ => valiantVarTauts p.1)
+  have htaut : ComputableInPolyTime (fun p : CNF ℕ × ℕ => valiantVarTauts p.1)
       (encPair encCNF encUnary) encCNF :=
-    (computableInPolyTime_valiantVarTauts.comp (ComputableInPolyTime.fst _ _)).tidy
-  have hflat : ComputableTidilyInPolyTime
+    computableInPolyTime_valiantVarTauts.comp (ComputableInPolyTime.fst _ _)
+  have hflat : ComputableInPolyTime
       (fun p : CNF ℕ × ℕ => p.1.zipIdx.flatMap (valiantClauseGadget p.2))
       (encPair encCNF encUnary) encCNF := by
-    refine ComputableTidilyInPolyTime.flatMapWith computableInPolyTime_valiantClauseGadget.tidy
-      (ComputableTidilyInPolyTime.snd _ _) ?_
-    exact (ComputableTidilyInPolyTime.zipIdx (encClause encNat)).comp
-      (ComputableTidilyInPolyTime.fst _ _)
-  exact ((ComputableTidilyInPolyTime.listAppend (encClause encNat)).comp
-    (htaut.prod hflat)).computableInPolyTime
+    refine ComputableInPolyTime.flatMapWith computableInPolyTime_valiantClauseGadget
+      (ComputableInPolyTime.snd _ _) ?_
+    exact (ComputableInPolyTime.zipIdx (encClause encNat)).comp (ComputableInPolyTime.fst _ _)
+  exact (ComputableInPolyTime.listAppend (encClause encNat)).comp (htaut.prod hflat)
 
-private theorem computableTidily_valiantParitySum (wantOdd : Bool) :
-    ComputableTidilyInPolyTime
+private theorem computableInPolyTime_valiantParitySum (wantOdd : Bool) :
+    ComputableInPolyTime
       (fun p : CNF ℕ × List ℕ =>
         ((p.2.zipIdx).map fun x =>
           if x.2.testBit 0 == wantOdd then (p.1.length + 1).choose (x.2 + 1) * x.1 else 0).sum)
       (encPair encCNF (encList encNat)) encNat := by
-  have hzip : ComputableTidilyInPolyTime
+  have hzip : ComputableInPolyTime
       (fun p : CNF ℕ × List ℕ => p.2.zipIdx)
       (encPair encCNF (encList encNat)) (encList (encPair encNat encUnary)) :=
-    (ComputableTidilyInPolyTime.zipIdx encNat).comp (ComputableTidilyInPolyTime.snd _ _)
-  have hterm : ComputableTidilyInPolyTime
+    (ComputableInPolyTime.zipIdx encNat).comp (ComputableInPolyTime.snd _ _)
+  have hterm : ComputableInPolyTime
       (fun q : (CNF ℕ × List ℕ) × (ℕ × ℕ) =>
         if q.2.2.testBit 0 == wantOdd then (q.1.1.length + 1).choose (q.2.2 + 1) * q.2.1 else 0)
       (encPair (encPair encCNF (encList encNat)) (encPair encNat encUnary)) encNat := by
@@ -1158,26 +1172,24 @@ private theorem computableTidily_valiantParitySum (wantOdd : Bool) :
         (fun q : (CNF ℕ × List ℕ) × (ℕ × ℕ) =>
           (q.1.1.length + 1).choose (q.2.2 + 1) * q.2.1)
         (encPair (encPair encCNF (encList encNat)) (encPair encNat encUnary)) encNat :=
-      (ComputableTidilyInPolyTime.binary_mul' hch.tidy
-        ((ComputableTidilyInPolyTime.fst _ _).comp
-          (ComputableTidilyInPolyTime.snd _ _))).computableInPolyTime
-    have hbit : ComputableTidilyInPolyTime
+      ComputableInPolyTime.binary_mul' hch
+        ((ComputableInPolyTime.fst _ _).comp (ComputableInPolyTime.snd _ _))
+    have hbit : ComputableInPolyTime
         (fun q : (CNF ℕ × List ℕ) × (ℕ × ℕ) => q.2.2.testBit 0 == wantOdd)
         (encPair (encPair encCNF (encList encNat)) (encPair encNat encUnary)) encBool := by
-      have hrBin : ComputableTidilyInPolyTime
+      have hrBin : ComputableInPolyTime
           (fun q : (CNF ℕ × List ℕ) × (ℕ × ℕ) => q.2.2)
           (encPair (encPair encCNF (encList encNat)) (encPair encNat encUnary)) encNat :=
-        ComputableTidilyInPolyTime.unary_to_binary.comp
-          ((ComputableTidilyInPolyTime.snd _ _).comp (ComputableTidilyInPolyTime.snd _ _))
-      have htb : ComputableTidilyInPolyTime
+        ComputableInPolyTime.unary_to_binary.comp
+          ((ComputableInPolyTime.snd _ _).comp (ComputableInPolyTime.snd _ _))
+      have htb : ComputableInPolyTime
           (fun q : (CNF ℕ × List ℕ) × (ℕ × ℕ) => q.2.2.testBit 0)
           (encPair (encPair encCNF (encList encNat)) (encPair encNat encUnary)) encBool :=
-        ComputableTidilyInPolyTime.binary_testBit hrBin (ComputableTidilyInPolyTime.const 0)
-      exact ComputableTidilyInPolyTime.bool_beq.comp
-        (htb.prod (ComputableTidilyInPolyTime.const wantOdd))
-    exact hbit.cond hmul.tidy (ComputableTidilyInPolyTime.const 0)
-  exact ComputableTidilyInPolyTime.binary_sum.comp
-    (ComputableTidilyInPolyTime.mapWithInput hzip hterm)
+        ComputableInPolyTime.binary_testBit hrBin (ComputableInPolyTime.const 0)
+      exact ComputableInPolyTime.beq htb (ComputableInPolyTime.const wantOdd)
+    exact hbit.ite hmul (ComputableInPolyTime.const 0)
+  exact ComputableInPolyTime.binary_sum.comp
+    (ComputableInPolyTime.mapWithInput hzip hterm)
 
 private theorem computableInPolyTime_valiantCombine :
     ComputableInPolyTime valiantCombine (encPair encCNF (encList encNat)) encNat := by
@@ -1198,7 +1210,7 @@ private theorem computableInPolyTime_valiantCombine :
       funext fun p => congrArg List.sum (List.map_congr_left fun x _ => by
         cases x.2.testBit 0 <;> rfl)
     rw [heq]
-    exact (computableTidily_valiantParitySum false).computableInPolyTime
+    exact computableInPolyTime_valiantParitySum false
   have hneg : ComputableInPolyTime
       (fun p : CNF ℕ × List ℕ =>
         ((p.2.zipIdx).map fun x =>
@@ -1215,7 +1227,7 @@ private theorem computableInPolyTime_valiantCombine :
       funext fun p => congrArg List.sum (List.map_congr_left fun x _ => by
         cases x.2.testBit 0 <;> rfl)
     rw [heq]
-    exact (computableTidily_valiantParitySum true).computableInPolyTime
+    exact computableInPolyTime_valiantParitySum true
   exact ComputableInPolyTime.binary_sub' hpos hneg
 
 /-- **`#SAT` reduces in polynomial time to `#2SAT` via a counting Turing reduction.** -/
@@ -1226,15 +1238,14 @@ theorem countingTuringReducible_SharpSAT_SharpTwoSAT :
   let bound (φ : CNF ℕ) : ℕ :=
     φ.vars.length + φ.length * (φ.length + 1) + 1
   have hqueries : ComputableInPolyTime queries encCNF (encList encCNF) := by
-    have hlist : ComputableTidilyInPolyTime (fun φ : CNF ℕ => List.range (φ.length + 1))
+    have hlist : ComputableInPolyTime (fun φ : CNF ℕ => List.range (φ.length + 1))
         encCNF (encList encUnary) := by
       have hlen : ComputableInPolyTime (fun φ : CNF ℕ => φ.length + 1) encCNF encUnary :=
         ComputableInPolyTime.unary_add'
           (SAT.computableInPolyTime_length ComputableInPolyTime.id')
           (ComputableInPolyTime.const 1)
-      exact ComputableTidilyInPolyTime.range.comp hlen.tidy
-    exact (ComputableTidilyInPolyTime.mapWithInput hlist
-      computableInPolyTime_valiantTwoSAT.tidy).computableInPolyTime
+      exact ComputableInPolyTime.range.comp hlen
+    exact ComputableInPolyTime.mapWithInput hlist computableInPolyTime_valiantTwoSAT
   have hbound : ComputableInPolyTime bound encCNF encUnary := by
     have hv := SAT.computableInPolyTime_vars_length ComputableInPolyTime.id'
     have hm := SAT.computableInPolyTime_length ComputableInPolyTime.id'

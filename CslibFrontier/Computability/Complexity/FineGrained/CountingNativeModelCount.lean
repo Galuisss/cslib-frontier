@@ -61,10 +61,12 @@ reduction `g : α → ℕ × CNF ℕ` and polynomial-time validity guard `valid 
 public theorem exists_counter_of_polyTime_toDeclared {α : Type} {encA : α ↪ List Bool} (k : ℕ)
     {g : α → DeclaredCNF} (hg : ComputableInPolyTime g encA encDeclaredCNF)
     {valid : α → Bool} (hvalid : ComputableInPolyTime valid encA encBool)
-    (hvalid_imp : ∀ x, valid x = true → CNF.validDeclaredInput k (g x).numVars (g x).formula = true) :
+    (hvalid_imp : ∀ x, valid x = true →
+      CNF.validDeclaredInput k (g x).numVars (g x).formula = true) :
     ∃ (count : α → ℕ) (T S : α → ℕ) (A c e a b : ℕ),
       ComputableInO count encA encNat T S ∧
-      (∀ x, count x = if valid x then (g x).formula.modelCountOn (Finset.range (g x).numVars) else 0) ∧
+      (∀ x, count x =
+        if valid x then (g x).formula.modelCountOn (Finset.range (g x).numVars) else 0) ∧
       (∀ x, (T x : ℝ) ≤ c * ((2 : ℝ) ^ ((A : ℝ) * interpolationScale (g x).numVars) *
         (((encA x).length : ℝ) + 1) ^ e) + c) ∧
       (∀ x, S x ≤ a * ((encA x).length + 1) ^ b) := by

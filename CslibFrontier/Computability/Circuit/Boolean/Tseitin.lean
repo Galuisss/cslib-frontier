@@ -291,6 +291,14 @@ theorem satisfiable_tseitinSatCNF_circuit_iff {n : ℕ} (c : Circuit signature n
   · rintro ⟨y, hxy, hout⟩
     exact ⟨List.ofFn y, by simp, hxy, by rwa [← Circuit.eval_eq_evalOutput]⟩
 
+/-- Evaluating more De Morgan gates preserves the values of the wires computed so far. -/
+theorem getD_evalCode_append_of_lt {x : List Bool} {gates rest : List (Op × List ℕ)}
+    {i : ℕ} (hi : i < x.length + gates.length) :
+    (evalCode interpretation false x (gates ++ rest)).getD i false =
+      (evalCode interpretation false x gates).getD i false := by
+  rw [evalCode_append]
+  exact getD_evalCode_of_lt _ _ _ _ (by simpa using hi)
+
 /-! ### Size -/
 
 /-- **Every clause of `tseitinSatCNF` has exactly three literals.** -/

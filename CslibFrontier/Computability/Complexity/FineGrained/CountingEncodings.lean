@@ -7,9 +7,10 @@ Authors: Samuel Schlesinger
 module
 -- upstream: candidate
 
-import CslibFrontier.Computability.Complexity.Problems.CSP.Declared
+public import CslibFrontier.Computability.Complexity.Problems.CSP.Declared
 public import CslibFrontier.Computability.Complexity.FineGrained.LocalMapCounting
 public import CslibFrontier.Computability.Complexity.Problems.Graph.CountingCNF
+public import CslibFrontier.Computability.Complexity.Problems.SAT.Declared
 public import CslibFrontier.Computability.Complexity.Problems.SetSplitting
 public import CslibFrontier.Logics.Propositional.CSP.ToOneHotCNF
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.BigO.Preprocess
@@ -29,12 +30,12 @@ certificates and conditional exponential/subexponential runtime transfers:
    `CountingTransfer.declaredCounter_of_modelCounter`): any declared `k`-CNF counter (or plain
    `(max k 2)`-CNF model counter via tautology variable padding `CNF.padDeclaredVars`) running in
    time `2 ^ E N * poly(|x|)` and polynomial space transfers along any polynomial-time compilation
-   `g : α → DeclaredCSP SelfDualThreeSAT.SignPattern` satisfying `(g x).1 ≤ C * μ x + D` under a polynomial-time guard.
+   `g : α → DeclaredCNF` satisfying `(g x).numVars ≤ C * μ x + D` under a polynomial-time guard.
 2. **Polynomial-time bounded one-hot CSP compilation**
    (`CSP.computableInPolyTime_toOneHotDeclaredCNF_of_forall`,
    `CSP.computableInPolyTime_toOneHotDeclaredCNF_of_finite`): compiles a finite-domain CSP over
    `Fin q` of arity `≤ k` on `N` declared variables into an equivalent CNF formula on `q * N`
-   variables of clause width `≤ max q (max k 2)` (`Cslib.Logic.PL.CSP.toOneHotDeclaredCNF`).
+   variables of clause width `≤ max q (max k 2)` (`Cslib.Complexity.CSP.toOneHotDeclaredCNF`).
 3. **Explicit assignment bijection for constant-locality Boolean maps**
    (`LocalMap.preimageDeclaredEquiv`): pairs `LocalMap.toDeclaredCNF` with an explicit bijection
    between declared-range satisfying assignments and `n`-bit preimages.
@@ -47,9 +48,9 @@ certificates and conditional exponential/subexponential runtime transfers:
 
 ## Main definitions
 
-* `Cslib.Complexity.encDeclaredCNF`, `Cslib.Complexity.encDeclaredCSP`: framed encodings of
-  declared-variable CNF and CSP instances.
 * `Cslib.Logic.PL.CNF.padDeclaredVars`: width-`2` tautology padding fixing `numVars = N`.
+* `Cslib.Complexity.CSP.toOneHotDeclaredCNF`: declared-variable one-hot CNF compilation
+  `DeclaredCSP Rel → DeclaredCNF`.
 * `Cslib.Complexity.LocalMap.preimageDeclaredEquiv`: explicit preimage bijection for
   `LocalMap.toDeclaredCNF`.
 
@@ -158,7 +159,7 @@ and `n`-bit preimages of `q.2` under `q.1` when `q.1.Valid k = true`. -/
 @[expose] def LocalMap.preimageDeclaredEquiv {k : ℕ} {q : LocalMap × List Bool}
     (hq : q.1.Valid k = true) :
     {σ : Finset.range q.1.numVars → Bool //
-      (LocalMap.toDeclaredCNF k q).2.eval
+      (LocalMap.toDeclaredCNF k q).formula.eval
         (fun v => if hv : v ∈ Finset.range q.1.numVars then σ ⟨v, hv⟩ else false) = true} ≃
       {σ : Finset.range q.1.numVars → Bool //
         q.1.eval (fun v => if hv : v ∈ Finset.range q.1.numVars then σ ⟨v, hv⟩ else false) =
@@ -206,15 +207,15 @@ private theorem computableInPolyTime_toOneHotCNFAt (encRel : Rel ↪ List Bool) 
       ComputableInPolyTime (fun R : Rel => sem R ts) encRel encBool) :
     ComputableInPolyTime
       (fun c : Constraint Rel ℕ =>
-        ((finTuples q r).filter fun ts => !sem c.1 ts).map (forbidOneHotClause q c.2))
+        ((finTuples q r).filter fun ts => !sem c.rel ts).map (forbidOneHotClause q c.scope))
       (encConstraint encRel encNat) encCNF := by
-  refine computableInPolyTime_mapFilterConst (finTuples q r)
-    (test := fun (c : Constraint Rel ℕ) (ts : List (Fin q)) => !sem c.1 ts)
-    (f := fun (c : Constraint Rel ℕ) (ts : List (Fin q)) => forbidOneHotClause q c.2 ts)
+  refine mapFilterConst (finTuples q r)
+    (test := fun (c : Constraint Rel ℕ) (ts : List (Fin q)) => !sem c.rel ts)
+    (f := fun (c : Constraint Rel ℕ) (ts : List (Fin q)) => forbidOneHotClause q c.scope ts)
     (fun ts hts => ?_) (fun ts _ => ?_)
   · have hsemt := hsem ts hts
     fun_prop
-  · exact (computableInPolyTime_forbidOneHot q ts).comp (snd encRel (encList encNat))
+  · exact (computableInPolyTime_forbidOneHot q ts).comp (encConstraint_scope_polyTime id')
 
 private theorem computableInPolyTime_constraintToOneHotCNFBounded
     (encRel : Rel ↪ List Bool) (q k : ℕ) (sem : Rel → List (Fin q) → Bool)
@@ -225,26 +226,26 @@ private theorem computableInPolyTime_constraintToOneHotCNFBounded
   induction k with
   | zero =>
     have htest : ComputableInPolyTime
-        (fun c : Constraint Rel ℕ => decide (c.2.length = 0))
+        (fun c : Constraint Rel ℕ => decide (c.scope.length = 0))
         (encConstraint encRel encNat) encBool := by
       fun_prop
     refine (htest.ite (computableInPolyTime_toOneHotCNFAt encRel q 0 sem
         fun ts hts => hsem ts (by simp [(mem_finTuples.mp hts)]))
       (const [])).of_enc_eq fun c => ?_
     simp only [Constraint.toOneHotCNFBounded, Constraint.toOneHotCNF, Nat.le_zero]
-    by_cases h : c.2.length = 0 <;> simp [h]
+    by_cases h : c.scope.length = 0 <;> simp [h]
   | succ k ih =>
     have htest : ComputableInPolyTime
-        (fun c : Constraint Rel ℕ => decide (c.2.length = k + 1))
+        (fun c : Constraint Rel ℕ => decide (c.scope.length = k + 1))
         (encConstraint encRel encNat) encBool := by
       fun_prop
     refine (htest.ite (computableInPolyTime_toOneHotCNFAt encRel q (k + 1) sem
         fun ts hts => hsem ts (by simp [(mem_finTuples.mp hts)]))
       (ih fun ts hts => hsem ts (hts.trans (Nat.le_succ k)))).of_enc_eq fun c => ?_
     simp only [Constraint.toOneHotCNFBounded, Constraint.toOneHotCNF]
-    by_cases h1 : c.2.length = k + 1
+    by_cases h1 : c.scope.length = k + 1
     · simp [h1]
-    · have hle : (c.2.length ≤ k + 1) ↔ (c.2.length ≤ k) := by omega
+    · have hle : (c.scope.length ≤ k + 1) ↔ (c.scope.length ≤ k) := by omega
       simp [h1, hle]
 
 private theorem computableInPolyTime_exactlyOneBlock (q : ℕ) :
@@ -260,29 +261,47 @@ private theorem computableInPolyTime_exactlyOneBlock (q : ℕ) :
     fun_prop
   exact hex.comp hlist
 
-/-- Compiling `(N, F)` to its declared one-hot CNF `(N * q, toOneHotCNFBounded q k N F sem)` is
-polynomial-time whenever `fun R => sem R ts` is polynomial-time on tuples of length `≤ k`. -/
+/-- Declared-variable one-hot CNF compilation `⟨x.numVars * q, toOneHotCNFBounded ...⟩`. -/
+@[expose] def toOneHotDeclaredCNF (q k : ℕ) (sem : Rel → List (Fin q) → Bool)
+    (x : DeclaredCSP Rel) : DeclaredCNF where
+  numVars := x.numVars * q
+  formula := toOneHotCNFBounded q k x.numVars x.formula sem
+
+theorem modelCountOn_toOneHotDeclaredCNF {q k : ℕ} (hq : 0 < q)
+    (sem : Rel → List (Fin q) → Bool) {x : DeclaredCSP Rel}
+    (hv : validDeclaredCSP k x.numVars x.formula = true) :
+    letI : Inhabited (Fin q) := ⟨⟨0, hq⟩⟩
+    (toOneHotDeclaredCNF q k sem x).formula.modelCountOn
+        (Finset.range (toOneHotDeclaredCNF q k sem x).numVars) =
+      x.formula.modelCountOn sem (Finset.range x.numVars) :=
+  modelCountOn_toOneHotCNFBounded hq sem hv
+
+/-- Compiling `x : DeclaredCSP Rel` to `toOneHotDeclaredCNF q k sem x` is polynomial-time whenever
+`fun R => sem R ts` is polynomial-time on tuples of length `≤ k`. -/
 theorem computableInPolyTime_toOneHotDeclaredCNF_of_forall (encRel : Rel ↪ List Bool) (q k : ℕ)
     (sem : Rel → List (Fin q) → Bool)
     (hsem : ∀ ts : List (Fin q), ts.length ≤ k →
       ComputableInPolyTime (fun R : Rel => sem R ts) encRel encBool) :
     ComputableInPolyTime (toOneHotDeclaredCNF q k sem)
       (encDeclaredCSP encRel) encDeclaredCNF := by
-  have hN : ComputableInPolyTime (fun x : DeclaredCSP Rel => x.1 * q)
+  have hN : ComputableInPolyTime (fun x : DeclaredCSP Rel => x.numVars * q)
       (encDeclaredCSP encRel) encUnary :=
-    unary_mul' (fst encUnary (encCSP encRel encNat)) (const q)
+    unary_mul' (encDeclaredCSP_numVars_polyTime encRel id') (const q)
   have hex : ComputableInPolyTime
       (fun x : DeclaredCSP Rel =>
-        (List.range x.1).flatMap fun v => CNF.exactlyOne ((List.range q).map fun a => v * q + a))
+        (List.range x.numVars).flatMap fun v =>
+          CNF.exactlyOne ((List.range q).map fun a => v * q + a))
       (encDeclaredCSP encRel) encCNF := by
+    have hn := encDeclaredCSP_numVars_polyTime encRel (id' (encIn := encDeclaredCSP encRel))
     have hb := computableInPolyTime_exactlyOneBlock q
     fun_prop
   have hforb : ComputableInPolyTime
-      (fun x : DeclaredCSP Rel => x.2.flatMap (Constraint.toOneHotCNFBounded q k sem))
+      (fun x : DeclaredCSP Rel => x.formula.flatMap (Constraint.toOneHotCNFBounded q k sem))
       (encDeclaredCSP encRel) encCNF := by
+    have hf := encDeclaredCSP_formula_polyTime encRel (id' (encIn := encDeclaredCSP encRel))
     have hc := computableInPolyTime_constraintToOneHotCNFBounded encRel q k sem hsem
     fun_prop
-  exact hN.prod (listAppend' hex hforb)
+  exact encDeclaredCNF_mk_polyTime hN (listAppend' hex hforb)
 
 /-- Over a finite relation alphabet `Rel`, `toOneHotDeclaredCNF q k sem` is polynomial-time. -/
 theorem computableInPolyTime_toOneHotDeclaredCNF_of_finite [Finite Rel]
@@ -301,43 +320,45 @@ open ComputableInPolyTime
 
 @[fun_prop]
 theorem computableInPolyTime_padDeclaredVars :
-    ComputableInPolyTime (fun p : DeclaredCSP SelfDualThreeSAT.SignPattern => CNF.padDeclaredVars p.1 p.2)
+    ComputableInPolyTime (fun p : DeclaredCNF => CNF.padDeclaredVars p.numVars p.formula)
       encDeclaredCNF encCNF := by
   unfold CNF.padDeclaredVars
   fun_prop
 
 /-- Convert any plain `(max k 2)`-CNF model counter on `encCNF` running in time
 `2 ^ E φ.numVars * (|φ| + 1) ^ e₀` and polynomial space into a declared `k`-CNF counter on
-`encDeclaredCNF` running in time `2 ^ E p.1 * (|p| + 1) ^ e` and polynomial space. -/
+`encDeclaredCNF` running in time `2 ^ E p.numVars * (|p| + 1) ^ e` and polynomial space. -/
 theorem declaredCounter_of_modelCounter {k : ℕ} {countCNF : CNF ℕ → ℕ} {T₀ S₀ : CNF ℕ → ℕ}
     {E : ℕ → ℕ} {e₀ b₀ : ℕ}
     (hcount : ComputableInO countCNF encCNF encNat T₀ S₀)
     (hspec : ∀ φ : CNF ℕ, (∀ cl ∈ φ, cl.length ≤ max k 2) → countCNF φ = φ.modelCount)
     (hT₀ : ∀ φ, T₀ φ ≤ 2 ^ E φ.numVars * ((encCNF φ).length + 1) ^ e₀)
     (hS₀ : ∀ φ, S₀ φ ≤ ((encCNF φ).length + 1) ^ b₀) :
-    ∃ (countDecl : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ) (e b : ℕ),
-      (∀ p : DeclaredCSP SelfDualThreeSAT.SignPattern, CNF.validDeclaredInput k p.1 p.2 = true →
-        countDecl p = p.2.modelCountOn (Finset.range p.1)) ∧
+    ∃ (countDecl : DeclaredCNF → ℕ) (e b : ℕ),
+      (∀ p : DeclaredCNF, CNF.validDeclaredInput k p.numVars p.formula = true →
+        countDecl p = p.formula.modelCountOn (Finset.range p.numVars)) ∧
       ComputableInO countDecl encDeclaredCNF encNat
-        (fun p => 2 ^ E p.1 * ((encDeclaredCNF p).length + 1) ^ e)
+        (fun p => 2 ^ E p.numVars * ((encDeclaredCNF p).length + 1) ^ e)
         (fun p => ((encDeclaredCNF p).length + 1) ^ b) := by
   have hvalid : ComputableInPolyTime
-      (fun p : DeclaredCSP SelfDualThreeSAT.SignPattern => CNF.validDeclaredInput k p.1 p.2) encDeclaredCNF encBool :=
-    CNF.computableInPolyTime_validDeclaredInput k id'
-  set pad : DeclaredCSP SelfDualThreeSAT.SignPattern → CNF ℕ := fun p =>
-    if CNF.validDeclaredInput k p.1 p.2 then CNF.padDeclaredVars p.1 p.2
-    else CNF.padDeclaredVars p.1 [[]]
+      (fun p : DeclaredCNF => CNF.validDeclaredInput k p.numVars p.formula)
+      encDeclaredCNF encBool :=
+    (CNF.computableInPolyTime_validDeclaredInput k id').comp
+      ((encDeclaredCNF_numVars_polyTime id').prod (encDeclaredCNF_formula_polyTime id'))
+  set pad : DeclaredCNF → CNF ℕ := fun p =>
+    if CNF.validDeclaredInput k p.numVars p.formula then CNF.padDeclaredVars p.numVars p.formula
+    else CNF.padDeclaredVars p.numVars [[]]
   have hpad : ComputableInPolyTime pad encDeclaredCNF encCNF :=
     hvalid.ite computableInPolyTime_padDeclaredVars
       (computableInPolyTime_padDeclaredVars.comp
-        ((fst encUnary encCNF).prod (const [[]])))
-  have hnum (p : DeclaredCSP SelfDualThreeSAT.SignPattern) : (pad p).numVars = p.1 := by
+        (encDeclaredCNF_mk_polyTime (encDeclaredCNF_numVars_polyTime id') (const [[]])))
+  have hnum (p : DeclaredCNF) : (pad p).numVars = p.numVars := by
     dsimp only [pad]
     split_ifs with hp
     · exact CNF.numVars_padDeclaredVars (CNF.validDeclaredInput_eq_true_iff.mp hp).2
     · exact CNF.numVars_padDeclaredVars (by simp [CNF.vars])
   obtain ⟨e, b, hcomp⟩ := hcount.comp_polyTime hpad
-    (E := fun p => E p.1)
+    (E := fun p => E p.numVars)
     (fun p => by simpa only [hnum p] using hT₀ (pad p))
     (fun p => hS₀ (pad p))
   refine ⟨fun p => countCNF (pad p), e, b, fun p hp => ?_, hcomp⟩
@@ -348,29 +369,32 @@ theorem declaredCounter_of_modelCounter {k : ℕ} {countCNF : CNF ℕ → ℕ} {
 
 /-- **General conditional counting runtime transfer:** any declared `k`-CNF counter running in time
 `2 ^ E N * (|p| + 1) ^ e₀` and polynomial space with monotone `E` transfers across any
-polynomial-time compilation `g : α → DeclaredCSP SelfDualThreeSAT.SignPattern` and guard `valid : α → Bool` satisfying
-`(g x).1 ≤ C * μ x + D` under `valid x = true`. -/
+polynomial-time compilation `g : α → DeclaredCNF` and guard `valid : α → Bool` satisfying
+`(g x).numVars ≤ C * μ x + D` under `valid x = true`. -/
 theorem transfer_declaredCounter {α : Type} {encA : α ↪ List Bool} (k : ℕ)
-    {countDecl : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {T₀ S₀ : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
+    {countDecl : DeclaredCNF → ℕ} {T₀ S₀ : DeclaredCNF → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
     {e₀ b₀ : ℕ}
     (hcount : ComputableInO countDecl encDeclaredCNF encNat T₀ S₀)
-    (hspec : ∀ p : DeclaredCSP SelfDualThreeSAT.SignPattern, CNF.validDeclaredInput k p.1 p.2 = true →
-      countDecl p = p.2.modelCountOn (Finset.range p.1))
-    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.1 * ((encDeclaredCNF p).length + 1) ^ e₀)
+    (hspec : ∀ p : DeclaredCNF, CNF.validDeclaredInput k p.numVars p.formula = true →
+      countDecl p = p.formula.modelCountOn (Finset.range p.numVars))
+    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.numVars * ((encDeclaredCNF p).length + 1) ^ e₀)
     (hS₀ : ∀ p, S₀ p ≤ ((encDeclaredCNF p).length + 1) ^ b₀)
-    {g : α → DeclaredCSP SelfDualThreeSAT.SignPattern} (hg : ComputableInPolyTime g encA encDeclaredCNF)
+    {g : α → DeclaredCNF} (hg : ComputableInPolyTime g encA encDeclaredCNF)
     {valid : α → Bool} (hvalid : ComputableInPolyTime valid encA encBool)
     (μ : α → ℕ) (C D : ℕ)
     (hvalid_imp : ∀ x, valid x = true →
-      CNF.validDeclaredInput k (g x).1 (g x).2 = true ∧ (g x).1 ≤ C * μ x + D) :
+      CNF.validDeclaredInput k (g x).numVars (g x).formula = true ∧
+        (g x).numVars ≤ C * μ x + D) :
     ∃ (count : α → ℕ) (e b : ℕ),
-      (∀ x, count x = if valid x then (g x).2.modelCountOn (Finset.range (g x).1) else 0) ∧
+      (∀ x, count x =
+        if valid x then (g x).formula.modelCountOn (Finset.range (g x).numVars) else 0) ∧
       ComputableInO count encA encNat
         (fun x => 2 ^ E (C * μ x + D) * ((encA x).length + 1) ^ e)
         (fun x => ((encA x).length + 1) ^ b) := by
-  set g' : α → DeclaredCSP SelfDualThreeSAT.SignPattern := fun x => if valid x then g x else (0, [[]])
-  have hg' : ComputableInPolyTime g' encA encDeclaredCNF := hvalid.ite hg (const (0, [[]]))
-  have hle (x : α) : (g' x).1 ≤ C * μ x + D := by
+  set g' : α → DeclaredCNF := fun x => if valid x then g x else ⟨0, [[]]⟩
+  have hg' : ComputableInPolyTime g' encA encDeclaredCNF :=
+    hvalid.ite hg (const (⟨0, [[]]⟩ : DeclaredCNF))
+  have hle (x : α) : (g' x).numVars ≤ C * μ x + D := by
     dsimp only [g']
     split_ifs with hx
     · exact (hvalid_imp x hx).2
@@ -387,7 +411,7 @@ theorem transfer_declaredCounter {α : Type} {encA : α ↪ List Bool} (k : ℕ)
   · have hv0 : CNF.validDeclaredInput k 0 ([[]] : CNF ℕ) = true := by
       rw [CNF.validDeclaredInput_eq_true_iff]
       simp [CNF.vars]
-    rw [hspec (0, [[]]) hv0]
+    rw [hspec ⟨0, [[]]⟩ hv0]
     simp only [CNF.modelCountOn, CNF.eval, Clause.eval, List.all_cons, List.any_nil,
       Bool.false_and, Bool.false_eq_true, Finset.filter_false, Finset.card_empty]
 
@@ -395,32 +419,34 @@ theorem transfer_declaredCounter {α : Type} {encA : α ↪ List Bool} (k : ℕ)
 
 /-- **Row 1 conditional transfer (`#IndependentSet`, width `2`, `n = |V|`)**: any declared `2`-CNF
 counter with monotone exponent `E` yields an independent-set counter in time
-`2 ^ E G.1.toFinset.card * (|G| + 1) ^ e` and polynomial space. -/
+`2 ^ E G.vertices.toFinset.card * (|G| + 1) ^ e` and polynomial space. -/
 theorem exists_indepSetCounter_of_declaredCounter
-    {countDecl : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {T₀ S₀ : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
+    {countDecl : DeclaredCNF → ℕ} {T₀ S₀ : DeclaredCNF → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
     {e₀ b₀ : ℕ}
     (hcount : ComputableInO countDecl encDeclaredCNF encNat T₀ S₀)
-    (hspec : ∀ p : DeclaredCSP SelfDualThreeSAT.SignPattern, CNF.validDeclaredInput 2 p.1 p.2 = true →
-      countDecl p = p.2.modelCountOn (Finset.range p.1))
-    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.1 * ((encDeclaredCNF p).length + 1) ^ e₀)
+    (hspec : ∀ p : DeclaredCNF, CNF.validDeclaredInput 2 p.numVars p.formula = true →
+      countDecl p = p.formula.modelCountOn (Finset.range p.numVars))
+    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.numVars * ((encDeclaredCNF p).length + 1) ^ e₀)
     (hS₀ : ∀ p, S₀ p ≤ ((encDeclaredCNF p).length + 1) ^ b₀) :
     ∃ (count : Graph → ℕ) (e b : ℕ),
       (∀ G : Graph, count G =
-        Nat.card {S : Finset {v : ℕ // v ∈ G.1} //
-          G.induced.IsIndepSet (S : Set {v : ℕ // v ∈ G.1})}) ∧
+        Nat.card {S : Finset {v : ℕ // v ∈ G.vertices} //
+          G.induced.IsIndepSet (S : Set {v : ℕ // v ∈ G.vertices})}) ∧
       ComputableInO count encGraph encNat
-        (fun G => 2 ^ E G.1.toFinset.card * ((encGraph G).length + 1) ^ e)
+        (fun G => 2 ^ E G.vertices.toFinset.card * ((encGraph G).length + 1) ^ e)
         (fun G => ((encGraph G).length + 1) ^ b) := by
   have hg : ComputableInPolyTime
-      (fun G : Graph => (G.toIndepSetCNF.denseRelabel.numVars, G.toIndepSetCNF.denseRelabel))
+      (fun G : Graph =>
+        (⟨G.toIndepSetCNF.denseRelabel.numVars, G.toIndepSetCNF.denseRelabel⟩ : DeclaredCNF))
       encGraph encDeclaredCNF := by
-    have hdecl : ComputableInPolyTime (fun ψ : CNF ℕ => (ψ.numVars, ψ)) encCNF encDeclaredCNF := by
-      fun_prop
+    have hdecl : ComputableInPolyTime (fun ψ : CNF ℕ => (⟨ψ.numVars, ψ⟩ : DeclaredCNF))
+        encCNF encDeclaredCNF :=
+      encDeclaredCNF_mk_polyTime (by fun_prop) id'
     exact hdecl.comp
       (SAT.computableInPolyTime_denseRelabel.comp Graph.computableInPolyTime_toIndepSetCNF)
   obtain ⟨count, e, b, hcspec, hcinO⟩ :=
     transfer_declaredCounter 2 hE hcount hspec hT₀ hS₀ hg (const true)
-      (fun G => G.1.toFinset.card) 1 0 fun G _ => by
+      (fun G => G.vertices.toFinset.card) 1 0 fun G _ => by
         have hw : ∀ cl ∈ G.toIndepSetCNF.denseRelabel, cl.length ≤ 2 :=
           (CNF.all_length_le_denseRelabel G.toIndepSetCNF).mpr fun _ hc =>
             (Graph.length_clause_toIndepSetCNF hc).le
@@ -434,29 +460,29 @@ theorem exists_indepSetCounter_of_declaredCounter
 
 /-- **Row 2 conditional transfer (`#q-Coloring`, width `max q 2`, `n = q * |V|`)**: any declared
 `(max q 2)`-CNF counter with monotone exponent `E` yields a proper `q`-colouring counter in time
-`2 ^ E (q * G.1.toFinset.card) * (|G| + 1) ^ e` and polynomial space. -/
+`2 ^ E (q * G.vertices.toFinset.card) * (|G| + 1) ^ e` and polynomial space. -/
 theorem exists_coloringCounter_of_declaredCounter (q : ℕ)
-    {countDecl : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {T₀ S₀ : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
+    {countDecl : DeclaredCNF → ℕ} {T₀ S₀ : DeclaredCNF → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
     {e₀ b₀ : ℕ}
     (hcount : ComputableInO countDecl encDeclaredCNF encNat T₀ S₀)
-    (hspec : ∀ p : DeclaredCSP SelfDualThreeSAT.SignPattern, CNF.validDeclaredInput (max q 2) p.1 p.2 = true →
-      countDecl p = p.2.modelCountOn (Finset.range p.1))
-    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.1 * ((encDeclaredCNF p).length + 1) ^ e₀)
+    (hspec : ∀ p : DeclaredCNF, CNF.validDeclaredInput (max q 2) p.numVars p.formula = true →
+      countDecl p = p.formula.modelCountOn (Finset.range p.numVars))
+    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.numVars * ((encDeclaredCNF p).length + 1) ^ e₀)
     (hS₀ : ∀ p, S₀ p ≤ ((encDeclaredCNF p).length + 1) ^ b₀) :
     ∃ (count : Graph → ℕ) (e b : ℕ),
       (∀ G : Graph, count G = Nat.card (G.induced.Coloring (Fin q))) ∧
       ComputableInO count encGraph encNat
-        (fun G => 2 ^ E (q * G.1.toFinset.card) * ((encGraph G).length + 1) ^ e)
+        (fun G => 2 ^ E (q * G.vertices.toFinset.card) * ((encGraph G).length + 1) ^ e)
         (fun G => ((encGraph G).length + 1) ^ b) := by
   have hg : ComputableInPolyTime
-      (fun G : Graph => (q * G.distinctVertices.length, G.toColoringCNF q))
+      (fun G : Graph => (⟨q * G.distinctVertices.length, G.toColoringCNF q⟩ : DeclaredCNF))
       encGraph encDeclaredCNF := by
     have hdv := Graph.computableInPolyTime_distinctVertices
     have hc := Graph.computableInPolyTime_toColoringCNF q
-    fun_prop
+    exact encDeclaredCNF_mk_polyTime (by fun_prop) hc
   obtain ⟨count, e, b, hcspec, hcinO⟩ :=
     transfer_declaredCounter (max q 2) hE hcount hspec hT₀ hS₀ hg (const true)
-      (fun G => G.1.toFinset.card) q 0 fun G _ =>
+      (fun G => G.vertices.toFinset.card) q 0 fun G _ =>
         ⟨Graph.validDeclaredInput_toColoringCNF q G,
           by simp [Graph.length_distinctVertices]⟩
   refine ⟨count, e, b, fun G => ?_, ?_⟩
@@ -467,12 +493,14 @@ theorem exists_coloringCounter_of_declaredCounter (q : ℕ)
 unary. -/
 theorem computableInPolyTime_perfectMatchingDeclaredVars :
     ComputableInPolyTime
-      (fun G : Graph => G.edgeList.length + G.perfectMatchingCircuit.1.length)
+      (fun G : Graph => G.edgeList.length + G.perfectMatchingCircuit.gates.length)
       encGraph encUnary := by
   have hE := Graph.computableInPolyTime_edgeList
   have hW : ComputableInPolyTime Graph.perfectMatchingWires
       encGraph (encList (encList encUnary)) := by
     unfold Graph.perfectMatchingWires Graph.incident
+    fun_prop
+  have hEl : ComputableInPolyTime (fun G : Graph => G.edgeList.length) encGraph encUnary := by
     fun_prop
   have hfl : ComputableInPolyTime (fun G : Graph => G.perfectMatchingWires.flatten.length)
       encGraph encUnary := by
@@ -483,8 +511,11 @@ theorem computableInPolyTime_perfectMatchingDeclaredVars :
   have hexpr : ComputableInPolyTime
       (fun G : Graph => G.edgeList.length +
         (1 + (3 * G.perfectMatchingWires.flatten.length + 4 * G.perfectMatchingWires.length)))
-      encGraph encUnary := by
-    fun_prop
+      encGraph encUnary :=
+    unary_add.comp (hEl.prod
+      (unary_add.comp ((const 1).prod
+        (unary_add.comp ((unary_mul.comp ((const 3).prod hfl)).prod
+          (unary_mul.comp ((const 4).prod hwl)))))))
   refine hexpr.of_enc_eq fun G => congrArg encUnary ?_
   rw [Graph.perfectMatchingCircuit, Circuits.Boolean.length_seqExactlyOneAll,
     List.length_flatten]
@@ -494,29 +525,31 @@ theorem computableInPolyTime_perfectMatchingDeclaredVars :
 any declared `3`-CNF counter with monotone exponent `E` yields an exact perfect-matching counter on
 general graphs in time `2 ^ E (7 * (|V| + |E|) + 1) * (|G| + 1) ^ e` and polynomial space. -/
 theorem exists_perfectMatchingCounter_of_declaredCounter
-    {countDecl : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {T₀ S₀ : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
+    {countDecl : DeclaredCNF → ℕ} {T₀ S₀ : DeclaredCNF → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
     {e₀ b₀ : ℕ}
     (hcount : ComputableInO countDecl encDeclaredCNF encNat T₀ S₀)
-    (hspec : ∀ p : DeclaredCSP SelfDualThreeSAT.SignPattern, CNF.validDeclaredInput 3 p.1 p.2 = true →
-      countDecl p = p.2.modelCountOn (Finset.range p.1))
-    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.1 * ((encDeclaredCNF p).length + 1) ^ e₀)
+    (hspec : ∀ p : DeclaredCNF, CNF.validDeclaredInput 3 p.numVars p.formula = true →
+      countDecl p = p.formula.modelCountOn (Finset.range p.numVars))
+    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.numVars * ((encDeclaredCNF p).length + 1) ^ e₀)
     (hS₀ : ∀ p, S₀ p ≤ ((encDeclaredCNF p).length + 1) ^ b₀) :
     ∃ (count : Graph → ℕ) (e b : ℕ),
       (∀ G : Graph, count G = Nat.card {M : G.induced.Subgraph // M.IsPerfectMatching}) ∧
       ComputableInO count encGraph encNat
-        (fun G => 2 ^ E (7 * (G.1.toFinset.card + G.edgeList.length) + 1) *
+        (fun G => 2 ^ E (7 * (G.vertices.toFinset.card + G.edgeList.length) + 1) *
           ((encGraph G).length + 1) ^ e)
         (fun G => ((encGraph G).length + 1) ^ b) := by
   have hg : ComputableInPolyTime
       (fun G : Graph =>
-        (G.edgeList.length + G.perfectMatchingCircuit.1.length, G.toPerfectMatchingCNF))
+        (⟨G.edgeList.length + G.perfectMatchingCircuit.gates.length,
+          G.toPerfectMatchingCNF⟩ : DeclaredCNF))
       encGraph encDeclaredCNF :=
-    computableInPolyTime_perfectMatchingDeclaredVars.prod
+    encDeclaredCNF_mk_polyTime computableInPolyTime_perfectMatchingDeclaredVars
       Graph.computableInPolyTime_toPerfectMatchingCNF
   obtain ⟨count, e, b, hcspec, hcinO⟩ :=
     transfer_declaredCounter 3 hE hcount hspec hT₀ hS₀ hg (const true)
-      (fun G => G.1.toFinset.card + G.edgeList.length) 7 1 fun G _ => by
+      (fun G => G.vertices.toFinset.card + G.edgeList.length) 7 1 fun G _ => by
         refine ⟨Graph.validDeclaredInput_toPerfectMatchingCNF G, ?_⟩
+        dsimp only
         have h := Graph.length_perfectMatchingCircuit_le G
         omega
   refine ⟨count, e, b, fun G => ?_, hcinO⟩
@@ -529,28 +562,29 @@ theorem exists_oneHotCSPCounter_of_declaredCounter {Rel : Type} (encRel : Rel �
     {q : ℕ} (hq : 0 < q) (k : ℕ) (sem : Rel → List (Fin q) → Bool)
     (hsem : ∀ ts : List (Fin q), ts.length ≤ k →
       ComputableInPolyTime (fun R : Rel => sem R ts) encRel encBool)
-    {countDecl : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {T₀ S₀ : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
+    {countDecl : DeclaredCNF → ℕ} {T₀ S₀ : DeclaredCNF → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
     {e₀ b₀ : ℕ}
     (hcount : ComputableInO countDecl encDeclaredCNF encNat T₀ S₀)
-    (hspec : ∀ p : DeclaredCSP SelfDualThreeSAT.SignPattern, CNF.validDeclaredInput (max q (max k 2)) p.1 p.2 = true →
-      countDecl p = p.2.modelCountOn (Finset.range p.1))
-    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.1 * ((encDeclaredCNF p).length + 1) ^ e₀)
+    (hspec : ∀ p : DeclaredCNF,
+      CNF.validDeclaredInput (max q (max k 2)) p.numVars p.formula = true →
+      countDecl p = p.formula.modelCountOn (Finset.range p.numVars))
+    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.numVars * ((encDeclaredCNF p).length + 1) ^ e₀)
     (hS₀ : ∀ p, S₀ p ≤ ((encDeclaredCNF p).length + 1) ^ b₀) :
     letI : Inhabited (Fin q) := ⟨⟨0, hq⟩⟩
     ∃ (count : DeclaredCSP Rel → ℕ) (e b : ℕ),
-      (∀ x, count x = if CSP.validDeclaredCSP k x.1 x.2 then
-        x.2.modelCountOn sem (Finset.range x.1) else 0) ∧
+      (∀ x, count x = if CSP.validDeclaredCSP k x.numVars x.formula then
+        x.formula.modelCountOn sem (Finset.range x.numVars) else 0) ∧
       ComputableInO count (encDeclaredCSP encRel) encNat
-        (fun x => 2 ^ E (q * x.1) * ((encDeclaredCSP encRel x).length + 1) ^ e)
+        (fun x => 2 ^ E (q * x.numVars) * ((encDeclaredCSP encRel x).length + 1) ^ e)
         (fun x => ((encDeclaredCSP encRel x).length + 1) ^ b) := by
   let : Inhabited (Fin q) := ⟨⟨0, hq⟩⟩
   obtain ⟨count, e, b, hcspec, hcinO⟩ :=
     transfer_declaredCounter (max q (max k 2)) hE hcount hspec hT₀ hS₀
       (CSP.computableInPolyTime_toOneHotDeclaredCNF_of_forall encRel q k sem hsem)
       (CSP.computableInPolyTime_validDeclaredCSP encRel k)
-      Prod.fst q 0 fun x hx =>
-        ⟨CSP.validDeclaredInput_toOneHotCNFBounded sem hx, by simp [CSP.toOneHotDeclaredCNF,
-          Nat.mul_comm]⟩
+      DeclaredCSP.numVars q 0 fun x hx =>
+        ⟨Cslib.Logic.PL.CSP.validDeclaredInput_toOneHotCNFBounded sem hx,
+          by simp [CSP.toOneHotDeclaredCNF, Nat.mul_comm]⟩
   refine ⟨count, e, b, fun x => ?_, ?_⟩
   · rw [hcspec x]
     split_ifs with hx
@@ -562,12 +596,12 @@ theorem exists_oneHotCSPCounter_of_declaredCounter {Rel : Type} (encRel : Rel �
 counter with monotone exponent `E` counts ordered splitting bipartitions on valid instances of set
 size `≤ k` in time `2 ^ E x.ground.toFinset.card * (|x| + 1) ^ e` and polynomial space. -/
 theorem exists_setSplittingCounter_of_declaredCounter (k : ℕ)
-    {countDecl : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {T₀ S₀ : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
+    {countDecl : DeclaredCNF → ℕ} {T₀ S₀ : DeclaredCNF → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
     {e₀ b₀ : ℕ}
     (hcount : ComputableInO countDecl encDeclaredCNF encNat T₀ S₀)
-    (hspec : ∀ p : DeclaredCSP SelfDualThreeSAT.SignPattern, CNF.validDeclaredInput k p.1 p.2 = true →
-      countDecl p = p.2.modelCountOn (Finset.range p.1))
-    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.1 * ((encDeclaredCNF p).length + 1) ^ e₀)
+    (hspec : ∀ p : DeclaredCNF, CNF.validDeclaredInput k p.numVars p.formula = true →
+      countDecl p = p.formula.modelCountOn (Finset.range p.numVars))
+    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.numVars * ((encDeclaredCNF p).length + 1) ^ e₀)
     (hS₀ : ∀ p, S₀ p ≤ ((encDeclaredCNF p).length + 1) ^ b₀) :
     ∃ (count : SetSplittingInstance → ℕ) (e b : ℕ),
       (∀ x : SetSplittingInstance,
@@ -595,12 +629,12 @@ theorem exists_setSplittingCounter_of_declaredCounter (k : ℕ)
 `n = G.numVars`)**: any declared `k`-CNF counter with monotone exponent `E` counts preimages of
 `k`-local Boolean maps in time `2 ^ E q.1.numVars * (|q| + 1) ^ e` and polynomial space. -/
 theorem exists_localMapPreimageCounter_of_declaredCounter (k : ℕ)
-    {countDecl : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {T₀ S₀ : DeclaredCSP SelfDualThreeSAT.SignPattern → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
+    {countDecl : DeclaredCNF → ℕ} {T₀ S₀ : DeclaredCNF → ℕ} {E : ℕ → ℕ} (hE : Monotone E)
     {e₀ b₀ : ℕ}
     (hcount : ComputableInO countDecl encDeclaredCNF encNat T₀ S₀)
-    (hspec : ∀ p : DeclaredCSP SelfDualThreeSAT.SignPattern, CNF.validDeclaredInput k p.1 p.2 = true →
-      countDecl p = p.2.modelCountOn (Finset.range p.1))
-    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.1 * ((encDeclaredCNF p).length + 1) ^ e₀)
+    (hspec : ∀ p : DeclaredCNF, CNF.validDeclaredInput k p.numVars p.formula = true →
+      countDecl p = p.formula.modelCountOn (Finset.range p.numVars))
+    (hT₀ : ∀ p, T₀ p ≤ 2 ^ E p.numVars * ((encDeclaredCNF p).length + 1) ^ e₀)
     (hS₀ : ∀ p, S₀ p ≤ ((encDeclaredCNF p).length + 1) ^ b₀) :
     ∃ (count : LocalMap × List Bool → ℕ) (e b : ℕ),
       (∀ q : LocalMap × List Bool,

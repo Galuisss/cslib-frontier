@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Complexity.Classes.NP.Witness
+public import CslibFrontier.Computability.Complexity.Problems.SAT.Declared
 public import CslibFrontier.Computability.Complexity.Problems.SAT.PolyTime
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
 public import CslibFrontier.Logics.Propositional.CNF.GraphCountingEncodings
@@ -233,8 +234,9 @@ theorem computableInPolyTime_distinctGround :
   CNF.setSplittingCNF x.sets
 
 /-- Dense declared-variable CNF compilation on `n = |ground.toFinset|` variables. -/
-@[expose] def toDeclaredCNF (x : SetSplittingInstance) : ℕ × CNF ℕ :=
-  (x.distinctGround.length, x.toCNF.relabel x.distinctGround.idxOf)
+@[expose] def toDeclaredCNF (x : SetSplittingInstance) : DeclaredCNF where
+  numVars := x.distinctGround.length
+  formula := x.toCNF.relabel x.distinctGround.idxOf
 
 /-- Every clause of `x.toCNF` has length at most `k` when every set in `x.sets` has length at most
 `k`. -/
@@ -245,10 +247,10 @@ theorem length_le_of_mem_toCNF {k : ℕ} {x : SetSplittingInstance}
     or_false] at hc
   obtain ⟨s, hs, rfl | rfl⟩ := hc <;> simp only [List.length_map] <;> exact hk s hs
 
-/-- Every clause of `(x.toDeclaredCNF).2` has length at most `k` when every set has length at most
-`k`. -/
+/-- Every clause of `x.toDeclaredCNF.formula` has length at most `k` when every set has length at
+most `k`. -/
 theorem length_le_of_mem_toDeclaredCNF {k : ℕ} {x : SetSplittingInstance}
-    (hk : ∀ s ∈ x.sets, s.length ≤ k) {c : Clause ℕ} (hc : c ∈ (x.toDeclaredCNF).2) :
+    (hk : ∀ s ∈ x.sets, s.length ≤ k) {c : Clause ℕ} (hc : c ∈ x.toDeclaredCNF.formula) :
     c.length ≤ k := by
   simp only [toDeclaredCNF, CNF.relabel, Clause.relabel, List.mem_map] at hc
   obtain ⟨c₀, hc₀, rfl⟩ := hc
@@ -300,7 +302,7 @@ theorem modelCountOn_toCNF {x : SetSplittingInstance} (hx : x.Valid) :
 /-- Under `x.Valid`, `idxOf` maps every occurring variable of `x.toCNF` into
 `Finset.range x.distinctGround.length`. -/
 theorem vars_toDeclaredCNF_subset {x : SetSplittingInstance} (hx : x.Valid) :
-    (x.toDeclaredCNF).2.vars.toFinset ⊆ Finset.range x.distinctGround.length := by
+    x.toDeclaredCNF.formula.vars.toFinset ⊆ Finset.range x.distinctGround.length := by
   intro i hi
   rw [toDeclaredCNF, List.mem_toFinset, CNF.vars_relabel, List.mem_map] at hi
   obtain ⟨v, hv, rfl⟩ := hi
@@ -311,21 +313,21 @@ theorem vars_toDeclaredCNF_subset {x : SetSplittingInstance} (hx : x.Valid) :
 
 theorem validDeclaredInput_toDeclaredCNF {k : ℕ} {x : SetSplittingInstance}
     (hx : x.maxSetSizeBool k = true) :
-    CNF.validDeclaredInput k (x.toDeclaredCNF).1 (x.toDeclaredCNF).2 = true := by
+    CNF.validDeclaredInput k x.toDeclaredCNF.numVars x.toDeclaredCNF.formula = true := by
   obtain ⟨hval, hk⟩ := (maxSetSizeBool_eq_true_iff k x).mp hx
   exact CNF.validDeclaredInput_eq_true_iff.mpr
     ⟨fun _ hc => length_le_of_mem_toDeclaredCNF hk hc, vars_toDeclaredCNF_subset hval⟩
 
 /-- **Exact model count of `x.toDeclaredCNF` on `Finset.range |U|` equals `x.count`.** -/
 theorem modelCountOn_toDeclaredCNF {x : SetSplittingInstance} (hx : x.Valid) :
-    (x.toDeclaredCNF).2.modelCountOn (Finset.range (x.toDeclaredCNF).1) = x.count := by
+    x.toDeclaredCNF.formula.modelCountOn (Finset.range x.toDeclaredCNF.numVars) = x.count := by
   have hinj : Set.InjOn x.distinctGround.idxOf {v | v ∈ x.toCNF.vars} := by
     intro u hu v hv huv
     have hu' : u ∈ x.distinctGround :=
       mem_distinctGround.mpr
         (List.mem_toFinset.mp (vars_toCNF_subset hx (List.mem_toFinset.mpr hu)))
     exact (List.idxOf_inj hu').mp huv
-  have hnum : (x.toDeclaredCNF).2.numVars = x.toCNF.numVars := by
+  have hnum : x.toDeclaredCNF.formula.numVars = x.toCNF.numVars := by
     rw [CNF.numVars, toDeclaredCNF, CNF.vars_relabel]
     have hmap : (x.toCNF.vars.map x.distinctGround.idxOf).toFinset =
         x.toCNF.vars.toFinset.image x.distinctGround.idxOf := by
@@ -334,9 +336,9 @@ theorem modelCountOn_toDeclaredCNF {x : SetSplittingInstance} (hx : x.Valid) :
     rw [hmap]
     exact Finset.card_image_of_injOn fun u hu v hv h =>
       hinj (List.mem_toFinset.mp hu) (List.mem_toFinset.mp hv) h
-  have hmc : (x.toDeclaredCNF).2.modelCount = x.toCNF.modelCount :=
+  have hmc : x.toDeclaredCNF.formula.modelCount = x.toCNF.modelCount :=
     CNF.modelCount_relabel_of_injOn x.toCNF hinj
-  have hdecl : (x.toDeclaredCNF).1 = x.distinctGround.length := rfl
+  have hdecl : x.toDeclaredCNF.numVars = x.distinctGround.length := rfl
   rw [hdecl, CNF.modelCountOn_eq_mul_modelCount _ _ (vars_toDeclaredCNF_subset hx),
     Finset.card_range, hnum, hmc, length_distinctGround,
     ← CNF.modelCountOn_eq_mul_modelCount x.toCNF x.ground.toFinset (vars_toCNF_subset hx),
@@ -349,46 +351,44 @@ theorem computableInPolyTime_toCNF :
   unfold toCNF CNF.setSplittingCNF
   fun_prop
 
-/-- Compiling `x` to `(x.distinctGround.length, x.toDeclaredCNF.2)` is polynomial-time. -/
+/-- Compiling `x` to `x.toDeclaredCNF` is polynomial-time. -/
 @[fun_prop]
 theorem computableInPolyTime_toDeclaredCNF :
-    ComputableInPolyTime toDeclaredCNF encSetSplitting (encPair encUnary encCNF) := by
+    ComputableInPolyTime toDeclaredCNF encSetSplitting encDeclaredCNF := by
   have hlen : ComputableInPolyTime (fun x : SetSplittingInstance => x.distinctGround.length)
       encSetSplitting encUnary :=
-    (ComputableTidilyInPolyTime.length encNat).computableInPolyTime.comp
-      computableInPolyTime_distinctGround
-  have hvar : ComputableTidilyInPolyTime
+    (ComputableInPolyTime.length encNat).comp computableInPolyTime_distinctGround
+  have hvar : ComputableInPolyTime
       (fun p : SetSplittingInstance × ℕ => p.1.distinctGround.idxOf p.2)
       (encPair encSetSplitting encNat) encNat :=
-    ComputableTidilyInPolyTime.unary_to_binary.comp
-      (ComputableTidilyInPolyTime.idxOfWithInput
-        (computableInPolyTime_distinctGround.comp (ComputableInPolyTime.fst _ _)).tidy
-        (ComputableTidilyInPolyTime.snd _ _))
-  have hlit : ComputableTidilyInPolyTime
+    ComputableInPolyTime.unary_to_binary.comp
+      (ComputableInPolyTime.idxOfWithInput
+        (computableInPolyTime_distinctGround.comp (ComputableInPolyTime.fst _ _))
+        (ComputableInPolyTime.snd _ _))
+  have hlit : ComputableInPolyTime
       (fun p : (SetSplittingInstance × Clause ℕ) × Literal ℕ =>
         (p.1.1.distinctGround.idxOf p.2.1, p.2.2))
       (encPair (encPair encSetSplitting (encClause encNat)) (encPair encNat encBool))
       (encPair encNat encBool) := by
-    have hv : ComputableTidilyInPolyTime
+    have hv : ComputableInPolyTime
         (fun p : (SetSplittingInstance × Clause ℕ) × Literal ℕ =>
           p.1.1.distinctGround.idxOf p.2.1)
         (encPair (encPair encSetSplitting (encClause encNat)) (encPair encNat encBool)) encNat :=
       hvar.comp
-        (((ComputableTidilyInPolyTime.fst _ _).comp (ComputableTidilyInPolyTime.fst _ _)).prod
-          ((ComputableTidilyInPolyTime.fst _ _).comp (ComputableTidilyInPolyTime.snd _ _)))
+        (((ComputableInPolyTime.fst _ _).comp (ComputableInPolyTime.fst _ _)).prod
+          ((ComputableInPolyTime.fst _ _).comp (ComputableInPolyTime.snd _ _)))
     fun_prop
-  have hclause : ComputableTidilyInPolyTime
+  have hclause : ComputableInPolyTime
       (fun p : SetSplittingInstance × Clause ℕ =>
         p.2.map fun l => (p.1.distinctGround.idxOf l.1, l.2))
       (encPair encSetSplitting (encClause encNat)) (encClause encNat) :=
-    ComputableTidilyInPolyTime.mapWithInput (ComputableTidilyInPolyTime.snd _ _) hlit
+    ComputableInPolyTime.mapWithInput (ComputableInPolyTime.snd _ _) hlit
   have hcnf : ComputableInPolyTime
       (fun x : SetSplittingInstance => x.toCNF.relabel x.distinctGround.idxOf)
       encSetSplitting encCNF := by
     unfold CNF.relabel Clause.relabel Prod.map
-    exact (ComputableTidilyInPolyTime.mapWithInput
-      computableInPolyTime_toCNF.tidy hclause).computableInPolyTime
-  exact hlen.prod hcnf
+    exact ComputableInPolyTime.mapWithInput computableInPolyTime_toCNF hclause
+  exact encDeclaredCNF_mk_polyTime hlen hcnf
 
 end SetSplittingInstance
 

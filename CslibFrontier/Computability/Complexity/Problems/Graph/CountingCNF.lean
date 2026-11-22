@@ -117,13 +117,12 @@ theorem modelCount_toIndepSetCNF (G : Graph) :
     Graph.induced_adj.trans Graph.toSimpleGraph_adj
 
 private theorem computableInPolyTime_edgePairs :
-    ComputableInPolyTime (fun G : Graph => CNF.edgePairs G.1 G.2)
+    ComputableInPolyTime (fun G : Graph => CNF.edgePairs G.vertices G.edges)
       encGraph (encList (encPair encNat encNat)) := by
   have h : ComputableInPolyTime
-      (fun G : Graph => G.2.filter fun e =>
-        decide (e.1 ∈ G.1) && decide (e.2 ∈ G.1) && decide (e.1 ≠ e.2))
+      (fun G : Graph => G.edges.filter fun e =>
+        decide (e.1 ∈ G.vertices) && decide (e.2 ∈ G.vertices) && decide (e.1 ≠ e.2))
       encGraph (encList (encPair encNat encNat)) := by
-    unfold encGraph
     fun_prop
   refine h.of_enc_eq fun G => congrArg (encList (encPair encNat encNat)) ?_
   simp only [CNF.edgePairs, Bool.decide_and, Bool.and_assoc]
@@ -340,112 +339,111 @@ theorem modelCountOn_toColoringCNF (q : ℕ) (G : Graph) :
       Nat.card (G.induced.Coloring (Fin q)) := by
   rw [← vars_toColoringCNF, CNF.modelCountOn_vars, modelCount_toColoringCNF]
 
-private theorem tidy_coloringVar (q c : ℕ) :
-    ComputableTidilyInPolyTime (fun p : Graph × ℕ => coloringVar q p.1 (p.2, c))
+private theorem polyTime_coloringVar (q c : ℕ) :
+    ComputableInPolyTime (fun p : Graph × ℕ => coloringVar q p.1 (p.2, c))
       (encPair encGraph encNat) encNat := by
   unfold coloringVar
-  have hidx : ComputableTidilyInPolyTime
+  have hidx : ComputableInPolyTime
       (fun p : Graph × ℕ => p.1.distinctVertices.idxOf p.2)
       (encPair encGraph encNat) encUnary :=
-    ComputableTidilyInPolyTime.idxOfWithInput
+    ComputableInPolyTime.idxOfWithInput
       (Graph.computableInPolyTime_distinctVertices.comp
-        (ComputableInPolyTime.fst encGraph encNat)).tidy
-      (ComputableTidilyInPolyTime.snd encGraph encNat)
-  have hmul : ComputableTidilyInPolyTime
+        (ComputableInPolyTime.fst encGraph encNat))
+      (ComputableInPolyTime.snd encGraph encNat)
+  have hmul : ComputableInPolyTime
       (fun p : Graph × ℕ => q * p.1.distinctVertices.idxOf p.2 + c)
       (encPair encGraph encNat) encUnary :=
-    ComputableTidilyInPolyTime.unary_add.comp
-      ((ComputableTidilyInPolyTime.unary_mul.comp
-        ((ComputableTidilyInPolyTime.const q).prod hidx)).prod
-        (ComputableTidilyInPolyTime.const c))
-  exact ComputableTidilyInPolyTime.unary_to_binary.comp hmul
+    ComputableInPolyTime.unary_add.comp
+      ((ComputableInPolyTime.unary_mul.comp
+        ((ComputableInPolyTime.const q).prod hidx)).prod
+        (ComputableInPolyTime.const c))
+  exact ComputableInPolyTime.unary_to_binary.comp hmul
 
-private theorem tidy_coloringVertexClauses (q : ℕ) :
-    ComputableTidilyInPolyTime
+private theorem polyTime_coloringVertexClauses (q : ℕ) :
+    ComputableInPolyTime
       (fun p : Graph × ℕ =>
         ([(List.range q).map fun c => (coloringVar q p.1 (p.2, c), true)] : CNF ℕ) ++
           (List.range q).flatMap fun c₁ =>
             ((List.range q).filter fun c₂ => decide (c₁ ≠ c₂)).map fun c₂ =>
               [(coloringVar q p.1 (p.2, c₁), false), (coloringVar q p.1 (p.2, c₂), false)])
       (encPair encGraph encNat) encCNF := by
-  have hal : ComputableTidilyInPolyTime
+  have hal : ComputableInPolyTime
       (fun p : Graph × ℕ => (List.range q).map fun c => (coloringVar q p.1 (p.2, c), true))
       (encPair encGraph encNat) (encClause encNat) :=
-    ComputableTidilyInPolyTime.mapConst (List.range q) fun c _ =>
-      (tidy_coloringVar q c).prod (ComputableTidilyInPolyTime.const true)
-  have hamo : ComputableTidilyInPolyTime
+    ComputableInPolyTime.mapConst (List.range q) fun c _ =>
+      (polyTime_coloringVar q c).prod (ComputableInPolyTime.const true)
+  have hamo : ComputableInPolyTime
       (fun p : Graph × ℕ =>
         (List.range q).flatMap fun c₁ =>
           ((List.range q).filter fun c₂ => decide (c₁ ≠ c₂)).map fun c₂ =>
             [(coloringVar q p.1 (p.2, c₁), false), (coloringVar q p.1 (p.2, c₂), false)])
       (encPair encGraph encNat) encCNF :=
-    ComputableTidilyInPolyTime.flatMapConst (List.range q) fun c₁ _ =>
-      ComputableTidilyInPolyTime.mapConst ((List.range q).filter fun c₂ => decide (c₁ ≠ c₂))
+    ComputableInPolyTime.flatMapConst (List.range q) fun c₁ _ =>
+      ComputableInPolyTime.mapConst ((List.range q).filter fun c₂ => decide (c₁ ≠ c₂))
         fun c₂ _ =>
-          ((tidy_coloringVar q c₁).prod (ComputableTidilyInPolyTime.const false)).cons'
-            (((tidy_coloringVar q c₂).prod (ComputableTidilyInPolyTime.const false)).cons'
-              (ComputableTidilyInPolyTime.const ([] : Clause ℕ)))
-  exact (ComputableTidilyInPolyTime.listAppend (encClause encNat)).comp
-    ((hal.cons' (ComputableTidilyInPolyTime.const ([] : CNF ℕ))).prod hamo)
+          ((polyTime_coloringVar q c₁).prod (ComputableInPolyTime.const false)).cons'
+            (((polyTime_coloringVar q c₂).prod (ComputableInPolyTime.const false)).cons'
+              (ComputableInPolyTime.const ([] : Clause ℕ)))
+  exact (ComputableInPolyTime.listAppend (encClause encNat)).comp
+    ((hal.cons' (ComputableInPolyTime.const ([] : CNF ℕ))).prod hamo)
 
-private theorem tidy_coloringEdgeVar1 (q c : ℕ) :
-    ComputableTidilyInPolyTime (fun p : Graph × ℕ × ℕ => coloringVar q p.1 (p.2.1, c))
+private theorem polyTime_coloringEdgeVar1 (q c : ℕ) :
+    ComputableInPolyTime (fun p : Graph × ℕ × ℕ => coloringVar q p.1 (p.2.1, c))
       (encPair encGraph (encPair encNat encNat)) encNat :=
-  (tidy_coloringVar q c).comp
-    ((ComputableTidilyInPolyTime.fst encGraph (encPair encNat encNat)).prod
-      (ComputableTidilyInPolyTime.snd encGraph (encPair encNat encNat)).fst')
+  (polyTime_coloringVar q c).comp
+    ((ComputableInPolyTime.fst encGraph (encPair encNat encNat)).prod
+      (ComputableInPolyTime.snd encGraph (encPair encNat encNat)).fst')
 
-private theorem tidy_coloringEdgeVar2 (q c : ℕ) :
-    ComputableTidilyInPolyTime (fun p : Graph × ℕ × ℕ => coloringVar q p.1 (p.2.2, c))
+private theorem polyTime_coloringEdgeVar2 (q c : ℕ) :
+    ComputableInPolyTime (fun p : Graph × ℕ × ℕ => coloringVar q p.1 (p.2.2, c))
       (encPair encGraph (encPair encNat encNat)) encNat :=
-  (tidy_coloringVar q c).comp
-    ((ComputableTidilyInPolyTime.fst encGraph (encPair encNat encNat)).prod
-      (ComputableTidilyInPolyTime.snd encGraph (encPair encNat encNat)).snd')
+  (polyTime_coloringVar q c).comp
+    ((ComputableInPolyTime.fst encGraph (encPair encNat encNat)).prod
+      (ComputableInPolyTime.snd encGraph (encPair encNat encNat)).snd')
 
-private theorem tidy_coloringEdgeClauses (q : ℕ) :
-    ComputableTidilyInPolyTime
+private theorem polyTime_coloringEdgeClauses (q : ℕ) :
+    ComputableInPolyTime
       (fun p : Graph × ℕ × ℕ =>
         (List.range q).map fun c =>
           [(coloringVar q p.1 (p.2.1, c), false), (coloringVar q p.1 (p.2.2, c), false)])
       (encPair encGraph (encPair encNat encNat)) encCNF :=
-  ComputableTidilyInPolyTime.mapConst (List.range q) fun c _ =>
-    ((tidy_coloringEdgeVar1 q c).prod (ComputableTidilyInPolyTime.const false)).cons'
-      (((tidy_coloringEdgeVar2 q c).prod (ComputableTidilyInPolyTime.const false)).cons'
-        (ComputableTidilyInPolyTime.const ([] : Clause ℕ)))
+  ComputableInPolyTime.mapConst (List.range q) fun c _ =>
+    ((polyTime_coloringEdgeVar1 q c).prod (ComputableInPolyTime.const false)).cons'
+      (((polyTime_coloringEdgeVar2 q c).prod (ComputableInPolyTime.const false)).cons'
+        (ComputableInPolyTime.const ([] : Clause ℕ)))
 
 /-- Constructing `G.toColoringCNF q` from `encGraph` is polynomial-time for every fixed `q`. -/
 @[fun_prop]
 theorem computableInPolyTime_toColoringCNF (q : ℕ) :
     ComputableInPolyTime (toColoringCNF q) encGraph encCNF := by
-  have hpart1 : ComputableTidilyInPolyTime
-      (fun G : Graph => G.1.flatMap fun v =>
+  have hpart1 : ComputableInPolyTime
+      (fun G : Graph => G.vertices.flatMap fun v =>
         [List.map (fun c => (coloringVar q G (v, c), true)) (List.range q)] ++
           (List.range q).flatMap fun c₁ =>
             ((List.range q).filter fun c₂ => decide (c₁ ≠ c₂)).map fun c₂ =>
               [(coloringVar q G (v, c₁), false), (coloringVar q G (v, c₂), false)])
       encGraph encCNF :=
-    ComputableTidilyInPolyTime.flatMapWithInput
-      (Graph.computableInPolyTime_fst ComputableInPolyTime.id').tidy (tidy_coloringVertexClauses q)
-  have hpart2 : ComputableTidilyInPolyTime
-      (fun G : Graph => (CNF.edgePairs G.1 G.2).flatMap fun e =>
+    ComputableInPolyTime.flatMapWithInput
+      (encGraph_vertices_polyTime ComputableInPolyTime.id') (polyTime_coloringVertexClauses q)
+  have hpart2 : ComputableInPolyTime
+      (fun G : Graph => (CNF.edgePairs G.vertices G.edges).flatMap fun e =>
         (List.range q).map fun c =>
           [(coloringVar q G (e.1, c), false), (coloringVar q G (e.2, c), false)])
       encGraph encCNF :=
-    ComputableTidilyInPolyTime.flatMapWithInput
-      computableInPolyTime_edgePairs.tidy (tidy_coloringEdgeClauses q)
+    ComputableInPolyTime.flatMapWithInput
+      computableInPolyTime_edgePairs (polyTime_coloringEdgeClauses q)
   have hcomb : ComputableInPolyTime
       (fun G : Graph =>
-        (G.1.flatMap fun v =>
+        (G.vertices.flatMap fun v =>
           [List.map (fun c => (coloringVar q G (v, c), true)) (List.range q)] ++
             (List.range q).flatMap fun c₁ =>
               ((List.range q).filter fun c₂ => decide (c₁ ≠ c₂)).map fun c₂ =>
                 [(coloringVar q G (v, c₁), false), (coloringVar q G (v, c₂), false)]) ++
-        ((CNF.edgePairs G.1 G.2).flatMap fun e =>
+        ((CNF.edgePairs G.vertices G.edges).flatMap fun e =>
           (List.range q).map fun c =>
             [(coloringVar q G (e.1, c), false), (coloringVar q G (e.2, c), false)]))
       encGraph encCNF :=
-    (ComputableTidilyInPolyTime.listAppend (encClause encNat)).computableInPolyTime.comp
-      (hpart1.prod hpart2).computableInPolyTime
+    (ComputableInPolyTime.listAppend (encClause encNat)).comp (hpart1.prod hpart2)
   refine hcomb.of_enc_eq fun G => congrArg encCNF ?_
   simp only [toColoringCNF, CNF.coloringCNF, CNF.relabel, Clause.relabel, CNF.exactlyOne,
     CNF.atLeastOne, CNF.atMostOne, List.map_append, List.map_flatMap, List.map_cons,
@@ -470,13 +468,14 @@ the positions `i < G.edgeList.length` of edges incident to `v`. -/
       Graph.incident (G.edgeList.getD i (0, 0)) v
 
 /-- Linear-size sequential exact-one De Morgan gate list and output wire for `G`. -/
-@[expose] def perfectMatchingCircuit (G : Graph) : List (Op × List ℕ) × ℕ :=
+@[expose] def perfectMatchingCircuit (G : Graph) : ExactOneCircuitResult :=
   seqExactlyOneAll G.edgeList.length G.perfectMatchingWires
 
 /-- **Width-`3` CNF encoding of perfect matchings** via sequential exact-one De Morgan circuits
 and Tseitin compilation: exact clause width `3` and `O(|V| + |E|)` variables and clauses. -/
 @[expose] def toPerfectMatchingCNF (G : Graph) : CNF ℕ :=
-  tseitinSatCNF [] G.edgeList.length G.perfectMatchingCircuit.1 G.perfectMatchingCircuit.2
+  tseitinSatCNF [] G.edgeList.length G.perfectMatchingCircuit.gates
+    G.perfectMatchingCircuit.outWire
 
 /-- Every clause of `G.toPerfectMatchingCNF` has exact width `3`. -/
 theorem length_clause_toPerfectMatchingCNF {G : Graph} {c : Clause ℕ}
@@ -512,10 +511,10 @@ theorem sum_length_perfectMatchingWires_le (G : Graph) :
 
 /-- Number of gates in `G.perfectMatchingCircuit` is `O(|V| + |E|)`. -/
 theorem length_perfectMatchingCircuit_le (G : Graph) :
-    G.perfectMatchingCircuit.1.length ≤
-      1 + 4 * G.1.toFinset.card + 6 * G.edgeList.length := by
+    G.perfectMatchingCircuit.gates.length ≤
+      1 + 4 * G.vertices.toFinset.card + 6 * G.edgeList.length := by
   rw [perfectMatchingCircuit, length_seqExactlyOneAll]
-  have hwlen : G.perfectMatchingWires.length = G.1.toFinset.card := by
+  have hwlen : G.perfectMatchingWires.length = G.vertices.toFinset.card := by
     rw [perfectMatchingWires, List.length_map, Graph.length_distinctVertices]
   have hsum := sum_length_perfectMatchingWires_le G
   omega
@@ -523,26 +522,26 @@ theorem length_perfectMatchingCircuit_le (G : Graph) :
 /-- Number of clauses of `G.toPerfectMatchingCNF` is linear: `≤ 4 + 12 |V| + 18 |E|`. -/
 theorem length_toPerfectMatchingCNF_le (G : Graph) :
     G.toPerfectMatchingCNF.length ≤
-      4 + 12 * G.1.toFinset.card + 18 * G.edgeList.length := by
+      4 + 12 * G.vertices.toFinset.card + 18 * G.edgeList.length := by
   rw [toPerfectMatchingCNF, length_tseitinSatCNF, List.length_nil]
   have h := length_perfectMatchingCircuit_le G
   omega
 
 theorem vars_toPerfectMatchingCNF_subset (G : Graph) :
     G.toPerfectMatchingCNF.vars.toFinset ⊆
-      Finset.range (G.edgeList.length + G.perfectMatchingCircuit.1.length) := by
+      Finset.range (G.edgeList.length + G.perfectMatchingCircuit.gates.length) := by
   have hcode := isCodeFrom_seqExactlyOneAll G.edgeList.length (mem_perfectMatchingWires_lt G)
   have ho := snd_lt_seqExactlyOneAll G.edgeList.length (mem_perfectMatchingWires_lt G)
-  have hpos : 0 < G.edgeList.length + G.perfectMatchingCircuit.1.length := by
+  have hpos : 0 < G.edgeList.length + G.perfectMatchingCircuit.gates.length := by
     simp [perfectMatchingCircuit, length_seqExactlyOneAll]
   exact vars_tseitinSatCNF_subset hcode ho hpos
 
 /-- Variable count of `G.toPerfectMatchingCNF` is linear: `≤ 1 + 4 |V| + 7 |E|`. -/
 theorem numVars_toPerfectMatchingCNF_le (G : Graph) :
     G.toPerfectMatchingCNF.numVars ≤
-      1 + 4 * G.1.toFinset.card + 7 * G.edgeList.length := by
+      1 + 4 * G.vertices.toFinset.card + 7 * G.edgeList.length := by
   have h1 : G.toPerfectMatchingCNF.numVars ≤
-      G.edgeList.length + G.perfectMatchingCircuit.1.length :=
+      G.edgeList.length + G.perfectMatchingCircuit.gates.length :=
     (Finset.card_le_card (vars_toPerfectMatchingCNF_subset G)).trans_eq (Finset.card_range _)
   have h2 := length_perfectMatchingCircuit_le G
   omega
@@ -551,7 +550,7 @@ theorem numVars_toPerfectMatchingCNF_le (G : Graph) :
 theorem numVars_toPerfectMatchingCNF_le_enc (G : Graph) :
     G.toPerfectMatchingCNF.numVars ≤ 7 * (encGraph G).length + 1 := by
   have h1 := numVars_toPerfectMatchingCNF_le G
-  have h2 := G.1.toFinset_card_le
+  have h2 := G.vertices.toFinset_card_le
   have h3 := length_edgeList_le G
   have h4 := Graph.length_vertices_add_length_edges_le_encGraph G
   omega
@@ -559,10 +558,10 @@ theorem numVars_toPerfectMatchingCNF_le_enc (G : Graph) :
 /-- Explicit bijection between declared-range models of `G.toPerfectMatchingCNF` and perfect
 matchings of `G.induced`. -/
 noncomputable def perfectMatchingCNFEquiv (G : Graph) :
-    {σ : Finset.range (G.edgeList.length + G.perfectMatchingCircuit.1.length) → Bool //
+    {σ : Finset.range (G.edgeList.length + G.perfectMatchingCircuit.gates.length) → Bool //
       G.toPerfectMatchingCNF.eval
         (fun w =>
-          if hw : w ∈ Finset.range (G.edgeList.length + G.perfectMatchingCircuit.1.length) then
+          if hw : w ∈ Finset.range (G.edgeList.length + G.perfectMatchingCircuit.gates.length) then
             σ ⟨w, hw⟩
           else false) = true} ≃
       {M : G.induced.Subgraph // M.IsPerfectMatching} := by
@@ -570,9 +569,10 @@ noncomputable def perfectMatchingCNFEquiv (G : Graph) :
   have ho := snd_lt_seqExactlyOneAll G.edgeList.length (mem_perfectMatchingWires_lt G)
   let e1 := (tseitinSatAssignmentEquiv hcode ho).symm
   let e2 : {x : Fin G.edgeList.length → Bool //
-        evalOutput (List.ofFn x) G.perfectMatchingCircuit.1 G.perfectMatchingCircuit.2 = true} ≃
+        evalOutput (List.ofFn x) G.perfectMatchingCircuit.gates
+          G.perfectMatchingCircuit.outWire = true} ≃
       {S : Finset ℕ // (∀ i ∈ S, i < G.edgeList.length) ∧
-        ∀ v ∈ G.1, ∃! i, i < G.edgeList.length ∧
+        ∀ v ∈ G.vertices, ∃! i, i < G.edgeList.length ∧
           Graph.incident (G.edgeList.getD i (0, 0)) v = true ∧ i ∈ S} :=
     { toFun := fun x =>
         ⟨(Finset.univ.filter fun i : Fin G.edgeList.length => x.1 i = true).map
@@ -643,7 +643,7 @@ noncomputable def perfectMatchingCNFEquiv (G : Graph) :
 equals the number of perfect matchings of `G.induced`. -/
 theorem modelCountOn_toPerfectMatchingCNF (G : Graph) :
     G.toPerfectMatchingCNF.modelCountOn
-        (Finset.range (G.edgeList.length + G.perfectMatchingCircuit.1.length)) =
+        (Finset.range (G.edgeList.length + G.perfectMatchingCircuit.gates.length)) =
       Nat.card {M : G.induced.Subgraph // M.IsPerfectMatching} := by
   classical
   rw [CNF.modelCountOn, ← Nat.card_eq_finsetCard]
@@ -654,19 +654,19 @@ theorem modelCountOn_toPerfectMatchingCNF (G : Graph) :
 /-- **Exact model count of `G.toPerfectMatchingCNF`** (`modelCount`), preserving the number of
 perfect matchings up to unused free wires (and exact equality when every wire occurs). -/
 theorem modelCount_toPerfectMatchingCNF_mul (G : Graph) :
-    2 ^ ((G.edgeList.length + G.perfectMatchingCircuit.1.length) -
+    2 ^ ((G.edgeList.length + G.perfectMatchingCircuit.gates.length) -
         G.toPerfectMatchingCNF.numVars) *
       G.toPerfectMatchingCNF.modelCount =
       Nat.card {M : G.induced.Subgraph // M.IsPerfectMatching} := by
-  rw [← Finset.card_range (G.edgeList.length + G.perfectMatchingCircuit.1.length),
+  rw [← Finset.card_range (G.edgeList.length + G.perfectMatchingCircuit.gates.length),
     ← CNF.modelCountOn_eq_mul_modelCount G.toPerfectMatchingCNF
-      (Finset.range (G.edgeList.length + G.perfectMatchingCircuit.1.length))
+      (Finset.range (G.edgeList.length + G.perfectMatchingCircuit.gates.length))
       (vars_toPerfectMatchingCNF_subset G)]
   exact modelCountOn_toPerfectMatchingCNF G
 
 theorem validDeclaredInput_toPerfectMatchingCNF (G : Graph) :
     CNF.validDeclaredInput 3
-        (G.edgeList.length + G.perfectMatchingCircuit.1.length) G.toPerfectMatchingCNF =
+        (G.edgeList.length + G.perfectMatchingCircuit.gates.length) G.toPerfectMatchingCNF =
       true := by
   rw [CNF.validDeclaredInput_eq_true_iff]
   exact ⟨fun _ hc => (length_clause_toPerfectMatchingCNF hc).le,
@@ -737,25 +737,25 @@ private theorem sum_clauseGateCost_take (wss : List (List ℕ)) (i : ℕ) :
     omega
 
 private theorem seqExactlyOneFold_eq_zipIdx (n base acc : ℕ) (wss : List (List ℕ)) :
-    (seqExactlyOneFold n base acc wss).1 =
+    (seqExactlyOneFold n base acc wss).gates =
       wss.zipIdx.flatMap (fun p =>
         let off := ((wss.take p.2).map fun u => 3 * u.length + 4).sum
         let curBase := base + off
         let curAcc := if p.2 = 0 then acc else n + curBase - 1
         let cl := seqExactlyOneClause n curBase p.1
-        cl.1 ++ [(.and, [curAcc, cl.2])]) ∧
-      (seqExactlyOneFold n base acc wss).2 =
+        cl.gates ++ [(.and, [curAcc, cl.outWire])]) ∧
+      (seqExactlyOneFold n base acc wss).outWire =
         if wss.length = 0 then acc
         else n + base + (wss.map fun u => 3 * u.length + 4).sum - 1 := by
   induction wss generalizing base acc with
   | nil => simp [seqExactlyOneFold]
   | cons ws wss ih =>
     let cl := seqExactlyOneClause n base ws
-    let nextAcc := n + base + cl.1.length
-    have hlen : cl.1.length = 3 * ws.length + 3 := length_seqExactlyOneClause n base ws
-    have hnext : base + cl.1.length + 1 = base + (3 * ws.length + 4) := by omega
+    let nextAcc := n + base + cl.gates.length
+    have hlen : cl.gates.length = 3 * ws.length + 3 := length_seqExactlyOneClause n base ws
+    have hnext : base + cl.gates.length + 1 = base + (3 * ws.length + 4) := by omega
     have hacc : nextAcc = n + (base + (3 * ws.length + 4)) - 1 := by omega
-    obtain ⟨ih1, ih2⟩ := ih (base + cl.1.length + 1) nextAcc
+    obtain ⟨ih1, ih2⟩ := ih (base + cl.gates.length + 1) nextAcc
     rw [seqExactlyOneFold]
     refine ⟨?_, ?_⟩
     · rw [ih1, List.zipIdx_cons', List.flatMap_cons, List.flatMap_map]
@@ -767,12 +767,12 @@ private theorem seqExactlyOneFold_eq_zipIdx (n base acc : ℕ) (wss : List (List
         Nat.add_eq_zero_iff, one_ne_zero, and_false, ↓reduceIte]
       have hadd1 : base + (3 * ws.length + 4 +
           ((wss.take j).map fun u => 3 * u.length + 4).sum) =
-          base + cl.1.length + 1 + ((wss.take j).map fun u => 3 * u.length + 4).sum := by
+          base + cl.gates.length + 1 + ((wss.take j).map fun u => 3 * u.length + 4).sum := by
         omega
       rw [hadd1]
       rcases j with _ | k
       · simp only [List.take_zero, List.map_nil, List.sum_nil, Nat.add_zero, ↓reduceIte]
-        have ha : nextAcc = n + (base + cl.1.length + 1) - 1 := by omega
+        have ha : nextAcc = n + (base + cl.gates.length + 1) - 1 := by omega
         rw [ha]
       · simp only [Nat.add_eq_zero_iff, one_ne_zero, and_false, ↓reduceIte]
         rfl
@@ -824,13 +824,11 @@ private theorem tseitinCNF_eq_zipIdx (n : ℕ) (gates : List (Op × List ℕ)) :
     tseitinCNF n gates = gates.zipIdx.flatMap fun p => gateClauses (n + p.2) p.1 := by
   rw [tseitinCNF, list_zipIdx_eq_map_finRange, List.flatMap_map]
 
-private theorem tidy_perfectMatchingWires :
-    ComputableTidilyInPolyTime perfectMatchingWires encGraph (encList (encList encUnary)) := by
-  have h : ComputableInPolyTime perfectMatchingWires encGraph (encList (encList encUnary)) := by
-    have hE := computableInPolyTime_edgeList
-    unfold perfectMatchingWires Graph.incident
-    fun_prop
-  exact h.tidy
+private theorem polyTime_perfectMatchingWires :
+    ComputableInPolyTime perfectMatchingWires encGraph (encList (encList encUnary)) := by
+  have hE := computableInPolyTime_edgeList
+  unfold perfectMatchingWires Graph.incident
+  fun_prop
 
 private def seqStepClosed (nw s1 s2 : ℕ) (ws : List ℕ) : List (Op × List ℕ) :=
   ws.zipIdx.flatMap fun p =>
@@ -839,72 +837,70 @@ private def seqStepClosed (nw s1 s2 : ℕ) (ws : List ℕ) : List (Op × List �
     let a2 := if p.2 = 0 then s2 else nw' - 2
     [(.and, [a1, p.1]), (.or, [a2, nw']), (.or, [a1, p.1])]
 
-private theorem tidy_seqStepClosed :
-    ComputableTidilyInPolyTime
+private theorem polyTime_seqStepClosed :
+    ComputableInPolyTime
       (fun q : ((ℕ × ℕ) × ℕ) × List ℕ => seqStepClosed q.1.1.1 q.1.1.2 q.1.2 q.2)
       (encPair (encPair (encPair encUnary encUnary) encUnary) (encList encUnary))
       (encList encGate) := by
   let E0 := encPair (encPair (encPair encUnary encUnary) encUnary) (encList encUnary)
   let E := encPair E0 (encPair encUnary encUnary)
-  have hzip : ComputableTidilyInPolyTime
+  have hzip : ComputableInPolyTime
       (fun q : ((ℕ × ℕ) × ℕ) × List ℕ => q.2.zipIdx)
       E0 (encList (encPair encUnary encUnary)) :=
-    (ComputableTidilyInPolyTime.zipIdx encUnary).comp
-      (ComputableTidilyInPolyTime.snd (encPair (encPair encUnary encUnary) encUnary)
+    (ComputableInPolyTime.zipIdx encUnary).comp
+      (ComputableInPolyTime.snd (encPair (encPair encUnary encUnary) encUnary)
         (encList encUnary))
-  have hq0 := ComputableTidilyInPolyTime.fst E0 (encPair encUnary encUnary)
-  have hqNw : ComputableTidilyInPolyTime
+  have hq0 := ComputableInPolyTime.fst E0 (encPair encUnary encUnary)
+  have hqNw : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) => q.1.1.1.1) E encUnary :=
     hq0.fst'.fst'.fst'
-  have hqS1 : ComputableTidilyInPolyTime
+  have hqS1 : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) => q.1.1.1.2) E encUnary :=
     hq0.fst'.fst'.snd'
-  have hqS2 : ComputableTidilyInPolyTime
+  have hqS2 : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) => q.1.1.2) E encUnary :=
     hq0.fst'.snd'
-  have hqWire : ComputableTidilyInPolyTime
+  have hqWire : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) => q.2.1) E encUnary :=
-    (ComputableTidilyInPolyTime.snd E0 (encPair encUnary encUnary)).fst'
-  have hqIdx : ComputableTidilyInPolyTime
+    (ComputableInPolyTime.snd E0 (encPair encUnary encUnary)).fst'
+  have hqIdx : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) => q.2.2) E encUnary :=
-    (ComputableTidilyInPolyTime.snd E0 (encPair encUnary encUnary)).snd'
-  have hnwU : ComputableTidilyInPolyTime
+    (ComputableInPolyTime.snd E0 (encPair encUnary encUnary)).snd'
+  have hnwU : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) => q.1.1.1.1 + 3 * q.2.2) E encUnary :=
-    ComputableTidilyInPolyTime.unary_add.comp
-      (hqNw.prod (ComputableTidilyInPolyTime.unary_mul.comp
-        ((ComputableTidilyInPolyTime.const 3).prod hqIdx)))
-  have hnw : ComputableTidilyInPolyTime
+    ComputableInPolyTime.unary_add.comp
+      (hqNw.prod (ComputableInPolyTime.unary_mul.comp
+        ((ComputableInPolyTime.const 3).prod hqIdx)))
+  have hnw : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) => q.1.1.1.1 + 3 * q.2.2) E encNat :=
-    ComputableTidilyInPolyTime.unary_to_binary.comp hnwU
-  have hzero : ComputableTidilyInPolyTime
+    ComputableInPolyTime.unary_to_binary.comp hnwU
+  have hzero : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) => decide (q.2.2 = 0)) E encBool :=
-    (ComputableInPolyTime.decide_eq' hqIdx.computableInPolyTime
-      (ComputableTidilyInPolyTime.const
-        (encIn := E) (encMid := encUnary) 0).computableInPolyTime).tidy
-  have ha1 : ComputableTidilyInPolyTime
+    ComputableInPolyTime.decide_eq' hqIdx (ComputableInPolyTime.const (encOut := encUnary) 0)
+  have ha1 : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) =>
         if q.2.2 = 0 then q.1.1.1.2 else q.1.1.1.1 + 3 * q.2.2 - 1) E encNat :=
-    ComputableTidilyInPolyTime.unary_to_binary.comp
-      (ComputableTidilyInPolyTime.ite_decide hzero hqS1
-        (ComputableTidilyInPolyTime.unary_sub.comp
-          (hnwU.prod (ComputableTidilyInPolyTime.const 1))))
-  have ha2 : ComputableTidilyInPolyTime
+    ComputableInPolyTime.unary_to_binary.comp
+      (ComputableInPolyTime.ite_decide hzero hqS1
+        (ComputableInPolyTime.unary_sub.comp
+          (hnwU.prod (ComputableInPolyTime.const 1))))
+  have ha2 : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) =>
         if q.2.2 = 0 then q.1.1.2 else q.1.1.1.1 + 3 * q.2.2 - 2) E encNat :=
-    ComputableTidilyInPolyTime.unary_to_binary.comp
-      (ComputableTidilyInPolyTime.ite_decide hzero hqS2
-        (ComputableTidilyInPolyTime.unary_sub.comp
-          (hnwU.prod (ComputableTidilyInPolyTime.const 2))))
-  have hw : ComputableTidilyInPolyTime
+    ComputableInPolyTime.unary_to_binary.comp
+      (ComputableInPolyTime.ite_decide hzero hqS2
+        (ComputableInPolyTime.unary_sub.comp
+          (hnwU.prod (ComputableInPolyTime.const 2))))
+  have hw : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) => q.2.1) E encNat :=
-    ComputableTidilyInPolyTime.unary_to_binary.comp hqWire
+    ComputableInPolyTime.unary_to_binary.comp hqWire
   have hgate (op : Op) {a b : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) → ℕ}
-      (ha : ComputableTidilyInPolyTime a E encNat)
-      (hb : ComputableTidilyInPolyTime b E encNat) :
-      ComputableTidilyInPolyTime (fun q => (op, [a q, b q])) E encGate :=
-    (ComputableTidilyInPolyTime.const op).prod
-      (ha.cons' (hb.cons' (ComputableTidilyInPolyTime.const ([] : List ℕ))))
-  have hitem : ComputableTidilyInPolyTime
+      (ha : ComputableInPolyTime a E encNat)
+      (hb : ComputableInPolyTime b E encNat) :
+      ComputableInPolyTime (fun q => (op, [a q, b q])) E encGate :=
+    (ComputableInPolyTime.const op).prod
+      (ha.cons' (hb.cons' (ComputableInPolyTime.const ([] : List ℕ))))
+  have hitem : ComputableInPolyTime
       (fun q : (((ℕ × ℕ) × ℕ) × List ℕ) × (ℕ × ℕ) =>
         let nw' := q.1.1.1.1 + 3 * q.2.2
         let a1 := if q.2.2 = 0 then q.1.1.1.2 else nw' - 1
@@ -914,85 +910,83 @@ private theorem tidy_seqStepClosed :
     (hgate .and ha1 hw).cons'
       ((hgate .or ha2 hnw).cons'
         ((hgate .or ha1 hw).cons'
-          (ComputableTidilyInPolyTime.const ([] : List (Op × List ℕ)))))
-  exact ComputableTidilyInPolyTime.flatMapWithInput hzip hitem
+          (ComputableInPolyTime.const ([] : List (Op × List ℕ)))))
+  exact ComputableInPolyTime.flatMapWithInput hzip hitem
 
-private theorem tidy_seqExactlyOneClause :
-    ComputableTidilyInPolyTime
-      (fun q : (ℕ × ℕ) × List ℕ => (seqExactlyOneClause q.1.1 q.1.2 q.2).1)
+private theorem polyTime_seqExactlyOneClause :
+    ComputableInPolyTime
+      (fun q : (ℕ × ℕ) × List ℕ => (seqExactlyOneClause q.1.1 q.1.2 q.2).gates)
       (encPair (encPair encUnary encUnary) (encList encUnary)) (encList encGate) := by
   let E2 := encPair (encPair encUnary encUnary) (encList encUnary)
-  have hq2 := ComputableTidilyInPolyTime.fst (encPair encUnary encUnary) (encList encUnary)
-  have hq2N : ComputableTidilyInPolyTime (fun q : (ℕ × ℕ) × List ℕ => q.1.1) E2 encUnary :=
+  have hq2 := ComputableInPolyTime.fst (encPair encUnary encUnary) (encList encUnary)
+  have hq2N : ComputableInPolyTime (fun q : (ℕ × ℕ) × List ℕ => q.1.1) E2 encUnary :=
     hq2.fst'
-  have hq2B : ComputableTidilyInPolyTime (fun q : (ℕ × ℕ) × List ℕ => q.1.2) E2 encUnary :=
+  have hq2B : ComputableInPolyTime (fun q : (ℕ × ℕ) × List ℕ => q.1.2) E2 encUnary :=
     hq2.snd'
-  have hq2W : ComputableTidilyInPolyTime
+  have hq2W : ComputableInPolyTime
       (fun q : (ℕ × ℕ) × List ℕ => q.2) E2 (encList encUnary) :=
-    ComputableTidilyInPolyTime.snd (encPair encUnary encUnary) (encList encUnary)
-  have hq2WLen : ComputableTidilyInPolyTime
+    ComputableInPolyTime.snd (encPair encUnary encUnary) (encList encUnary)
+  have hq2WLen : ComputableInPolyTime
       (fun q : (ℕ × ℕ) × List ℕ => q.2.length) E2 encUnary :=
-    (ComputableTidilyInPolyTime.length_list encUnary).comp hq2W
-  have hq2NB : ComputableTidilyInPolyTime
+    (ComputableInPolyTime.length_list encUnary).comp hq2W
+  have hq2NB : ComputableInPolyTime
       (fun q : (ℕ × ℕ) × List ℕ => q.1.1 + q.1.2) E2 encUnary :=
-    ComputableTidilyInPolyTime.unary_add.comp (hq2N.prod hq2B)
-  have hq2NB1 : ComputableTidilyInPolyTime
+    ComputableInPolyTime.unary_add.comp (hq2N.prod hq2B)
+  have hq2NB1 : ComputableInPolyTime
       (fun q : (ℕ × ℕ) × List ℕ => q.1.1 + q.1.2 + 1) E2 encUnary :=
-    ComputableTidilyInPolyTime.unary_add.comp (hq2NB.prod (ComputableTidilyInPolyTime.const 1))
-  have hq2NW : ComputableTidilyInPolyTime
+    ComputableInPolyTime.unary_add.comp (hq2NB.prod (ComputableInPolyTime.const 1))
+  have hq2NW : ComputableInPolyTime
       (fun q : (ℕ × ℕ) × List ℕ => q.1.1 + q.1.2 + 1 + 3 * q.2.length) E2 encUnary :=
-    ComputableTidilyInPolyTime.unary_add.comp
-      (hq2NB1.prod (ComputableTidilyInPolyTime.unary_mul.comp
-        ((ComputableTidilyInPolyTime.const 3).prod hq2WLen)))
-  have hq2W0 : ComputableTidilyInPolyTime
+    ComputableInPolyTime.unary_add.comp
+      (hq2NB1.prod (ComputableInPolyTime.unary_mul.comp
+        ((ComputableInPolyTime.const 3).prod hq2WLen)))
+  have hq2W0 : ComputableInPolyTime
       (fun q : (ℕ × ℕ) × List ℕ => decide (q.2.length = 0)) E2 encBool :=
-    (ComputableInPolyTime.decide_eq' hq2WLen.computableInPolyTime
-      (ComputableTidilyInPolyTime.const
-        (encIn := E2) (encMid := encUnary) 0).computableInPolyTime).tidy
-  have hs : ComputableTidilyInPolyTime
+    ComputableInPolyTime.decide_eq' hq2WLen (ComputableInPolyTime.const (encOut := encUnary) 0)
+  have hs : ComputableInPolyTime
       (fun q : (ℕ × ℕ) × List ℕ =>
         seqStepClosed (q.1.1 + q.1.2 + 1) (q.1.1 + q.1.2) (q.1.1 + q.1.2) q.2)
       E2 (encList encGate) :=
-    tidy_seqStepClosed.comp (((hq2NB1.prod hq2NB).prod hq2NB).prod hq2W)
-  have hseen (off : ℕ) : ComputableTidilyInPolyTime
+    polyTime_seqStepClosed.comp (((hq2NB1.prod hq2NB).prod hq2NB).prod hq2W)
+  have hseen (off : ℕ) : ComputableInPolyTime
       (fun q : (ℕ × ℕ) × List ℕ =>
         if q.2.length = 0 then q.1.1 + q.1.2
         else q.1.1 + q.1.2 + 1 + 3 * q.2.length - off) E2 encNat :=
-    ComputableTidilyInPolyTime.unary_to_binary.comp
-      (ComputableTidilyInPolyTime.ite_decide hq2W0 hq2NB
-        (ComputableTidilyInPolyTime.unary_sub.comp
-          (hq2NW.prod (ComputableTidilyInPolyTime.const off))))
-  have hnot : ComputableTidilyInPolyTime
+    ComputableInPolyTime.unary_to_binary.comp
+      (ComputableInPolyTime.ite_decide hq2W0 hq2NB
+        (ComputableInPolyTime.unary_sub.comp
+          (hq2NW.prod (ComputableInPolyTime.const off))))
+  have hnot : ComputableInPolyTime
       (fun q : (ℕ × ℕ) × List ℕ =>
         (.not, [(seqExactlyOneStep (q.1.1 + q.1.2 + 1)
           (q.1.1 + q.1.2) (q.1.1 + q.1.2) q.2).seen2Wire]))
       E2 encGate := by
-    have harg : ComputableTidilyInPolyTime
+    have harg : ComputableInPolyTime
         (fun q : (ℕ × ℕ) × List ℕ =>
           (seqExactlyOneStep (q.1.1 + q.1.2 + 1)
             (q.1.1 + q.1.2) (q.1.1 + q.1.2) q.2).seen2Wire) E2 encNat :=
       (hseen 2).of_enc_eq fun q => by
         rw [seen2Wire_seqExactlyOneStep]
-    exact (ComputableTidilyInPolyTime.const Op.not).prod
-      (harg.cons' (ComputableTidilyInPolyTime.const ([] : List ℕ)))
-  have hand : ComputableTidilyInPolyTime
+    exact (ComputableInPolyTime.const Op.not).prod
+      (harg.cons' (ComputableInPolyTime.const ([] : List ℕ)))
+  have hand : ComputableInPolyTime
       (fun q : (ℕ × ℕ) × List ℕ =>
         (.and, [(seqExactlyOneStep (q.1.1 + q.1.2 + 1)
           (q.1.1 + q.1.2) (q.1.1 + q.1.2) q.2).seen1Wire,
           q.1.1 + q.1.2 + 1 + 3 * q.2.length]))
       E2 encGate := by
-    have hs1 : ComputableTidilyInPolyTime
+    have hs1 : ComputableInPolyTime
         (fun q : (ℕ × ℕ) × List ℕ =>
           (seqExactlyOneStep (q.1.1 + q.1.2 + 1)
             (q.1.1 + q.1.2) (q.1.1 + q.1.2) q.2).seen1Wire) E2 encNat :=
       (hseen 1).of_enc_eq fun q => by
         rw [seen1Wire_seqExactlyOneStep]
-    have hnw : ComputableTidilyInPolyTime
+    have hnw : ComputableInPolyTime
         (fun q : (ℕ × ℕ) × List ℕ => q.1.1 + q.1.2 + 1 + 3 * q.2.length) E2 encNat :=
-      ComputableTidilyInPolyTime.unary_to_binary.comp hq2NW
-    exact (ComputableTidilyInPolyTime.const Op.and).prod
-      (hs1.cons' (hnw.cons' (ComputableTidilyInPolyTime.const ([] : List ℕ))))
-  have hc : ComputableTidilyInPolyTime
+      ComputableInPolyTime.unary_to_binary.comp hq2NW
+    exact (ComputableInPolyTime.const Op.and).prod
+      (hs1.cons' (hnw.cons' (ComputableInPolyTime.const ([] : List ℕ))))
+  have hc : ComputableInPolyTime
       (fun q : (ℕ × ℕ) × List ℕ =>
         [(.const false, [])] ++
           seqStepClosed (q.1.1 + q.1.2 + 1) (q.1.1 + q.1.2) (q.1.1 + q.1.2) q.2 ++
@@ -1002,9 +996,9 @@ private theorem tidy_seqExactlyOneClause :
             (q.1.1 + q.1.2) (q.1.1 + q.1.2) q.2).seen1Wire,
             q.1.1 + q.1.2 + 1 + 3 * q.2.length])])
       E2 (encList encGate) := by
-    have ha := (ComputableTidilyInPolyTime.listAppend encGate).comp
-      ((ComputableTidilyInPolyTime.const ([(.const false, [])] : List (Op × List ℕ))).prod hs)
-    have htail : ComputableTidilyInPolyTime
+    have ha := (ComputableInPolyTime.listAppend encGate).comp
+      ((ComputableInPolyTime.const ([(.const false, [])] : List (Op × List ℕ))).prod hs)
+    have htail : ComputableInPolyTime
         (fun q : (ℕ × ℕ) × List ℕ =>
           [(.not, [(seqExactlyOneStep (q.1.1 + q.1.2 + 1)
             (q.1.1 + q.1.2) (q.1.1 + q.1.2) q.2).seen2Wire]),
@@ -1012,191 +1006,184 @@ private theorem tidy_seqExactlyOneClause :
             (q.1.1 + q.1.2) (q.1.1 + q.1.2) q.2).seen1Wire,
             q.1.1 + q.1.2 + 1 + 3 * q.2.length])])
         E2 (encList encGate) :=
-      hnot.cons' (hand.cons' (ComputableTidilyInPolyTime.const ([] : List (Op × List ℕ))))
-    exact (ComputableTidilyInPolyTime.listAppend encGate).comp (ha.prod htail)
+      hnot.cons' (hand.cons' (ComputableInPolyTime.const ([] : List (Op × List ℕ))))
+    exact (ComputableInPolyTime.listAppend encGate).comp (ha.prod htail)
   refine hc.of_enc_eq fun q => congrArg (encList encGate) ?_
   rw [seqExactlyOneClause]
   dsimp only
   rw [length_seqExactlyOneStep, seqExactlyOneStep_eq_zipIdx, seqStepClosed]
 
-private theorem tidy_perfectMatchingBlock :
-    ComputableTidilyInPolyTime
+private theorem polyTime_perfectMatchingBlock :
+    ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) =>
         let take := q.1.perfectMatchingWires.take q.2.2
         let curBase := 1 + (3 * take.flatten.length + 4 * take.length)
         let curAcc := if q.2.2 = 0 then q.1.edgeList.length else q.1.edgeList.length + curBase - 1
         let cl := seqExactlyOneClause q.1.edgeList.length curBase q.2.1
-        cl.1 ++ [(.and, [curAcc, cl.2])])
+        cl.gates ++ [(.and, [curAcc, cl.outWire])])
       (encPair encGraph (encPair (encList encUnary) encUnary)) (encList encGate) := by
   let P := encPair encGraph (encPair (encList encUnary) encUnary)
-  have hN : ComputableTidilyInPolyTime (fun G : Graph => G.edgeList.length) encGraph encUnary :=
-    (ComputableTidilyInPolyTime.length_list (encPair encNat encNat)).comp
-      computableInPolyTime_edgeList.tidy
-  have hG := ComputableTidilyInPolyTime.fst encGraph (encPair (encList encUnary) encUnary)
-  have hP2 := ComputableTidilyInPolyTime.snd encGraph (encPair (encList encUnary) encUnary)
-  have hNq : ComputableTidilyInPolyTime
+  have hN : ComputableInPolyTime (fun G : Graph => G.edgeList.length) encGraph encUnary :=
+    (ComputableInPolyTime.length_list (encPair encNat encNat)).comp computableInPolyTime_edgeList
+  have hG := ComputableInPolyTime.fst encGraph (encPair (encList encUnary) encUnary)
+  have hP2 := ComputableInPolyTime.snd encGraph (encPair (encList encUnary) encUnary)
+  have hNq : ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) => q.1.edgeList.length) P encUnary :=
     hN.comp hG
-  have hIdxq : ComputableTidilyInPolyTime
+  have hIdxq : ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) => q.2.2) P encUnary :=
     hP2.snd'
-  have hWsq : ComputableTidilyInPolyTime
+  have hWsq : ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) => q.2.1) P (encList encUnary) :=
     hP2.fst'
-  have htake : ComputableTidilyInPolyTime
+  have htake : ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) => q.1.perfectMatchingWires.take q.2.2)
       P (encList (encList encUnary)) :=
-    ComputableTidilyInPolyTime.listTakeWithInput (tidy_perfectMatchingWires.comp hG) hIdxq
-  have htakeFl : ComputableTidilyInPolyTime
+    ComputableInPolyTime.listTakeWithInput (polyTime_perfectMatchingWires.comp hG) hIdxq
+  have htakeFl : ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) => (q.1.perfectMatchingWires.take q.2.2).flatten)
       P (encList encUnary) :=
-    (ComputableTidilyInPolyTime.flatten encUnary).comp htake
-  have hbase : ComputableTidilyInPolyTime
+    (ComputableInPolyTime.flatten encUnary).comp htake
+  have hbase : ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) =>
         1 + (3 * (q.1.perfectMatchingWires.take q.2.2).flatten.length +
           4 * (q.1.perfectMatchingWires.take q.2.2).length)) P encUnary :=
-    ComputableTidilyInPolyTime.unary_add.comp
-      ((ComputableTidilyInPolyTime.const 1).prod
-        (ComputableTidilyInPolyTime.unary_add.comp
-          ((ComputableTidilyInPolyTime.unary_mul.comp
-            ((ComputableTidilyInPolyTime.const 3).prod
-              ((ComputableTidilyInPolyTime.length_list encUnary).comp htakeFl))).prod
-            (ComputableTidilyInPolyTime.unary_mul.comp
-              ((ComputableTidilyInPolyTime.const 4).prod
-                ((ComputableTidilyInPolyTime.length_list (encList encUnary)).comp htake))))))
-  have hclq : ComputableTidilyInPolyTime
+    ComputableInPolyTime.unary_add.comp
+      ((ComputableInPolyTime.const 1).prod
+        (ComputableInPolyTime.unary_add.comp
+          ((ComputableInPolyTime.unary_mul.comp
+            ((ComputableInPolyTime.const 3).prod
+              ((ComputableInPolyTime.length_list encUnary).comp htakeFl))).prod
+            (ComputableInPolyTime.unary_mul.comp
+              ((ComputableInPolyTime.const 4).prod
+                ((ComputableInPolyTime.length_list (encList encUnary)).comp htake))))))
+  have hclq : ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) =>
         let take := q.1.perfectMatchingWires.take q.2.2
         let curBase := 1 + (3 * take.flatten.length + 4 * take.length)
-        (seqExactlyOneClause q.1.edgeList.length curBase q.2.1).1) P (encList encGate) :=
-    tidy_seqExactlyOneClause.comp ((hNq.prod hbase).prod hWsq)
-  have hidx0 : ComputableTidilyInPolyTime
+        (seqExactlyOneClause q.1.edgeList.length curBase q.2.1).gates) P (encList encGate) :=
+    polyTime_seqExactlyOneClause.comp ((hNq.prod hbase).prod hWsq)
+  have hidx0 : ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) => decide (q.2.2 = 0)) P encBool :=
-    (ComputableInPolyTime.decide_eq' hIdxq.computableInPolyTime
-      (ComputableTidilyInPolyTime.const
-        (encIn := P) (encMid := encUnary) 0).computableInPolyTime).tidy
-  have hacc : ComputableTidilyInPolyTime
+    ComputableInPolyTime.decide_eq' hIdxq (ComputableInPolyTime.const (encOut := encUnary) 0)
+  have hacc : ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) =>
         let take := q.1.perfectMatchingWires.take q.2.2
         let curBase := 1 + (3 * take.flatten.length + 4 * take.length)
         if q.2.2 = 0 then q.1.edgeList.length else q.1.edgeList.length + curBase - 1)
       P encNat :=
-    ComputableTidilyInPolyTime.unary_to_binary.comp
-      (ComputableTidilyInPolyTime.ite_decide hidx0 hNq
-        (ComputableTidilyInPolyTime.unary_sub.comp
-          ((ComputableTidilyInPolyTime.unary_add.comp (hNq.prod hbase)).prod
-            (ComputableTidilyInPolyTime.const 1))))
-  have hcl2 : ComputableTidilyInPolyTime
+    ComputableInPolyTime.unary_to_binary.comp
+      (ComputableInPolyTime.ite_decide hidx0 hNq
+        (ComputableInPolyTime.unary_sub.comp
+          ((ComputableInPolyTime.unary_add.comp (hNq.prod hbase)).prod
+            (ComputableInPolyTime.const 1))))
+  have hcl2 : ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) =>
         let take := q.1.perfectMatchingWires.take q.2.2
         let curBase := 1 + (3 * take.flatten.length + 4 * take.length)
-        (seqExactlyOneClause q.1.edgeList.length curBase q.2.1).2) P encNat := by
-    have hu : ComputableTidilyInPolyTime
+        (seqExactlyOneClause q.1.edgeList.length curBase q.2.1).outWire) P encNat := by
+    have hu : ComputableInPolyTime
         (fun q : Graph × (List ℕ × ℕ) =>
           let take := q.1.perfectMatchingWires.take q.2.2
           let curBase := 1 + (3 * take.flatten.length + 4 * take.length)
           q.1.edgeList.length + curBase + 3 * q.2.1.length + 2) P encUnary :=
-      ComputableTidilyInPolyTime.unary_add.comp
-        ((ComputableTidilyInPolyTime.unary_add.comp
-          ((ComputableTidilyInPolyTime.unary_add.comp (hNq.prod hbase)).prod
-            (ComputableTidilyInPolyTime.unary_mul.comp
-              ((ComputableTidilyInPolyTime.const 3).prod
-                ((ComputableTidilyInPolyTime.length_list encUnary).comp hWsq))))).prod
-          (ComputableTidilyInPolyTime.const 2))
-    exact (ComputableTidilyInPolyTime.unary_to_binary.comp hu).of_enc_eq fun q => by
+      ComputableInPolyTime.unary_add.comp
+        ((ComputableInPolyTime.unary_add.comp
+          ((ComputableInPolyTime.unary_add.comp (hNq.prod hbase)).prod
+            (ComputableInPolyTime.unary_mul.comp
+              ((ComputableInPolyTime.const 3).prod
+                ((ComputableInPolyTime.length_list encUnary).comp hWsq))))).prod
+          (ComputableInPolyTime.const 2))
+    exact (ComputableInPolyTime.unary_to_binary.comp hu).of_enc_eq fun q => by
       rw [snd_seqExactlyOneClause]
       rfl
-  have handGate : ComputableTidilyInPolyTime
+  have handGate : ComputableInPolyTime
       (fun q : Graph × (List ℕ × ℕ) =>
         let take := q.1.perfectMatchingWires.take q.2.2
         let curBase := 1 + (3 * take.flatten.length + 4 * take.length)
         let curAcc := if q.2.2 = 0 then q.1.edgeList.length else q.1.edgeList.length + curBase - 1
         let cl := seqExactlyOneClause q.1.edgeList.length curBase q.2.1
-        [(.and, [curAcc, cl.2])]) P (encList encGate) :=
-    ((ComputableTidilyInPolyTime.const Op.and).prod
-      (hacc.cons' (hcl2.cons' (ComputableTidilyInPolyTime.const ([] : List ℕ))))).cons'
-      (ComputableTidilyInPolyTime.const ([] : List (Op × List ℕ)))
-  exact (ComputableTidilyInPolyTime.listAppend encGate).comp (hclq.prod handGate)
+        [(.and, [curAcc, cl.outWire])]) P (encList encGate) :=
+    ((ComputableInPolyTime.const Op.and).prod
+      (hacc.cons' (hcl2.cons' (ComputableInPolyTime.const ([] : List ℕ))))).cons'
+      (ComputableInPolyTime.const ([] : List (Op × List ℕ)))
+  exact (ComputableInPolyTime.listAppend encGate).comp (hclq.prod handGate)
 
-private theorem tidy_perfectMatchingCircuit :
-    ComputableTidilyInPolyTime (fun G : Graph => G.perfectMatchingCircuit)
-      encGraph (encPair (encList encGate) encUnary) := by
-  have hN : ComputableTidilyInPolyTime (fun G : Graph => G.edgeList.length) encGraph encUnary :=
-    (ComputableTidilyInPolyTime.length_list (encPair encNat encNat)).comp
-      computableInPolyTime_edgeList.tidy
-  have hzip : ComputableTidilyInPolyTime
+private theorem polyTime_perfectMatchingGates :
+    ComputableInPolyTime (fun G : Graph => G.perfectMatchingCircuit.gates)
+      encGraph (encList encGate) := by
+  have hzip : ComputableInPolyTime
       (fun G : Graph => G.perfectMatchingWires.zipIdx)
       encGraph (encList (encPair (encList encUnary) encUnary)) :=
-    (ComputableTidilyInPolyTime.zipIdx (encList encUnary)).comp tidy_perfectMatchingWires
-  have hgates : ComputableTidilyInPolyTime
-      (fun G : Graph => G.perfectMatchingCircuit.1) encGraph (encList encGate) := by
-    have hfold : ComputableTidilyInPolyTime
-        (fun G : Graph => (Op.const true, ([] : List ℕ)) ::
-          (G.perfectMatchingWires.zipIdx.flatMap fun p =>
-            let take := G.perfectMatchingWires.take p.2
-            let curBase := 1 + (3 * take.flatten.length + 4 * take.length)
-            let curAcc := if p.2 = 0 then G.edgeList.length else G.edgeList.length + curBase - 1
-            let cl := seqExactlyOneClause G.edgeList.length curBase p.1
-            cl.1 ++ [(.and, [curAcc, cl.2])]))
-        encGraph (encList encGate) :=
-      (ComputableTidilyInPolyTime.const (Op.const true, ([] : List ℕ))).cons'
-        (ComputableTidilyInPolyTime.flatMapWithInput hzip tidy_perfectMatchingBlock)
-    refine hfold.of_enc_eq fun G => congrArg (encList encGate) ?_
-    rw [perfectMatchingCircuit, seqExactlyOneAll]
-    dsimp only
-    congr 1
-    rw [(seqExactlyOneFold_eq_zipIdx G.edgeList.length 1 G.edgeList.length
-      G.perfectMatchingWires).1]
-    refine List.flatMap_congr fun p _ => ?_
-    rw [sum_clauseGateCost_take]
-  have hout : ComputableTidilyInPolyTime
-      (fun G : Graph => G.perfectMatchingCircuit.2) encGraph encUnary := by
-    have hfl : ComputableTidilyInPolyTime
-        (fun G : Graph => G.perfectMatchingWires.flatten) encGraph (encList encUnary) :=
-      (ComputableTidilyInPolyTime.flatten encUnary).comp tidy_perfectMatchingWires
-    have hwlen : ComputableTidilyInPolyTime
-        (fun G : Graph => G.perfectMatchingWires.length) encGraph encUnary :=
-      (ComputableTidilyInPolyTime.length_list (encList encUnary)).comp tidy_perfectMatchingWires
-    have hsumU : ComputableTidilyInPolyTime
-        (fun G : Graph =>
-          3 * G.perfectMatchingWires.flatten.length + 4 * G.perfectMatchingWires.length)
-        encGraph encUnary :=
-      ComputableTidilyInPolyTime.unary_add.comp
-        ((ComputableTidilyInPolyTime.unary_mul.comp
-          ((ComputableTidilyInPolyTime.const 3).prod
-            ((ComputableTidilyInPolyTime.length_list encUnary).comp hfl))).prod
-          (ComputableTidilyInPolyTime.unary_mul.comp
-            ((ComputableTidilyInPolyTime.const 4).prod hwlen)))
-    have hw0 : ComputableTidilyInPolyTime
-        (fun G : Graph => decide (G.perfectMatchingWires.length = 0)) encGraph encBool :=
-      (ComputableInPolyTime.decide_eq' hwlen.computableInPolyTime
-        (ComputableTidilyInPolyTime.const (encIn := encGraph)
-          (encMid := encUnary) 0).computableInPolyTime).tidy
-    have hu : ComputableTidilyInPolyTime
-        (fun G : Graph =>
-          if G.perfectMatchingWires.length = 0 then G.edgeList.length
-          else G.edgeList.length + 1 +
-            (3 * G.perfectMatchingWires.flatten.length + 4 * G.perfectMatchingWires.length) - 1)
-        encGraph encUnary :=
-      ComputableTidilyInPolyTime.ite_decide hw0 hN
-        (ComputableTidilyInPolyTime.unary_sub.comp
-          ((ComputableTidilyInPolyTime.unary_add.comp
-            ((ComputableTidilyInPolyTime.unary_add.comp
-              (hN.prod (ComputableTidilyInPolyTime.const 1))).prod hsumU)).prod
-            (ComputableTidilyInPolyTime.const 1)))
-    refine hu.of_enc_eq fun G => ?_
-    rw [perfectMatchingCircuit, seqExactlyOneAll,
-      (seqExactlyOneFold_eq_zipIdx G.edgeList.length 1 G.edgeList.length
-        G.perfectMatchingWires).2]
-    have hsum : (G.perfectMatchingWires.map fun u => 3 * u.length + 4).sum =
-        3 * G.perfectMatchingWires.flatten.length + 4 * G.perfectMatchingWires.length := by
-      have ht := sum_clauseGateCost_take G.perfectMatchingWires G.perfectMatchingWires.length
-      rwa [List.take_length] at ht
-    rw [hsum]
-  exact hgates.prod hout
+    (ComputableInPolyTime.zipIdx (encList encUnary)).comp polyTime_perfectMatchingWires
+  have hfold : ComputableInPolyTime
+      (fun G : Graph => (Op.const true, ([] : List ℕ)) ::
+        (G.perfectMatchingWires.zipIdx.flatMap fun p =>
+          let take := G.perfectMatchingWires.take p.2
+          let curBase := 1 + (3 * take.flatten.length + 4 * take.length)
+          let curAcc := if p.2 = 0 then G.edgeList.length else G.edgeList.length + curBase - 1
+          let cl := seqExactlyOneClause G.edgeList.length curBase p.1
+          cl.gates ++ [(.and, [curAcc, cl.outWire])]))
+      encGraph (encList encGate) :=
+    (ComputableInPolyTime.const (Op.const true, ([] : List ℕ))).cons'
+      (ComputableInPolyTime.flatMapWithInput hzip polyTime_perfectMatchingBlock)
+  refine hfold.of_enc_eq fun G => congrArg (encList encGate) ?_
+  rw [perfectMatchingCircuit, seqExactlyOneAll]
+  dsimp only
+  congr 1
+  rw [(seqExactlyOneFold_eq_zipIdx G.edgeList.length 1 G.edgeList.length
+    G.perfectMatchingWires).1]
+  refine List.flatMap_congr fun p _ => ?_
+  rw [sum_clauseGateCost_take]
 
-private theorem tidy_gateClauses :
-    ComputableTidilyInPolyTime (fun p : ℕ × (Op × List ℕ) => gateClauses p.1 p.2)
+private theorem polyTime_perfectMatchingOutWire :
+    ComputableInPolyTime (fun G : Graph => G.perfectMatchingCircuit.outWire)
+      encGraph encUnary := by
+  have hN : ComputableInPolyTime (fun G : Graph => G.edgeList.length) encGraph encUnary :=
+    (ComputableInPolyTime.length_list (encPair encNat encNat)).comp computableInPolyTime_edgeList
+  have hfl : ComputableInPolyTime
+      (fun G : Graph => G.perfectMatchingWires.flatten) encGraph (encList encUnary) :=
+    (ComputableInPolyTime.flatten encUnary).comp polyTime_perfectMatchingWires
+  have hwlen : ComputableInPolyTime
+      (fun G : Graph => G.perfectMatchingWires.length) encGraph encUnary :=
+    (ComputableInPolyTime.length_list (encList encUnary)).comp polyTime_perfectMatchingWires
+  have hsumU : ComputableInPolyTime
+      (fun G : Graph =>
+        3 * G.perfectMatchingWires.flatten.length + 4 * G.perfectMatchingWires.length)
+      encGraph encUnary :=
+    ComputableInPolyTime.unary_add.comp
+      ((ComputableInPolyTime.unary_mul.comp
+        ((ComputableInPolyTime.const 3).prod
+          ((ComputableInPolyTime.length_list encUnary).comp hfl))).prod
+        (ComputableInPolyTime.unary_mul.comp
+          ((ComputableInPolyTime.const 4).prod hwlen)))
+  have hw0 : ComputableInPolyTime
+      (fun G : Graph => decide (G.perfectMatchingWires.length = 0)) encGraph encBool :=
+    ComputableInPolyTime.decide_eq' hwlen (ComputableInPolyTime.const (encOut := encUnary) 0)
+  have hu : ComputableInPolyTime
+      (fun G : Graph =>
+        if G.perfectMatchingWires.length = 0 then G.edgeList.length
+        else G.edgeList.length + 1 +
+          (3 * G.perfectMatchingWires.flatten.length + 4 * G.perfectMatchingWires.length) - 1)
+      encGraph encUnary :=
+    ComputableInPolyTime.ite_decide hw0 hN
+      (ComputableInPolyTime.unary_sub.comp
+        ((ComputableInPolyTime.unary_add.comp
+          ((ComputableInPolyTime.unary_add.comp
+            (hN.prod (ComputableInPolyTime.const 1))).prod hsumU)).prod
+          (ComputableInPolyTime.const 1)))
+  refine hu.of_enc_eq fun G => ?_
+  rw [perfectMatchingCircuit, seqExactlyOneAll,
+    (seqExactlyOneFold_eq_zipIdx G.edgeList.length 1 G.edgeList.length
+      G.perfectMatchingWires).2]
+  have hsum : (G.perfectMatchingWires.map fun u => 3 * u.length + 4).sum =
+      3 * G.perfectMatchingWires.flatten.length + 4 * G.perfectMatchingWires.length := by
+    have ht := sum_clauseGateCost_take G.perfectMatchingWires G.perfectMatchingWires.length
+    rwa [List.take_length] at ht
+  rw [hsum]
+
+private theorem polyTime_gateClauses :
+    ComputableInPolyTime (fun p : ℕ × (Op × List ℕ) => gateClauses p.1 p.2)
       (encPair encUnary encGate) (encList (encClause encNat)) := by
   have hOpTag (op : Op) : ComputableInPolyTime
       (fun p : ℕ × (Op × List ℕ) => decide (p.2.1 = op))
@@ -1250,51 +1237,50 @@ private theorem tidy_gateClauses :
     (ComputableInPolyTime.ite (hOpTag (.const true)) hct
       (ComputableInPolyTime.ite (hOpTag .not) hcnot
         (ComputableInPolyTime.ite (hOpTag .and) hcand hcor)))
-  exact (hcomp.of_enc_eq fun p => by
+  exact hcomp.of_enc_eq fun p => by
     rw [gateClauses_eq_ite]
-    simp only [decide_eq_true_eq]).tidy
+    simp only [decide_eq_true_eq]
 
 /-- Constructing `G.toPerfectMatchingCNF` from `encGraph` is polynomial-time. -/
 @[fun_prop]
 theorem computableInPolyTime_toPerfectMatchingCNF :
     ComputableInPolyTime toPerfectMatchingCNF encGraph encCNF := by
-  have hN : ComputableTidilyInPolyTime (fun G : Graph => G.edgeList.length) encGraph encUnary :=
-    (ComputableTidilyInPolyTime.length_list (encPair encNat encNat)).comp
-      computableInPolyTime_edgeList.tidy
-  have hzipG : ComputableTidilyInPolyTime
-      (fun G : Graph => G.perfectMatchingCircuit.1.zipIdx)
+  have hN : ComputableInPolyTime (fun G : Graph => G.edgeList.length) encGraph encUnary :=
+    (ComputableInPolyTime.length_list (encPair encNat encNat)).comp computableInPolyTime_edgeList
+  have hzipG : ComputableInPolyTime
+      (fun G : Graph => G.perfectMatchingCircuit.gates.zipIdx)
       encGraph (encList (encPair encGate encUnary)) :=
-    (ComputableTidilyInPolyTime.zipIdx encGate).comp tidy_perfectMatchingCircuit.fst'
-  have hP2 := ComputableTidilyInPolyTime.snd encGraph (encPair encGate encUnary)
-  have hbody : ComputableTidilyInPolyTime
+    (ComputableInPolyTime.zipIdx encGate).comp polyTime_perfectMatchingGates
+  have hP2 := ComputableInPolyTime.snd encGraph (encPair encGate encUnary)
+  have hbody : ComputableInPolyTime
       (fun q : Graph × ((Op × List ℕ) × ℕ) => gateClauses (q.1.edgeList.length + q.2.2) q.2.1)
       (encPair encGraph (encPair encGate encUnary)) (encList (encClause encNat)) :=
-    tidy_gateClauses.comp
-      ((ComputableTidilyInPolyTime.unary_add.comp
-        ((hN.comp (ComputableTidilyInPolyTime.fst encGraph (encPair encGate encUnary))).prod
+    polyTime_gateClauses.comp
+      ((ComputableInPolyTime.unary_add.comp
+        ((hN.comp (ComputableInPolyTime.fst encGraph (encPair encGate encUnary))).prod
           hP2.snd')).prod hP2.fst')
-  have hts : ComputableTidilyInPolyTime
-      (fun G : Graph => tseitinCNF G.edgeList.length G.perfectMatchingCircuit.1)
+  have hts : ComputableInPolyTime
+      (fun G : Graph => tseitinCNF G.edgeList.length G.perfectMatchingCircuit.gates)
       encGraph encCNF :=
-    (ComputableTidilyInPolyTime.flatMapWithInput
+    (ComputableInPolyTime.flatMapWithInput
       (f := fun (G : Graph) (p : (Op × List ℕ) × ℕ) => gateClauses (G.edgeList.length + p.2) p.1)
       hzipG hbody).of_enc_eq fun G =>
         congrArg (encList (encClause encNat))
-          (tseitinCNF_eq_zipIdx G.edgeList.length G.perfectMatchingCircuit.1)
-  have hoBin : ComputableTidilyInPolyTime
-      (fun G : Graph => G.perfectMatchingCircuit.2) encGraph encNat :=
-    ComputableTidilyInPolyTime.unary_to_binary.comp tidy_perfectMatchingCircuit.snd'
-  have hoLit : ComputableTidilyInPolyTime
-      (fun G : Graph => (G.perfectMatchingCircuit.2, true))
+          (tseitinCNF_eq_zipIdx G.edgeList.length G.perfectMatchingCircuit.gates)
+  have hoBin : ComputableInPolyTime
+      (fun G : Graph => G.perfectMatchingCircuit.outWire) encGraph encNat :=
+    ComputableInPolyTime.unary_to_binary.comp polyTime_perfectMatchingOutWire
+  have hoLit : ComputableInPolyTime
+      (fun G : Graph => (G.perfectMatchingCircuit.outWire, true))
       encGraph (encPair encNat encBool) :=
-    hoBin.prod (ComputableTidilyInPolyTime.const true)
-  have hunit : ComputableTidilyInPolyTime
-      (fun G : Graph => unitClause (G.perfectMatchingCircuit.2, true))
+    hoBin.prod (ComputableInPolyTime.const true)
+  have hunit : ComputableInPolyTime
+      (fun G : Graph => unitClause (G.perfectMatchingCircuit.outWire, true))
       encGraph (encClause encNat) := by
     unfold unitClause
     exact hoLit.cons' (hoLit.cons' (hoLit.cons'
-      (ComputableTidilyInPolyTime.const ([] : Clause ℕ))))
-  exact (hunit.cons' hts).computableInPolyTime.of_enc_eq fun G =>
+      (ComputableInPolyTime.const ([] : Clause ℕ))))
+  exact (hunit.cons' hts).of_enc_eq fun G =>
     congrArg encCNF (by simp [toPerfectMatchingCNF, tseitinSatCNF])
 
 end Cslib.Complexity.Graph

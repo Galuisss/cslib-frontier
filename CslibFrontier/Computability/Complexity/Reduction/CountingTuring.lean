@@ -50,8 +50,7 @@ total decoder for its input encoding) drops to `FP`.
   hardness across a counting Turing reduction.
 * `Cslib.Complexity.PolyTimeOracleProgram.of_batchNatBits`: batch builder for counting Turing
   reductions without direct oracle-monad plumbing.
-* `Cslib.Complexity.bitGraph_mem_P_of_decoder`,
-  `Cslib.Complexity.CountingTuringReducible.computableInPolyTime_of_decoder`: collapsing a counting
+* `Cslib.Complexity.CountingTuringReducible.computableInPolyTime_of_decoder`: collapsing a counting
   Turing reduction to polynomial time when the oracle function is in `FP`.
 
 ## References
@@ -98,7 +97,7 @@ theorem ParsimoniousReducible.comp_countingTuringReducible
     CountingTuringReducible encA encC f g := by
   obtain ⟨r, hr, hfr⟩ := hfh
   obtain ⟨prog, hprog, hspec⟩ := hhg
-  refine ⟨fun a => prog (r a), hprog.preprocess' hr, fun A hA => ?_⟩
+  refine ⟨fun a => prog (r a), hprog.preprocess hr, fun A hA => ?_⟩
   funext a
   exact (congrFun (hspec A hA) (r a)).trans (hfr a).symm
 
@@ -139,68 +138,63 @@ def batchNatOracleProgram (encB : β ↪ List Bool) (queries : α → List β)
   (fun bits => combine (a, decodeNatBatch (queries a).length (bound a) bits)) <$>
     queryWords (batchNatBitWords encB (queries a) (bound a))
 
-private theorem computableTidily_natBitWords (encB : β ↪ List Bool) :
-    ComputableTidilyInPolyTime (fun p : ℕ × β => natBitWords encB p.2 p.1)
+private theorem computableInPolyTime_natBitWords (encB : β ↪ List Bool) :
+    ComputableInPolyTime (fun p : ℕ × β => natBitWords encB p.2 p.1)
       (encPair encUnary encB) (encList encBits) := by
   unfold natBitWords
-  refine ComputableTidilyInPolyTime.mapWithInput (by fun_prop) ?_
-  have harg : ComputableInPolyTime
-      (fun q : (ℕ × β) × ℕ => encPair encB encNat (q.1.2, q.2))
-      (encPair (encPair encUnary encB) encUnary) encBits := by
-    have hpair : ComputableInPolyTime (fun q : (ℕ × β) × ℕ => (q.1.2, q.2))
-        (encPair (encPair encUnary encB) encUnary) (encPair encB encNat) := by
-      have h1 : ComputableInPolyTime (fun q : (ℕ × β) × ℕ => q.1.2)
-          (encPair (encPair encUnary encB) encUnary) encB :=
-        (ComputableInPolyTime.snd encUnary encB).comp (ComputableInPolyTime.fst _ _)
-      have h2 : ComputableInPolyTime (fun q : (ℕ × β) × ℕ => q.2)
-          (encPair (encPair encUnary encB) encUnary) encNat :=
-        ComputableTidilyInPolyTime.unary_to_binary.computableInPolyTime.comp
-          (ComputableInPolyTime.snd _ _)
-      exact h1.prod h2
-    exact ComputableInPolyTime.encoding_comp hpair
-  exact harg.tidy
+  refine ComputableInPolyTime.mapWithInput (by fun_prop) ?_
+  have hpair : ComputableInPolyTime (fun q : (ℕ × β) × ℕ => (q.1.2, q.2))
+      (encPair (encPair encUnary encB) encUnary) (encPair encB encNat) := by
+    have h1 : ComputableInPolyTime (fun q : (ℕ × β) × ℕ => q.1.2)
+        (encPair (encPair encUnary encB) encUnary) encB :=
+      (ComputableInPolyTime.snd encUnary encB).comp (ComputableInPolyTime.fst _ _)
+    have h2 : ComputableInPolyTime (fun q : (ℕ × β) × ℕ => q.2)
+        (encPair (encPair encUnary encB) encUnary) encNat :=
+      ComputableInPolyTime.unary_to_binary.comp (ComputableInPolyTime.snd _ _)
+    exact h1.prod h2
+  exact ComputableInPolyTime.encoding_comp hpair
 
 private theorem computableInPolyTime_batchNatBitWords (encB : β ↪ List Bool) :
     ComputableInPolyTime (fun p : List β × ℕ => batchNatBitWords encB p.1 p.2)
       (encPair (encList encB) encUnary) (encList encBits) := by
   unfold batchNatBitWords
-  exact (ComputableTidilyInPolyTime.flatMapWith
-    (computableTidily_natBitWords encB)
-    (ComputableTidilyInPolyTime.snd (encList encB) encUnary)
-    (ComputableTidilyInPolyTime.fst (encList encB) encUnary)).computableInPolyTime
+  exact ComputableInPolyTime.flatMapWith
+    (computableInPolyTime_natBitWords encB)
+    (ComputableInPolyTime.snd (encList encB) encUnary)
+    (ComputableInPolyTime.fst (encList encB) encUnary)
 
 private theorem computableInPolyTime_decodeNatBatch :
     ComputableInPolyTime (fun p : (ℕ × ℕ) × List Bool => decodeNatBatch p.1.1 p.1.2 p.2)
       (encPair (encPair encUnary encUnary) encBits) (encList encNat) := by
   unfold decodeNatBatch
-  have hlist : ComputableTidilyInPolyTime
+  have hlist : ComputableInPolyTime
       (fun p : (ℕ × ℕ) × List Bool => List.range p.1.1)
       (encPair (encPair encUnary encUnary) encBits) (encList encUnary) := by
     fun_prop
-  have hbody : ComputableTidilyInPolyTime
+  have hbody : ComputableInPolyTime
       (fun q : ((ℕ × ℕ) × List Bool) × ℕ =>
         ofBits ((q.1.2.drop (q.2 * q.1.1.2)).take q.1.1.2))
       (encPair (encPair (encPair encUnary encUnary) encBits) encUnary) encNat := by
-    have hmul : ComputableTidilyInPolyTime
+    have hmul : ComputableInPolyTime
         (fun q : ((ℕ × ℕ) × List Bool) × ℕ => q.2 * q.1.1.2)
         (encPair (encPair (encPair encUnary encUnary) encBits) encUnary) encUnary :=
-      ComputableTidilyInPolyTime.unary_mul.comp
-        ((ComputableTidilyInPolyTime.snd _ _).prod
-          ((ComputableTidilyInPolyTime.snd _ _).comp
-            ((ComputableTidilyInPolyTime.fst _ _).comp (ComputableTidilyInPolyTime.fst _ _))))
-    have hbits : ComputableTidilyInPolyTime
+      ComputableInPolyTime.unary_mul.comp
+        ((ComputableInPolyTime.snd _ _).prod
+          ((ComputableInPolyTime.snd _ _).comp
+            ((ComputableInPolyTime.fst _ _).comp (ComputableInPolyTime.fst _ _))))
+    have hbits : ComputableInPolyTime
         (fun q : ((ℕ × ℕ) × List Bool) × ℕ => q.1.2)
         (encPair (encPair (encPair encUnary encUnary) encBits) encUnary) encBits :=
-      (ComputableTidilyInPolyTime.snd _ _).comp (ComputableTidilyInPolyTime.fst _ _)
-    have hdrop := ComputableTidilyInPolyTime.bitsDropWithInput hbits hmul
-    have hk : ComputableTidilyInPolyTime
+      (ComputableInPolyTime.snd _ _).comp (ComputableInPolyTime.fst _ _)
+    have hdrop := ComputableInPolyTime.bitsDropWithInput hbits hmul
+    have hk : ComputableInPolyTime
         (fun q : ((ℕ × ℕ) × List Bool) × ℕ => q.1.1.2)
         (encPair (encPair (encPair encUnary encUnary) encBits) encUnary) encUnary :=
-      (ComputableTidilyInPolyTime.snd _ _).comp
-        ((ComputableTidilyInPolyTime.fst _ _).comp (ComputableTidilyInPolyTime.fst _ _))
-    exact ComputableTidilyInPolyTime.bitsToNat.comp
-      (ComputableTidilyInPolyTime.bitsTakeWithInput hdrop hk)
-  exact (ComputableTidilyInPolyTime.mapWithInput hlist hbody).computableInPolyTime
+      (ComputableInPolyTime.snd _ _).comp
+        ((ComputableInPolyTime.fst _ _).comp (ComputableInPolyTime.fst _ _))
+    exact ComputableInPolyTime.bitsToNat.comp
+      (ComputableInPolyTime.bitsTakeWithInput hdrop hk)
+  exact ComputableInPolyTime.mapWithInput hlist hbody
 
 private theorem drop_take_flatMap_eq {γ δ : Type*} (l : List γ) (f : γ → List δ) (K : ℕ)
     (hlen : ∀ x ∈ l, (f x).length = K) {j : ℕ} (hj : j < l.length) :
@@ -249,9 +243,9 @@ theorem isOraclePPTOn_queryNatBits (encB : β ↪ List Bool) :
     IsOraclePPTOn (encPair encB encUnary) encNat
       (fun p => OracleComp.interpret ProbOracleComp.query (queryNatBits encB p.1 p.2)) := by
   simp only [queryNatBits, OracleComp.interpret_map]
-  refine IsOraclePPTOn.map' ?_ ComputableInPolyTime.bitsToNat
-  exact isOraclePPTOn_queryWords.preprocess'
-    ((computableTidily_natBitWords encB).computableInPolyTime.comp
+  refine IsOraclePPTOn.map ?_ ComputableInPolyTime.bitsToNat
+  exact isOraclePPTOn_queryWords.preprocess
+    ((computableInPolyTime_natBitWords encB).comp
       ((ComputableInPolyTime.snd _ _).prod (ComputableInPolyTime.fst _ _)))
 
 open Classical in
@@ -269,14 +263,14 @@ theorem PolyTimeOracleProgram.of_batchNatBits
     CountingTuringReducible encA encB f g := by
   refine ⟨batchNatOracleProgram encB queries bound combine, ?_, fun A hA => ?_⟩
   · simp only [batchNatOracleProgram, OracleComp.interpret_map]
-    have hq := isOraclePPTOn_queryWords.preprocess'
+    have hq := isOraclePPTOn_queryWords.preprocess
       ((computableInPolyTime_batchNatBitWords encB).comp (hqueries.prod hbound))
     have hpost : ComputableInPolyTime
         (fun p : α × List Bool =>
           combine (p.1, decodeNatBatch (queries p.1).length (bound p.1) p.2))
         (encPair encA encBits) encNat := by
       have hlen : ComputableInPolyTime (fun a : α => (queries a).length) encA encUnary :=
-        (ComputableTidilyInPolyTime.length encB).computableInPolyTime.comp hqueries
+        (ComputableInPolyTime.length encB).comp hqueries
       have hdec : ComputableInPolyTime
           (fun p : α × List Bool => decodeNatBatch (queries p.1).length (bound p.1) p.2)
           (encPair encA encBits) (encList encNat) :=
@@ -285,7 +279,7 @@ theorem PolyTimeOracleProgram.of_batchNatBits
               (hbound.comp (ComputableInPolyTime.fst _ _)))).prod
             (ComputableInPolyTime.snd _ _))
       exact hcombine.comp ((ComputableInPolyTime.fst _ _).prod hdec)
-    exact hq.map_with' hpost
+    exact hq.map_with hpost
   · funext a
     simp only [batchNatOracleProgram, OracleComp.interpret_map, interpret_queryWords]
     have hmap : (batchNatBitWords encB (queries a) (bound a)).map (fun w => decide (w ∈ A)) =
@@ -312,71 +306,6 @@ section OracleElimination
 
 variable {α β : Type}
 
-private theorem testBit_eq_bounded {n i : ℕ} :
-    n.testBit i = (decide (i < n.size) && n.testBit (min n.size i)) := by
-  by_cases hi : i < n.size
-  · simp [hi, Nat.min_eq_right hi.le]
-  · have hlt : n < 2 ^ i := by
-      have hs : n < 2 ^ n.size := Nat.lt_size_self n
-      have hp : 2 ^ n.size ≤ 2 ^ i := Nat.pow_le_pow_right (by omega) (le_of_not_gt hi)
-      exact hs.trans_le hp
-    simp [hi, Nat.testBit_lt_two_pow hlt]
-
-/-- If `g : β → ℕ` is computable in polynomial time (`FP`) and `encB` has a polynomial-time total
-decoder, then the bit-graph oracle `bitGraph encB g` belongs to `P`. -/
-theorem bitGraph_mem_P_of_decoder {encB : β ↪ List Bool} (D : Decoder encB)
-    {g : β → ℕ} (hg : ComputableInPolyTime g encB encNat) :
-    bitGraph encB g ∈ P encBits := by
-  classical
-  let Dpair : Decoder (encPair encB encNat) := Decoder.pair D Decoder.nat
-  let decider : List Bool → Bool := fun w =>
-    let p := Dpair.decode w
-    decide (w = encPair encB encNat p) && (g p.1).testBit p.2
-  refine ⟨decider, ?_, fun w => ?_⟩
-  · have hdecode : ComputableInPolyTime Dpair.decode encBits (encPair encB encNat) :=
-      Dpair.computableInPolyTime
-    have hreenc : ComputableInPolyTime (fun w => encPair encB encNat (Dpair.decode w))
-        encBits encBits :=
-      ComputableInPolyTime.encoding_comp hdecode
-    have heq : ComputableInPolyTime (fun w => decide (w = encPair encB encNat (Dpair.decode w)))
-        encBits encBool := by
-      convert ComputableInPolyTime.beq ComputableInPolyTime.id' hreenc using 1
-      funext w
-      rw [Bool.eq_iff_iff, decide_eq_true_eq, beq_iff_eq]
-    have hgb : ComputableInPolyTime (fun w => g (Dpair.decode w).1) encBits encNat :=
-      hg.comp ((ComputableInPolyTime.fst _ _).comp hdecode)
-    have hind : ComputableInPolyTime (fun w => (Dpair.decode w).2) encBits encNat :=
-      (ComputableInPolyTime.snd _ _).comp hdecode
-    have hsize : ComputableInPolyTime (fun w => (g (Dpair.decode w).1).size) encBits encUnary :=
-      ComputableInPolyTime.binary_size.comp hgb
-    have hsizeBin : ComputableInPolyTime (fun w => (g (Dpair.decode w).1).size) encBits encNat :=
-      ComputableTidilyInPolyTime.unary_to_binary.computableInPolyTime.comp hsize
-    have hlt : ComputableInPolyTime
-        (fun w => decide ((Dpair.decode w).2 < (g (Dpair.decode w).1).size)) encBits encBool :=
-      ComputableInPolyTime.binary_lt' hind hsizeBin
-    have hmin : ComputableInPolyTime
-        (fun w => min (g (Dpair.decode w).1).size (Dpair.decode w).2) encBits encUnary :=
-      ComputableInPolyTime.binary_min_unary' hsize hind
-    have htb : ComputableInPolyTime
-        (fun w => (g (Dpair.decode w).1).testBit (min (g (Dpair.decode w).1).size
-          (Dpair.decode w).2))
-        encBits encBool :=
-      (ComputableTidilyInPolyTime.binary_testBit hgb.tidy hmin.tidy).computableInPolyTime
-    have hbit : ComputableInPolyTime (fun w => (g (Dpair.decode w).1).testBit (Dpair.decode w).2)
-        encBits encBool := by
-      convert (ComputableTidilyInPolyTime.bool_and' hlt.tidy htb.tidy).computableInPolyTime using 1
-      funext w
-      exact testBit_eq_bounded
-    exact (ComputableTidilyInPolyTime.bool_and' heq.tidy hbit.tidy).computableInPolyTime
-  · simp only [decider, Bool.and_eq_true, decide_eq_true_eq, bitGraph, Set.mem_image,
-      Set.mem_ofPred_eq, Prod.exists]
-    constructor
-    · rintro ⟨b, i, hbi, rfl⟩
-      simp only [Dpair.decode_enc, true_and]
-      exact hbi
-    · rintro ⟨hw, hbi⟩
-      exact ⟨(Dpair.decode w).1, (Dpair.decode w).2, hbi, hw.symm⟩
-
 /-- If `f ≤_T^#P g` and the bit graph of `g` is in `P`, then `f` is computable in polynomial
 time (`FP`). -/
 theorem CountingTuringReducible.computableInPolyTime_of_bitGraph_mem_P
@@ -396,7 +325,7 @@ theorem CountingTuringReducible.computableInPolyTime_of_decoder
     (hfg : CountingTuringReducible encA encB f g)
     (hg : ComputableInPolyTime g encB encNat) :
     ComputableInPolyTime f encA encNat :=
-  hfg.computableInPolyTime_of_bitGraph_mem_P (bitGraph_mem_P_of_decoder D hg)
+  hfg.computableInPolyTime_of_bitGraph_mem_P (bitGraph_mem_P D hg)
 
 end OracleElimination
 

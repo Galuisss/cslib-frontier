@@ -88,9 +88,9 @@ noncomputable def perfectMatchingPositionsEquiv (G : Graph) :
       {S : Finset ℕ // (∀ i ∈ S, i < G.edgeList.length) ∧
         ∀ v ∈ G.vertices, ∃! i, i < G.edgeList.length ∧
           incident (G.edgeList.getD i (0, 0)) v = true ∧ i ∈ S} where
-  toFun M :=
-    ⟨positions M.1, fun i hi => (mem_positions.mp hi).1,
-      fun v hv => cover_positions M.2.1 v hv (M.2.2 _)⟩
+  toFun := fun ⟨M, hmatch, hspan⟩ =>
+    ⟨positions M, fun i hi => (mem_positions.mp hi).1,
+      fun v hv => cover_positions hmatch v hv (hspan _)⟩
   invFun S :=
     let ⟨s, hs1, hs2⟩ := S
     ⟨ofPositions G s, isPerfectMatching_ofPositions hs1 hs2⟩

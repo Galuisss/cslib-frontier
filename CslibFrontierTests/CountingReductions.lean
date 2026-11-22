@@ -56,7 +56,7 @@ example :
 /-! ### 2. Row 1: Independent sets (`n = |V|`, width `2`) -/
 
 /-- Path graph `0 — 1 — 2` has `5` independent sets (`∅, {0}, {1}, {2}, {0, 2}`). -/
-def path3 : Graph := ([0, 1, 2], [(0, 1), (1, 2)])
+def path3 : Graph := ⟨[0, 1, 2], [(0, 1), (1, 2)]⟩
 
 example : path3.toIndepSetCNF.numVars = 3 := by decide
 
@@ -65,15 +65,15 @@ example : path3.toIndepSetCNF.all (fun c => decide (c.length = 2)) = true := by 
 example : path3.toIndepSetCNF.modelCount = 5 := by decide
 
 example :
-    Nat.card {S : Finset {v : ℕ // v ∈ path3.1} //
-      path3.induced.IsIndepSet (S : Set {v : ℕ // v ∈ path3.1})} = 5 := by
+    Nat.card {S : Finset {v : ℕ // v ∈ path3.vertices} //
+      path3.induced.IsIndepSet (S : Set {v : ℕ // v ∈ path3.vertices})} = 5 := by
   rw [← Graph.modelCount_toIndepSetCNF]
   decide
 
 /-! ### 3. Row 2: Proper `q`-colourings (`n = q * |V|`, width `≤ max q 2`) -/
 
 /-- Single edge `K₂` has `3 * 2 = 6` proper `3`-colourings on `6` Boolean variables. -/
-def edgeGraph : Graph := ([0, 1], [(0, 1)])
+def edgeGraph : Graph := ⟨[0, 1], [(0, 1)]⟩
 
 example : (edgeGraph.toColoringCNF 3).numVars = 6 := by decide
 
@@ -88,13 +88,13 @@ example : Nat.card (edgeGraph.induced.Coloring (Fin 3)) = 6 := by
 /-! ### 4. Row 3: Perfect matchings via sequential `O(degree)` circuit (`width = 3`) -/
 
 /-- Four-cycle `C₄` compiles to an exact `3`-CNF formula on linear wires. -/
-def cycle4 : Graph := ([0, 1, 2, 3], [(0, 1), (1, 2), (2, 3), (3, 0)])
+def cycle4 : Graph := ⟨[0, 1, 2, 3], [(0, 1), (1, 2), (2, 3), (3, 0)]⟩
 
 example : cycle4.toPerfectMatchingCNF.all (fun c => decide (c.length = 3)) = true := by decide
 
 example :
     CNF.validDeclaredInput 3
-      (cycle4.edgeList.length + cycle4.perfectMatchingCircuit.1.length)
+      (cycle4.edgeList.length + cycle4.perfectMatchingCircuit.gates.length)
       cycle4.toPerfectMatchingCNF = true :=
   Graph.validDeclaredInput_toPerfectMatchingCNF cycle4
 
@@ -102,23 +102,23 @@ example :
 false]` and `[false, true, false, true]` and rejects adjacent edges `[true, true, false, false]`. -/
 example :
     Circuits.Boolean.evalOutput [true, false, true, false]
-      cycle4.perfectMatchingCircuit.1 cycle4.perfectMatchingCircuit.2 = true := by
+      cycle4.perfectMatchingCircuit.gates cycle4.perfectMatchingCircuit.outWire = true := by
   decide
 
 example :
     Circuits.Boolean.evalOutput [false, true, false, true]
-      cycle4.perfectMatchingCircuit.1 cycle4.perfectMatchingCircuit.2 = true := by
+      cycle4.perfectMatchingCircuit.gates cycle4.perfectMatchingCircuit.outWire = true := by
   decide
 
 example :
     Circuits.Boolean.evalOutput [true, true, false, false]
-      cycle4.perfectMatchingCircuit.1 cycle4.perfectMatchingCircuit.2 = false := by
+      cycle4.perfectMatchingCircuit.gates cycle4.perfectMatchingCircuit.outWire = false := by
   decide
 
 /-- Single isolated vertex `[0]` has `0` perfect matchings (`5` Tseitin wires, checked by
 `decide`), while the empty graph `[]` has `1` perfect matching (`1` Tseitin wire). -/
-def isolated1 : Graph := ([0], [])
-def emptyGraph : Graph := ([], [])
+def isolated1 : Graph := ⟨[0], []⟩
+def emptyGraph : Graph := ⟨[], []⟩
 
 example : Nat.card {M : isolated1.induced.Subgraph // M.IsPerfectMatching} = 0 := by
   rw [← Graph.modelCountOn_toPerfectMatchingCNF]
@@ -136,7 +136,7 @@ def neqSem3 (_ : Unit) (ts : List (Fin 3)) : Bool :=
   | [a, b] => decide (a ≠ b)
   | _ => false
 
-def ternaryNeqCSP : CSP Unit ℕ := [((), [0, 1])]
+def ternaryNeqCSP : CSP Unit ℕ := [⟨(), [0, 1]⟩]
 
 example : (CSP.toOneHotCNF 3 2 ternaryNeqCSP neqSem3).numVars = 6 := by decide
 
@@ -147,7 +147,8 @@ example :
 example : (CSP.toOneHotCNF 3 2 ternaryNeqCSP neqSem3).modelCount = 6 := by decide
 
 example :
-    (CSP.toOneHotDeclaredCNF 3 2 neqSem3 (2, ternaryNeqCSP)).2.modelCountOn (Finset.range 6) =
+    (CSP.toOneHotDeclaredCNF 3 2 neqSem3 ⟨2, ternaryNeqCSP⟩).formula.modelCountOn
+        (Finset.range 6) =
       6 := by
   decide
 
@@ -160,11 +161,11 @@ def split3 : SetSplittingInstance :=
 
 example : split3.maxSetSizeBool 3 = true := by decide
 
-example : (split3.toDeclaredCNF).1 = 3 := by decide
+example : split3.toDeclaredCNF.numVars = 3 := by decide
 
-example : (split3.toDeclaredCNF).2.all (fun c => decide (c.length ≤ 3)) = true := by decide
+example : split3.toDeclaredCNF.formula.all (fun c => decide (c.length ≤ 3)) = true := by decide
 
-example : (split3.toDeclaredCNF).2.modelCountOn (Finset.range 3) = 6 := by decide
+example : split3.toDeclaredCNF.formula.modelCountOn (Finset.range 3) = 6 := by decide
 
 example : split3.count = 6 := by
   have hv : split3.Valid := (split3.validBool_eq_true_iff).mp (by decide)
@@ -180,12 +181,13 @@ def andLocalMap : LocalMap :=
 example : andLocalMap.Valid 2 = true := by decide
 
 example :
-    (LocalMap.toDeclaredCNF 2 (andLocalMap, [false])).2.modelCountOn (Finset.range 2) = 3 := by
+    (LocalMap.toDeclaredCNF 2 (andLocalMap, [false])).formula.modelCountOn (Finset.range 2) =
+      3 := by
   decide
 
 noncomputable example :
     {σ : Finset.range 2 → Bool //
-      (LocalMap.toDeclaredCNF 2 (andLocalMap, [false])).2.eval
+      (LocalMap.toDeclaredCNF 2 (andLocalMap, [false])).formula.eval
         (fun v => if hv : v ∈ Finset.range 2 then σ ⟨v, hv⟩ else false) = true} ≃
       {σ : Finset.range 2 → Bool //
         andLocalMap.eval (fun v => if hv : v ∈ Finset.range 2 then σ ⟨v, hv⟩ else false) =

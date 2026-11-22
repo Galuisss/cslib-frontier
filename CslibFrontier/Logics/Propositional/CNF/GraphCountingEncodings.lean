@@ -305,9 +305,6 @@ private theorem coloringDecode_spec [DecidableEq V] {q : ℕ} {vs : List V} {es 
       then σ ⟨(u.1, (coloringDecode hσ u).1), hp⟩ else false) = true :=
   (((eval_coloringCNF q vs es _).mp hσ).1 u.1 u.2).1.choose_spec.2
 
-/-- **Assignment bijection for `coloringCNF`**: satisfying assignments on the one-hot variables
-`vs.toFinset ×ˢ Finset.range q` biject with proper `Fin q`-colourings of `G`. -/
-
 private def coloringEncode [DecidableEq V] {q : ℕ} {vs : List V}
     {G : SimpleGraph {v : V // v ∈ vs}}
     (C : G.Coloring (Fin q)) : (vs.toFinset ×ˢ Finset.range q : Finset (V × ℕ)) → Bool :=
@@ -319,7 +316,8 @@ private theorem eval_coloringEncode [DecidableEq V] {q : ℕ} {vs : List V} {es 
       u.1 ≠ w.1 ∧ ((u.1, w.1) ∈ es ∨ (w.1, u.1) ∈ es))
     (C : G.Coloring (Fin q)) :
     (coloringCNF q vs es).eval
-      (fun p => if hp : p ∈ vs.toFinset ×ˢ Finset.range q then coloringEncode C ⟨p, hp⟩ else false) =
+      (fun p =>
+        if hp : p ∈ vs.toFinset ×ˢ Finset.range q then coloringEncode C ⟨p, hp⟩ else false) =
         true := by
   rw [eval_coloringCNF]
   refine ⟨fun v hv => ?_, fun e he h1 h2 hne c hc hs1 hs2 => ?_⟩
@@ -343,6 +341,8 @@ private theorem eval_coloringEncode [DecidableEq V] {q : ℕ} {vs : List V} {es 
     have hadj : G.Adj ⟨e.1, h1⟩ ⟨e.2, h2⟩ := (hG _ _).mpr ⟨hne, Or.inl he⟩
     exact C.valid hadj (Fin.ext (hs1.symm.trans hs2))
 
+/-- **Assignment bijection for `coloringCNF`**: satisfying assignments on the one-hot variables
+`vs.toFinset ×ˢ Finset.range q` biject with proper `Fin q`-colourings of `G`. -/
 noncomputable def coloringCNFEquiv [DecidableEq V] {q : ℕ} {vs : List V} {es : List (V × V)}
     {G : SimpleGraph {v : V // v ∈ vs}}
     (hG : ∀ (u w : {v : V // v ∈ vs}), G.Adj u w ↔
@@ -402,7 +402,7 @@ noncomputable def coloringCNFEquiv [DecidableEq V] {q : ℕ} {vs : List V} {es :
     have hp : (u, (coloringDecode hσ0 ⟨u, hu⟩).1) ∈ vs.toFinset ×ˢ Finset.range q :=
       Finset.mem_product.mpr ⟨List.mem_toFinset.mpr hu,
         Finset.mem_range.mpr (coloringDecode hσ0 ⟨u, hu⟩).2⟩
-    simpa [σ0, hp] using hspec
+    simpa only [σ0, coloringEncode, hp, ↓reduceDIte, decide_eq_true_eq] using hspec
 
 /-- **`coloringCNF` preserves the exact count of proper `q`-colourings.** -/
 theorem modelCount_coloringCNF [DecidableEq V] {q : ℕ} {vs : List V} {es : List (V × V)}

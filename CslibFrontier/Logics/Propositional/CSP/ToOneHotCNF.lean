@@ -36,9 +36,8 @@ with an explicit assignment bijection (`CSP.toOneHotCNFEquiv`).
 * `Cslib.Logic.PL.CSP.finTuples`: all `Fin q`-valued lists of a given length.
 * `Cslib.Logic.PL.Constraint.toOneHotCNF`, `Cslib.Logic.PL.Constraint.toOneHotCNFBounded`:
   per-constraint one-hot forbidden-tuple clauses and their width-guarded variant.
-* `Cslib.Logic.PL.CSP.toOneHotCNF`, `Cslib.Logic.PL.CSP.toOneHotCNFBounded`,
-  `Cslib.Logic.PL.CSP.toOneHotDeclaredCNF`: one-hot CNF compilation on `N * q` Boolean variables
-  and its width-guarded declared-variable variants.
+* `Cslib.Logic.PL.CSP.toOneHotCNF`, `Cslib.Logic.PL.CSP.toOneHotCNFBounded`: one-hot CNF
+  compilation on `N * q` Boolean variables and its width-guarded variant.
 * `Cslib.Logic.PL.CSP.toOneHotCNFEquiv`: explicit bijection between satisfying assignments on
   `Finset.range (N * q)` and solutions of `F` on `Finset.range N`.
 
@@ -52,7 +51,7 @@ with an explicit assignment bijection (`CSP.toOneHotCNFEquiv`).
   for `0 < q`.
 * `Cslib.Logic.PL.CSP.eval_toOneHotCNF`, `Cslib.Logic.PL.CSP.modelCountOn_toOneHotCNF`,
   `Cslib.Logic.PL.CSP.modelCount_toOneHotCNF`,
-  `Cslib.Logic.PL.CSP.modelCountOn_toOneHotDeclaredCNF`: exact evaluation and model-count
+  `Cslib.Logic.PL.CSP.modelCountOn_toOneHotCNFBounded`: exact evaluation and model-count
   preservation.
 
 ## References
@@ -115,16 +114,17 @@ variable {Rel : Type*}
 /-- One-hot forbidden-tuple clauses for a single constraint `c` over `Fin q`. -/
 @[expose] def toOneHotCNF (q : ℕ) (sem : Rel → List (Fin q) → Bool) (c : Constraint Rel ℕ) :
     CNF ℕ :=
-  ((CSP.finTuples q c.2.length).filter fun ts => !sem c.1 ts).map (CSP.forbidOneHotClause q c.2)
+  ((CSP.finTuples q c.scope.length).filter fun ts => !sem c.rel ts).map
+    (CSP.forbidOneHotClause q c.scope)
 
-/-- Width-guarded one-hot forbidden-tuple clauses: emits `toOneHotCNF` when `c.2.length ≤ k`, and
-`[]` otherwise. -/
+/-- Width-guarded one-hot forbidden-tuple clauses: emits `toOneHotCNF` when `c.scope.length ≤ k`,
+and `[]` otherwise. -/
 @[expose] def toOneHotCNFBounded (q k : ℕ) (sem : Rel → List (Fin q) → Bool)
     (c : Constraint Rel ℕ) : CNF ℕ :=
-  if c.2.length ≤ k then toOneHotCNF q sem c else []
+  if c.scope.length ≤ k then toOneHotCNF q sem c else []
 
 theorem toOneHotCNFBounded_eq_toOneHotCNF {q k : ℕ} {sem : Rel → List (Fin q) → Bool}
-    {c : Constraint Rel ℕ} (hc : c.2.length ≤ k) :
+    {c : Constraint Rel ℕ} (hc : c.scope.length ≤ k) :
     toOneHotCNFBounded q k sem c = toOneHotCNF q sem c := by
   simp [toOneHotCNFBounded, hc]
 
@@ -150,23 +150,28 @@ declared variables `0, …, N - 1`. Uses Boolean variables `v * q + a` (`v < N`,
   ((List.range N).flatMap fun v => CNF.exactlyOne ((List.range q).map fun a => v * q + a)) ++
     F.flatMap (Constraint.toOneHotCNF q sem)
 
+private theorem length_clause_of_mem_exactlyOne_le {q k : ℕ} {f : ℕ → ℕ} {cl : Clause ℕ}
+    (hc : cl ∈ CNF.exactlyOne ((List.range q).map f)) :
+    cl.length ≤ max q (max k 2) := by
+  rw [CNF.exactlyOne, List.mem_append] at hc
+  rcases hc with hc | hc
+  · rw [CNF.atLeastOne, List.mem_singleton] at hc
+    subst hc
+    simp
+  · simp only [CNF.atMostOne, List.mem_flatMap, List.mem_map] at hc
+    obtain ⟨_, _, _, _, rfl⟩ := hc
+    exact (le_max_right k 2).trans (le_max_right q (max k 2))
+
 /-- If every constraint scope has length at most `k`, every clause of `toOneHotCNF q N F sem`
 has width at most `max q (max k 2)`. -/
 theorem length_clause_toOneHotCNF_le {q N k : ℕ} {F : CSP Rel ℕ}
-    (sem : Rel → List (Fin q) → Bool) (hF : ∀ c ∈ F, c.2.length ≤ k)
+    (sem : Rel → List (Fin q) → Bool) (hF : ∀ c ∈ F, c.scope.length ≤ k)
     {cl : Clause ℕ} (hcl : cl ∈ toOneHotCNF q N F sem) :
     cl.length ≤ max q (max k 2) := by
   simp only [toOneHotCNF, Constraint.toOneHotCNF, List.mem_append, List.mem_flatMap,
     List.mem_map, List.mem_filter] at hcl
   rcases hcl with ⟨v, _, hc⟩ | ⟨c, hcF, ts, -, rfl⟩
-  · rw [CNF.exactlyOne, List.mem_append] at hc
-    rcases hc with hc | hc
-    · rw [CNF.atLeastOne, List.mem_singleton] at hc
-      subst hc
-      simp
-    · simp only [CNF.atMostOne, List.mem_flatMap, List.mem_map] at hc
-      obtain ⟨_, _, _, _, rfl⟩ := hc
-      exact (le_max_right k 2).trans (le_max_right q (max k 2))
+  · exact length_clause_of_mem_exactlyOne_le hc
   · rw [length_forbidOneHotClause]
     exact (Nat.min_le_left _ _).trans
       ((hF c hcF).trans ((le_max_left k 2).trans (le_max_right q (max k 2))))
@@ -453,13 +458,8 @@ declared variables `0, …, N - 1`. -/
   ((List.range N).flatMap fun v => CNF.exactlyOne ((List.range q).map fun a => v * q + a)) ++
     F.flatMap (Constraint.toOneHotCNFBounded q k sem)
 
-/-- Declared-variable one-hot CNF compilation `(N * q, toOneHotCNFBounded q k N F sem)`. -/
-@[expose] def toOneHotDeclaredCNF (q k : ℕ) (sem : Rel → List (Fin q) → Bool)
-    (x : ℕ × CSP Rel ℕ) : ℕ × CNF ℕ :=
-  (x.1 * q, toOneHotCNFBounded q k x.1 x.2 sem)
-
 theorem toOneHotCNFBounded_eq_toOneHotCNF {q k N : ℕ} {F : CSP Rel ℕ}
-    (sem : Rel → List (Fin q) → Bool) (hF : ∀ c ∈ F, c.2.length ≤ k) :
+    (sem : Rel → List (Fin q) → Bool) (hF : ∀ c ∈ F, c.scope.length ≤ k) :
     toOneHotCNFBounded q k N F sem = toOneHotCNF q N F sem := by
   unfold toOneHotCNFBounded toOneHotCNF
   congr 1
@@ -471,15 +471,8 @@ theorem length_clause_toOneHotCNFBounded_le {q k N : ℕ} {F : CSP Rel ℕ}
     cl.length ≤ max q (max k 2) := by
   rw [toOneHotCNFBounded, List.mem_append] at hcl
   rcases hcl with hcl | hcl
-  · obtain ⟨v, _, hc⟩ := List.mem_flatMap.mp hcl
-    rw [CNF.exactlyOne, List.mem_append] at hc
-    rcases hc with hc | hc
-    · rw [CNF.atLeastOne, List.mem_singleton] at hc
-      subst hc
-      simp
-    · simp only [CNF.atMostOne, List.mem_flatMap, List.mem_map] at hc
-      obtain ⟨_, _, _, _, rfl⟩ := hc
-      exact (le_max_right k 2).trans (le_max_right q (max k 2))
+  · obtain ⟨_, _, hc⟩ := List.mem_flatMap.mp hcl
+    exact length_clause_of_mem_exactlyOne_le hc
   · obtain ⟨c, _, hc⟩ := List.mem_flatMap.mp hcl
     exact (Constraint.length_clause_toOneHotCNFBounded_le hc).trans
       ((le_max_left k 2).trans (le_max_right q (max k 2)))
@@ -496,18 +489,15 @@ theorem validDeclaredInput_toOneHotCNFBounded {q k N : ℕ} {F : CSP Rel ℕ}
     (fun v hv' => Finset.mem_range.mp (hsub (List.mem_toFinset.mpr hv')))
     (List.mem_toFinset.mp hx))
 
-theorem modelCountOn_toOneHotDeclaredCNF {q k : ℕ} (hq : 0 < q)
-    (sem : Rel → List (Fin q) → Bool) {x : ℕ × CSP Rel ℕ}
-    (hv : validDeclaredCSP k x.1 x.2 = true) :
+theorem modelCountOn_toOneHotCNFBounded {q k N : ℕ} (hq : 0 < q) {F : CSP Rel ℕ}
+    (sem : Rel → List (Fin q) → Bool) (hv : validDeclaredCSP k N F = true) :
     letI : Inhabited (Fin q) := ⟨⟨0, hq⟩⟩
-    (toOneHotDeclaredCNF q k sem x).2.modelCountOn
-        (Finset.range (toOneHotDeclaredCNF q k sem x).1) =
-      x.2.modelCountOn sem (Finset.range x.1) := by
+    (toOneHotCNFBounded q k N F sem).modelCountOn (Finset.range (N * q)) =
+      F.modelCountOn sem (Finset.range N) := by
   let : Inhabited (Fin q) := ⟨⟨0, hq⟩⟩
   obtain ⟨hw, hsub⟩ := validDeclaredCSP_eq_true_iff.mp hv
-  dsimp only [toOneHotDeclaredCNF]
   rw [toOneHotCNFBounded_eq_toOneHotCNF sem hw]
-  exact modelCountOn_toOneHotCNF hq x.2 sem fun v hv' =>
+  exact modelCountOn_toOneHotCNF hq F sem fun v hv' =>
     Finset.mem_range.mp (hsub (List.mem_toFinset.mpr hv'))
 
 end Cslib.Logic.PL.CSP
