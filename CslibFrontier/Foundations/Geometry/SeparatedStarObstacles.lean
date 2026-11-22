@@ -98,8 +98,10 @@ theorem isPathConnected_compl_iUnion_starConvex_of_separated_rectangles {ι : Ty
       have hV : IsOpen V :=
         (isOpen_Ioo.preimage Complex.continuous_re).inter
           (isOpen_Ioo.preimage Complex.continuous_im)
-      exact hyinterior (hV.subset_interior_iff.mpr
-        (fun _ hz => ⟨Set.Ioo_subset_Icc_self hz.1, Set.Ioo_subset_Icc_self hz.2⟩) ⟨hj, him⟩)
+      have hVBox : V ⊆ box i := fun _ hz =>
+        ⟨Set.Ioo_subset_Icc_self hz.1, Set.Ioo_subset_Icc_self hz.2⟩
+      have hyV : y ∈ V := ⟨hj, him⟩
+      exact hyinterior (hV.subset_interior_iff.mpr hVBox hyV)
     · exact Set.disjoint_left.mp (hsep he) hybox.1 (Set.Ioo_subset_Icc_self hj)
   have join_exit (z : ℂ) (hz : z ∈ W) : ∃ y ∈ U, JoinedIn W z y := by
     by_cases hzU : z ∈ U
