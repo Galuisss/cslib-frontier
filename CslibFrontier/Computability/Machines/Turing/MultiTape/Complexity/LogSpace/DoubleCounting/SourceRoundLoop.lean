@@ -32,6 +32,7 @@ rejects the source scan.
 * `replayRounds_correct` gives the mathematical verdict of a successful full-fuel replay.
 * `haltsWithin` and `length_run_le` charge the retained registers and supplied callback bounds
   on every branch.
+* `verdictElimSnd_inSpace` dispatches an optional verdict while retaining encoded caller data.
 * `exists_routines` compiles the loop with supplied native callbacks and
   `native_firstHalting_accept_iff` preserves its accepting occurrence lists.
 -/
@@ -78,6 +79,28 @@ private def verdictView : ControllerVerdict ≃ (ℕ ⊕ Bool) where
 /-- One tag followed by the tied radius or the reachability bit. -/
 def encVerdict : ControllerVerdict ↪ List Bool :=
   verdictView.toEmbedding.trans (encSum encNat encBool)
+
+/-- Case analysis on an optional verdict retains the caller's first component.
+The missing, bad-radius, and decided branches supply their linear-space certificates. -/
+theorem verdictElimSnd_inSpace {π ε : Type} {encP : π ↪ List Bool} {encE : ε ↪ List Bool}
+    {missing : π → ε} {bad : π × ℕ → ε} {decided : π × Bool → ε}
+    (hmissing : ComputableInSpace missing encP encE (fun p => (encP p).length))
+    (hbad : ComputableInSpace bad (encPair encP encNat) encE
+      (fun p => (encPair encP encNat p).length))
+    (hdecided : ComputableInSpace decided (encPair encP encBool) encE
+      (fun p => (encPair encP encBool p).length)) :
+    let E := encPair encP (encOption encVerdict)
+    ComputableInSpace (fun p : π × Option ControllerVerdict =>
+      match p.2 with
+      | none => missing p.1
+      | some (.bad radius) => bad (p.1, radius)
+      | some (.decided answer) => decided (p.1, answer))
+      E encE (fun p => (E p).length) := by
+  have hsome := (sumElimSnd hbad hdecided).of_encIn_eq
+    (encIn' := encPair encP encVerdict)
+    (fun p : π × ControllerVerdict => (p.1, verdictView p.2)) (fun _ => rfl)
+  exact (optionElimSnd hmissing hsome).of_enc_eq fun
+    | (_, none) | (_, some (.bad _)) | (_, some (.decided _)) => rfl
 
 /-- A pending round, a pending final membership query, or the terminal verdict. -/
 abbrev State (κ ρ μ : Type) :=
