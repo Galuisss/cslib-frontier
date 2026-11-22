@@ -441,8 +441,21 @@ theorem configurationJustesenSourceLoop_acceptCount_eq_one
   rw [R.acceptCount_eq_one_iff a hclock]
   refine (existsUnique_congr fun bits => ?_).mpr
     (configurationJustesenSourceLoop_existsUnique_firstHalting ntm c w seed source target)
-  have h := (R.existsUnique_accepting_replay_iff a bits).symm.trans
-    (justesenSourceLoop_native_firstHalting_accept_iff ntm c R a bits)
-  simpa only [hcontext, hlimit] using h
+  let entered := (justesenSourceLoop ntm c baseline fuel).withInit
+    (justesenSourceLoop ntm c (contextOf a) (limitOf a)).init
+  change (entered.FirstHalting w bits entered.init ∧
+    entered.accept (entered.run w bits) = true) ↔ _
+  dsimp only [entered]
+  rw [justesenSourceLoop_withInit, hcontext, hlimit]
+  let context : JustesenSourceContext :=
+    ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+  let initial := SourceRoundLoop.start context n
+  let M := justesenSourceLoop ntm c context n
+  have haccept := SourceRoundLoop.machine_accept_iff initial
+    (justesenRetainedSourceRound ntm c initial)
+    justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
+    (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
+    MembershipTally.retainedReply (M.run w bits)
+  exact (and_congr_right fun _ => haccept).trans exists_and_left.symm
 
 end Cslib.Complexity.STCON
