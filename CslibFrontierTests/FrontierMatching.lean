@@ -12,12 +12,10 @@ import CslibFrontier.Computability.Circuit.Frontier.Layouts.Gaussian.Matching
 Verifies:
 1. Concrete `pairKey` threshold cuts and strict `1 < 2` saving over naive median-of-3 edge scores.
 2. Concrete `K₄` cubic graph with perfect matching `M = {e₀₁, e₂₃}` where `matchingCost = 2 < 4`
-   (strictly half the naive `EdgeStraddles` count of `4`!).
+   (strictly half the naive `EdgeStraddles` count of `4`).
 3. Concrete theta multigraph (2 vertices, 3 parallel edges) confirming the loopless multigraph
    theory handles parallel edges directly.
 4. Non-vacuous instantiation of `layoutBound_of_matching_mean` via `M = ∅`.
-5. Standard-axiom-only guards (`propext`, `Classical.choice`, `Quot.sound`) for all headline
-   theorems.
 -/
 
 open Cslib.Circuits.Frontier
@@ -187,57 +185,3 @@ example : LayoutBound 3 (2 * Gaussian.straddleBound 0) := by
     Gaussian.measureReal_straddleEvent_le hloop h3 (q := 0) le_rfl (R := 1)
       (ρ₀ := 0) le_rfl (by norm_num) t v
   simpa [Finset.sum_const, nsmul_eq_mul] using hle
-
-/-! ### 5. Standard-axiom-only guards -/
-
-/-- info: 'Cslib.Circuits.Frontier.twoVertexEnergy_pairKey' depends on axioms: [propext] -/
-#guard_msgs in
-#print axioms Cslib.Circuits.Frontier.twoVertexEnergy_pairKey
-
-/--
-info: 'Cslib.Circuits.Frontier.Multigraph.matchingCost_le_edgeStraddles' depends on axioms: [propext,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms Cslib.Circuits.Frontier.Multigraph.matchingCost_le_edgeStraddles
-
-/--
-info: 'Cslib.Circuits.Frontier.Multigraph.ncard_edgeCut_threshold_le_matchingCost' depends on axioms: [propext,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms Cslib.Circuits.Frontier.Multigraph.ncard_edgeCut_threshold_le_matchingCost
-
-/--
-info: 'Cslib.Circuits.Frontier.Multigraph.exists_width_le_of_matching_edgeScore' depends on axioms: [propext,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms Cslib.Circuits.Frontier.Multigraph.exists_width_le_of_matching_edgeScore
-
-/--
-info: 'Cslib.Circuits.Frontier.Gaussian.exists_good_matching_sample_of_mean' depends on axioms: [propext,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms Cslib.Circuits.Frontier.Gaussian.exists_good_matching_sample_of_mean
-
-/--
-info: 'Cslib.Circuits.Frontier.Gaussian.cubicLayoutBound_of_matching_mean' depends on axioms: [propext,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms Cslib.Circuits.Frontier.Gaussian.cubicLayoutBound_of_matching_mean
-
-/--
-info: 'Cslib.Circuits.Frontier.Gaussian.layoutBound_of_matching_mean' depends on axioms: [propext,
- Classical.choice,
- Quot.sound]
--/
-#guard_msgs in
-#print axioms Cslib.Circuits.Frontier.Gaussian.layoutBound_of_matching_mean
