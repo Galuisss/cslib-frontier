@@ -630,6 +630,11 @@ Irit Dinur. “The PCP Theorem by Gap Amplification.” *Journal of the ACM* 54(
 
 Irit Dinur. “Mildly Exponential Reduction from Gap 3SAT to Polynomial-Gap Label-Cover.” *Electronic Colloquium on Computational Complexity*, Report TR16-128, 2016. https://eccc.weizmann.ac.il/report/2016/128/ . Bibliographic metadata checked against the ECCC report record; the report's full text was inspected for Hypothesis 2.5 (p. 5), which has at most $D n$ clauses and fixed soundness $< 0.9$. Used alongside [manurangsiraghavendra2017](#manurangsiraghavendra2017) to document the Gap Exponential Time Hypothesis adaptation (`GapETH`, `rGapETH`) in [FineGrained/GapETH.lean](../CslibFrontier/Computability/Complexity/FineGrained/GapETH.lean).
 
+<a id="dolevstrong1983"></a>
+## dolevstrong1983
+
+Danny Dolev and H. Raymond Strong. "Authenticated Algorithms for Byzantine Agreement." *SIAM Journal on Computing* 12(4), 656–666, 1983. https://doi.org/10.1137/0212045 . Bibliographic metadata checked via secondary indexes on 2026-11-21 UTC; the full journal PDF was not inspected, so no numbered section or theorem locator is asserted. Cited by [Byzantine/DolevStrong.lean](../CslibFrontier/Computability/Distributed/Byzantine/DolevStrong.lean) for `(t + 1)`-round synchronous authenticated Byzantine broadcast over arbitrary process sets with at most two relayed chains per process.
+
 <a id="dosasgall2013"></a>
 ## dosasgall2013
 
@@ -714,6 +719,11 @@ National Institute of Standards and Technology. *Module-Lattice-Based Key-Encaps
 ## fips205
 
 National Institute of Standards and Technology. *Stateless Hash-Based Digital Signature Standard*, Federal Information Processing Standards Publication 205, 2024. https://doi.org/10.6028/NIST.FIPS.205 . Checked on 2026-11-13 against the official PDF (SHA-256 `8ef34228276f3386d23cb0da8c14592b8cfb0db3358016bba64df7a004f8d13d`): Section 4.2 and Figures 2–9 define the canonical 32-byte address and its seven type-specific layouts; Section 4.3 and Table 1 define the address setters, including clearing the final 12 bytes on every type change; Section 4.4 defines the unsigned big-endian integer encoding and Algorithm 4 defines `base_2b`; Section 5, Equations (5.1)–(5.4) fixes `lg_w = 4`, `w = 16`, `len1 = 2n`, `len2 = 3` and `len = 2n + 3` for `n = 16, 24, 32`; Algorithms 7 and 8, lines 1–7 define the shared message conversion and complement checksum, including the four-bit left shift and two-byte big-endian encoding; and Section 11.2, Figure 18 and Table 3 define the 22-byte compressed address used by the SHA2 parameter sets. `CslibFrontier.Crypto.Primitives.SLHDSA.Address` formalizes the address-domain layer with typed 32-byte and 22-byte encodings, and `CslibFrontier.Crypto.Primitives.SLHDSA.WOTS.Digits` formalizes exactly the digit-preprocessing layer. They do not formalize the concrete hash instantiations, the Algorithm 5 chain, complete WOTS+, XMSS, FORS, the hypertree, signing, verification or security analysis.
+
+<a id="fischerlynch1982"></a>
+## fischerlynch1982
+
+Michael J. Fischer and Nancy A. Lynch. "A Lower Bound for the Time to Assure Interactive Consistency." *Information Processing Letters* 14(4), 183–186, 1982. https://doi.org/10.1016/0020-0190(82)90033-3 . Bibliographic metadata checked via secondary indexes on 2026-11-21 UTC; the full journal PDF was not inspected, so no numbered section or theorem locator is asserted. Cited by [Byzantine/RoundBound.lean](../CslibFrontier/Computability/Distributed/Byzantine/RoundBound.lean) for the `t + 1` round lower bound for deterministic synchronous Byzantine agreement.
 
 <a id="fks84"></a>
 ## fks84

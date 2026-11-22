@@ -3169,9 +3169,11 @@ public import CslibFrontier.Computability.Distributed.AsyncByzantine.Basic
 public import CslibFrontier.Computability.Distributed.AsyncByzantine.Bracha
 public import CslibFrontier.Computability.Distributed.AsyncByzantine.Impossibility
 public import CslibFrontier.Computability.Distributed.Byzantine.Basic
+public import CslibFrontier.Computability.Distributed.Byzantine.DolevStrong
 public import CslibFrontier.Computability.Distributed.Byzantine.NodeBound
 public import CslibFrontier.Computability.Distributed.Byzantine.OralMessages
 public import CslibFrontier.Computability.Distributed.Byzantine.RecursiveOralMessages
+public import CslibFrontier.Computability.Distributed.Byzantine.RoundBound
 public import CslibFrontier.Computability.Distributed.OrientedCycle.Basic
 public import CslibFrontier.Computability.Distributed.OrientedCycle.ColeVishkin
 public import CslibFrontier.Computability.Distributed.OrientedCycle.Graph
