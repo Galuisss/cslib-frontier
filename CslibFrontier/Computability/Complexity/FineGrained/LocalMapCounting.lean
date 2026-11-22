@@ -9,6 +9,7 @@ module
 
 public import CslibFrontier.Init
 public import CslibFrontier.Computability.Complexity.FineGrained.CountingCSP
+public import CslibFrontier.Computability.Complexity.Problems.SAT.Declared
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Basic
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Bounds
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List
@@ -253,14 +254,14 @@ def cspSem (rel : List (List Bool) × Bool) (w : List Bool) : Bool :=
   rel.1.contains w == rel.2
 
 /-- Express the local map preimage equation `G(x) = target` as a Boolean CSP over relation
-alphabet `List (List Bool) × Bool`, emitting one constraint `((c.accepts, target_i), c.scope)` per
+alphabet `List (List Bool) × Bool`, emitting one constraint `⟨(c.accepts, target_i), c.scope⟩` per
 output coordinate. -/
 def toCSP (G : LocalMap) (target : List Bool) : CSP (List (List Bool) × Bool) ℕ :=
-  (G.2.zip target).map fun p => ((p.numVars.2, p.formula), p.numVars.1)
+  (G.2.zip target).map fun p => ⟨(p.1.2, p.2), p.1.1⟩
 
 private theorem eval_map_zip_toCSP (cs : List LocalOutput) (bs : List Bool)
     (hlen : bs.length = cs.length) (σ : ℕ → Bool) :
-    CSP.eval cspSem σ ((cs.zip bs).map fun p => ((p.numVars.2, p.formula), p.numVars.1)) =
+    CSP.eval cspSem σ ((cs.zip bs).map fun p => ⟨(p.1.2, p.2), p.1.1⟩) =
       decide (cs.map (fun c => c.eval σ) = bs) := by
   induction cs generalizing bs with
   | nil =>
@@ -271,8 +272,8 @@ private theorem eval_map_zip_toCSP (cs : List LocalOutput) (bs : List Bool)
     rcases bs with _ | ⟨b, bs⟩
     · simp at hlen
     · simp only [List.length_cons, Nat.add_right_cancel_iff] at hlen
-      change (Constraint.eval cspSem σ ((c.2, b), c.1) &&
-          CSP.eval cspSem σ ((cs.zip bs).map fun p => ((p.numVars.2, p.formula), p.numVars.1))) =
+      change (Constraint.eval cspSem σ ⟨(c.2, b), c.1⟩ &&
+          CSP.eval cspSem σ ((cs.zip bs).map fun p => ⟨(p.1.2, p.2), p.1.1⟩)) =
         decide (c.eval σ :: cs.map (fun c => c.eval σ) = b :: bs)
       rw [ih bs hlen]
       change ((c.eval σ == b) && decide (cs.map (fun c => c.eval σ) = bs)) =
@@ -363,12 +364,12 @@ private theorem list_contains_eq_any {α : Type*} [BEq α] [LawfulBEq α] (l : L
 /-- `LocalOutput.evalLocal` is computable in polynomial time. -/
 @[fun_prop]
 theorem computableInPolyTime_localOutput_evalLocal :
-    ComputableInPolyTime (fun p : LocalOutput × List Bool => p.numVars.evalLocal p.formula)
+    ComputableInPolyTime (fun p : LocalOutput × List Bool => p.1.evalLocal p.2)
       (encPair encLocalOutput (encList encBool)) encBool := by
   have haccepts := (snd (encList encNat) (encList (encList encBool))).comp
     (fst encLocalOutput (encList encBool))
   have hany : ComputableInPolyTime
-      (fun p : LocalOutput × List Bool => p.numVars.2.any fun β => β == p.formula)
+      (fun p : LocalOutput × List Bool => p.1.2.any fun β => β == p.2)
       (encPair encLocalOutput (encList encBool)) encBool :=
     anyWithInput haccepts (beq (snd _ _) ((snd encLocalOutput (encList encBool)).comp (fst _ _)))
   exact hany.of_enc_eq fun p => by simp only [LocalOutput.evalLocal, list_contains_eq_any]
@@ -377,16 +378,16 @@ theorem computableInPolyTime_localOutput_evalLocal :
 @[fun_prop]
 theorem computableInPolyTime_cspSem :
     ComputableInPolyTime (fun p : (List (List Bool) × Bool) × List Bool =>
-      LocalMap.cspSem p.numVars p.formula)
+      LocalMap.cspSem p.1 p.2)
       (encPair LocalMap.encCSPRel encBits) encBool := by
   have hbits : ComputableInPolyTime
-      (fun p : (List (List Bool) × Bool) × List Bool => p.formula)
+      (fun p : (List (List Bool) × Bool) × List Bool => p.2)
       (encPair LocalMap.encCSPRel encBits) (encList encBool) :=
     (bits_encList_polyTime encBool).1.comp (snd LocalMap.encCSPRel encBits)
   have hrel1 := (fst (encList (encList encBool)) encBool).comp (fst LocalMap.encCSPRel encBits)
   have hrel2 := (snd (encList (encList encBool)) encBool).comp (fst LocalMap.encCSPRel encBits)
   have hcontains : ComputableInPolyTime
-      (fun p : (List (List Bool) × Bool) × List Bool => p.numVars.1.any fun β => β == p.formula)
+      (fun p : (List (List Bool) × Bool) × List Bool => p.1.1.any fun β => β == p.2)
       (encPair LocalMap.encCSPRel encBits) encBool :=
     anyWithInput hrel1 (beq (snd _ _) (hbits.comp (fst _ _)))
   exact (beq hcontains hrel2).of_enc_eq fun p => by
@@ -395,16 +396,16 @@ theorem computableInPolyTime_cspSem :
 /-- `LocalOutput.Valid k` is computable in polynomial time. -/
 @[fun_prop]
 theorem computableInPolyTime_localOutput_valid (k : ℕ) :
-    ComputableInPolyTime (fun p : ℕ × LocalOutput => p.formula.Valid k p.numVars)
+    ComputableInPolyTime (fun p : ℕ × LocalOutput => p.2.Valid k p.1)
       (encPair encUnary encLocalOutput) encBool := by
-  have hN : ComputableInPolyTime (fun p : ℕ × LocalOutput => p.numVars)
+  have hN : ComputableInPolyTime (fun p : ℕ × LocalOutput => p.1)
       (encPair encUnary encLocalOutput) encNat :=
     unary_to_binary.comp (fst encUnary encLocalOutput)
-  have hscope : ComputableInPolyTime (fun p : ℕ × LocalOutput => p.formula.1)
+  have hscope : ComputableInPolyTime (fun p : ℕ × LocalOutput => p.2.1)
       (encPair encUnary encLocalOutput) (encList encNat) :=
     (fst (encList encNat) (encList (encList encBool))).comp (snd encUnary encLocalOutput)
   have hall : ComputableInPolyTime
-      (fun p : ℕ × LocalOutput => p.formula.1.all fun v => decide (v < p.numVars))
+      (fun p : ℕ × LocalOutput => p.2.1.all fun v => decide (v < p.1))
       (encPair encUnary encLocalOutput) encBool :=
     allWithInput hscope (binary_lt.comp ((snd _ _).prod (hN.comp (fst _ _))))
   unfold LocalOutput.Valid
@@ -427,10 +428,11 @@ theorem computableInPolyTime_localMap_toCSP :
   have hbits := (bits_encList_polyTime encBool).1.comp (snd encLocalMap encBits)
   have hp1 := fst encLocalOutput encBool
   have hentry : ComputableInPolyTime
-      (fun p : LocalOutput × Bool => ((p.numVars.2, p.formula), p.numVars.1))
+      (fun p : LocalOutput × Bool => (⟨(p.1.2, p.2), p.1.1⟩ : Constraint _ ℕ))
       (encPair encLocalOutput encBool) (encConstraint LocalMap.encCSPRel encNat) :=
-    (((snd (encList encNat) (encList (encList encBool))).comp hp1).prod
-      (snd encLocalOutput encBool)).prod
+    encConstraint_mk_polyTime
+      (((snd (encList encNat) (encList (encList encBool))).comp hp1).prod
+        (snd encLocalOutput encBool))
       ((fst (encList encNat) (encList (encList encBool))).comp hp1)
   (map hentry).comp ((zip encLocalOutput encBool).comp (hout.prod hbits))
 
@@ -440,18 +442,18 @@ theorem computableInPolyTime_localMap_evalBits :
     ComputableInPolyTime (fun q : LocalMap × List Bool => q.1.evalBits q.2)
       encLocalMapQuery (encList encBool) := by
   have hget : ComputableInPolyTime
-      (fun p : (LocalMap × List Bool) × ℕ => p.numVars.2.getD p.formula false)
+      (fun p : (LocalMap × List Bool) × ℕ => p.1.2.getD p.2 false)
       (encPair encLocalMapQuery encNat) encBool :=
     listGetD_binary false ((snd encLocalMap encBits).comp (fst _ _)) (snd _ _)
   have hscope : ComputableInPolyTime
       (fun p : (LocalMap × List Bool) × LocalOutput =>
-        p.formula.1.map fun v => p.numVars.2.getD v false)
+        p.2.1.map fun v => p.1.2.getD v false)
       (encPair encLocalMapQuery encLocalOutput) (encList encBool) :=
     mapWithInput ((fst (encList encNat) (encList (encList encBool))).comp (snd _ _))
       (hget.comp (((fst _ _).comp (fst _ _)).prod (snd _ _)))
   have hcoord : ComputableInPolyTime
       (fun p : (LocalMap × List Bool) × LocalOutput =>
-        p.formula.evalLocal (p.formula.1.map fun v => p.numVars.2.getD v false))
+        p.2.evalLocal (p.2.1.map fun v => p.1.2.getD v false))
       (encPair encLocalMapQuery encLocalOutput) encBool :=
     computableInPolyTime_localOutput_evalLocal.comp ((snd _ _).prod hscope)
   exact mapWithInput ((snd encUnary (encList encLocalOutput)).comp (fst encLocalMap encBits))
@@ -490,16 +492,16 @@ theorem computableInPolyTime_validQuery (k : ℕ) :
       ((length_list encLocalOutput).comp hout)
   exact bool_and' hval hlen
 
-/-- Convert a local map query `(G, target)` into a declared-variable CNF instance `(N, φ)` for
+/-- Convert a local map query `(G, target)` into a declared-variable CNF instance `DeclaredCNF` for
 width `k` by compiling `G.toCSP target` via `CSP.toCNFBounded k LocalMap.cspSem` when
-`LocalMap.ValidQuery k q` holds, and emitting `(G.numVars, [[]])` otherwise. -/
-def toDeclaredCNF (k : ℕ) (q : LocalMap × List Bool) : DeclaredCNF :=
-  { numVars := q.1.numVars
-    formula :=
-      if ValidQuery k q then
-        (q.1.toCSP q.2).toCNFBounded k LocalMap.cspSem
-      else
-        [[]] }
+`LocalMap.ValidQuery k q` holds, and emitting `⟨G.numVars, [[]]⟩` otherwise. -/
+def toDeclaredCNF (k : ℕ) (q : LocalMap × List Bool) : DeclaredCNF where
+  numVars := q.1.numVars
+  formula :=
+    if ValidQuery k q then
+      (q.1.toCSP q.2).toCNFBounded k LocalMap.cspSem
+    else
+      [[]]
 
 /-- The declared variable count of `LocalMap.toDeclaredCNF k q` is `q.1.numVars`. -/
 @[simp]
@@ -528,7 +530,7 @@ theorem eval_toDeclaredCNF (k : ℕ) (q : LocalMap × List Bool) (σ : ℕ → B
   dsimp only
   by_cases hG : q.1.Valid k = true
   · by_cases hlen : q.2.length = q.1.numOutputs
-    · have hwidth : ∀ c ∈ q.1.toCSP q.2, c.2.length ≤ k :=
+    · have hwidth : ∀ c ∈ q.1.toCSP q.2, c.scope.length ≤ k :=
         (CSP.validDeclaredCSP_eq_true_iff.mp (q.1.validDeclaredCSP_toCSP hG q.2)).1
       simp only [hG, hlen, decide_true, Bool.and_self, ↓reduceIte,
         CSP.toCNFBounded_eq_toCNF hwidth, CSP.eval_toCNF, q.1.eval_toCSP hlen, Bool.true_and]
@@ -553,7 +555,7 @@ open ComputableInPolyTime in
 /-- `LocalMap.toDeclaredCNF k` is computable in polynomial time. -/
 @[fun_prop]
 theorem computableInPolyTime_toDeclaredCNF (k : ℕ) :
-    ComputableInPolyTime (toDeclaredCNF k) encLocalMapQuery (encDeclaredCNF) := by
+    ComputableInPolyTime (toDeclaredCNF k) encLocalMapQuery encDeclaredCNF := by
   have hn : ComputableInPolyTime (fun q : LocalMap × List Bool => q.1.numVars)
       encLocalMapQuery encUnary :=
     (fst encUnary (encList encLocalOutput)).comp (fst encLocalMap encBits)
@@ -562,7 +564,8 @@ theorem computableInPolyTime_toDeclaredCNF (k : ℕ) :
       encLocalMapQuery encCNF :=
     (CSP.computableInPolyTime_toCNFBounded encCSPRel encNat k cspSem
       computableInPolyTime_cspSem).comp computableInPolyTime_localMap_toCSP
-  exact hn.prod ((computableInPolyTime_validQuery k).ite hcompile (const [[]]))
+  exact encDeclaredCNF_mk_polyTime hn
+    ((computableInPolyTime_validQuery k).ite hcompile (const [[]]))
 
 /-- Polynomial-time reduction from `LocalMapHasPreimage k` to `KSAT k`. -/
 def toKSAT (k : ℕ) (q : LocalMap × List Bool) : CNF ℕ :=
@@ -573,7 +576,7 @@ open ComputableInPolyTime in
 @[fun_prop]
 theorem computableInPolyTime_toKSAT (k : ℕ) :
     ComputableInPolyTime (toKSAT k) encLocalMapQuery encCNF :=
-  (snd encUnary encCNF).comp (computableInPolyTime_toDeclaredCNF k)
+  encDeclaredCNF_formula_polyTime (computableInPolyTime_toDeclaredCNF k)
 
 /-- The number of occurring variables in `LocalMap.toKSAT k q` is at most `q.1.numVars`. -/
 theorem numVars_toKSAT_le (k : ℕ) (q : LocalMap × List Bool) :
@@ -787,21 +790,21 @@ abbrev PreimageSearchState : Type := (ℕ × CNF ℕ) × List Bool
 
 /-- Encoding of `LocalMap.PreimageSearchState`. -/
 private abbrev encPreimageSearchState : PreimageSearchState ↪ List Bool :=
-  encPair (encDeclaredCNF) encBits
+  encPair (encPair encUnary encCNF) encBits
 
 /-- Build the declared-variable CNF query testing whether `u ++ [false]` can be extended to a
 satisfying assignment of `st.1.2` on `Finset.range st.1.1`. -/
-def makePreimageQuery (st : PreimageSearchState) : DeclaredCNF :=
+def makePreimageQuery (st : PreimageSearchState) : ℕ × CNF ℕ :=
   (st.1.1, st.1.2 ++ prefixUnits (st.2 ++ [false]))
 
 /-- One step of prefix self-reduction parameterized by a declared-variable counter `count`:
 append `false` if `u ++ [false]` has at least one extension (`count (...) != 0`), and `true`
 otherwise (`count (...) == 0`). -/
-def preimageStepWith (count : DeclaredCNF → ℕ) (st : PreimageSearchState) : PreimageSearchState :=
+def preimageStepWith (count : ℕ × CNF ℕ → ℕ) (st : PreimageSearchState) : PreimageSearchState :=
   (st.1, st.2 ++ [count (makePreimageQuery st) == 0])
 
 @[simp]
-private theorem iterate_preimageStepWith_fst (count : DeclaredCNF → ℕ) (i : ℕ)
+private theorem iterate_preimageStepWith_fst (count : ℕ × CNF ℕ → ℕ) (i : ℕ)
     (st : PreimageSearchState) :
     ((preimageStepWith count)^[i] st).1 = st.1 := by
   induction i generalizing st with
@@ -811,7 +814,7 @@ private theorem iterate_preimageStepWith_fst (count : DeclaredCNF → ℕ) (i : 
     rfl
 
 @[simp]
-private theorem length_snd_iterate_preimageStepWith (count : DeclaredCNF → ℕ) (i : ℕ)
+private theorem length_snd_iterate_preimageStepWith (count : ℕ × CNF ℕ → ℕ) (i : ℕ)
     (st : PreimageSearchState) :
     ((preimageStepWith count)^[i] st).2.length = st.2.length + i := by
   induction i generalizing st with
@@ -821,51 +824,51 @@ private theorem length_snd_iterate_preimageStepWith (count : DeclaredCNF → ℕ
     simp only [preimageStepWith, List.length_append, List.length_singleton]
     omega
 
-/-- Canonical mathematical declared-variable counter on `Finset.range p.numVars`. -/
+/-- Canonical mathematical declared-variable counter on `Finset.range p.1`. -/
 def canonicalDeclaredCount (p : ℕ × CNF ℕ) : ℕ :=
-  p.formula.modelCountOn (Finset.range p.numVars)
+  p.2.modelCountOn (Finset.range p.1)
 
-private theorem iterate_preimageStepWith_congr {k : ℕ} {count : DeclaredCNF → ℕ}
-    (hcount : ∀ p : DeclaredCNF, validDeclaredInput (max 1 k) p.numVars p.formula = true →
+private theorem iterate_preimageStepWith_congr {k : ℕ} {count : ℕ × CNF ℕ → ℕ}
+    (hcount : ∀ p : ℕ × CNF ℕ, validDeclaredInput (max 1 k) p.1 p.2 = true →
       count p = canonicalDeclaredCount p)
-    {p : ℕ × CNF ℕ} (hp : validDeclaredInput (max 1 k) p.numVars p.formula = true) :
-    ∀ (i : ℕ) (u : List Bool), u.length + i ≤ p.numVars →
+    {p : ℕ × CNF ℕ} (hp : validDeclaredInput (max 1 k) p.1 p.2 = true) :
+    ∀ (i : ℕ) (u : List Bool), u.length + i ≤ p.1 →
       (preimageStepWith count)^[i] (p, u) =
         (preimageStepWith canonicalDeclaredCount)^[i] (p, u)
   | 0, _, _ => rfl
   | i + 1, u, hu => by
     rw [Function.iterate_succ_apply, Function.iterate_succ_apply]
-    have hu1 : (u ++ [false]).length ≤ p.numVars := by
+    have hu1 : (u ++ [false]).length ≤ p.1 := by
       simp only [List.length_append, List.length_singleton]
       omega
-    have hvalid : validDeclaredInput (max 1 k) p.numVars (p.formula ++ prefixUnits (u ++ [false])) = true :=
+    have hvalid : validDeclaredInput (max 1 k) p.1 (p.2 ++ prefixUnits (u ++ [false])) = true :=
       validDeclaredInput_append_prefixUnits hp hu1
     have hstep : preimageStepWith count (p, u) =
         preimageStepWith canonicalDeclaredCount (p, u) := by
-      simp only [preimageStepWith, makePreimageQuery, hcount (p.numVars, _) hvalid]
+      simp only [preimageStepWith, makePreimageQuery, hcount (p.1, _) hvalid]
     rw [hstep]
     exact iterate_preimageStepWith_congr hcount hp i _ (by
       simp only [List.length_append, List.length_singleton]
       omega)
 
 private theorem modelCountOn_pos_preimageStepWith_canonical (p : ℕ × CNF ℕ) (u : List Bool)
-    (hpos : 0 < (p.formula ++ prefixUnits u).modelCountOn (Finset.range p.numVars)) :
-    0 < (p.formula ++ prefixUnits (preimageStepWith canonicalDeclaredCount (p, u)).2).modelCountOn
-      (Finset.range p.numVars) := by
-  have hsplit := modelCountOn_append_prefixUnits_split p.formula u (Finset.range p.numVars)
+    (hpos : 0 < (p.2 ++ prefixUnits u).modelCountOn (Finset.range p.1)) :
+    0 < (p.2 ++ prefixUnits (preimageStepWith canonicalDeclaredCount (p, u)).2).modelCountOn
+      (Finset.range p.1) := by
+  have hsplit := modelCountOn_append_prefixUnits_split p.2 u (Finset.range p.1)
   simp only [preimageStepWith, makePreimageQuery, canonicalDeclaredCount]
-  by_cases h0 : (p.formula ++ prefixUnits (u ++ [false])).modelCountOn (Finset.range p.numVars) = 0
+  by_cases h0 : (p.2 ++ prefixUnits (u ++ [false])).modelCountOn (Finset.range p.1) = 0
   · simp only [h0, beq_self_eq_true]
     omega
-  · have hbeq : ((p.formula ++ prefixUnits (u ++ [false])).modelCountOn (Finset.range p.numVars) == 0) =
+  · have hbeq : ((p.2 ++ prefixUnits (u ++ [false])).modelCountOn (Finset.range p.1) == 0) =
         false := beq_eq_false_iff_ne.mpr h0
     simp only [hbeq]
     omega
 
 private theorem modelCountOn_pos_iterate_preimageStepWith_canonical (p : ℕ × CNF ℕ) (i : ℕ)
-    (u : List Bool) (hpos : 0 < (p.formula ++ prefixUnits u).modelCountOn (Finset.range p.numVars)) :
-    0 < (p.formula ++ prefixUnits ((preimageStepWith canonicalDeclaredCount)^[i] (p, u)).2).modelCountOn
-      (Finset.range p.numVars) := by
+    (u : List Bool) (hpos : 0 < (p.2 ++ prefixUnits u).modelCountOn (Finset.range p.1)) :
+    0 < (p.2 ++ prefixUnits ((preimageStepWith canonicalDeclaredCount)^[i] (p, u)).2).modelCountOn
+      (Finset.range p.1) := by
   induction i generalizing u with
   | zero => exact hpos
   | succ i ih =>
@@ -877,12 +880,32 @@ satisfies the formula `st.1.2`, returning `some st.2` if so and `none` otherwise
 def finishPreimageSearch (st : PreimageSearchState) : Option (List Bool) :=
   if st.1.2.eval (fun v => st.2.getD v false) then some st.2 else none
 
+/-- Pair view `(numVars, formula)` of `LocalMap.toDeclaredCNF k q` for the tuple-encoded
+`PreimageSearchState` self-reduction loop. -/
+def toDeclaredCNFPair (k : ℕ) (q : LocalMap × List Bool) : ℕ × CNF ℕ :=
+  ((toDeclaredCNF k q).numVars, (toDeclaredCNF k q).formula)
+
+@[simp]
+private theorem toDeclaredCNFPair_fst (k : ℕ) (q : LocalMap × List Bool) :
+    (toDeclaredCNFPair k q).1 = q.1.numVars := rfl
+
+@[simp]
+private theorem toDeclaredCNFPair_snd (k : ℕ) (q : LocalMap × List Bool) :
+    (toDeclaredCNFPair k q).2 = (toDeclaredCNF k q).formula := rfl
+
+open ComputableInPolyTime in
+@[fun_prop]
+private theorem computableInPolyTime_toDeclaredCNFPair (k : ℕ) :
+    ComputableInPolyTime (toDeclaredCNFPair k) encLocalMapQuery (encPair encUnary encCNF) :=
+  (encDeclaredCNF_numVars_polyTime (computableInPolyTime_toDeclaredCNF k)).prod
+    (encDeclaredCNF_formula_polyTime (computableInPolyTime_toDeclaredCNF k))
+
 /-- Run `G.numVars` steps of prefix self-reduction with counter `count` and verify the resulting
 candidate bitstring. -/
-def findPreimageWith (k : ℕ) (count : DeclaredCNF → ℕ) (G : LocalMap) (target : List Bool) :
+def findPreimageWith (k : ℕ) (count : ℕ × CNF ℕ → ℕ) (G : LocalMap) (target : List Bool) :
     Option (List Bool) :=
   finishPreimageSearch
-    ((preimageStepWith count)^[G.numVars] (toDeclaredCNF k (G, target), []))
+    ((preimageStepWith count)^[G.numVars] (toDeclaredCNFPair k (G, target), []))
 
 private theorem eval_toDeclaredCNF_getD (k : ℕ) (q : LocalMap × List Bool) (u : List Bool) :
     (toDeclaredCNF k q).formula.eval (fun v => u.getD v false) =
@@ -894,8 +917,8 @@ self-reduction. -/
 def findPreimage (k : ℕ) (G : LocalMap) (target : List Bool) : Option (List Bool) :=
   findPreimageWith k canonicalDeclaredCount G target
 
-private theorem findPreimageWith_eq_findPreimage {k : ℕ} {count : DeclaredCNF → ℕ}
-    (hcount : ∀ p : DeclaredCNF, validDeclaredInput (max 1 k) p.numVars p.formula = true →
+private theorem findPreimageWith_eq_findPreimage {k : ℕ} {count : ℕ × CNF ℕ → ℕ}
+    (hcount : ∀ p : ℕ × CNF ℕ, validDeclaredInput (max 1 k) p.1 p.2 = true →
       count p = canonicalDeclaredCount p)
     (G : LocalMap) (target : List Bool) :
     findPreimageWith k count G target = G.findPreimage k target := by
@@ -910,7 +933,7 @@ theorem findPreimage_eq_some {k : ℕ} {G : LocalMap} {target x : List Bool}
     (h : G.findPreimage k target = some x) :
     G.Valid k = true ∧ x.length = G.numVars ∧ G.evalBits x = target := by
   simp only [findPreimage, findPreimageWith, finishPreimageSearch,
-    iterate_preimageStepWith_fst, eval_toDeclaredCNF_getD] at h
+    iterate_preimageStepWith_fst, toDeclaredCNFPair_snd, eval_toDeclaredCNF_getD] at h
   split_ifs at h with hcond
   · simp only [Option.some.injEq] at h
     subst h
@@ -924,21 +947,21 @@ theorem findPreimage_eq_some {k : ℕ} {G : LocalMap} {target x : List Bool}
 theorem findPreimage_isSome_of_preimageCount_pos {k : ℕ} {G : LocalMap} (hG : G.Valid k = true)
     {target : List Bool} (hpos : 0 < G.preimageCount target) :
     (G.findPreimage k target).isSome = true := by
-  let p := toDeclaredCNF k (G, target)
+  let p := toDeclaredCNFPair k (G, target)
   let u := ((preimageStepWith canonicalDeclaredCount)^[G.numVars] (p, [])).2
   have hu_len : u.length = G.numVars := by
     simp [u]
-  have h0 : 0 < (p.formula ++ prefixUnits []).modelCountOn (Finset.range p.numVars) := by
-    simp only [p, prefixUnits_nil, List.append_nil, modelCountOn_toDeclaredCNF, hG, ↓reduceIte]
-    exact hpos
+  have h0 : 0 < (p.2 ++ prefixUnits []).modelCountOn (Finset.range p.1) := by
+    simpa only [p, toDeclaredCNFPair, prefixUnits_nil, List.append_nil,
+      modelCountOn_toDeclaredCNF, hG, ↓reduceIte] using hpos
   have hfinal := modelCountOn_pos_iterate_preimageStepWith_canonical p G.numVars [] h0
   rw [CNF.modelCountOn, Finset.card_pos, Finset.filter_nonempty_iff] at hfinal
   obtain ⟨σ, -, hσ⟩ := hfinal
   simp only [CNF.eval_append, Bool.and_eq_true, eval_prefixUnits] at hσ
-  have heval_p : p.formula.eval (fun v => u.getD v false) = true := by
+  have heval_p : p.2.eval (fun v => u.getD v false) = true := by
     rw [eval_toDeclaredCNF_getD, Bool.and_eq_true, decide_eq_true_eq]
     refine ⟨hG, ?_⟩
-    have hσ1 : G.eval (fun v => if h : v ∈ Finset.range p.numVars then σ ⟨v, h⟩ else false) = target := by
+    have hσ1 : G.eval (fun v => if h : v ∈ Finset.range p.1 then σ ⟨v, h⟩ else false) = target := by
       have h1 := hσ.1
       rwa [eval_toDeclaredCNF, hG, Bool.true_and, decide_eq_true_eq] at h1
     rw [LocalMap.evalBits, ← hσ1]
@@ -946,7 +969,7 @@ theorem findPreimage_isSome_of_preimageCount_pos {k : ℕ} {G : LocalMap} (hG : 
     exact (hσ.2 v (hu_len.symm ▸ hv)).symm
   simp only [findPreimage, findPreimageWith, finishPreimageSearch,
     iterate_preimageStepWith_fst]
-  change (if p.formula.eval (fun v => u.getD v false) then some u else none).isSome = true
+  change (if p.2.eval (fun v => u.getD v false) then some u else none).isSome = true
   simp only [heval_p, ↓reduceIte, Option.isSome_some]
 
 /-- For a valid `k`-local map `G`, `G.findPreimage k target` returns `some x` if and only if
@@ -977,19 +1000,19 @@ private theorem computableInPolyTime_prefixUnits :
     ComputableInPolyTime prefixUnits encBits encCNF := by
   have hrange : ComputableInPolyTime (fun u : List Bool => List.range u.length)
       encBits (encList encUnary) := by fun_prop
-  have hj : ComputableInPolyTime (fun p : List Bool × ℕ => p.formula)
+  have hj : ComputableInPolyTime (fun p : List Bool × ℕ => p.2)
       (encPair encBits encUnary) encNat := by fun_prop
-  have hbit : ComputableInPolyTime (fun p : List Bool × ℕ => p.numVars.getD p.formula false)
+  have hbit : ComputableInPolyTime (fun p : List Bool × ℕ => p.1.getD p.2 false)
       (encPair encBits encUnary) encBool := by fun_prop
   have hcl : ComputableInPolyTime
-      (fun p : List Bool × ℕ => [(p.formula, p.numVars.getD p.formula false)])
+      (fun p : List Bool × ℕ => [(p.2, p.1.getD p.2 false)])
       (encPair encBits encUnary) (encList (encPair encNat encBool)) := by fun_prop
   exact mapWithInput hrange hcl
 
 private theorem computableInPolyTime_makePreimageQuery :
-    ComputableInPolyTime makePreimageQuery encPreimageSearchState (encDeclaredCNF) := by
-  have hst1 := fst (encDeclaredCNF) encBits
-  have hst2 := snd (encDeclaredCNF) encBits
+    ComputableInPolyTime makePreimageQuery encPreimageSearchState (encPair encUnary encCNF) := by
+  have hst1 := fst (encPair encUnary encCNF) encBits
+  have hst2 := snd (encPair encUnary encCNF) encBits
   have hu0 : ComputableInPolyTime
       (fun st : PreimageSearchState => st.2 ++ [false]) encPreimageSearchState encBits :=
     bitsAppend hst2 (const [false])
@@ -1006,24 +1029,24 @@ private theorem computableInPolyTime_finishPreimageSearch :
     ComputableInPolyTime finishPreimageSearch encPreimageSearchState (encOption encBits) := by
   have hget : ComputableInPolyTime
       (fun p : (PreimageSearchState × Clause ℕ) × Literal ℕ =>
-        (p.numVars.1.2.getD p.formula.1 false) == p.formula.2)
+        (p.1.1.2.getD p.2.1 false) == p.2.2)
       (encPair (encPair encPreimageSearchState (encList (encPair encNat encBool)))
         (encPair encNat encBool))
       encBool := by
     have hu : ComputableInPolyTime
-        (fun p : (PreimageSearchState × Clause ℕ) × Literal ℕ => p.numVars.1.2)
+        (fun p : (PreimageSearchState × Clause ℕ) × Literal ℕ => p.1.1.2)
         (encPair (encPair encPreimageSearchState (encList (encPair encNat encBool)))
           (encPair encNat encBool))
         encBits :=
-      (snd (encDeclaredCNF) encBits).comp ((fst _ _).comp (fst _ _))
+      (snd (encPair encUnary encCNF) encBits).comp ((fst _ _).comp (fst _ _))
     have hv : ComputableInPolyTime
-        (fun p : (PreimageSearchState × Clause ℕ) × Literal ℕ => p.formula.1)
+        (fun p : (PreimageSearchState × Clause ℕ) × Literal ℕ => p.2.1)
         (encPair (encPair encPreimageSearchState (encList (encPair encNat encBool)))
           (encPair encNat encBool))
         encNat :=
       (fst encNat encBool).comp (snd _ _)
     have hpol : ComputableInPolyTime
-        (fun p : (PreimageSearchState × Clause ℕ) × Literal ℕ => p.formula.2)
+        (fun p : (PreimageSearchState × Clause ℕ) × Literal ℕ => p.2.2)
         (encPair (encPair encPreimageSearchState (encList (encPair encNat encBool)))
           (encPair encNat encBool))
         encBool :=
@@ -1031,7 +1054,7 @@ private theorem computableInPolyTime_finishPreimageSearch :
     exact beq (listGetD_binary false hu hv) hpol
   have hcl : ComputableInPolyTime
       (fun p : PreimageSearchState × Clause ℕ =>
-        p.formula.any fun l => (p.numVars.2.getD l.1 false) == l.2)
+        p.2.any fun l => (p.1.2.getD l.1 false) == l.2)
       (encPair encPreimageSearchState (encList (encPair encNat encBool))) encBool :=
     anyWithInput (snd _ _) hget
   have hphi : ComputableInPolyTime
@@ -1071,7 +1094,7 @@ public theorem exists_localMapPreimageFinder_declared (k : ℕ) :
       (∀ q : LocalMap × List Bool, S q ≤ a * ((encLocalMapQuery q).length + 1) ^ b) := by
   obtain ⟨count, T₀, S₀, A, c, e, a, b, hcount, hspec, hT₀, hS₀⟩ :=
     exists_declaredCounter (max 1 k)
-  have hcount_valid : ∀ p : DeclaredCNF, validDeclaredInput (max 1 k) p.numVars p.formula = true →
+  have hcount_valid : ∀ p : ℕ × CNF ℕ, validDeclaredInput (max 1 k) p.1 p.2 = true →
       count p = canonicalDeclaredCount p := by
     intro p hp
     simp [hspec p, hp, canonicalDeclaredCount]
@@ -1086,14 +1109,14 @@ public theorem exists_localMapPreimageFinder_declared (k : ℕ) :
       (fun q => ((encLocalMapQuery q).length + 1) ^ dn)
       (fun q => ((encLocalMapQuery q).length + 1) ^ dn) :=
     hdn.inO
-  -- Step 2: init(q) = (toDeclaredCNF k q, [])
+  -- Step 2: init(q) = (LocalMap.toDeclaredCNFPair k q, [])
   have hinit_polytime : ComputableInPolyTime
-      (fun q : LocalMap × List Bool => (toDeclaredCNF k q, ([] : List Bool)))
+      (fun q : LocalMap × List Bool => (LocalMap.toDeclaredCNFPair k q, ([] : List Bool)))
       encLocalMapQuery encPreimageSearchState :=
-    (computableInPolyTime_toDeclaredCNF k).prod (const [])
+    (LocalMap.computableInPolyTime_toDeclaredCNFPair k).prod (const [])
   obtain ⟨di, _, hdi⟩ := hinit_polytime.exists_degree
   have hinit : ComputableInO
-      (fun q : LocalMap × List Bool => (toDeclaredCNF k q, ([] : List Bool)))
+      (fun q : LocalMap × List Bool => (LocalMap.toDeclaredCNFPair k q, ([] : List Bool)))
       encLocalMapQuery encPreimageSearchState
       (fun q => ((encLocalMapQuery q).length + 1) ^ di)
       (fun q => ((encLocalMapQuery q).length + 1) ^ di) :=
@@ -1118,21 +1141,21 @@ public theorem exists_localMapPreimageFinder_declared (k : ℕ) :
           encBool_apply, List.append_assoc]
   -- Step 4: Trajectory bounds B, M, R, Q
   let B (q : LocalMap × List Bool) : ℕ :=
-    2 * (encDeclaredCNF (toDeclaredCNF k q)).length + 1 + q.1.numVars
+    2 * (encPair encUnary encCNF (LocalMap.toDeclaredCNFPair k q)).length + 1 + q.1.numVars
   have hstate : ∀ (q : LocalMap × List Bool) (i : ℕ), i ≤ q.1.numVars →
       (encPreimageSearchState
-        ((preimageStepWith count)^[i] (toDeclaredCNF k q, []))).length ≤ B q := by
+        ((preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, []))).length ≤ B q := by
     intro q i hi
     simp only [encPreimageSearchState, length_encPair, iterate_preimageStepWith_fst,
       encBits_apply, length_snd_iterate_preimageStepWith, List.length_nil, Nat.zero_add, B]
     omega
   let M (q : LocalMap × List Bool) : ℕ := p_mk * (B q + 1) ^ q_mk
   have hM_le : ∀ (q : LocalMap × List Bool) (i : ℕ), i ≤ q.1.numVars →
-      (encDeclaredCNF
-        (makePreimageQuery ((preimageStepWith count)^[i] (toDeclaredCNF k q, [])))).length ≤
+      (encPair encUnary encCNF
+        (makePreimageQuery ((preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, [])))).length ≤
         M q := by
     intro q i hi
-    let st := (preimageStepWith count)^[i] (toDeclaredCNF k q, [])
+    let st := (preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, [])
     exact (hp_mk st).trans
       (Nat.mul_le_mul_left p_mk (Nat.pow_le_pow_left (Nat.add_le_add_right (hstate q i hi) 1) q_mk))
   let N_exp (q : LocalMap × List Bool) : ℕ :=
@@ -1142,7 +1165,7 @@ public theorem exists_localMapPreimageFinder_declared (k : ℕ) :
   let Q (q : LocalMap × List Bool) : ℕ :=
     B q + ((B q + 1) ^ d_mk + a * (M q + 1) ^ b)
   have hround : ∀ (q : LocalMap × List Bool) (i : ℕ), i ≤ q.1.numVars →
-      (let st := (preimageStepWith count)^[i] (toDeclaredCNF k q, [])
+      (let st := (preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, [])
        (encPreimageSearchState st).length +
         (((encPreimageSearchState st).length + 1) ^ d_mk + T₀ (makePreimageQuery st))) ≤
         R q := by
@@ -1151,24 +1174,24 @@ public theorem exists_localMapPreimageFinder_declared (k : ℕ) :
     have hst_len := hstate q i hi
     have hmk_len := hM_le q i hi
     have hmk_fst :
-        (makePreimageQuery ((preimageStepWith count)^[i] (toDeclaredCNF k q, []))).1 =
+        (makePreimageQuery ((preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, []))).1 =
           q.1.numVars := by
       simp [makePreimageQuery, iterate_preimageStepWith_fst]
     have hT_mk :
-        T₀ (makePreimageQuery ((preimageStepWith count)^[i] (toDeclaredCNF k q, []))) ≤
+        T₀ (makePreimageQuery ((preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, []))) ≤
           c * N_exp q * (M q + 1) ^ e + c := by
-      have h := hT₀ (makePreimageQuery ((preimageStepWith count)^[i] (toDeclaredCNF k q, [])))
+      have h := hT₀ (makePreimageQuery ((preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, [])))
       rw [hmk_fst] at h
       have hXN : (2 : ℝ) ^ ((A : ℝ) * interpolationScale q.1.numVars) ≤ N_exp q :=
         Nat.le_ceil _
       have hpow :
-          (((encDeclaredCNF
-            (makePreimageQuery ((preimageStepWith count)^[i] (toDeclaredCNF k q, [])))).length : ℝ)
+          (((encPair encUnary encCNF
+            (makePreimageQuery ((preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, [])))).length : ℝ)
               + 1) ^ e ≤ ((M q : ℝ) + 1) ^ e := by
         exact_mod_cast Nat.pow_le_pow_left (Nat.add_le_add_right hmk_len 1) e
       have h1 := mul_le_mul hXN hpow (by positivity) (Nat.cast_nonneg (N_exp q))
       have h2 := mul_le_mul_of_nonneg_left h1 (Nat.cast_nonneg c)
-      have : (T₀ (makePreimageQuery ((preimageStepWith count)^[i] (toDeclaredCNF k q, []))) : ℝ) ≤
+      have : (T₀ (makePreimageQuery ((preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, []))) : ℝ) ≤
           ((c * N_exp q * (M q + 1) ^ e + c : ℕ) : ℝ) := by
         push_cast
         rw [mul_assoc]
@@ -1176,12 +1199,12 @@ public theorem exists_localMapPreimageFinder_declared (k : ℕ) :
       exact_mod_cast this
     have hpow_dmk :
         ((encPreimageSearchState
-          ((preimageStepWith count)^[i] (toDeclaredCNF k q, []))).length + 1) ^ d_mk ≤
+          ((preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, []))).length + 1) ^ d_mk ≤
           (B q + 1) ^ d_mk :=
       Nat.pow_le_pow_left (Nat.add_le_add_right hst_len 1) d_mk
     omega
   have hspace : ∀ (q : LocalMap × List Bool) (i : ℕ), i ≤ q.1.numVars →
-      (let st := (preimageStepWith count)^[i] (toDeclaredCNF k q, [])
+      (let st := (preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, [])
        (encPreimageSearchState st).length +
         (((encPreimageSearchState st).length + 1) ^ d_mk + S₀ (makePreimageQuery st))) ≤
         Q q := by
@@ -1190,13 +1213,13 @@ public theorem exists_localMapPreimageFinder_declared (k : ℕ) :
     have hst_len := hstate q i hi
     have hmk_len := hM_le q i hi
     have hS_mk :
-        S₀ (makePreimageQuery ((preimageStepWith count)^[i] (toDeclaredCNF k q, []))) ≤
+        S₀ (makePreimageQuery ((preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, []))) ≤
           a * (M q + 1) ^ b :=
-      (hS₀ (makePreimageQuery ((preimageStepWith count)^[i] (toDeclaredCNF k q, [])))).trans
+      (hS₀ (makePreimageQuery ((preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, [])))).trans
         (Nat.mul_le_mul_left a (Nat.pow_le_pow_left (Nat.add_le_add_right hmk_len 1) b))
     have hpow_dmk :
         ((encPreimageSearchState
-          ((preimageStepWith count)^[i] (toDeclaredCNF k q, []))).length + 1) ^ d_mk ≤
+          ((preimageStepWith count)^[i] (LocalMap.toDeclaredCNFPair k q, []))).length + 1) ^ d_mk ≤
           (B q + 1) ^ d_mk :=
       Nat.pow_le_pow_left (Nat.add_le_add_right hst_len 1) d_mk
     omega
@@ -1219,7 +1242,7 @@ public theorem exists_localMapPreimageFinder_declared (k : ℕ) :
     PolyBounded.self.mono numVars_le_length_encLocalMapQuery
   have hB_poly : PolyBounded size B :=
     (((PolyBounded.const 2).mul
-      (computableInPolyTime_toDeclaredCNF k).polyBounded_length).add (.const 1)).add hn_poly
+      (LocalMap.computableInPolyTime_toDeclaredCNFPair k).polyBounded_length).add (.const 1)).add hn_poly
   have hM_poly : PolyBounded size M := by growth_poly
   have hQ_poly : PolyBounded size Q := by growth_poly
   have hencNat_n_le (q : LocalMap × List Bool) :
@@ -1253,14 +1276,14 @@ public theorem exists_localMapPreimageFinder_declared (k : ℕ) :
       omega
     have hfin_le :
         ((encPreimageSearchState
-          ((preimageStepWith count)^[q.1.numVars] (toDeclaredCNF k q, []))).length + 1) ^ df ≤
+          ((preimageStepWith count)^[q.1.numVars] (LocalMap.toDeclaredCNFPair k q, []))).length + 1) ^ df ≤
         (B q + 1) ^ df :=
       Nat.pow_le_pow_left (Nat.add_le_add_right (hstate q q.1.numVars le_rfl) 1) df
     have hT_le_N :
         ((size q + 1) ^ dn + (size q + 1) ^ di +
           (q.1.numVars + 1) * (R q + B q + ((encNat q.1.numVars).length + 1) ^ 2)) +
           ((encPreimageSearchState
-            ((preimageStepWith count)^[q.1.numVars] (toDeclaredCNF k q, []))).length + 1) ^ df ≤
+            ((preimageStepWith count)^[q.1.numVars] (LocalMap.toDeclaredCNFPair k q, []))).length + 1) ^ df ≤
         N_exp q * T_poly q := by
       have hstep_le : R q + B q + ((encNat q.1.numVars).length + 1) ^ 2 ≤
           N_exp q * (R_poly q + B q + ((encNat q.1.numVars).length + 1) ^ 2) := by
@@ -1291,7 +1314,7 @@ public theorem exists_localMapPreimageFinder_declared (k : ℕ) :
         ((((size q + 1) ^ dn + (size q + 1) ^ di +
           (q.1.numVars + 1) * (R q + B q + ((encNat q.1.numVars).length + 1) ^ 2)) +
           ((encPreimageSearchState
-            ((preimageStepWith count)^[q.1.numVars] (toDeclaredCNF k q, []))).length + 1) ^ df :
+            ((preimageStepWith count)^[q.1.numVars] (LocalMap.toDeclaredCNFPair k q, []))).length + 1) ^ df :
           ℕ) : ℝ) ≤
         (N_exp q : ℝ) * ((C_T : ℝ) * Y ^ d_T) := by
       dsimp only [Y, size]
@@ -1307,7 +1330,7 @@ public theorem exists_localMapPreimageFinder_declared (k : ℕ) :
     linarith only [htotal, hmul1, hZ0, hring, hc_nonneg]
   · have hfin_le :
         ((encPreimageSearchState
-          ((preimageStepWith count)^[q.1.numVars] (toDeclaredCNF k q, []))).length + 1) ^ df ≤
+          ((preimageStepWith count)^[q.1.numVars] (LocalMap.toDeclaredCNFPair k q, []))).length + 1) ^ df ≤
         (B q + 1) ^ df :=
       Nat.pow_le_pow_left (Nat.add_le_add_right (hstate q q.1.numVars le_rfl) 1) df
     exact (Nat.add_le_add_left hfin_le _).trans (hCS q)

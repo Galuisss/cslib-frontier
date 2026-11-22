@@ -70,7 +70,7 @@ public theorem exists_counter_of_polyTime_toDeclared {α : Type} {encA : α ↪ 
       (∀ x, S x ≤ a * ((encA x).length + 1) ^ b) := by
   let g' (x : α) : ℕ × CNF ℕ := ((g x).numVars, (g x).formula)
   have hg' : ComputableInPolyTime g' encA (encPair encUnary encCNF) :=
-    ComputableInPolyTime.pair (encDeclaredCNF_numVars_polyTime hg) (encDeclaredCNF_formula_polyTime hg)
+    (encDeclaredCNF_numVars_polyTime hg).prod (encDeclaredCNF_formula_polyTime hg)
   obtain ⟨count₀, T₀, S₀, A, c₀, e₀, a₀, b₀, hcount₀, hspec₀, hT₀, hS₀⟩ :=
     exists_declaredCounter k
   obtain ⟨dg, _, hdg⟩ := hg'.exists_degree
