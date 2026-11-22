@@ -247,4 +247,14 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   have h := configurationJustesenSeedScheduler_replay ntm c w bits
   exact ⟨congrArg Prod.fst h, congrArg (fun q => SeedSchedulerMachine.reply q.2) h⟩
 
+/-- The same clock bounds the fixed scheduler at every original-word entry. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) :
+    PolyBounded List.length (configurationJustesenSeedSchedulerClock ntm c) ∧
+      NondeterministicQueryMachine.HaltsWithin
+        ((justesenSeedScheduler ntm c).withInit (configurationJustesenSeedSchedulerEntry ntm c w))
+        w (configurationJustesenSeedSchedulerClock ntm c w) :=
+  ⟨configurationJustesenSeedSchedulerClock_polyBounded ntm c,
+    configurationJustesenSeedScheduler_haltsWithin_clock ntm c w⟩
+
 end CslibFrontierTests.STCONSeedScheduler

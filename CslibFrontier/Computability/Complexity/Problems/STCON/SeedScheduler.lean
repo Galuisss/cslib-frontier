@@ -277,6 +277,19 @@ theorem seedSchedulerCandidate_valid {s : SeedSearchSetup} {seed : ℕ} {f : See
     exact ⟨⟨‹_›, rfl, rfl⟩, rfl, rfl⟩
   · contradiction
 
+/-- A valid frame requests an in-range source if the designated and indexed IDs are valid. -/
+theorem SeedSchedulerFrame.Valid.source_lt {f : SeedSchedulerFrame} (hf : f.Valid)
+    (hsource : f.request.setup.sourceID <
+      f.request.setup.parameters.search.subdivision.vertexCount)
+    (hroot : ∀ j < f.request.setup.parameters.search.subdivision.originalCount,
+      f.request.setup.originalSourceID j <
+        f.request.setup.parameters.search.subdivision.vertexCount) :
+    f.request.sourceID < f.request.setup.parameters.search.subdivision.vertexCount := by
+  obtain ⟨_, hphase⟩ := hf
+  split at hphase
+  · exact hphase.2 ▸ hsource
+  · exact hphase.2 ▸ hroot _ hphase.1
+
 private theorem seedSchedulerRoot_progress {f g : SeedSchedulerFrame} {position : ℕ}
     {answer : Bool} (hf : f.Valid) (h : seedSchedulerRoot f position answer = .inl g) :
     g.Valid ∧ g.request.setup = f.request.setup ∧ g.request.seed = f.request.seed ∧

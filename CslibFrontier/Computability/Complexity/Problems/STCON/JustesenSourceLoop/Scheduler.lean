@@ -34,6 +34,8 @@ prepared field in its state and uses it to start each scan on the original input
   initializers agree at any requested source.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_replay`: re-entering the fixed
   scheduler agrees with the scheduler initialized for the original word.
+* `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_haltsWithin_clock`:
+  a common polynomial selector clock for every branch.
 -/
 
 public section
@@ -134,5 +136,87 @@ theorem configurationJustesenSeedScheduler_replay {k : ℕ} {State : Type} [Fint
     SeedSchedulerMachine.machine_withInit empty setup (justesenSeedSchedulerScan ntm c)
       (fun request => justesenSourceLoopEntryOfRequest request field) SourceRoundLoop.reply
   exact congrArg (fun M : NondeterministicQueryMachine _ => (field, M.run w bits)) hentry
+
+private theorem justesenSeedSchedulerScan_withInit_of_valid {k : ℕ} {State : Type}
+    [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool)
+    (f : SeedSchedulerFrame) (hs : f.request.setup = configurationSeedSearchSetup ntm c w)
+    (hv : f.Valid) :
+    let I := configurationInstance ntm c w
+    let setup := configurationSeedSearchSetup ntm c w
+    let n := setup.parameters.search.subdivision.vertexCount
+    ∃ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source : Fin n),
+      (justesenSeedSchedulerScan ntm c).withInit
+        (justesenSourceLoopEntryOfRequest f.request (configurationFieldContext ntm c w)) =
+        justesenSourceLoop ntm c
+          ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, setup.targetID⟩
+          n := by
+  intro I setup n
+  rcases f with ⟨⟨saved, rank, source⟩, cursor, answer⟩
+  change saved = setup at hs
+  subst saved
+  have hrank := hv.1
+  change rank < setup.parameters.search.seedLimit at hrank
+  rw [configurationSeedScheduler_seedLimit ntm c w,
+    (configurationSeedSearchSetup_endpoints ntm c w).1] at hrank
+  have hends := configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w
+  have hroot := fun j hj => configurationSeedSearchSetup_originalSourceID_lt_vertexCount
+    ntm c w (position := j) hj
+  have hsource : source < n := hv.source_lt hends.1 hroot
+  refine ⟨⟨rank, hrank⟩, ⟨source, hsource⟩, ?_⟩
+  rw [show justesenSourceLoopEntryOfRequest ⟨setup, rank, source⟩
+      (configurationFieldContext ntm c w) = _ from
+    justesenSourceLoopEntryOfRequest_eq ntm c w rank source]
+  exact justesenSourceLoop_withInit ntm c _ _ 0 n
+
+/-- Charge the full-fuel scan and one return selector at each designated or indexed frame. -/
+noncomputable def configurationJustesenSeedSchedulerClock {k : ℕ} {State : Type} [Fintype State]
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) : ℕ :=
+  let size := (configurationSeedSearchSetup ntm c w).parameters.search
+  size.seedLimit * ((1 + size.subdivision.originalCount) *
+    (configurationJustesenSourceLoopClock ntm c w + 1))
+
+/-- The scheduler's selector clock is polynomial in the original word length. -/
+theorem configurationJustesenSeedSchedulerClock_polyBounded {k : ℕ} {State : Type} [Fintype State]
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) :
+    PolyBounded List.length (configurationJustesenSeedSchedulerClock ntm c) :=
+  configurationSeedScheduler_clock_polyBounded ntm c
+    ((configurationJustesenSourceLoopClock_polyBounded ntm c).add (.const 1))
+
+/-- Every scheduler branch, including rejection and either designated answer, halts within
+the common clock at the original-word entry. -/
+theorem configurationJustesenSeedScheduler_haltsWithin_clock {k : ℕ} {State : Type} [Fintype State]
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool) :
+    NondeterministicQueryMachine.HaltsWithin
+      ((justesenSeedScheduler ntm c).withInit (configurationJustesenSeedSchedulerEntry ntm c w))
+      w (configurationJustesenSeedSchedulerClock ntm c w) := by
+  let setup := configurationSeedSearchSetup ntm c w
+  let empty := configurationSeedSearchSetup ntm c []
+  let field := configurationFieldContext ntm c w
+  let scan := justesenSeedSchedulerScan ntm c
+  let start := fun r => justesenSourceLoopEntryOfRequest r field
+  let clock := configurationJustesenSourceLoopClock ntm c w
+  have hends := configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w
+  have hscan (f : SeedSchedulerFrame) (hs : f.request.setup = setup) (hv : f.Valid)
+      (_ : f.needsScan = true) : (scan.withInit (start f.request)).HaltsWithin w clock := by
+    obtain ⟨seed, source, hreenter⟩ :=
+      justesenSeedSchedulerScan_withInit_of_valid ntm c w f hs hv
+    change NondeterministicQueryMachine.HaltsWithin ((justesenSeedSchedulerScan ntm c).withInit
+      (justesenSourceLoopEntryOfRequest f.request (configurationFieldContext ntm c w))) w clock
+    rw [hreenter]
+    exact configurationJustesenSourceLoop_haltsWithin_clock ntm c w
+      seed source ⟨setup.targetID, hends.2⟩ _ le_rfl
+  have hscheduler := SeedSchedulerMachine.haltsWithin setup scan start SourceRoundLoop.reply
+    w clock hscan
+  intro bits hlen
+  rw [NondeterministicQueryMachine.run_withInit,
+    configurationJustesenSeedScheduler_replay ntm c w bits]
+  change (justesenSeedSchedulerFor ntm c empty field).halted
+    ((justesenSeedSchedulerFor ntm c setup field).run w bits) = true
+  have hhalt := congrArg NondeterministicQueryMachine.halted
+    (SeedSchedulerMachine.machine_withInit empty setup scan start SourceRoundLoop.reply)
+  change (justesenSeedSchedulerFor ntm c empty field).halted =
+    (justesenSeedSchedulerFor ntm c setup field).halted at hhalt
+  rw [hhalt]
+  exact hscheduler bits hlen
 
 end Cslib.Complexity.STCON
