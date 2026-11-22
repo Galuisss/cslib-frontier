@@ -29,8 +29,8 @@ example :
         Metric.closedBall (0 : ℂ) 2 \ (segment ℝ (0 : ℂ) 1 ∪ segment ℝ 0 Complex.I) := by
   have h1 := left_mem_segment ℝ (0 : ℂ) 1
   have hi := left_mem_segment ℝ (0 : ℂ) Complex.I
-  have hs := ((convex_segment ℝ (0 : ℂ) 1).starConvex h1).union
-    ((convex_segment ℝ (0 : ℂ) Complex.I).starConvex hi)
+  have hs := ((convex_segment (𝕜 := ℝ) (0 : ℂ) 1).starConvex h1).union
+    ((convex_segment (𝕜 := ℝ) (0 : ℂ) Complex.I).starConvex hi)
   refine exists_segment_to_frontier_avoiding_starConvex (isCompact_closedBall _ _)
     (convex_closedBall _ _) hs (Or.inl h1) ?_ ?_
   · rw [Metric.mem_closedBall, dist_zero_right, norm_neg, norm_one]
