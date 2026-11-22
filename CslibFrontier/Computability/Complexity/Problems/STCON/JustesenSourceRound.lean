@@ -121,19 +121,19 @@ theorem justesenRetainedSourceRound_parts_inSpace {k : ℕ} {State : Type} [Fint
   have hreply := budget_comp_linear (SourceRound.answer_inSpace C) hsnd
   exact ⟨hquery, hnext, hhalt, hreply⟩
 
-/-- The retained round consumes exactly the selectors of the corresponding scalar replay. -/
-theorem justesenRetainedSourceRound_firstHalting_iff_replayScan
+private theorem justesenRetainedSourceRound_firstHalting_iff_scalar
     {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
     (r : SourceRoundLoop.Registers JustesenSourceContext) (w bits : List Bool)
     (update : RoundUpdate) :
     let M := justesenRetainedSourceRound ntm c r
     let ctx :=
       SourceRoundLoop.roundContext JustesenSourceContext.size JustesenSourceContext.sourceID r
+    let scalar := SourceRound.machine ctx (justesenRoundCallback ntm c)
+      (justesenRoundCallbackStart r.context.adjacency) justesenRoundCallbackReply
     M.FirstHalting w bits M.init ∧ justesenRetainedSourceRoundReply (M.run w bits) = some update ↔
-      SourceRound.replayScan ctx (justesenRoundCallback ntm c)
-        (justesenRoundCallbackStart r.context.adjacency) justesenRoundCallbackReply w bits =
-          some (update, []) := by
-  intro M ctx
+      scalar.FirstHalting w bits scalar.init ∧
+        SourceRound.answer (scalar.run w bits) = some update := by
+  intro M ctx scalar
   let N := justesenRoundCallback ntm c
   let start := fun ctx : JustesenSourceContext => justesenRoundCallbackStart ctx.adjacency
   change (SourceRoundLoop.retainedRound _ _ N start justesenRoundCallbackReply r).FirstHalting
@@ -146,8 +146,22 @@ theorem justesenRetainedSourceRound_firstHalting_iff_replayScan
     ((SourceRoundLoop.retainedRound _ _ N start justesenRoundCallbackReply r).run w bits) =
       some update ↔ _
   rw [hrun]
-  exact SourceRound.firstHalting_iff_replayScan ctx N (start r.context)
-    justesenRoundCallbackReply w bits update
+  rfl
+
+/-- The retained round consumes exactly the selectors of the corresponding scalar replay. -/
+theorem justesenRetainedSourceRound_firstHalting_iff_replayScan
+    {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (r : SourceRoundLoop.Registers JustesenSourceContext) (w bits : List Bool)
+    (update : RoundUpdate) :
+    let M := justesenRetainedSourceRound ntm c r
+    let ctx :=
+      SourceRoundLoop.roundContext JustesenSourceContext.size JustesenSourceContext.sourceID r
+    M.FirstHalting w bits M.init ∧ justesenRetainedSourceRoundReply (M.run w bits) = some update ↔
+      SourceRound.replayScan ctx (justesenRoundCallback ntm c)
+        (justesenRoundCallbackStart r.context.adjacency) justesenRoundCallbackReply w bits =
+          some (update, []) := by
+  exact (justesenRetainedSourceRound_firstHalting_iff_scalar ntm c r w bits update).trans
+    (SourceRound.firstHalting_iff_replayScan _ _ _ _ w bits update)
 
 private theorem initializedRoundContext {k : ℕ} {State : Type} [Fintype State]
     (ntm : MultiTapeNTM k Bool State) (c : ℕ) (w : List Bool)
@@ -243,11 +257,10 @@ theorem configurationJustesenRetainedSourceRound_existsUnique_firstHalting
         justesenRetainedSourceRoundReply (M.run w selectors) = some result ↔
       scalar.FirstHalting w selectors scalar.init ∧
         SourceRound.answer (scalar.run w selectors) = some result := by
-    have h := justesenRetainedSourceRound_firstHalting_iff_replayScan ntm c r w selectors result
+    have h := justesenRetainedSourceRound_firstHalting_iff_scalar ntm c r w selectors result
+    dsimp only at h
     rw [hctx] at h
-    exact h.trans
-      (SourceRound.firstHalting_iff_replayScan ctx N start justesenRoundCallbackReply w
-        selectors result).symm
+    exact h
   refine ⟨bits, ⟨update, (htransfer bits update).mpr ⟨hfirst, hanswer⟩⟩, ?_⟩
   rintro other ⟨result, hresult⟩
   obtain ⟨hfirst', hanswer'⟩ := (htransfer other result).mp hresult
