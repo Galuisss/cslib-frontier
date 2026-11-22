@@ -3019,6 +3019,7 @@ public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenRoun
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceContext
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceContext.Scheduler
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceLoop
+public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceLoop.Scheduler
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceRound
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenWeightedSubdivision.Replay

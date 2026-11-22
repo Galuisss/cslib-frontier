@@ -17,10 +17,16 @@ designated endpoints, and row-major original roots as the indexed isolation sear
 With exact scanner outcomes, the scheduler selects the least min-isolating seed and
 returns the reachability answer for the configuration instance.
 
+## Main definitions
+
+* `configurationSeedSchedulerReferenceScan` runs the mathematical controller on a request.
+
 ## Main results
 
 * `configurationSeedScheduler_correct` transports the indexed search correctness theorem
   to the initialized scheduler and its scanner requests.
+* `configurationSeedSchedulerReferenceScan_correct` gives the exact verdict for any bounded
+  source in the generated subdivision.
 -/
 
 public section
@@ -133,5 +139,46 @@ theorem configurationSeedScheduler_correct {m : Type → Type} [AlternativeMonad
   · intro i hi
     rw [← bitsOfRank]
     exact hleast i hi
+
+/-- Evaluate the mathematical controller with exact adjacency and membership answers
+for the request's seed and source in the original input's subdivision. The input fixes the
+setup and target. A source outside that subdivision yields no verdict. -/
+noncomputable def configurationSeedSchedulerReferenceScan
+    {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (input : List Bool) (request : SeedScanRequest) : Option ControllerVerdict :=
+  let I := configurationInstance ntm c input
+  let setup := configurationSeedSearchSetup ntm c input
+  let n := setup.parameters.search.subdivision.vertexCount
+  let edge := generatedSubdivisionAdj (layeredDigraph I)
+    (configurationSubdivisionIndex ntm c input) (fun j => request.seed.testBit j.val)
+  if h : request.sourceID < n then
+    let source : Fin n := ⟨request.sourceID, h⟩
+    let target : Fin n := ⟨setup.targetID,
+      (configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c input).2⟩
+    runController (m := Id) (fun u v => @decide (edge u v) (Classical.propDecidable _))
+      (fun radius _ v => decide (v ∈ round edge source radius))
+      target
+  else none
+
+/-- A bounded source produces the controller verdict for its generated subdivision. -/
+theorem configurationSeedSchedulerReferenceScan_correct
+    {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (input : List Bool) (request : SeedScanRequest) :
+    let I := configurationInstance ntm c input
+    let setup := configurationSeedSearchSetup ntm c input
+    let n := setup.parameters.search.subdivision.vertexCount
+    let edge := generatedSubdivisionAdj (layeredDigraph I)
+      (configurationSubdivisionIndex ntm c input) (fun j => request.seed.testBit j.val)
+    let target : Fin n := ⟨setup.targetID,
+      (configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c input).2⟩
+    ∀ (hsource : request.sourceID < n),
+      ∃ verdict, configurationSeedSchedulerReferenceScan ntm c input request = some verdict ∧
+        verdict.Correct edge ⟨request.sourceID, hsource⟩ target := by
+  classical
+  intro I setup n edge target hsource
+  let source : Fin n := ⟨request.sourceID, hsource⟩
+  rw [configurationSeedSchedulerReferenceScan, dite_eq_left hsource]
+  exact runController_correct (m := Id) (r := edge) (s := source) (target := target)
+    (fun _ _ => rfl) (fun _ _ _ => rfl)
 
 end Cslib.Complexity.STCON
