@@ -269,7 +269,7 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   exact configurationJustesenSeedSchedulerScan_existsUnique_firstHalting
     ntm c w frame hsetup hvalid
 
-/-- A negative reply at candidate zero rules out a path from the requested source
+/-- A negative reply at candidate zero matches the mathematical scanner and rules out a path
 to the setup's target in the subdivision for the all-zero seed. -/
 example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
     (c : ℕ) (w bits rest : List Bool) (frame : SeedSchedulerFrame)
@@ -282,14 +282,16 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
     let n := s.parameters.search.subdivision.vertexCount
     let edge := Cslib.Reachability.Hoza.generatedSubdivisionAdj (layeredDigraph I)
       (configurationSubdivisionIndex ntm c w) (fun _ => false)
-    ∃ source : Fin n, source.val = frame.request.sourceID ∧
-      ¬ Relation.ReflTransGen edge source
-        ⟨s.targetID, (configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w).2⟩ := by
+    configurationSeedSchedulerReferenceScan ntm c w frame.request = some (.decided false) ∧
+      ∃ source : Fin n, source.val = frame.request.sourceID ∧
+        ¬ Relation.ReflTransGen edge source
+          ⟨s.targetID, (configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w).2⟩ := by
   obtain ⟨hvalid, hsetup, hseed⟩ := seedSchedulerCandidate_valid hcandidate
   obtain ⟨source, hsource, _, hreach⟩ :=
     configurationJustesenSeedSchedulerScan_readReply_correct
       ntm c w frame hsetup hvalid bits rest (.decided false) hreply
-  refine ⟨source, hsource, fun hpath => ?_⟩
+  refine ⟨configurationJustesenSeedSchedulerScan_readReply_eq_reference
+    ntm c w frame hsetup hvalid bits rest (.decided false) hreply, source, hsource, fun hpath => ?_⟩
   have hfalse := hreach.mpr (by simpa only [hseed, Nat.zero_testBit] using hpath)
   cases hfalse
 
