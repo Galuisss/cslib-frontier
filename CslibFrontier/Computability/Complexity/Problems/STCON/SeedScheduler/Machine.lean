@@ -114,6 +114,15 @@ theorem machine_withInit {σ : Type} (setup next : SeedSearchSetup)
   unfold machine NondeterministicQueryMachine.withInit
   rfl
 
+/-- Changing the initial setup or scan entry leaves query, halt, and acceptance unchanged. -/
+theorem observations_eq {σ : Type} (setup next : SeedSearchSetup)
+    (scan : NondeterministicQueryMachine σ) (start restart : SeedScanRequest → σ)
+    (verdict : σ → Option ControllerVerdict) :
+    let M := machine setup scan start verdict
+    let N := machine next scan restart verdict
+    M.query = N.query ∧ M.halted = N.halted ∧ M.accept = N.accept :=
+  ⟨rfl, rfl, rfl⟩
+
 open _root_.Turing.MultiTapeTM.ComputableInSpace in
 /-- Query, read the phase tag or terminal reply, and test acceptance in space linear in
 the encoded scheduler state. Only the active scan's query uses a supplied certificate. -/

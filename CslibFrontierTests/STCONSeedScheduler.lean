@@ -293,4 +293,16 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   have hfalse := hreach.mpr (by simpa only [hseed, Nat.zero_testBit] using hpath)
   cases hfalse
 
+/-- The native compiler can compose the observations under any retained-state producer's budget. -/
+example {k : ℕ} {State α : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) {enc : α ↪ List Bool} {S : α → ℕ} {state : α → JustesenSeedSchedulerState}
+    (hs : ComputableInSpace state enc encJustesenSeedSchedulerState S) :
+    let M := justesenSeedScheduler ntm c
+    ComputableInSpace (fun a => M.query (state a)) enc encNat S ∧
+      ComputableInSpace (fun a => M.halted (state a)) enc encBool S ∧
+      ComputableInSpace (fun a => M.accept (state a)) enc encBool S := by
+  obtain ⟨hq, hh, ha⟩ := justesenSeedScheduler_observations_inSpace ntm c
+  exact ⟨ComputableInSpace.budget_comp_linear hq hs,
+    ComputableInSpace.budget_comp_linear hh hs, ComputableInSpace.budget_comp_linear ha hs⟩
+
 end CslibFrontierTests.STCONSeedScheduler
