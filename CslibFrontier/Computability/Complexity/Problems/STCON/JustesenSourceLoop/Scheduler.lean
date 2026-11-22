@@ -36,6 +36,8 @@ prepared field in its state and uses it to start each scan on the original input
   scheduler agrees with the scheduler initialized for the original word.
 * `Cslib.Complexity.STCON.configurationJustesenSeedSchedulerScan_existsUnique_firstHalting`:
   a valid requested scan has exactly one first-halting selector list returning a verdict.
+* `Cslib.Complexity.STCON.configurationJustesenSeedSchedulerScan_readReply_correct`:
+  parsed scanner replies give the first tie or the reachability verdict for the requested source.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_haltsWithin_clock`:
   a common polynomial selector clock for every branch.
 -/
@@ -44,7 +46,7 @@ public section
 
 namespace Cslib.Complexity.STCON
 
-open Cslib.Code.JustesenFamily
+open Cslib.Code.JustesenFamily Cslib.DoubleCounting Cslib.Reachability.Hoza
 open _root_.Turing _root_.Turing.DoubleCounting
 open _root_.Turing.MultiTapeTM _root_.Turing.MultiTapeTM.ComputableInSpace
 
@@ -147,6 +149,7 @@ private theorem justesenSeedSchedulerScan_withInit_of_valid {k : ℕ} {State : T
     let setup := configurationSeedSearchSetup ntm c w
     let n := setup.parameters.search.subdivision.vertexCount
     ∃ (seed : Fin (2 ^ codeLength I.n (I.n - 1))) (source : Fin n),
+      seed.val = f.request.seed ∧ source.val = f.request.sourceID ∧
       (justesenSeedSchedulerScan ntm c).withInit
         (justesenSourceLoopEntryOfRequest f.request (configurationFieldContext ntm c w)) =
         justesenSourceLoop ntm c
@@ -164,7 +167,7 @@ private theorem justesenSeedSchedulerScan_withInit_of_valid {k : ℕ} {State : T
   have hroot := fun j hj => configurationSeedSearchSetup_originalSourceID_lt_vertexCount
     ntm c w (position := j) hj
   have hsource : source < n := hv.source_lt hends.1 hroot
-  refine ⟨⟨rank, hrank⟩, ⟨source, hsource⟩, ?_⟩
+  refine ⟨⟨rank, hrank⟩, ⟨source, hsource⟩, rfl, rfl, ?_⟩
   rw [show justesenSourceLoopEntryOfRequest ⟨setup, rank, source⟩
       (configurationFieldContext ntm c w) = _ from
     justesenSourceLoopEntryOfRequest_eq ntm c w rank source]
@@ -181,7 +184,7 @@ theorem configurationJustesenSeedSchedulerScan_existsUnique_firstHalting
     ∃! bits, scan.FirstHalting w bits entry ∧
       (SourceRoundLoop.reply (scan.replay w bits entry)).isSome := by
   intro scan entry
-  obtain ⟨seed, source, hreenter⟩ :=
+  obtain ⟨seed, source, _, _, hreenter⟩ :=
     justesenSeedSchedulerScan_withInit_of_valid ntm c w frame hsetup hvalid
   let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
   let target : Fin n := ⟨(configurationSeedSearchSetup ntm c w).targetID,
@@ -196,6 +199,60 @@ theorem configurationJustesenSeedSchedulerScan_existsUnique_firstHalting
   rw [hreenter]
   exact (existsUnique_congr (justesenSourceLoop_firstHalting_reply_iff ntm c context n w)).mpr
     (configurationJustesenSourceLoop_existsUnique_firstHalting ntm c w seed source target)
+
+/-- A parsed scanner reply gives the first radius without a unique passing transcript,
+or gives the correct reachability answer with unique transcripts at every radius.
+The graph uses the seed rank and source recorded by the scheduler frame. -/
+theorem configurationJustesenSeedSchedulerScan_readReply_correct
+    {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (w : List Bool) (frame : SeedSchedulerFrame)
+    (hsetup : frame.request.setup = configurationSeedSearchSetup ntm c w) (hvalid : frame.Valid)
+    (bits rest : List Bool) (verdict : ControllerVerdict)
+    (hreply : (justesenSeedSchedulerScan ntm c).readReply SourceRoundLoop.reply w
+      (justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w))
+      bits = some (verdict, rest)) :
+    let I := configurationInstance ntm c w
+    let setup := configurationSeedSearchSetup ntm c w
+    let n := setup.parameters.search.subdivision.vertexCount
+    let target : Fin n := ⟨setup.targetID,
+      (configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w).2⟩
+    let edge := generatedSubdivisionAdj (layeredDigraph I)
+      (configurationSubdivisionIndex ntm c w)
+      (fun j => frame.request.seed.testBit j.val)
+    ∃ source : Fin n, source.val = frame.request.sourceID ∧
+      match verdict with
+      | .bad radius =>
+        (∀ j < radius, ∃! transcript, Passes edge source j transcript) ∧
+          ¬ (∃! transcript, Passes edge source radius transcript)
+      | .decided hit =>
+        (∀ radius, ∃! transcript, Passes edge source radius transcript) ∧
+          (hit = true ↔ Relation.ReflTransGen edge source target) := by
+  intro I setup n target edge
+  obtain ⟨seed, source, hseed, hsource, hreenter⟩ :=
+    justesenSeedSchedulerScan_withInit_of_valid ntm c w frame hsetup hvalid
+  let scan := justesenSeedSchedulerScan ntm c
+  let entry := justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w)
+  obtain ⟨callBits, _, hfirst, hret⟩ :=
+    (scan.readReply_iff SourceRoundLoop.reply w bits entry verdict rest).mp hreply
+  have hrun : (scan.withInit entry).run w callBits = .inr (some verdict) := by
+    rw [NondeterministicQueryMachine.run_withInit]
+    revert hret
+    cases scan.replay w callBits entry <;> simp [SourceRoundLoop.reply]
+  change (scan.withInit entry).FirstHalting w callBits (scan.withInit entry).init at hfirst
+  rw [hreenter] at hfirst hrun
+  have hcorrect := configurationJustesenSourceLoop_correct ntm c w seed source target
+    callBits verdict hfirst hrun
+  refine ⟨source, hsource, ?_⟩
+  have hedge : (fun u v => configurationJustesenSubdivisionAdjacent ntm c w seed u v = true) =
+      edge := by
+    funext u v
+    have hbits : (Cslib.BitString.equivFin _).symm seed =
+        fun j => frame.request.seed.testBit j.val := by
+      funext j
+      rw [Cslib.BitString.equivFin_symm_apply, hseed]
+    simp only [configurationJustesenSubdivisionAdjacent, decide_eq_true_eq, hbits, edge]
+    rfl
+  cases verdict <;> simpa only [hedge] using hcorrect
 
 /-- Charge the full-fuel scan and one return selector at each designated or indexed frame. -/
 noncomputable def configurationJustesenSeedSchedulerClock {k : ℕ} {State : Type} [Fintype State]
@@ -227,7 +284,7 @@ theorem configurationJustesenSeedScheduler_haltsWithin_clock {k : ℕ} {State : 
   have hends := configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w
   have hscan (f : SeedSchedulerFrame) (hs : f.request.setup = setup) (hv : f.Valid)
       (_ : f.needsScan = true) : (scan.withInit (start f.request)).HaltsWithin w clock := by
-    obtain ⟨seed, source, hreenter⟩ :=
+    obtain ⟨seed, source, _, _, hreenter⟩ :=
       justesenSeedSchedulerScan_withInit_of_valid ntm c w f hs hv
     change NondeterministicQueryMachine.HaltsWithin ((justesenSeedSchedulerScan ntm c).withInit
       (justesenSourceLoopEntryOfRequest f.request (configurationFieldContext ntm c w))) w clock

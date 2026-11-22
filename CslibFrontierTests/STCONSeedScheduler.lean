@@ -269,4 +269,28 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   exact configurationJustesenSeedSchedulerScan_existsUnique_firstHalting
     ntm c w frame hsetup hvalid
 
+/-- A negative reply at candidate zero rules out a path from the requested source
+to the setup's target in the subdivision for the all-zero seed. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w bits rest : List Bool) (frame : SeedSchedulerFrame)
+    (hcandidate : seedSchedulerCandidate (configurationSeedSearchSetup ntm c w) 0 = some frame)
+    (hreply : (justesenSeedSchedulerScan ntm c).readReply SourceRoundLoop.reply w
+      (justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w))
+      bits = some (.decided false, rest)) :
+    let I := configurationInstance ntm c w
+    let s := configurationSeedSearchSetup ntm c w
+    let n := s.parameters.search.subdivision.vertexCount
+    let edge := Cslib.Reachability.Hoza.generatedSubdivisionAdj (layeredDigraph I)
+      (configurationSubdivisionIndex ntm c w) (fun _ => false)
+    ∃ source : Fin n, source.val = frame.request.sourceID ∧
+      ¬ Relation.ReflTransGen edge source
+        ⟨s.targetID, (configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w).2⟩ := by
+  obtain ⟨hvalid, hsetup, hseed⟩ := seedSchedulerCandidate_valid hcandidate
+  obtain ⟨source, hsource, _, hreach⟩ :=
+    configurationJustesenSeedSchedulerScan_readReply_correct
+      ntm c w frame hsetup hvalid bits rest (.decided false) hreply
+  refine ⟨source, hsource, fun hpath => ?_⟩
+  have hfalse := hreach.mpr (by simpa only [hseed, Nat.zero_testBit] using hpath)
+  cases hfalse
+
 end CslibFrontierTests.STCONSeedScheduler
