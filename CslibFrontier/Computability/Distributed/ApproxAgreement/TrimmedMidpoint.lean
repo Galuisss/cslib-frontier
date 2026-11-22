@@ -105,7 +105,7 @@ and marked `@[expose]` for kernel reduction. -/
 @[expose] def sortLE (xs : List K) : List K :=
   xs.foldr insertSorted []
 
-theorem sortLE_eq_insertionSort (xs : List K) : sortLE xs = xs.insertionSort (· ≤ ·) := by
+private theorem sortLE_eq_insertionSort (xs : List K) : sortLE xs = xs.insertionSort (· ≤ ·) := by
   induction xs with
   | nil => simp only [sortLE, List.foldr_nil, List.insertionSort_nil]
   | cons a xs ih =>
@@ -119,11 +119,11 @@ theorem sortLE_eq_insertionSort (xs : List K) : sortLE xs = xs.insertionSort (·
 theorem sortLE_eq_mergeSort (xs : List K) : sortLE xs = xs.mergeSort (· ≤ ·) := by
   rw [sortLE_eq_insertionSort, ← List.mergeSort_eq_insertionSort]
 
-theorem sortedLE_sortLE (xs : List K) : (sortLE xs).SortedLE := by
+private theorem sortedLE_sortLE (xs : List K) : (sortLE xs).SortedLE := by
   rw [sortLE_eq_mergeSort]
   exact List.sortedLE_mergeSort
 
-theorem perm_sortLE (xs : List K) : (sortLE xs).Perm xs := by
+private theorem perm_sortLE (xs : List K) : (sortLE xs).Perm xs := by
   rw [sortLE_eq_mergeSort]
   exact List.mergeSort_perm xs _
 
@@ -131,7 +131,7 @@ theorem perm_sortLE (xs : List K) : (sortLE xs).Perm xs := by
 theorem length_sortLE (xs : List K) : (sortLE xs).length = xs.length :=
   (perm_sortLE xs).length_eq
 
-theorem sortLE_eq_of_perm {xs ys : List K} (h : xs.Perm ys) : sortLE xs = sortLE ys :=
+private theorem sortLE_eq_of_perm {xs ys : List K} (h : xs.Perm ys) : sortLE xs = sortLE ys :=
   ((perm_sortLE xs).trans (h.trans (perm_sortLE ys).symm)).eq_of_sortedLE
     (sortedLE_sortLE xs) (sortedLE_sortLE ys)
 

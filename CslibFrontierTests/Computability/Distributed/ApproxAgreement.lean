@@ -174,9 +174,14 @@ example :
     stPre.heard 0 5 = some 100 ∧
     -- Delivering the 5th round-0 sender `4` advances round `0 → 1` (`est = (1/2 + 1)/2 = 3/4`)
     -- AND immediately cascades `1 → 2` using the 5 pre-buffered round-1 values (`est = 1/2`)!
+    -- Any stale round-0 message arriving afterwards (`msg.round < st.round`) is ignored.
+    let staleRes := asyncApproxStep 1 3 finalRes.nextState 0 ⟨0, 42⟩
     finalRes.nextState.round = 2 ∧
     finalRes.delivered = some (1 / 2) ∧
-    finalRes.outgoing = broadcastAll (Fin 6) ⟨1, 3 / 4⟩ := by
+    finalRes.outgoing = broadcastAll (Fin 6) ⟨1, 3 / 4⟩ ∧
+    staleRes.nextState.heard 0 0 = none ∧
+    staleRes.outgoing = 0 ∧
+    staleRes.delivered = none := by
   decide +kernel
 
 -- Full reachable 2-round asynchronous trace on `Fin 6, t = 1` (`5 * 1 < 6`):
@@ -346,6 +351,14 @@ example : ∃ (S M : Type) (_ : DecidableEq M) (π : AsyncProtocol (Fin 6) ℚ S
 example : ∃ (S M : Type) (_ : DecidableEq M) (π : AsyncProtocol (Fin 1) ℚ S M),
     π.SolvesAsyncApproxAgreement 3 (1 / 1000) :=
   exists_solvesAsyncApproxAgreement (Fin 1) ℚ 3 (by norm_num) (Or.inl (by decide))
+
+-- Independent universe polymorphism `.{u, v}` across `P : Type u` and `K : Type v`.
+private theorem async_universes.{u, v} (P : Type u) (K : Type v) [Fintype P] [DecidableEq P]
+    [Field K] [LinearOrder K] [IsStrictOrderedRing K] [Archimedean K]
+    (t : ℕ) {ε : K} (hε : 0 < ε) (hn : Fintype.card P ≤ 1 ∨ 5 * t < Fintype.card P) :
+    ∃ (S : Type (max u v)) (M : Type v) (_ : DecidableEq M) (π : AsyncProtocol P K S M),
+      π.SolvesAsyncApproxAgreement t ε :=
+  exists_solvesAsyncApproxAgreement.{u, v} P K t hε hn
 
 -- Admissible-run cross-step agreement (`agreement_admissible`) and fair termination instantiation.
 example {x : Fin 6 → ℚ} (hx : ∀ k ∉ ({5} : Finset (Fin 6)), x k ∈ Set.Icc (0 : ℚ) 1)
