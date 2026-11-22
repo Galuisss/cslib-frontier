@@ -448,6 +448,22 @@ theorem configurationJustesenSourceLoop_exists_firstHalting
   exact (configurationJustesenSourceLoop_existsUnique_firstHalting
     ntm c w seed source target).exists
 
+/-- A first-halting run returns a reply exactly when its terminal state carries a verdict. -/
+theorem justesenSourceLoop_firstHalting_reply_iff
+    (ntm : MultiTapeNTM k Bool State) (c : ℕ) (context : JustesenSourceContext)
+    (fuel : ℕ) (w bits : List Bool) :
+    let M := justesenSourceLoop ntm c context fuel
+    M.FirstHalting w bits M.init ∧ (SourceRoundLoop.reply (M.run w bits)).isSome ↔
+      ∃ verdict, M.FirstHalting w bits M.init ∧ M.run w bits = .inr (some verdict) := by
+  intro M
+  let initial := SourceRoundLoop.start context fuel
+  have haccept := SourceRoundLoop.machine_accept_iff initial
+    (justesenRetainedSourceRound ntm c initial)
+    justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
+    (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
+    MembershipTally.retainedReply (M.run w bits)
+  exact (and_congr_right fun _ => haccept).trans exists_and_left.symm
+
 /-- At any sufficient native clock, the compiled full-fuel source loop has exactly
 one accepting occurrence across all selector lists. -/
 theorem configurationJustesenSourceLoop_acceptCount_eq_one
@@ -477,13 +493,6 @@ theorem configurationJustesenSourceLoop_acceptCount_eq_one
   rw [justesenSourceLoop_withInit, hcontext, hlimit]
   let context : JustesenSourceContext :=
     ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
-  let initial := SourceRoundLoop.start context n
-  let M := justesenSourceLoop ntm c context n
-  have haccept := SourceRoundLoop.machine_accept_iff initial
-    (justesenRetainedSourceRound ntm c initial)
-    justesenRetainedSourceRoundEntry justesenRetainedSourceRoundReply
-    (justesenSourceMembershipMachine ntm c) justesenSourceMembershipStart
-    MembershipTally.retainedReply (M.run w bits)
-  exact (and_congr_right fun _ => haccept).trans exists_and_left.symm
+  exact justesenSourceLoop_firstHalting_reply_iff ntm c context n w bits
 
 end Cslib.Complexity.STCON

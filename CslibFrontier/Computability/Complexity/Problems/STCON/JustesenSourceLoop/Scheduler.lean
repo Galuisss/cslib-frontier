@@ -34,6 +34,8 @@ prepared field in its state and uses it to start each scan on the original input
   initializers agree at any requested source.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_replay`: re-entering the fixed
   scheduler agrees with the scheduler initialized for the original word.
+* `Cslib.Complexity.STCON.configurationJustesenSeedSchedulerScan_existsUnique_firstHalting`:
+  a valid requested scan has exactly one first-halting selector list returning a verdict.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_haltsWithin_clock`:
   a common polynomial selector clock for every branch.
 -/
@@ -167,6 +169,33 @@ private theorem justesenSeedSchedulerScan_withInit_of_valid {k : ℕ} {State : T
       (configurationFieldContext ntm c w) = _ from
     justesenSourceLoopEntryOfRequest_eq ntm c w rank source]
   exact justesenSourceLoop_withInit ntm c _ _ 0 n
+
+/-- A valid scheduler frame has exactly one scanner trace that first halts with a verdict.
+A tie and either Boolean reachability verdict are successful returns. -/
+theorem configurationJustesenSeedSchedulerScan_existsUnique_firstHalting
+    {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (w : List Bool) (frame : SeedSchedulerFrame)
+    (hsetup : frame.request.setup = configurationSeedSearchSetup ntm c w) (hvalid : frame.Valid) :
+    let scan := justesenSeedSchedulerScan ntm c
+    let entry := justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w)
+    ∃! bits, scan.FirstHalting w bits entry ∧
+      (SourceRoundLoop.reply (scan.replay w bits entry)).isSome := by
+  intro scan entry
+  obtain ⟨seed, source, hreenter⟩ :=
+    justesenSeedSchedulerScan_withInit_of_valid ntm c w frame hsetup hvalid
+  let n := (configurationSeedSearchSetup ntm c w).parameters.search.subdivision.vertexCount
+  let target : Fin n := ⟨(configurationSeedSearchSetup ntm c w).targetID,
+    (configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w).2⟩
+  let context : JustesenSourceContext :=
+    ⟨configurationJustesenSubdivisionContext ntm c w seed.val, source.val, target.val⟩
+  let loop := justesenSourceLoop ntm c context n
+  let entered := scan.withInit entry
+  change entered = loop at hreenter
+  change ∃! bits, entered.FirstHalting w bits entered.init ∧
+    (SourceRoundLoop.reply (entered.run w bits)).isSome
+  rw [hreenter]
+  exact (existsUnique_congr (justesenSourceLoop_firstHalting_reply_iff ntm c context n w)).mpr
+    (configurationJustesenSourceLoop_existsUnique_firstHalting ntm c w seed source target)
 
 /-- Charge the full-fuel scan and one return selector at each designated or indexed frame. -/
 noncomputable def configurationJustesenSeedSchedulerClock {k : ℕ} {State : Type} [Fintype State]

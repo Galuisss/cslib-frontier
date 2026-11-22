@@ -257,4 +257,16 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
   ⟨configurationJustesenSeedSchedulerClock_polyBounded ntm c,
     configurationJustesenSeedScheduler_haltsWithin_clock ntm c w⟩
 
+/-- When candidate zero is present, its designated scan returns a verdict exactly once. -/
+example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) (frame : SeedSchedulerFrame)
+    (h : seedSchedulerCandidate (configurationSeedSearchSetup ntm c w) 0 = some frame) :
+    let scan := justesenSeedSchedulerScan ntm c
+    let entry := justesenSourceLoopEntryOfRequest frame.request (configurationFieldContext ntm c w)
+    ∃! bits, scan.FirstHalting w bits entry ∧
+      (SourceRoundLoop.reply (scan.replay w bits entry)).isSome := by
+  obtain ⟨hvalid, hsetup, _⟩ := seedSchedulerCandidate_valid h
+  exact configurationJustesenSeedSchedulerScan_existsUnique_firstHalting
+    ntm c w frame hsetup hvalid
+
 end CslibFrontierTests.STCONSeedScheduler
