@@ -294,4 +294,15 @@ example {k : ℕ} {State α : Type} [Fintype State] (ntm : MultiTapeNTM k Bool S
   exact ⟨ComputableInSpace.budget_comp_linear hq hs,
     ComputableInSpace.budget_comp_linear hh hs, ComputableInSpace.budget_comp_linear ha hs⟩
 
+open NondeterministicQueryMachine ComputableInSpace in
+/-- A transition composes with separate producers for the retained state and read/selector input. -/
+example {k : ℕ} {State α : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) {enc : α ↪ List Bool} {S : α → ℕ} {state : α → JustesenSeedSchedulerState}
+    {input : α → Option Bool × Bool}
+    (hs : ComputableInSpace state enc encJustesenSeedSchedulerState S)
+    (hi : ComputableInSpace input enc encReadChoice S) :
+    ComputableInSpace (fun a => (justesenSeedScheduler ntm c).next (state a, input a))
+      enc encJustesenSeedSchedulerState S :=
+  budget_comp_linear (justesenSeedScheduler_next_inSpace ntm c) (budget_prod hs hi)
+
 end CslibFrontierTests.STCONSeedScheduler
