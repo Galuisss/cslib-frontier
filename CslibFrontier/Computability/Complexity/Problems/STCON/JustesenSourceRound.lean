@@ -482,12 +482,8 @@ theorem configurationJustesenRetainedSourceRound_exact_advance
   subst tally
   obtain ⟨hnext, hpass⟩ := configurationJustesenRetainedSourceRound_correct ntm c w
     seed source target fuel radius (hgood radius le_rfl) bits update hfirst hreply
-  have hradius : radius + 1 < n := by
-    by_contra! h
-    apply hgrew
-    rw [hnext]
-    simp only [expected, round_stable_of_size_le h]
-    rfl
+  rw [hnext] at hgrew
+  have hradius : radius + 1 < n := radius_succ_lt_of_expected_count_ne hgrew
   refine ⟨rfl, ?_, ?_, hnext, ?_⟩
   · change fuel - 1 + (radius + 1) = n
     omega
