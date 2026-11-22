@@ -440,9 +440,7 @@ example {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool Stat
           JustesenSourceRoundExact ctx edge source (r.advance update.tally)) := by
   intro I n seed source target edge ctx r M
   have hreentry : M = justesenRetainedSourceRound ntm c r :=
-    SourceRoundLoop.retainedRound_withInit JustesenSourceContext.size JustesenSourceContext.sourceID
-      (justesenRoundCallback ntm c) (fun ctx => justesenRoundCallbackStart ctx.adjacency)
-      justesenRoundCallbackReply base r
+    justesenRetainedSourceRound_withInit ntm c base r
   rw [hreentry]
   have hpass := existsUnique_passes_zero edge source
   have hinit : JustesenSourceRoundExact ctx edge source r :=
