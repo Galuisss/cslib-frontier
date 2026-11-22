@@ -8,6 +8,7 @@ module
 
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalCoefficientEvaluation
 import CslibFrontier.Computability.Complexity.RealAlgebraic.CriticalParameterEvaluation
+import CslibFrontier.Computability.Complexity.RealAlgebraic.UnivariateDerivativeEvaluation
 import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignApproximation
 import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProduct
 import CslibFrontier.Foundations.Algebra.Polynomial.DyadicSignProductBounds
@@ -49,6 +50,16 @@ open Cslib Cslib.Complexity Cslib.Complexity.RealAlgebraic Turing.MultiTapeTM
 open MvPolynomial MvPolynomial.CriticalSystem MvPolynomial.PurePower
 
 private instance : Fact (Nat.Prime 101) := ⟨by decide⟩
+
+-- Binary order two applied to 3X² gives the constant 6 modulo 101.
+example : (univariateDerivativeResidue 101 2 2 0 (fun i => if i = 2 then 3 else 0) :
+    ZMod 101) = 6 := by
+  have h := univariateDerivativeResidue_cast (p := 101) (D := 2) (k := 2) (z := 0)
+    (Polynomial.monomial 2 (3 : ZMod 101))
+    (Polynomial.natDegree_monomial_le _) (by decide) (fun i => if i = 2 then 3 else 0)
+    (by intro i _; by_cases hi : i = 2 <;> simp [hi, Polynomial.coeff_monomial])
+  norm_num [Polynomial.coeff_iterate_derivative, Nat.descFactorial] at h
+  exact h
 
 -- Above-dimension addresses return zero even for arbitrary evaluators and nonprime moduli.
 example (p n ell B m : ℕ) (hm : ell ^ n < m)

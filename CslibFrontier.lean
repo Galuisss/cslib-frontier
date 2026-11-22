@@ -3111,6 +3111,7 @@ public import CslibFrontier.Computability.Complexity.RealAlgebraic.ResidueEvalua
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.TraceExponential
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.TranslatedCoefficientEvaluation
 public import CslibFrontier.Computability.Complexity.RealAlgebraic.TranslatedPoint
+public import CslibFrontier.Computability.Complexity.RealAlgebraic.UnivariateDerivativeEvaluation
 public import CslibFrontier.Computability.Complexity.Reduction
 public import CslibFrontier.Computability.Complexity.Reduction.Autoreducibility
 public import CslibFrontier.Computability.Complexity.Reduction.BoundedOracle
