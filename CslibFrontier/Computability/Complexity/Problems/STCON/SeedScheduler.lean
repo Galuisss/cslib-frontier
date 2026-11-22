@@ -322,6 +322,11 @@ designated source. An indexed phase uses a bounded cursor and its corresponding 
     | some _ => f.cursor < s.parameters.search.subdivision.originalCount ∧
       f.request.sourceID = s.originalSourceID f.cursor
 
+/-- A valid frame holds a rank below the seed limit. -/
+theorem SeedSchedulerFrame.Valid.seed_lt {f : SeedSchedulerFrame} (hf : f.Valid) :
+    f.request.seed < f.request.setup.parameters.search.seedLimit :=
+  hf.1
+
 /-- Each available candidate starts in a valid designated frame. -/
 theorem seedSchedulerCandidate_valid {s : SeedSearchSetup} {seed : ℕ} {f : SeedSchedulerFrame}
     (h : seedSchedulerCandidate s seed = some f) :
@@ -465,6 +470,22 @@ theorem length_encSeedSchedulerFrame_le (s : SeedSearchSetup) (i cursor u : ℕ)
   have hsource := (length_encNat_mono hu).trans
     ((encSubdivisionSize_vertexCount_length_le s.parameters.search.subdivision).trans hsub)
   cases answer <;> enc_len [encSeedSchedulerFrame_apply, encSeedScanRequest_apply]
+
+/-- Valid scheduler frames are bounded by their setup once the designated source and indexed
+roots are known to lie in the subdivision. -/
+theorem SeedSchedulerFrame.Valid.length_le {f : SeedSchedulerFrame} (hf : f.Valid)
+    (hsource : f.request.setup.sourceID <
+      f.request.setup.parameters.search.subdivision.vertexCount)
+    (hroot : ∀ j < f.request.setup.parameters.search.subdivision.originalCount,
+      f.request.setup.originalSourceID j <
+        f.request.setup.parameters.search.subdivision.vertexCount) :
+    (encSeedSchedulerFrame f).length ≤ 12 * (encSeedSearchSetup f.request.setup).length + 9 := by
+  obtain ⟨hi, hphase⟩ := hf
+  split at hphase
+  · exact length_encSeedSchedulerFrame_le _ _ _ _ _ hi.le
+      (hphase.1 ▸ Nat.zero_le _) (hphase.2 ▸ hsource.le)
+  · exact length_encSeedSchedulerFrame_le _ _ _ _ _ hi.le
+      hphase.1.le (hphase.2 ▸ (hroot _ hphase.1).le)
 
 private theorem scanFrame_bounds (s : SeedSearchSetup)
     (hlimit : s.parameters.search.seedLimit = 2 ^ s.parameters.search.seedWidth)
