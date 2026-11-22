@@ -116,6 +116,14 @@ def machine {σ : Type} (setup : SeedSearchSetup) (scan : NondeterministicQueryM
     | .inr _ => true
   accept s := ((reply s).join.map Answer.reachable).getD false
 
+/-- The scheduler accepts exactly a returned positive designated answer. -/
+theorem machine_accept_iff {σ : Type} (setup : SeedSearchSetup)
+    (scan : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)
+    (verdict : σ → Option ControllerVerdict) (s : State σ) :
+    (machine setup scan start verdict).accept s = true ↔
+      ∃ answer, reply s = some (some answer) ∧ answer.reachable = true := by
+  rcases s with _ | (_ | (_ | answer)) <;> simp [machine, reply]
+
 /-- Changing the initial setup changes only the scheduler's entry. -/
 theorem machine_withInit {σ : Type} (setup next : SeedSearchSetup)
     (scan : NondeterministicQueryMachine σ) (start : SeedScanRequest → σ)

@@ -58,6 +58,8 @@ prepared field in its state and uses it to start each scan on the original input
   logarithmic encoded state length on every selector prefix.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_exists_routines`:
   compile the retained scheduler on the original word with logarithmic space and polynomial time.
+* `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_acceptCount`:
+  the native accepting count is one exactly on reachable instances and zero otherwise.
 -/
 
 public section
@@ -606,5 +608,60 @@ theorem configurationJustesenSeedScheduler_exists_routines {k : ℕ} {State : Ty
     (fun w => by simpa only [encBits_apply] using
       configurationJustesenSeedScheduler_haltsWithin_clock ntm c w)
   exact ⟨R, L, d, fun w => by simpa only [encBits_apply] using hbounds w⟩
+
+open Classical NondeterministicQueryMachine in
+/-- The compiled scheduler has one accepting occurrence when the configuration target is
+reachable, and zero otherwise, at any clock sufficient for all native branches. -/
+theorem configurationJustesenSeedScheduler_acceptCount {k : ℕ} {State : Type}
+    [Fintype State] (ntm : MultiTapeNTM k Bool State) (c : ℕ)
+    (R : Routines (justesenSeedScheduler ntm c) (configurationJustesenSeedSchedulerEntry ntm c)
+      encBits (fun w => Nat.log2 w.length + 1))
+    (w : List Bool) {clock : ℕ} (hclock : R.machine.RunsInTime w clock) :
+    (Native.countingMachine R.I R.P R.F R.C).acceptCount clock (R.machine.initCfg w) =
+      if configurationInstance ntm c w ∈ STCON then 1 else 0 := by
+  let I := configurationInstance ntm c w
+  let M := justesenSeedScheduler ntm c
+  let entry := configurationJustesenSeedSchedulerEntry ntm c w
+  let reply (trace : List Bool) := SeedSchedulerMachine.reply (M.replay w trace entry).2
+  obtain ⟨answer, bits, _, _, _, hreach, hfirst, hreply, hunique⟩ :=
+    configurationJustesenSeedScheduler_replay_correct ntm c w
+  have haccept (trace : List Bool) : M.accept (M.replay w trace entry) = true ↔
+      ∃ a, reply trace = some (some a) ∧ a.reachable = true := by
+    let final := M.replay w trace entry
+    exact SeedSchedulerMachine.machine_accept_iff (configurationSeedSearchSetup ntm c [])
+      (justesenSeedSchedulerScan ntm c) (fun r => justesenSourceLoopEntryOfRequest r final.1)
+      SourceRoundLoop.reply final.2
+  have htrace (trace : List Bool) :
+      (M.FirstHalting w trace entry ∧ M.accept (M.replay w trace entry) = true) ↔
+        trace = bits ∧ I ∈ STCON := by
+    rw [haccept]
+    constructor
+    · rintro ⟨hhalt, a, ha, hhit⟩
+      have hsome : (reply trace).isSome := by simp [ha]
+      have heq := hunique trace hhalt hsome
+      subst trace
+      have ha' : a = answer := by
+        have h : reply bits = some (some answer) := hreply
+        simpa only [h, Option.some.injEq] using ha.symm
+      exact ⟨rfl, hreach.mp (ha' ▸ hhit)⟩
+    · rintro ⟨rfl, hmem⟩
+      exact ⟨hfirst, answer, hreply, hreach.mpr hmem⟩
+  have hset : {trace : List Bool |
+      M.FirstHalting w trace entry ∧ M.accept (M.replay w trace entry) = true} =
+        if I ∈ STCON then {bits} else ∅ := by
+    ext trace
+    rw [Set.mem_ofPred_eq, htrace]
+    by_cases h : I ∈ STCON <;> simp [h]
+  rw [← Nat.cast_inj (R := ℕ∞)]
+  calc
+    _ = {trace : List Bool |
+        M.FirstHalting w trace entry ∧ M.accept (M.replay w trace entry) = true}.encard := by
+      simpa only [MultiTapeCTM.acceptCount, encBits_apply, beq_iff_eq, List.cons.injEq, and_true]
+        using R.branchCount_eq_encard_firstHalting w hclock (· == [true])
+    _ = _ := by
+      rw [hset]
+      change (if I ∈ STCON then ({bits} : Set (List Bool)) else ∅).encard =
+        ↑(if I ∈ STCON then (1 : ℕ) else 0)
+      by_cases hmem : I ∈ STCON <;> simp [hmem]
 
 end Cslib.Complexity.STCON
