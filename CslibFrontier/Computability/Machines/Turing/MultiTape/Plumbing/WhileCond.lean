@@ -84,29 +84,8 @@ lemma exists_runFrom_round {d : Cfg k Symbol (State ⊕ Unit) input} {t : ℕ}
     (hsp : (MultiTapeNTM.RunPath.ofDeterministic tm (wordsCfgAt input p (some tm.q₀) w out)
       τ).space ≤ σ) :
     ∃ u ≤ τ, ConfinedRun (whileCond c tm) d (wordsCfgAt input p' (some (.inr ())) w' out')
-      (t + (u + 1)) σ := by
-  obtain ⟨u, hu, hhalt⟩ := exists_haltsAt (show (tm.runFrom _ τ).Halted by rw [hrun]; rfl)
-  have hstart : (whileCond c tm).step (wordsCfgAt input p (some (.inr ())) w out) =
-      (wordsCfgAt input p (some tm.q₀) w out).mapState (handOver ()) := by
-    rw [step_check, hc]
-    rfl
-  have hround : (whileCond c tm).runFrom (wordsCfgAt input p (some (.inr ())) w out) (u + 1) =
-      wordsCfgAt input p' (some (.inr ())) w' out' := by
-    rw [runFrom_succ_eq_step, hstart, hhalt.runFrom_combine_left (handOver_some ()) le_rfl,
-      ← hhalt.runFrom_eq hu, hrun]
-    rfl
-  refine ⟨u, hu, by rw [runFrom_add, hd.reaches, hround], fun l => ?_⟩
-  rw [visitedByTapeHead_add, hd.reaches]
-  refine Finset.union_subset (hd.confined l) (visitedByTapeHead_subset _ fun m hm => ?_)
-  rcases m with _ | m
-  · simp [runFrom]
-  · rw [runFrom_succ_eq_step, hstart]
-    obtain hlt | rfl := (Nat.lt_succ_iff.mp hm).lt_or_eq
-    · rw [hhalt.runFrom_combine_left (handOver_some ()) hlt.le]
-      exact visitedByTapeHead_subset_Icc _ rfl ((space_mono tm _ hu).trans hsp)
-        (MultiTapeNTM.RunPath.mem_visitedByTapeHead_ofDeterministic.mpr ⟨m, by lia, rfl⟩)
-    · rw [hhalt.runFrom_combine_left (handOver_some ()) le_rfl, ← hhalt.runFrom_eq hu, hrun]
-      simp
+      (t + (u + 1)) σ :=
+  hd.exists_combine_round (by rw [step_check, hc]; rfl) hrun hsp
 
 end WhileCond
 

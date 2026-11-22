@@ -83,6 +83,46 @@ public noncomputable abbrev whileInput (tm : MultiTapeTM k Symbol State) :
   simp only [SignType.coe_one] at this
   omega
 
+/-- One round of `combine tm test (handOver ()) f q₀`: once the test step hands over to `tm.q₀`,
+running `tm` to a halted `wordsCfgAt` configuration within space `σ` returns to `.inr ()` in
+`u + 1` steps (`u ≤ τ`) while keeping every head within `[-σ, σ]`. -/
+public theorem ConfinedRun.exists_combine_round {test : MultiTapeTM k Symbol Unit}
+    {tm : MultiTapeTM k Symbol State} {f : Option Unit → Option (State ⊕ Unit)}
+    {q₀ : State ⊕ Unit} {start : Cfg k Symbol (State ⊕ Unit) input} {t : ℕ}
+    {p p' : Fin (input.length + 2)} {w w' : Fin k → List Symbol} {out out' : List Symbol}
+    {τ σ : ℕ}
+    (hd : ConfinedRun (combine tm test (handOver ()) f q₀) start
+      (wordsCfgAt input p (some (.inr ())) w out) t σ)
+    (hstart : (combine tm test (handOver ()) f q₀).step
+      (wordsCfgAt input p (some (.inr ())) w out) =
+      (wordsCfgAt input p (some tm.q₀) w out).mapState (handOver ()))
+    (hrun : tm.runFrom (wordsCfgAt input p (some tm.q₀) w out) τ =
+      wordsCfgAt input p' none w' out')
+    (hsp : (MultiTapeNTM.RunPath.ofDeterministic tm (wordsCfgAt input p (some tm.q₀) w out)
+      τ).space ≤ σ) :
+    ∃ u ≤ τ, ConfinedRun (combine tm test (handOver ()) f q₀) start
+      (wordsCfgAt input p' (some (.inr ())) w' out') (t + (u + 1)) σ := by
+  obtain ⟨u, hu, hhalt⟩ := exists_haltsAt (show (tm.runFrom _ τ).Halted by rw [hrun]; rfl)
+  have hround :
+      (combine tm test (handOver ()) f q₀).runFrom
+        (wordsCfgAt input p (some (.inr ())) w out) (u + 1) =
+      wordsCfgAt input p' (some (.inr ())) w' out' := by
+    rw [runFrom_succ_eq_step, hstart, hhalt.runFrom_combine_left (handOver_some ()) le_rfl,
+      ← hhalt.runFrom_eq hu, hrun]
+    rfl
+  refine ⟨u, hu, by rw [runFrom_add, hd.reaches, hround], fun l => ?_⟩
+  rw [visitedByTapeHead_add, hd.reaches]
+  refine Finset.union_subset (hd.confined l) (visitedByTapeHead_subset _ fun m hm => ?_)
+  rcases m with _ | m
+  · simp [runFrom]
+  · rw [runFrom_succ_eq_step, hstart]
+    obtain hlt | rfl := (Nat.lt_succ_iff.mp hm).lt_or_eq
+    · rw [hhalt.runFrom_combine_left (handOver_some ()) hlt.le]
+      exact visitedByTapeHead_subset_Icc _ rfl ((space_mono tm _ hu).trans hsp)
+        (MultiTapeNTM.RunPath.mem_visitedByTapeHead_ofDeterministic.mpr ⟨m, by lia, rfl⟩)
+    · rw [hhalt.runFrom_combine_left (handOver_some ()) le_rfl, ← hhalt.runFrom_eq hu, hrun]
+      simp
+
 namespace WhileInput
 
 variable {tm : MultiTapeTM k Symbol State}
@@ -106,29 +146,8 @@ lemma exists_runFrom_round {c : Cfg k Symbol (State ⊕ Unit) input} {t : ℕ}
       τ).space ≤ σ) :
     ∃ u ≤ τ, ConfinedRun (whileInput tm) c (wordsCfgAt input p' (some (.inr ())) w' out')
       (t + (u + 1)) σ := by
-  obtain ⟨u, hu, hhalt⟩ := exists_haltsAt (show (tm.runFrom _ τ).Halted by rw [hrun]; rfl)
   obtain ⟨a, ha⟩ := Option.ne_none_iff_exists'.mp hsym
-  have hstart : (whileInput tm).step (wordsCfgAt input p (some (.inr ())) w out) =
-      (wordsCfgAt input p (some tm.q₀) w out).mapState (handOver ()) := by
-    rw [step_check, ha]
-    rfl
-  have hround : (whileInput tm).runFrom (wordsCfgAt input p (some (.inr ())) w out) (u + 1) =
-      wordsCfgAt input p' (some (.inr ())) w' out' := by
-    rw [runFrom_succ_eq_step, hstart, hhalt.runFrom_combine_left (handOver_some ()) le_rfl,
-      ← hhalt.runFrom_eq hu, hrun]
-    rfl
-  refine ⟨u, hu, by rw [runFrom_add, hc.reaches, hround], fun l => ?_⟩
-  rw [visitedByTapeHead_add, hc.reaches]
-  refine Finset.union_subset (hc.confined l) (visitedByTapeHead_subset _ fun m hm => ?_)
-  rcases m with _ | m
-  · simp [runFrom]
-  · rw [runFrom_succ_eq_step, hstart]
-    obtain hlt | rfl := (Nat.lt_succ_iff.mp hm).lt_or_eq
-    · rw [hhalt.runFrom_combine_left (handOver_some ()) hlt.le]
-      exact visitedByTapeHead_subset_Icc _ rfl ((space_mono tm _ hu).trans hsp)
-        (MultiTapeNTM.RunPath.mem_visitedByTapeHead_ofDeterministic.mpr ⟨m, by lia, rfl⟩)
-    · rw [hhalt.runFrom_combine_left (handOver_some ()) le_rfl, ← hhalt.runFrom_eq hu, hrun]
-      simp
+  exact hc.exists_combine_round (by rw [step_check, ha]; rfl) hrun hsp
 
 end WhileInput
 
