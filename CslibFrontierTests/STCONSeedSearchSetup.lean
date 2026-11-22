@@ -71,14 +71,7 @@ example (input : List Bool)
   intro setup hs hr
   let scan (r : SeedScanRequest) := [configurationSeedSchedulerReferenceScan ntm c input r]
   obtain ⟨result, hresult, _, _, hreach⟩ :=
-    configurationSeedScheduler_correct ntm c input scan (by
-      intro seed source
-      obtain ⟨verdict, hscan, hspec⟩ := configurationSeedSchedulerReferenceScan_correct
-        ntm c input ⟨setup, seed.val, source.val⟩ source.isLt
-      refine ⟨verdict, congrArg (fun v => [v]) hscan, ?_⟩
-      cases verdict with
-      | bad j => exact hspec.2
-      | decided hit => exact hspec)
+    configurationSeedSchedulerReference_correct ntm c input
   exact ⟨scan, result, hresult, hreach.trans (configurationInstance_mem_iff ntm c hspace)⟩
 
 end CslibFrontierTests.STCONSeedSearchSetup

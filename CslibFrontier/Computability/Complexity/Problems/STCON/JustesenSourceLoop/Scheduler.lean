@@ -11,6 +11,7 @@ public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSour
 public import CslibFrontier.Computability.Complexity.Problems.STCON.JustesenSourceLoop
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler.Correct
 public import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler.Machine
+import CslibFrontier.Computability.Complexity.Problems.STCON.SeedScheduler.Replay
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.LogSpace.NondeterministicQueryMachine.Retain
 
 /-!
@@ -43,6 +44,8 @@ prepared field in its state and uses it to start each scan on the original input
   parsed scanner replies give the first tie or the reachability verdict for the requested source.
 * `Cslib.Complexity.STCON.configurationJustesenSeedSchedulerScan_readReply_eq_reference`:
   every parsed reply agrees with the mathematical reference callback.
+* `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_replay_correct`:
+  the unique successful replay returns the least min-isolating seed and decides reachability.
 * `Cslib.Complexity.STCON.configurationJustesenSeedScheduler_haltsWithin_clock`:
   a common polynomial selector clock for every branch.
 -/
@@ -301,6 +304,87 @@ theorem configurationJustesenSeedSchedulerScan_readReply_eq_reference
   have heq : source = ⟨frame.request.sourceID, hsource ▸ source.isLt⟩ := Fin.ext hsource
   rw [heq] at hcorrect
   rw [hscan, href.eq hcorrect]
+
+/-- On the original input, exactly one first-halting scheduler replay returns a result.
+That result selects the least min-isolating rank and decides the STCON instance, including
+when the designated target is unreachable. -/
+theorem configurationJustesenSeedScheduler_replay_correct
+    {k : ℕ} {State : Type} [Fintype State] (ntm : MultiTapeNTM k Bool State)
+    (c : ℕ) (w : List Bool) :
+    let I := configurationInstance ntm c w
+    let setup := configurationSeedSearchSetup ntm c w
+    let M := justesenSeedScheduler ntm c
+    let entry := configurationJustesenSeedSchedulerEntry ntm c w
+    let reply := fun bits => SeedSchedulerMachine.reply (M.replay w bits entry).2
+    ∃ (answer : SeedSchedulerMachine.Answer) (bits : List Bool),
+      answer.seed < setup.parameters.search.seedLimit ∧
+      (layeredDigraph I).IsMinIsolating (generatedWeight (fun j => answer.seed.testBit j.val)) ∧
+      (∀ i : Fin (2 ^ setup.parameters.search.seedWidth), i.val < answer.seed →
+        ¬ (layeredDigraph I).IsMinIsolating (generatedWeight (fun j => i.val.testBit j.val))) ∧
+      (answer.reachable = true ↔ I ∈ STCON) ∧
+      M.FirstHalting w bits entry ∧ reply bits = some (some answer) ∧
+      ∀ other, M.FirstHalting w other entry → (reply other).isSome → other = bits := by
+  intro I setup M entry reply
+  let field := configurationFieldContext ntm c w
+  let scan := justesenSeedSchedulerScan ntm c
+  let start := fun r => justesenSourceLoopEntryOfRequest r field
+  let entered := justesenSeedSchedulerFor ntm c setup field
+  let empty := configurationSeedSearchSetup ntm c []
+  let family := justesenSeedSchedulerFor ntm c empty
+  let oracle := fun r => [configurationSeedSchedulerReferenceScan ntm c w r]
+  have hspec (f : SeedSchedulerFrame) (hs : f.request.setup = setup) (hv : f.Valid) :
+      ∃! bits, scan.FirstHalting w bits (start f.request) ∧
+        (SourceRoundLoop.reply (scan.replay w bits (start f.request))).isSome :=
+    configurationJustesenSeedSchedulerScan_existsUnique_firstHalting ntm c w f hs hv
+  obtain ⟨bits, hfirst, hresult⟩ :=
+    SeedSchedulerMachine.exists_successful_firstHalting setup scan start SourceRoundLoop.reply w
+      (fun f hs hv _ => (hspec f hs hv).exists)
+  have hunique :=
+    SeedSchedulerMachine.subsingleton_successful_firstHalting setup scan start
+      SourceRoundLoop.reply w (by
+        intro f hs hv _
+        obtain ⟨_, _, unique⟩ := hspec f hs hv
+        intro left hl right hr
+        exact (unique left hl).trans (unique right hr).symm)
+  obtain ⟨answer, hanswer⟩ := Option.isSome_iff_exists.mp hresult
+  obtain ⟨actual, hactual, hpack⟩ := SeedSchedulerMachine.runSeedSchedulerFor_eq_of_firstHalting
+    setup (configurationSeedSearchSetup_endpoints_lt_vertexCount ntm c w).1
+    (fun _ hp => configurationSeedSearchSetup_originalSourceID_lt_vertexCount ntm c w hp)
+    (configurationSeedScheduler_seedLimit ntm c w) scan start SourceRoundLoop.reply w oracle
+    (by
+      intro f hs hv _ trace value hhalt hret
+      have hread := (scan.readReply_iff SourceRoundLoop.reply w (trace ++ [false])
+        (start f.request) value []).mpr ⟨trace, rfl, hhalt, hret⟩
+      exact congrArg (fun x => [x])
+        (configurationJustesenSeedSchedulerScan_readReply_eq_reference
+          ntm c w f hs hv (trace ++ [false]) [] value hread))
+    bits answer hfirst hanswer
+  obtain ⟨result, hmath, hmin, hleast, hreach⟩ :=
+    configurationSeedSchedulerReference_correct ntm c w
+  have hactual' : actual = some result := List.singleton_inj.mp (hactual.symm.trans hmath)
+  let selected : SeedSchedulerMachine.Answer := ⟨result.seed.val, result.reachable⟩
+  have hselected : answer = some selected := by
+    rw [hactual'] at hpack
+    exact hpack.symm
+  have hhalt (trace : List Bool) :
+      M.FirstHalting w trace entry ↔ entered.FirstHalting w trace entered.init := by
+    let e := Equiv.refl JustesenSeedSchedulerState
+    change (NondeterministicQueryMachine.retain e family
+      (configurationFieldContext ntm c [])).FirstHalting w trace (e.symm (field, entered.init)) ↔ _
+    have hinit : (family field).withInit entered.init = entered :=
+      SeedSchedulerMachine.machine_withInit empty setup scan start SourceRoundLoop.reply
+    rw [NondeterministicQueryMachine.firstHalting_retain,
+      ← (family field).firstHalting_withInit entered.init, hinit]
+  have hreply (trace : List Bool) :
+      reply trace = SeedSchedulerMachine.reply (entered.run w trace) :=
+    congrArg (fun s => SeedSchedulerMachine.reply s.2)
+      (configurationJustesenSeedScheduler_replay ntm c w trace)
+  have hseed : selected.seed < setup.parameters.search.seedLimit :=
+    (configurationSeedScheduler_seedLimit ntm c w).symm ▸ result.seed.isLt
+  refine ⟨selected, bits, hseed, hmin, hleast, hreach, (hhalt bits).mpr hfirst, ?_, ?_⟩
+  · exact (hreply bits).trans (hanswer.trans (congrArg some hselected))
+  · intro other hother hr
+    exact hunique ⟨(hhalt other).mp hother, hreply other ▸ hr⟩ ⟨hfirst, hresult⟩
 
 /-- Charge the full-fuel scan and one return selector at each designated or indexed frame. -/
 noncomputable def configurationJustesenSeedSchedulerClock {k : ℕ} {State : Type} [Fintype State]
