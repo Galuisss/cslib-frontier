@@ -54,6 +54,7 @@ import CslibFrontier.Computability.Complexity.Problems.Permanent.Valiant
 import CslibFrontier.Computability.Complexity.Problems.ThreeSAT.Collapse
 import CslibFrontier.Computability.Complexity.Problems.ThreeSAT.Tautology
 import CslibFrontier.Computability.Complexity.Problems.NCL.Hardness
+import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Hardness
 import CslibFrontier.Computability.Complexity.Classes.Sparse.Envelope
 import CslibFrontier.Computability.Complexity.Classes.Advice.OneBit
 import CslibFrontier.Computability.Complexity.Classes.Advice.LengthComparison
@@ -947,6 +948,25 @@ register_result "ncl-and-or-pspace-complete" where
     or two configurations. The reductions from alternating prenex CNF emit loop-free graphs. \
     The upper bound uses deterministic Savitch search. \
     Source check: https://github.com/cslib-community/cslib-frontier/pull/7455#issuecomment-7078246392."
+
+register_result "ncl-planar-and-or-pspace-complete" where
+  title := "Hearn–Demaine: planar AND/OR constraint-logic reachability is PSPACE-complete"
+  topic := "space complexity"
+  sources := [
+    { paper := HearnDemaine2005, theorem := "Theorem 9",
+      locator := "Authors’ version, §3.2, p. 9" }
+  ]
+  theorems := [
+    Cslib.Complexity.NCL.PlanarAndOrNCL_pspaceComplete,
+    Cslib.Complexity.NCL.PlanarAndOrNCLEdge_pspaceComplete,
+    Cslib.Complexity.NCL.PlanarAndOrNCLEdgeToEdge_pspaceComplete
+  ]
+  scope := "The three reachability problems use closed, well-typed words of adjacent single \
+    AND/OR vertices, with no swap instructions; configurations use one bit per compiled edge. \
+    Deterministic polynomial-time reductions from alternating prenex CNF emit loop-free \
+    multigraphs; parallel edges are allowed. PSPACE membership reuses general AND/OR \
+    reachability. Every checked word's actual compiled incidence graph admits a standard \
+    continuous planar orthogonal drawing, with its original finite edge numbering."
 
 register_result "alternation-apspace-exp" where
   title := "Chandra–Kozen–Stockmeyer: APSPACE equals EXP"
