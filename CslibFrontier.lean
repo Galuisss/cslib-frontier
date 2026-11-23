@@ -3144,7 +3144,6 @@ public import CslibFrontier.Computability.Complexity.Problems.NCL.Gadgets.Standa
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Gadgets.Vnoc
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Gadgets.Wire
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.AndOr
-public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.Bandwidth
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.Basic
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.Bounded
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.BoundedReduction
