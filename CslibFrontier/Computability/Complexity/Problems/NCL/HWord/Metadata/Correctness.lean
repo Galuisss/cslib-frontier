@@ -198,7 +198,7 @@ private theorem scan_eq_source {α : Type*} (f : ℕ → Tag q → α)
   simpa only [hpos, htag, Function.comp_def] using hf (PortGraph.rowTag.symm (i, tag))
 
 /-- The natural-coordinate scan is the actual certified source-cell block enumeration. -/
-theorem blocks_eq : blocks H hq n =
+private theorem blocks_eq : blocks H hq n =
     Program.blocks (PortGraph.network H n) (AndOr.rowSection H hq)
       (PortGraph.bandwidthCertificate H).order (AndOr.input_arity_le H hq) (stride q)
       (Fin.val ∘ PortGraph.vertexRow) :=

@@ -49,7 +49,7 @@ structure SelectionLegal (s : Fin n × Fin q → Bool) : Prop where
     ∀ a b, s (i, a) = true → s (j, b) = true → H.Adj a b
 
 /-- A selector configuration includes the symbol of the word at every position. -/
-@[expose] def Encodes (s : Fin n × Fin q → Bool) (w : Fin n → Fin q) : Prop :=
+private def Encodes (s : Fin n × Fin q → Bool) (w : Fin n → Fin q) : Prop :=
   ∀ i, s (i, w i) = true
 
 /-- Select exactly the word's symbol at each position. -/

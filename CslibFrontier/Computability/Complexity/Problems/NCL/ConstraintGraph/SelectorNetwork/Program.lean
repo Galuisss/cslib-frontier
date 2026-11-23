@@ -75,7 +75,7 @@ enc_structure encBlock (budget : ℕ) : Block budget where
   edgeCount := (names blocks).length
 
 /-- Reading the actual bounded local template from a block is polynomial-time. -/
-theorem computableInPolyTime_blockTemplate (budget : ℕ) :
+private theorem computableInPolyTime_blockTemplate (budget : ℕ) :
     ComputableInPolyTime (fun b : Block budget => b.shape.val.template)
       (encBlock budget) encTemplate := by
   simpa only [Function.comp_def] using (Cell.computableInPolyTime_template budget).comp

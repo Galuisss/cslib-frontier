@@ -51,7 +51,7 @@ variable {m : ℕ} (order : Vert U C R ≃ Fin m) (budget : ℕ)
     | .inr _ => 0
 
 /-- Sparse names on one cell's shared/private split. -/
-@[expose] def localCode (v : Vert U C R)
+private def localCode (v : Vert U C R)
     (e : Edge C R ⊕ Diagram.Replacement.Inner (cell N A v).openSim) : ℕ :=
   code N A order budget (Sum.map id (fun i => (⟨v, i⟩ : Private N A)) e)
 
