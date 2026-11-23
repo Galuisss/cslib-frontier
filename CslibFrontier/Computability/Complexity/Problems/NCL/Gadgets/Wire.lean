@@ -103,7 +103,6 @@ local notation "B" => Color.blue
   | .red => (((Diagram.id [R]).tensor Conv.redToRedBlue).comp
       (Conv.redRedToBlue.tensor (Diagram.id [B]))).comp blueCap
 
-
 end Cslib.Complexity.NCL.Gadgets.Wire
 
 end

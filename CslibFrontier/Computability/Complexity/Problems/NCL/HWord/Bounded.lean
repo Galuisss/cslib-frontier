@@ -45,12 +45,6 @@ private def rowArray : List ℕ :=
   3 * Planar.Embedding.rowBudget (K * (64 + 66 * q)) (K * (66 + 69 * q))
     (2 * (K * (66 + 69 * q))) - 1
 
-/-- The actual emitted vertices sorted by their row array. -/
-private def layoutOrder : (diagram (n := n) H hq).Vtx Prim.interp ≃
-    Fin (rowArray (n := n) H hq).length :=
-  ((vertexEquiv Prim.interp (diagram (n := n) H hq)).trans (finCongr List.length_ofFn.symm)).trans
-    (ConstraintGraph.RowOrder.equiv (rowArray (n := n) H hq))
-
 private theorem getD_rowArray (v : (diagram (n := n) H hq).Vtx Prim.interp) :
     (rowArray (n := n) H hq).getD ((vertexEquiv Prim.interp (diagram (n := n) H hq)) v).val 0 =
       Planar.Embedding.planeVertexRow (vertices H hq) (vertices_wellFormed H hq)
@@ -64,46 +58,33 @@ private theorem getD_rowArray (v : (diagram (n := n) H hq).Vtx Prim.interp) :
       ((vertexEquiv Prim.interp (diagram (n := n) H hq)) v)) = _
   rw [Equiv.symm_apply_apply]
 
-private theorem monotone_layoutOrder : Monotone (fun i =>
-    Planar.Embedding.planeVertexRow (vertices (n := n) H hq) (vertices_wellFormed H hq)
-      (vertexRow H hq) (ownerRow H hq) ((layoutOrder (n := n) H hq).symm i)) := by
-  have hrow (i : Fin (rowArray (n := n) H hq).length) :
-      Planar.Embedding.planeVertexRow (vertices H hq) (vertices_wellFormed H hq)
-        (vertexRow H hq) (ownerRow H hq) ((layoutOrder (n := n) H hq).symm i) =
-      (rowArray (n := n) H hq).getD
-        ((ConstraintGraph.RowOrder.equiv (rowArray (n := n) H hq)).symm i).val 0 := by
-    calc
-      _ = (rowArray (n := n) H hq).getD
-          ((vertexEquiv Prim.interp (diagram (n := n) H hq))
-            ((layoutOrder (n := n) H hq).symm i)).val 0 :=
-        (getD_rowArray (n := n) H hq _).symm
-      _ = _ := by
-        apply congrArg (fun k => (rowArray (n := n) H hq).getD k 0)
-        change ((vertexEquiv Prim.interp (diagram (n := n) H hq))
-          ((vertexEquiv Prim.interp (diagram (n := n) H hq)).symm
-            (Fin.cast (show (rowArray (n := n) H hq).length =
-              ((diagram (n := n) H hq).vertexList Prim.interp).length from List.length_ofFn)
-              ((ConstraintGraph.RowOrder.equiv (rowArray (n := n) H hq)).symm i)))).val = _
-        rw [Equiv.apply_symm_apply]
-        rfl
-  intro i j hij
-  exact (hrow i).trans_le
-    ((ConstraintGraph.RowOrder.monotone_row_symm (rowArray (n := n) H hq) hij).trans_eq
-      (hrow j).symm)
-
 /-- The actual emitted graph has the fixed bandwidth under its computed row order. -/
 def layoutCertificate :
     ConstraintGraph.BandwidthCertificate ((diagram (n := n) H hq).graph Prim.interp)
-      (layoutBound q) :=
-  Planar.Embedding.rowBandwidthCertificate (vertices H hq) (vertices_wellFormed H hq)
-    (vertexRow H hq) (portRow H hq) (ownerRow H hq)
-    (vertexLabels_pairwise H hq) (pairLabels_pairwise H hq)
-    (fun p _ => portRow_bounds H hq p)
-    _ _ _
-    (fun r => by simpa only [Nat.card_eq_fintype_card] using vertexRow_card_le H hq r)
-    (fun r => by simpa only [Nat.card_eq_fintype_card] using ownerRow_card_le H hq r)
-    (incidenceRow_length_le H hq)
-    (vertexRow_port_bounds H hq) (layoutOrder (n := n) H hq)
-    (by exact monotone_layoutOrder (n := n) H hq)
+      (layoutBound q) := by
+  let base := (vertexEquiv Prim.interp (diagram (n := n) H hq)).trans
+    (finCongr (show ((diagram (n := n) H hq).vertexList Prim.interp).length =
+      (rowArray (n := n) H hq).length from List.length_ofFn.symm))
+  have hrow (v : (diagram (n := n) H hq).Vtx Prim.interp) :
+      (rowArray (n := n) H hq).getD (base v).val 0 =
+        Planar.Embedding.planeVertexRow (vertices H hq) (vertices_wellFormed H hq)
+          (vertexRow H hq) (ownerRow H hq) v := getD_rowArray H hq v
+  refine ConstraintGraph.BandwidthCertificate.ofRowArray (d := 2) _
+    (rowArray (n := n) H hq) base ?_ ?_
+  · intro r
+    simp only [hrow]
+    exact Planar.Embedding.planeVertexRow_card_le (vertices H hq) (vertices_wellFormed H hq)
+      (vertexRow H hq) (portRow H hq) (ownerRow H hq)
+      (vertexLabels_pairwise H hq) (pairLabels_pairwise H hq)
+      (fun p _ => portRow_bounds H hq p) _ _ _
+      (fun r => by simpa only [Nat.card_eq_fintype_card] using vertexRow_card_le H hq r)
+      (fun r => by simpa only [Nat.card_eq_fintype_card] using ownerRow_card_le H hq r)
+      (incidenceRow_length_le H hq) r
+  · intro u v p hp r hr he
+    simp only [hrow]
+    exact Planar.Embedding.planeVertexRow_edge_bounds (vertices H hq)
+      (vertices_wellFormed H hq) (vertexRow H hq) (portRow H hq) (ownerRow H hq)
+      (vertexLabels_pairwise H hq) (pairLabels_pairwise H hq)
+      (fun p _ => portRow_bounds H hq p) (vertexRow_port_bounds H hq) u v p hp r hr he
 
 end Cslib.Complexity.NCL.HWord.Planarized
