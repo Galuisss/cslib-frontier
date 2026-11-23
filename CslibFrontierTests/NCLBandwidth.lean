@@ -78,12 +78,30 @@ example : HWord.Planarized.reduceGraph compatibility (by decide +kernel) wordInp
       ⟨0, by decide +kernel⟩
       (fun j hj => False.elim (hj (Fin.eq_zero j)))
 
-/-- info: 'Cslib.Complexity.NCL.BandwidthPlanarAndOrNCL_mem_PSPACE' depends on axioms:
-[propext, Classical.choice, Quot.sound] -/
-#guard_msgs (whitespace := lax) in
-#print axioms BandwidthPlanarAndOrNCL_mem_PSPACE
+-- Two-letter inputs exercise an actual forbidden-pair clause in the compiler.
+private def restrictedCompatibility : Digraph (Fin 2) := ⟨fun a b => a = 0 ∨ b = 0⟩
 
-/-- info: 'Cslib.Complexity.NCL.exists_BandwidthPlanarAndOrNCL_pspaceComplete' depends on axioms:
-[propext, Classical.choice, Quot.sound] -/
-#guard_msgs (whitespace := lax) in
-#print axioms exists_BandwidthPlanarAndOrNCL_pspaceComplete
+private instance : DecidableRel restrictedCompatibility.Adj :=
+  fun a b => inferInstanceAs (Decidable (a = 0 ∨ b = 0))
+
+private def pairInput : HWord.Instance 2 := ⟨[0, 0], [1, 0]⟩
+
+private def forbiddenPairInput : HWord.Instance 2 := ⟨[0, 0], [1, 1]⟩
+
+example : HWord.Planarized.reduceGraph restrictedCompatibility (by decide +kernel) pairInput ∈
+    BandwidthPlanarAndOrNCL (HWord.Planarized.layoutBound 2) := by
+  rw [HWord.Planarized.reduceGraph_mem_iff]
+  change HWord.Instance.mk (List.ofFn (fun _ : Fin 2 => (0 : Fin 2)))
+    (List.ofFn (fun i : Fin 2 => if i = 0 then (1 : Fin 2) else 0)) ∈ _
+  rw [HWord.language_ofFn]
+  exact ⟨by decide +kernel, .single (by unfold HWord.Step; decide +kernel)⟩
+
+example : HWord.Planarized.reduceGraph restrictedCompatibility (by decide +kernel)
+    forbiddenPairInput ∉ BandwidthPlanarAndOrNCL (HWord.Planarized.layoutBound 2) := by
+  rw [HWord.Planarized.reduceGraph_mem_iff]
+  change HWord.Instance.mk (List.ofFn (fun _ : Fin 2 => (0 : Fin 2)))
+    (List.ofFn (fun _ : Fin 2 => (1 : Fin 2))) ∉ _
+  rw [HWord.language_ofFn]
+  rintro ⟨hs, hr⟩
+  exact (by decide +kernel : ¬HWord.Legal restrictedCompatibility (fun _ : Fin 2 => 1))
+    (hr.legal hs)

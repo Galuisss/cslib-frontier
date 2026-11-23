@@ -7,7 +7,7 @@ Authors: Xuyang Peng
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.PortGraph
+public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.ConstraintGraph
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.AndOr
 
 /-!

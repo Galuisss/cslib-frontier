@@ -7,11 +7,13 @@ Authors: Xuyang Peng
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.ConstraintGraph
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.Simulation
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.Bandwidth
+public import Mathlib.Combinatorics.Digraph.Basic
+public import Mathlib.Data.Fintype.Sigma
 import Mathlib.Logic.Equiv.Fin.Basic
 import Mathlib.Data.List.ProdSigma
+import Mathlib.Tactic.DeriveFintype
 
 /-!
 # Finite weighted word-selector networks
@@ -22,6 +24,7 @@ uses inactive relations, so the same finite index sets and row blocks work at ev
 
 ## Main definitions
 
+* `HWord.RelationSite`: a position and an ordered symbol pair.
 * `HWord.PortGraph.network`: the explicit weighted selector network for a fixed digraph.
 
 ## Main results
@@ -29,7 +32,6 @@ uses inactive relations, so the same finite index sets and row blocks work at ev
 * `HWord.PortGraph.wellFormed`: every edge has two consistently weighted, opposite ports.
 * `HWord.PortGraph.loopFree`: every edge joins two distinct vertices.
 * `HWord.PortGraph.bandwidthCertificate`: an explicit order with span independent of word length.
-* `HWord.PortGraph.reachable_oneHot_iff`: exact word reachability between canonical physical states.
 
 ## References
 
@@ -38,7 +40,19 @@ uses inactive relations, so the same finite index sets and row blocks work at ev
 
 public section
 
-namespace Cslib.Complexity.NCL.HWord.PortGraph
+namespace Cslib.Complexity.NCL.HWord
+
+/-- A possible forbidden pair at one position and its successor. -/
+@[ext] structure RelationSite (q n : ℕ) where
+  /-- The position of the first symbol. -/
+  position : Fin n
+  /-- The selected symbol at this position. -/
+  first : Fin q
+  /-- The selected symbol at the next position. -/
+  second : Fin q
+  deriving DecidableEq, Fintype
+
+namespace PortGraph
 
 variable {q n : ℕ}
 
@@ -108,6 +122,17 @@ theorem network_endpoint_symbol (H : Digraph (Fin q)) [DecidableRel H.Adj]
 theorem network_required (H : Digraph (Fin q)) [DecidableRel H.Adj] (r : RelationSite q n) :
     (network H n).required r = decide (r.position.val + 1 < n ∧ ¬H.Adj r.first r.second) := by rfl
 
+/-- The second endpoint of an active relation is at the following word position. -/
+theorem network_endpoint_true (H : Digraph (Fin q)) [DecidableRel H.Adj]
+    (r : RelationSite q n) (hr : r.position.val + 1 < n) :
+    (network H n).endpoint r true = (⟨r.position.val + 1, hr⟩, r.second) := by
+  simp only [network, ite_true, next, hr, dite_true]
+
+/-- The first endpoint of a relation selects its first symbol at its own position. -/
+theorem network_endpoint_false (H : Digraph (Fin q)) [DecidableRel H.Adj]
+    (r : RelationSite q n) :
+    (network H n).endpoint r false = (r.position, r.first) := by rfl
+
 variable (H : Digraph (Fin q)) [DecidableRel H.Adj]
 
 /-- The physical weighted graph has the exact two-port incidence discipline. -/
@@ -143,13 +168,6 @@ theorem loopFree : (network H n).graph.LoopFree := by
       rfl
     · rfl
     · rfl
-
-/-- The weighted network has one row, `q` characters, and `q²` relation vertices per position. -/
-theorem card_vertices :
-    Fintype.card (SelectorNetwork.Vert (Fin n) (Fin n × Fin q) (RelationSite q n)) =
-      n * (1 + (q + q * q)) := by
-  rw [Fintype.card_congr rowTag]
-  simp
 
 /-- The explicit edge list has `q` selectors and `2q²` unit edges per position. -/
 theorem length_edges : ((network H n).edges).length = n * q + 2 * (n * (q * q)) := by
@@ -279,42 +297,6 @@ theorem endpoint_row_bounds
         ite_false, ite_true, le_refl, true_and]
     all_goals first | omega | (unfold next; split_ifs <;> simp)
 
-private theorem source_legal_iff (s : Fin n × Fin q → Bool) :
-    (network H n).sourceGraph.Legal s ↔ (HWord.graph H n).Legal s := by
-  rw [SelectorNetwork.legal_source_iff, HWord.legal_graph_iff]
-  constructor
-  · intro hs
-    constructor
-    · intro i
-      obtain ⟨⟨j, a⟩, hj, ha⟩ := hs.nonempty i
-      change j = i at hj
-      subst j
-      exact ⟨a, ha⟩
-    · intro i j hij a b ha hb
-      by_contra hab
-      have hn : i.val + 1 < n := hij ▸ j.isLt
-      have hnext : next i = j := by simp only [next, hn, dite_true]; exact Fin.ext hij
-      have hr : (network H n).required ⟨i, a, b⟩ = true := by simp [network, hn, hab]
-      have hc := hs.relation ⟨i, a, b⟩ hr
-      simp [network, hnext, ha, hb] at hc
-  · intro hs
-    constructor
-    · intro i
-      obtain ⟨a, ha⟩ := hs.nonempty i
-      exact ⟨(i, a), rfl, ha⟩
-    · intro r hr
-      have hactive : r.position.val + 1 < n ∧ ¬H.Adj r.first r.second :=
-        by simpa only [network, decide_eq_true_eq] using hr
-      by_cases ha : s (r.position, r.first) = true
-      · right
-        apply Bool.eq_false_iff.mpr
-        intro hb
-        have hb' : s (⟨r.position.val + 1, hactive.1⟩, r.second) = true := by
-          simpa only [network, next, hactive.1, dite_true, ite_true] using hb
-        exact hactive.2 (hs.compatible _ _ rfl _ _ ha hb')
-      · left
-        exact Bool.eq_false_iff.mpr ha
-
 private def branchCode (c : Fin n × Fin q) (e : RelationSite q n × Bool) : Fin 3 × Fin q :=
   if e.2 then (if e.1.position = c.1 then 1 else 2, e.1.first) else (0, e.1.second)
 
@@ -385,27 +367,5 @@ theorem selectorWeight_le (c : Fin n × Fin q) : (network H n).selectorWeight c 
     exact (Finset.card_le_univ _).trans_eq (by simp)
   exact Nat.add_le_add_right hc 1
 
-/-- Canonical one-hot physical configurations are legal exactly for compatible words. -/
-theorem legal_oneHot_iff (w : Fin n → Fin q) :
-    (network H n).graph.Legal ((network H n).encode (HWord.oneHot w)) ↔ HWord.Legal H w :=
-  (SelectorNetwork.legal_encode_iff _ _).trans
-    ((source_legal_iff H _).trans (HWord.legal_oneHot_iff H w))
-
-/-- The concrete, well-formed weighted graph preserves and reflects word reconfiguration. -/
-theorem reachable_oneHot_iff (s t : Fin n → Fin q) :
-    (network H n).graph.Reachable ((network H n).encode (HWord.oneHot s))
-      ((network H n).encode (HWord.oneHot t)) ↔ HWord.Reachable H s t := by
-  have hr : (network H n).graph.Reachable ((network H n).encode (HWord.oneHot s))
-      ((network H n).encode (HWord.oneHot t)) ↔
-        (network H n).sourceGraph.Reachable (HWord.oneHot s) (HWord.oneHot t) := by
-    simpa only [SelectorNetwork.simulation_enc] using
-      (network H n).simulation.reachable_enc_iff (a := HWord.oneHot s) (a' := HWord.oneHot t)
-  have heq : (network H n).sourceGraph.Step = (HWord.graph H n).Step := by
-    funext a b
-    apply propext
-    simp only [ConstraintGraph.Step, source_legal_iff H]
-  change _ ↔ Relation.ReflTransGen (network H n).sourceGraph.Step _ _ at hr
-  rw [heq] at hr
-  exact hr.trans (HWord.reachable_oneHot_iff H)
-
-end Cslib.Complexity.NCL.HWord.PortGraph
+end PortGraph
+end Cslib.Complexity.NCL.HWord
