@@ -149,8 +149,9 @@ private theorem pack_inner (s : E → Bool) (x : (v : V) → I v → Bool)
   · by_cases hw : w = v
     · subst w
       simp [pack, reverse, Function.update]
-    · simp [pack, reverse, Function.update, hw, show (⟨w, f⟩ : Σ v, I v) ≠ ⟨v, e⟩ from
-        fun h => hw (congrArg Sigma.fst h)]
+    · have hne : (⟨w, f⟩ : Σ v, I v) ≠ ⟨v, e⟩ :=
+        fun h => hw (congrArg Sigma.fst h)
+      simp [pack, reverse, Function.update, hw, hne]
 
 private theorem step_pack {x y : (model H).State} (h : (model H).Step x y) :
     (graph H).Step (pack H x) (pack H y) := by
