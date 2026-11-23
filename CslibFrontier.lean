@@ -3178,6 +3178,7 @@ public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Windo
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.Window
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Hardness
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Instance
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Instance.Bandwidth
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Instance.Incidence
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Instance.OfFinite
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Instance.PolyTime
@@ -3188,6 +3189,7 @@ public import CslibFrontier.Computability.Complexity.Problems.NCL.PSPACE
 public import CslibFrontier.Computability.Complexity.Problems.NCL.PSPACE.Edge
 public import CslibFrontier.Computability.Complexity.Problems.NCL.PSPACE.EdgeToEdge
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Bandwidth
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.BandwidthPSPACE
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Bits
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.BlueCrossover
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Circuit

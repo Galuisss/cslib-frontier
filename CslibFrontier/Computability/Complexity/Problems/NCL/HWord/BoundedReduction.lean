@@ -12,9 +12,10 @@ public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.Reductio
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.Hardness
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Bandwidth
 import CslibFrontier.Computability.Complexity.Problems.NCL.Diagram.Word.CompilePolyTime
+import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.BandwidthPSPACE
 
 /-!
-# PSPACE-hard planar AND/OR reachability with a fixed bandwidth
+# PSPACE-complete planar AND/OR reachability with a fixed bandwidth
 
 Compile the fixed-H word instance into its actual numbered planar graph and endpoint bits.
 The constructed row order certifies a bandwidth bound depending only on the fixed alphabet.
@@ -25,6 +26,7 @@ The output uses the general graph encoding `encAndOrNCL`.
 * `HWord.Planarized.polyTimeReducible_bounded`: the fixed-H reduction under general graph encoding.
 * `exists_BandwidthPlanarAndOrNCL_pspaceHard`: the hardness direction of
   [VanDerZanden2015, Theorem 6], with configuration-to-configuration reachability.
+* `exists_BandwidthPlanarAndOrNCL_pspaceComplete`: the full completeness theorem.
 
 ## References
 
@@ -99,5 +101,13 @@ theorem exists_BandwidthPlanarAndOrNCL_pspaceHard :
   obtain ⟨q, H, hq, hhard⟩ := HWord.exists_language_pspaceHard
   exact ⟨HWord.Planarized.layoutBound q,
     hhard.trans (HWord.Planarized.polyTimeReducible_bounded H hq)⟩
+
+/-- For some fixed bandwidth, configuration-to-configuration reachability on planar AND/OR
+multigraphs is PSPACE-complete under the general graph encoding `encAndOrNCL`
+[VanDerZanden2015, Theorem 6]. The bandwidth bound is independent of the input graph. -/
+theorem exists_BandwidthPlanarAndOrNCL_pspaceComplete :
+    ∃ bound, PSPACEComplete encAndOrNCL (BandwidthPlanarAndOrNCL bound) := by
+  obtain ⟨bound, hhard⟩ := exists_BandwidthPlanarAndOrNCL_pspaceHard
+  exact ⟨bound, BandwidthPlanarAndOrNCL_mem_PSPACE bound, hhard⟩
 
 end Cslib.Complexity.NCL

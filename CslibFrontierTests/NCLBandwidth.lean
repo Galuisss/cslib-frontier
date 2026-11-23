@@ -6,6 +6,7 @@ Authors: Xuyang Peng
 
 import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.BoundedReduction
 import CslibFrontier.Computability.Complexity.Problems.NCL.Instance.Incidence
+import CslibFrontier.Computability.Complexity.Problems.NCL.Instance.Bandwidth
 
 /-! Parallel edges, stable sorting with tied rows, and an actual accepted reduction image. -/
 
@@ -17,6 +18,25 @@ private def parallelGraph : AndOrGraph :=
 
 example : parallelGraph.Valid :=
   (AndOrGraph.checkValid_eq_true_iff _).1 (by decide +kernel)
+
+example : parallelGraph.checkBandwidth 1 [0, 1] = true := by decide +kernel
+
+example : parallelGraph.checkBandwidth 0 [0, 1] = false := by decide +kernel
+
+example : parallelGraph.checkBandwidth 1 [0, 0] = false := by decide +kernel
+
+-- Undeclared ports are absent from the interpreted finite graph.
+example : ({ parallelGraph with edgeCount := 0 } : AndOrGraph).checkBandwidth 0 [0, 1] = true := by
+  decide +kernel
+
+private def loopGraph : AndOrGraph :=
+  ⟨[.or ⟨0, false⟩ ⟨0, true⟩ ⟨1, false⟩,
+    .or ⟨1, true⟩ ⟨2, false⟩ ⟨2, true⟩], 3⟩
+
+example : loopGraph.Valid :=
+  (AndOrGraph.checkValid_eq_true_iff _).1 (by decide +kernel)
+
+example : loopGraph.checkBandwidth 1 [0, 1] = true := by decide +kernel
 
 example : parallelGraph.graph.HasBandwidth 1 := by
   refine ⟨{ size := 2, order := Equiv.refl _, span := ?_ }⟩
@@ -57,3 +77,13 @@ example : HWord.Planarized.reduceGraph compatibility (by decide +kernel) wordInp
   · exact HWord.reachable_of_eq_off (fun _ _ _ => trivial) (fun _ _ _ => trivial)
       ⟨0, by decide +kernel⟩
       (fun j hj => False.elim (hj (Fin.eq_zero j)))
+
+/-- info: 'Cslib.Complexity.NCL.BandwidthPlanarAndOrNCL_mem_PSPACE' depends on axioms:
+[propext, Classical.choice, Quot.sound] -/
+#guard_msgs (whitespace := lax) in
+#print axioms BandwidthPlanarAndOrNCL_mem_PSPACE
+
+/-- info: 'Cslib.Complexity.NCL.exists_BandwidthPlanarAndOrNCL_pspaceComplete' depends on axioms:
+[propext, Classical.choice, Quot.sound] -/
+#guard_msgs (whitespace := lax) in
+#print axioms exists_BandwidthPlanarAndOrNCL_pspaceComplete
