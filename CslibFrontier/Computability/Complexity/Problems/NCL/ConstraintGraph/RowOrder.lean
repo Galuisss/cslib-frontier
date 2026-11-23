@@ -208,7 +208,7 @@ namespace Cslib.Complexity.NCL.ConstraintGraph
     (G : ConstraintGraph V E) (rows : List ℕ) (base : V ≃ Fin rows.length)
     (hB : ∀ r, Nat.card {v // rows.getD (base v).val 0 = r} ≤ B)
     (hneighbours : ∀ u v, ∀ p ∈ (G u).ports, ∀ q ∈ (G v).ports,
-      p.1.edge = q.1.edge → Nat.dist (rows.getD (base u).val 0)
+      p.port.edge = q.port.edge → Nat.dist (rows.getD (base u).val 0)
         (rows.getD (base v).val 0) ≤ d) : BandwidthCertificate G ((d + 1) * B - 1) :=
   .ofRowOrder G (base.trans (RowOrder.equiv rows)) (fun v => rows.getD (base v).val 0) hB
     (by simpa only [Equiv.symm_trans_apply, Equiv.apply_symm_apply] using
