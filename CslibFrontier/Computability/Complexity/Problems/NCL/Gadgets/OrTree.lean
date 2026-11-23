@@ -75,7 +75,7 @@ private def rest (n : ℕ) (i : Fin (bundle n).length) : Fin (bundle (n + 1)).le
   (List.appendIndexEquiv [B] (bundle n)) (.inr i)
 
 /-- The boundary and intermediate wires of one growing step. -/
-abbrev GrowEdge (n : ℕ) :=
+private abbrev GrowEdge (n : ℕ) :=
   TreeJunction.Edge ([B] ++ bundle n).length
 
 /-- The disjunction of the old input directions. -/

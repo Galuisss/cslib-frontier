@@ -146,7 +146,7 @@ theorem compι_compRight (z : D₂.Edge) :
 @[expose] def compEnc (s : (comp D₁ D₂).Edge → Bool) : (comp D₁' D₂').Edge → Bool :=
   glueComp D₁' D₂' (S₁.enc (s ∘ compLeft D₁ D₂)) (S₂.enc (s ∘ compRight D₁ D₂))
 
-theorem compEnc_agree (s : (comp D₁ D₂).Edge → Bool) (j : Fin b.length) :
+private theorem compEnc_agree (s : (comp D₁ D₂).Edge → Bool) (j : Fin b.length) :
     S₂.enc (s ∘ compRight D₁ D₂) (.inl j) = S₁.enc (s ∘ compLeft D₁ D₂) (D₁'.bottom j) := by
   rw [← S₂.ι_top, S₂.enc_ι, ← S₁.ι_bottom, S₁.enc_ι]
   rfl

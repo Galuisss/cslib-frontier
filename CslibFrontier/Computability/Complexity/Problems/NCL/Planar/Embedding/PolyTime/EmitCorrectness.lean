@@ -54,11 +54,11 @@ private theorem edgeColor_eq (g : AndOrGraph) (hb : g.Bounded) (e : Fin g.edgeCo
   rfl
 
 /-- The emitted binary port records retain the actual finite incidence identities. -/
-@[expose] def finiteWire (g : AndOrGraph) (bits : List Bool) (p : Port (Fin g.edgeCount)) : Wire :=
+private def finiteWire (g : AndOrGraph) (bits : List Bool) (p : Port (Fin g.edgeCount)) : Wire :=
   Emit.wire g bits (p.map Fin.val)
 
 /-- Finite incidence names remain distinct after adding their color and direction data. -/
-theorem finiteWire_injective (g : AndOrGraph) (bits : List Bool) :
+private theorem finiteWire_injective (g : AndOrGraph) (bits : List Bool) :
     Function.Injective (finiteWire g bits) := by
   intro p q h
   have he : (⟨p, 0⟩ : WeightedPort (Fin g.edgeCount)) = ⟨q, 0⟩ :=
@@ -67,7 +67,7 @@ theorem finiteWire_injective (g : AndOrGraph) (bits : List Bool) :
   exact congrArg WeightedPort.port he
 
 /-- The finite wire's color agrees with the canonical incidence drawing. -/
-theorem finiteWire_color (g : AndOrGraph) (hb : g.Bounded) (bits : List Bool) :
+private theorem finiteWire_color (g : AndOrGraph) (hb : g.Bounded) (bits : List Bool) :
     (fun p => (finiteWire g bits p).color) = fun p => color (List.ofFn g.graph) p.edge := by
   funext p
   exact edgeColor_eq g hb p.edge
@@ -81,7 +81,7 @@ private theorem shape_vertices (g : AndOrGraph) (h : g.Valid) :
   · exact ⟨by simpa only [Vertex.or, List.length_cons, List.length_nil] using hp.length_eq, hn⟩
 
 /-- Source instructions retain every original vertex's port order and index. -/
-theorem sources_eq (x : AndOrNCL.Instance) (h : x.graph.Valid) (bits : List Bool) :
+private theorem sources_eq (x : AndOrNCL.Instance) (h : x.graph.Valid) (bits : List Bool) :
     Emit.sources x bits = sourceProgram
       ((List.ofFn x.graph.graph).map
         fun v => v.ports.map fun p => finiteWire x.graph bits p.port) 0 := by
@@ -101,7 +101,7 @@ theorem sources_eq (x : AndOrNCL.Instance) (h : x.graph.Valid) (bits : List Bool
     rfl
 
 /-- The explicit available-wire list is precisely the finite source boundary order. -/
-theorem available_eq (g : AndOrGraph) (hb : g.Bounded) (bits : List Bool) :
+private theorem available_eq (g : AndOrGraph) (hb : g.Bounded) (bits : List Bool) :
     Emit.available g bits = (Sources.vertexLabels (List.ofFn g.graph)).map (finiteWire g bits) := by
   unfold Emit.available Sources.vertexLabels
   conv_lhs => rw [← vertices_map g hb]
@@ -109,7 +109,7 @@ theorem available_eq (g : AndOrGraph) (hb : g.Bounded) (bits : List Bool) :
   rfl
 
 /-- The explicit requested-wire list is exactly the finite endpoint-pair order. -/
-theorem requested_eq (x : AndOrNCL.Instance) (hl : x.initial.length = x.graph.edgeCount)
+private theorem requested_eq (x : AndOrNCL.Instance) (hl : x.initial.length = x.graph.edgeCount)
     (bits : List Bool) :
     Emit.requested x bits = (Sinks.pairLabels (List.finRange x.graph.edgeCount)).map
       (finiteWire x.graph bits) := by
@@ -119,7 +119,7 @@ theorem requested_eq (x : AndOrNCL.Instance) (hl : x.initial.length = x.graph.ed
   rfl
 
 /-- The cap stream retains the original finite edge order and endpoint directions. -/
-theorem caps_eq (x : AndOrNCL.Instance) (h : x.graph.Valid)
+private theorem caps_eq (x : AndOrNCL.Instance) (h : x.graph.Valid)
     (hl : x.initial.length = x.graph.edgeCount) (bits : List Bool) :
     Emit.caps x bits = capProgram (color (List.ofFn x.graph.graph))
       (fun p => (finiteWire x.graph bits p).bit) (List.finRange x.graph.edgeCount) 0 := by
