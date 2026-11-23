@@ -87,6 +87,31 @@ namespace OpenSim
 variable {D₁ : Diagram Γ a b} {D₂ : Diagram Γ b c} {D₁' : Diagram Γ' a b}
   {D₂' : Diagram Γ' b c}
 
+/-- Lifts of false-to-true reversals suffice, since all internal and boundary moves reverse. -/
+theorem lift_of_false {D : Diagram Γ a b} {D' : Diagram Γ' a b}
+    (ι : D.Edge → D'.Edge) (enc : (D.Edge → Bool) → D'.Edge → Bool)
+    (hlegal : ∀ {s}, (D.graph I).Legal s → (D'.graph I').Legal (enc s))
+    (hpositive : ∀ s x, s x = false → (D.graph I).Legal s →
+      (D.graph I).Legal (reverse s x) →
+        ∃ u, InnerReach I' D' (enc s) u ∧ (D'.graph I').Legal (reverse u (ι x)) ∧
+          InnerReach I' D' (reverse u (ι x)) (enc (reverse s x)))
+    {s : D.Edge → Bool} (x : D.Edge) (hs : (D.graph I).Legal s)
+    (ht : (D.graph I).Legal (reverse s x)) :
+    ∃ u, InnerReach I' D' (enc s) u ∧ (D'.graph I').Legal (reverse u (ι x)) ∧
+      InnerReach I' D' (reverse u (ι x)) (enc (reverse s x)) := by
+  let : Std.Symm (InnerStep I' D') := ⟨fun _ _ h => ConstraintGraph.StepOn.symm h⟩
+  cases hx : s x with
+  | false => exact hpositive s x hx hs ht
+  | true =>
+    have hγ : reverse s x x = false := by simp only [reverse_self, hx, Bool.not_true]
+    have hs' : (D.graph I).Legal (reverse (reverse s x) x) := by
+      simpa only [reverse_reverse] using hs
+    obtain ⟨u, hp, hf, hq⟩ := hpositive (reverse s x) x hγ ht hs'
+    refine ⟨reverse u (ι x), ?_, ?_, ?_⟩
+    · simpa only [reverse_reverse] using _root_.symm hq
+    · simpa only [reverse_reverse] using InnerReach.legal hp (hlegal ht)
+    · simpa only [reverse_reverse] using _root_.symm hp
+
 /-- Created wires stay created wires. -/
 theorem ι_inr {D : Diagram Γ a b} {D' : Diagram Γ' a b} (S : OpenSim I I' D D') (e : D.Inner) :
     ∃ e', S.ι (.inr e) = .inr e' := by
