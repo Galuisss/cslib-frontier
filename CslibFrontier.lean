@@ -3171,8 +3171,6 @@ public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Equiv
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Phases
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Rules
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Syntax
-public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Window
-public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0WindowSpace
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.Window
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Hardness
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Instance
@@ -4692,6 +4690,8 @@ public import CslibFrontier.Computability.Machines.Turing.SingleTape.PostTuringM
 public import CslibFrontier.Computability.Machines.Turing.SingleTape.Rectangle
 public import CslibFrontier.Computability.Machines.Turing.SingleTape.TM0Restrict
 public import CslibFrontier.Computability.Machines.Turing.SingleTape.TM0Universal
+public import CslibFrontier.Computability.Machines.Turing.SingleTape.TM0Window
+public import CslibFrontier.Computability.Machines.Turing.SingleTape.TM0WindowEncoding
 public import CslibFrontier.Computability.Machines.Turing.TM2.ConfigBound
 public import CslibFrontier.Computability.Machines.Turing.TM2.Degree
 public import CslibFrontier.Computability.Machines.Turing.TM2.Encoding
@@ -4712,6 +4712,7 @@ public import CslibFrontier.Computability.Machines.Turing.TM2.Reverse.TapeSpace
 public import CslibFrontier.Computability.Machines.Turing.TM2.Reverse.Transfer
 public import CslibFrontier.Computability.Machines.Turing.TM2.Simulation
 public import CslibFrontier.Computability.Machines.Turing.TM2.SingleTapeSpace
+public import CslibFrontier.Computability.Machines.Turing.TM2.WindowSpace
 public import CslibFrontier.Computability.PCP.Amplification
 public import CslibFrontier.Computability.PCP.Amplification.Arithmetic
 public import CslibFrontier.Computability.PCP.Amplification.Family
