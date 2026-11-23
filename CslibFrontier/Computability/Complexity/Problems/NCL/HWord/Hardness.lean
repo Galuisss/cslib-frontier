@@ -7,11 +7,12 @@ Authors: Xuyang Peng
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Machines.Turing.TM2.WindowSpace
-public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Encoding
-public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.RewriteTable
+public import CslibFrontier.Computability.Complexity.Classes.Space
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.RewriteReduction
-public import CslibFrontier.Computability.Complexity.Classes.Space.TQBF.Prenex
+import CslibFrontier.Computability.Complexity.Classes.Space.TQBF.Prenex
+import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.RewriteTable
+import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Encoding
+import CslibFrontier.Computability.Machines.Turing.TM2.WindowSpace
 
 /-!
 # PSPACE-hardness for fixed rewriting and fixed H-word reconfiguration
