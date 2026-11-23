@@ -294,7 +294,8 @@ open Turing Turing.MultiTapeTM
 
 /-- Every standard PSPACE language has a fixed finite-control, finite-alphabet single-tape
 machine whose accepting computation fits in a polynomial-width window. The target is the
-canonical true halt configuration, and the input encoding is preserved. -/
+canonical true halt configuration, the computed Boolean characterizes membership, and the input
+encoding is preserved. -/
 theorem mem_PSPACE_exists_boundedTM0 {α : Type} {encIn : α ↪ List Bool} {A : Set α}
     (hA : A ∈ PSPACE encIn) :
     ∃ (f : α → Bool) (h : TM2Computable encIn encBool f), (∀ k, Finite (h.tm.Γ k)) ∧
@@ -303,6 +304,7 @@ theorem mem_PSPACE_exists_boundedTM0 {α : Type} {encIn : α ↪ List Bool} {A :
           (p.eval (encIn a).length + TM2to1.headOverhead h.tm.m)
           ⟨TM0.init (TM2to1.trInit h.tm.k₀ (List.map h.inputAlphabet.symm (encIn a))), 0⟩
           ⟨h.tm.toTM0Halt [h.outputAlphabet.symm (f a)], 0⟩) ∧
+        (∀ a, a ∈ A ↔ f a = true) ∧
         (∀ a, a ∈ A ↔ TM0.Reaches h.tm.toTM0
           (TM0.init (TM2to1.trInit h.tm.k₀ (List.map h.inputAlphabet.symm (encIn a))))
           (h.tm.toTM0Halt [h.outputAlphabet.symm true])) := by
@@ -311,6 +313,6 @@ theorem mem_PSPACE_exists_boundedTM0 {α : Type} {encIn : α ↪ List Bool} {A :
   have hs' : h.StacksBounded (fun a => p.eval (encIn a).length) :=
     fun a n k => (hs a n k).trans (hp a)
   obtain ⟨hr, ht⟩ := h.toTM0_bool hs'
-  exact ⟨f, h, hfinite, p, hr, fun a => (hf a).trans (ht a)⟩
+  exact ⟨f, h, hfinite, p, hr, hf, fun a => (hf a).trans (ht a)⟩
 
 end Cslib.Complexity

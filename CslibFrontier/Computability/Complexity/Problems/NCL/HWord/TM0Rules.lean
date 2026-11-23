@@ -29,6 +29,7 @@ replaces two letters by two letters, preserving at least one of them.
 public section
 
 namespace Cslib.Complexity.NCL.TM0Window
+open Turing.TM0Window
 open Turing Cslib.PostCorrespondence
 
 /-- Active control and the held-cell tags of each transfer direction. -/

@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Equivalence
+public import CslibFrontier.Computability.Machines.Turing.SingleTape.TM0WindowEncoding
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.Problem
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Plain
@@ -28,13 +29,8 @@ public section
 noncomputable section
 
 namespace Cslib.Complexity.NCL.TM0Window
-open Turing.MultiTapeTM Cslib.PostCorrespondence.OfTM0.Letter
+open Turing.TM0Window Turing.MultiTapeTM Cslib.PostCorrespondence.OfTM0.Letter
 variable {Γ Q : Type} [Finite Γ] [Finite Q]
-
-/-- Structural encoding of finite control, scanned cell, and the nearest-first tape lists. -/
-enc_structure encCfg : Cfg Γ Q where
-  state : (encFinite Q), scanned : (encFinite Γ),
-  left : (encList (encFinite Γ)), right : (encList (encFinite Γ))
 
 /-- The framed stable tape word is produced in polynomial time from its four fields. -/
 @[fun_prop]

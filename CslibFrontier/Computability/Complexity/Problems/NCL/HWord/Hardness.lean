@@ -7,7 +7,8 @@ Authors: Xuyang Peng
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0WindowSpace
+public import CslibFrontier.Computability.Machines.Turing.TM2.WindowSpace
+public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Encoding
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.RewriteTable
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.RewriteReduction
 public import CslibFrontier.Computability.Complexity.Classes.Space.TQBF.Prenex

@@ -10,7 +10,7 @@ import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Encoding
 
 namespace CslibFrontierTests.HWordMachine
 
-open Cslib.Complexity.NCL.TM0Window StateTransition
+open Turing.TM0Window Cslib.Complexity.NCL.TM0Window StateTransition
 
 private def machine : Turing.TM0.Machine Bool (Fin 3) := fun q _ =>
   if q = 0 then some (1, .move .right)

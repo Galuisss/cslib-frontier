@@ -24,6 +24,7 @@ machine. Reachability of a halted word therefore agrees with the original forwar
 public section
 
 namespace Cslib.Complexity.NCL.TM0Window.Rules
+open Turing.TM0Window
 open Cslib.PostCorrespondence StateTransition
 variable {Γ Q : Type*} [Inhabited Q]
 
@@ -66,9 +67,9 @@ private theorem eval_eq_of_symmetric_reaches {M : Turing.TM0.Machine Γ Q}
 
 /-- Symmetric rewriting reaches a halted word exactly when the original window machine does. -/
 theorem symmetric_reaches_halted_iff (M : Turing.TM0.Machine Γ Q) (c d : Cfg Γ Q)
-    (hd : TM0Window.step M d = none) :
+    (hd : Turing.TM0Window.step M d = none) :
     Relation.ReflTransGen (Rewrites (SymmetricRule M)) (word (.stable c)) (word (.stable d)) ↔
-      Reaches (TM0Window.step M) c d := by
+      Reaches (Turing.TM0Window.step M) c d := by
   constructor
   · intro hr
     obtain ⟨e, he, hev⟩ := eval_eq_of_symmetric_reaches hr

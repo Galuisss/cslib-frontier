@@ -15,17 +15,21 @@ public import CslibFrontier.Computability.Machines.Turing.SingleTape.TM0Restrict
 
 A window records the finite tape cells on both sides of the head. Moving past its ends has no
 successor. Interior moves and writes use the original `TM0.Machine`, and keep the window length.
-This is the finite presentation used by the length-preserving rewrite simulation.
+
+## Main definitions
+
+* `Turing.TM0Window.Cfg`: finite control, scanned cell and two nearest-first tape lists.
+* `Turing.TM0Window.step`: the original transition stopped at the window boundary.
 
 ## Main results
 
-* `TM0Window.step_size`: every window transition preserves its number of cells.
-* `TM0Window.step_native`: every window transition is a transition of the original machine.
+* `Turing.TM0Window.step_size`: every window transition preserves its number of cells.
+* `Turing.TM0Window.step_native`: every window transition is a transition of the original machine.
 -/
 
 public section
 
-namespace Cslib.Complexity.NCL.TM0Window
+namespace Turing.TM0Window
 
 open Turing
 
@@ -139,4 +143,4 @@ theorem reaches_native {M : TM0.Machine Γ Q} {c d : Cfg Γ Q}
     (hr : StateTransition.Reaches (step M) c d) : TM0.Reaches M c.toNative d.toNative :=
   hr.lift Cfg.toNative fun _ _ h => step_native h
 
-end Cslib.Complexity.NCL.TM0Window
+end Turing.TM0Window

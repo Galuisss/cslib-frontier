@@ -8,8 +8,8 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Machines.Turing.TM2.SingleTapeSpace
-public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Window
-public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Encoding
+public import CslibFrontier.Computability.Machines.Turing.SingleTape.TM0WindowEncoding
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.List
 
 /-!
 # Polynomial finite windows for standard PSPACE machines
@@ -17,9 +17,14 @@ public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Encod
 Bounded native head-coordinate paths lift to finite windows of the same width. Initial and
 canonical halting windows pad the standard compiler's tapes by blanks.
 
+## Main definitions
+
+* `Turing.TM2Computable.inputWindow`: the original input padded to polynomial width.
+* `Turing.TM2Computable.haltWindow`: the canonical Boolean halt configuration at the same width.
+
 ## Main results
 
-* `TM0Window.headRange_reaches`: a native head-range path executes inside its finite window.
+* `Turing.TM0Window.headRange_reaches`: a native head-range path executes inside its finite window.
 * `Turing.TM2Computable.computableInPolyTime_inputWindow`: the actual padded input constructor.
 * `Turing.TM2Computable.computableInPolyTime_haltWindow`: the canonical Boolean target constructor.
 * `Cslib.Complexity.mem_PSPACE_exists_windowTM0`: standard PSPACE acceptance in these windows.
@@ -29,7 +34,7 @@ public section
 
 attribute [local instance] Turing.FinTM2.ΛFin
 
-namespace Cslib.Complexity.NCL.TM0Window
+namespace Turing.TM0Window
 
 open Turing Turing.MultiTapeTM Turing.MultiTapeTM.ComputableInPolyTime
 
@@ -214,7 +219,7 @@ theorem computableInPolyTime_ofList {Γ Q α : Type} [Inhabited Γ] {encIn : α 
   have hright := (listAppend (encFinite Γ)).comp (ht.prod hpad)
   exact encCfg_mk_polyTime hq hs (Turing.MultiTapeTM.ComputableInPolyTime.const [default]) hright
 
-end Cslib.Complexity.NCL.TM0Window
+end Turing.TM0Window
 
 namespace Turing.FinTM2
 
@@ -237,7 +242,7 @@ end Turing.FinTM2
 
 namespace Turing.TM2Computable
 
-open Cslib.Complexity.NCL.TM0Window Turing.MultiTapeTM
+open Turing.TM0Window Turing.MultiTapeTM
 
 open Turing.MultiTapeTM.ComputableInPolyTime
 
@@ -246,16 +251,16 @@ variable {α : Type} {encIn : α ↪ List Bool} {f : α → Bool}
 /-- Finite initial tape, with a blank at coordinate `-1` and polynomial right padding. -/
 @[expose] noncomputable def inputWindow (h : TM2Computable encIn encBool f)
     (p : Polynomial ℕ) (a : α) :
-    Cslib.Complexity.NCL.TM0Window.Cfg (TM2to1.Γ' h.tm.K h.tm.Γ) (FinTM2.TM0Control h.tm) :=
-  Cslib.Complexity.NCL.TM0Window.Cfg.ofList default
+    Turing.TM0Window.Cfg (TM2to1.Γ' h.tm.K h.tm.Γ) (FinTM2.TM0Control h.tm) :=
+  Turing.TM0Window.Cfg.ofList default
     (TM2to1.trInit h.tm.k₀ (List.map h.inputAlphabet.symm (encIn a)))
     (h.tm.windowRadius p (encIn a).length)
 
 /-- Canonical Boolean halt window at the same width as the input window. -/
 @[expose] noncomputable def haltWindow (h : TM2Computable encIn encBool f)
     (p : Polynomial ℕ) (a : α) (bit : Bool) :
-    Cslib.Complexity.NCL.TM0Window.Cfg (TM2to1.Γ' h.tm.K h.tm.Γ) (FinTM2.TM0Control h.tm) :=
-  Cslib.Complexity.NCL.TM0Window.Cfg.ofList (h.tm.toTM0Halt [h.outputAlphabet.symm bit]).q
+    Turing.TM0Window.Cfg (TM2to1.Γ' h.tm.K h.tm.Γ) (FinTM2.TM0Control h.tm) :=
+  Turing.TM0Window.Cfg.ofList (h.tm.toTM0Halt [h.outputAlphabet.symm bit]).q
     (TM2to1.trInit h.tm.k₁ [h.outputAlphabet.symm bit]) (h.tm.windowRadius p (encIn a).length)
 
 private theorem trInit_tail_length {K : Type} [DecidableEq K] {Γ : K → Type} (k : K)
@@ -320,7 +325,7 @@ theorem haltWindow_size (h : TM2Computable encIn encBool f) (p : Polynomial ℕ)
 /-- A canonical halt window is terminal for the actual finite-window transition function. -/
 theorem haltWindow_terminal (h : TM2Computable encIn encBool f) (p : Polynomial ℕ)
     (a : α) (bit : Bool) :
-    Cslib.Complexity.NCL.TM0Window.step h.tm.toTM0 (h.haltWindow p a bit) = none :=
+    Turing.TM0Window.step h.tm.toTM0 (h.haltWindow p a bit) = none :=
   step_eq_none_of_native (by rw [haltWindow_toNative]; exact h.tm.toTM0Halt_terminal _)
 
 /-- The initial finite window is computed in polynomial time from the original binary input. -/
@@ -347,7 +352,7 @@ private theorem headRange_toWindow (h : TM2Computable encIn encBool f) (p : Poly
       (p.eval (encIn a).length + TM2to1.headOverhead h.tm.m)
       ⟨TM0.init (TM2to1.trInit h.tm.k₀ (List.map h.inputAlphabet.symm (encIn a))), 0⟩
       ⟨h.tm.toTM0Halt [h.outputAlphabet.symm bit], 0⟩) :
-    StateTransition.Reaches (Cslib.Complexity.NCL.TM0Window.step h.tm.toTM0)
+    StateTransition.Reaches (Turing.TM0Window.step h.tm.toTM0)
       (h.inputWindow p a) (h.haltWindow p a bit) := by
   have hr' := hr.mono (show (-1 : ℤ) ≤ -1 from le_rfl)
     (show (p.eval (encIn a).length + TM2to1.headOverhead h.tm.m : ℤ) ≤
@@ -362,7 +367,7 @@ end Turing.TM2Computable
 
 namespace Cslib.Complexity
 
-open Turing Turing.MultiTapeTM Cslib.Complexity.NCL.TM0Window
+open Turing Turing.MultiTapeTM Turing.TM0Window
 
 /-- Standard PSPACE languages are exactly the accepting paths of the constructed fixed finite
 single-tape machines inside their polynomially padded finite windows. -/
@@ -371,17 +376,9 @@ theorem mem_PSPACE_exists_windowTM0 {α : Type} {encIn : α ↪ List Bool} {A : 
     ∃ (f : α → Bool) (h : TM2Computable encIn encBool f), (∀ k, Finite (h.tm.Γ k)) ∧
       ∃ p : Polynomial ℕ, ∀ a, a ∈ A ↔
         StateTransition.Reaches (step h.tm.toTM0) (h.inputWindow p a) (h.haltWindow p a true) := by
-  obtain ⟨f, h, hfinite, p, hp, ht⟩ := mem_PSPACE_exists_boundedTM0 hA
+  obtain ⟨f, h, hfinite, p, hp, hf, ht⟩ := mem_PSPACE_exists_boundedTM0 hA
   refine ⟨f, h, hfinite, p, fun a => ⟨fun ha => ?_, fun hr => ?_⟩⟩
-  · have hn : TM0.Reaches h.tm.toTM0
-        (TM0.init (TM2to1.trInit h.tm.k₀ (List.map h.inputAlphabet.symm (encIn a))))
-        (h.tm.toTM0Halt [h.outputAlphabet.symm true]) := (ht a).mp ha
-    have hf : f a = true := by
-      have he := Part.mem_unique
-        (StateTransition.mem_eval.mpr ⟨(hp a).native, h.tm.toTM0Halt_terminal _⟩)
-        (StateTransition.mem_eval.mpr ⟨hn, h.tm.toTM0Halt_terminal _⟩)
-      exact h.outputAlphabet.symm.injective (h.tm.toTM0Halt_singleton_injective he)
-    exact h.headRange_toWindow p a true (by simpa only [hf] using hp a)
+  · exact h.headRange_toWindow p a true (by simpa only [(hf a).mp ha] using hp a)
   · apply (ht a).mpr
     simpa only [TM2Computable.inputWindow_toNative, TM2Computable.haltWindow_toNative] using
       reaches_native hr

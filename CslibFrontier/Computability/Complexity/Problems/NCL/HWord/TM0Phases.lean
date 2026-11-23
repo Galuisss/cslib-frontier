@@ -7,7 +7,7 @@ Authors: Xuyang Peng
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.TM0Window
+public import CslibFrontier.Computability.Machines.Turing.SingleTape.TM0Window
 
 /-!
 # Single-letter phases for moving a finite-window tape head
@@ -25,6 +25,7 @@ one changed letter. Writes have a single phase.
 public section
 
 namespace Cslib.Complexity.NCL.TM0Window
+open Turing.TM0Window
 open Turing StateTransition
 
 /-- The two cells and their surrounding tape during a head transfer. -/
@@ -57,7 +58,7 @@ variable {Γ Q : Type*} [Inhabited Q]
 
 /-- Execute a write immediately, and split each head transfer into four single-letter stages. -/
 @[expose] def step (M : TM0.Machine Γ Q) : MicroCfg Γ Q → Option (MicroCfg Γ Q)
-  | .stable c => (TM0Window.step M c).map fun d =>
+  | .stable c => (Turing.TM0Window.step M c).map fun d =>
       match M c.state c.scanned with
       | some (_, .move .right) =>
           .moving .rightStart ⟨d.state, c.scanned, d.scanned, c.left, d.right⟩
@@ -90,53 +91,54 @@ private theorem finish_right (M : TM0.Machine Γ Q) (p : PairCfg Γ Q) :
   exact h2.tail (by simp only [step, Option.mem_def])
 
 private theorem run_of_step {M : TM0.Machine Γ Q} {c d : Cfg Γ Q}
-    (h : TM0Window.step M c = some d) : Reaches₁ (step M) (.stable c) (.stable d) := by
+    (h : Turing.TM0Window.step M c = some d) : Reaches₁ (step M) (.stable c) (.stable d) := by
   rcases c with ⟨q, a, L, R⟩
   cases hM : M q a with
-  | none => simp only [TM0Window.step, hM] at h; contradiction
+  | none => simp only [Turing.TM0Window.step, hM] at h; contradiction
   | some result =>
     rcases result with ⟨q', action⟩
     cases action with
     | write b =>
-      simp only [TM0Window.step, hM] at h
+      simp only [Turing.TM0Window.step, hM] at h
       cases h
-      exact .single (by simp only [step, TM0Window.step, hM, Option.map_some, Option.mem_def])
+      exact .single (by
+        simp only [step, Turing.TM0Window.step, hM, Option.map_some, Option.mem_def])
     | move direction =>
       cases direction with
       | left =>
         cases L with
-        | nil => simp only [TM0Window.step, hM] at h; contradiction
+        | nil => simp only [Turing.TM0Window.step, hM] at h; contradiction
         | cons b L =>
-          simp only [TM0Window.step, hM] at h
+          simp only [Turing.TM0Window.step, hM] at h
           cases h
           let p : PairCfg Γ Q := ⟨q', b, a, L, R⟩
           have hs : MicroCfg.moving .leftStart p ∈ step M (.stable ⟨q, a, b :: L, R⟩) := by
-            simp only [step, TM0Window.step, hM, Option.map_some, Option.mem_def, p]
+            simp only [step, Turing.TM0Window.step, hM, Option.map_some, Option.mem_def, p]
           exact .head hs (finish_left M p)
       | right =>
         cases R with
-        | nil => simp only [TM0Window.step, hM] at h; contradiction
+        | nil => simp only [Turing.TM0Window.step, hM] at h; contradiction
         | cons b R =>
-          simp only [TM0Window.step, hM] at h
+          simp only [Turing.TM0Window.step, hM] at h
           cases h
           let p : PairCfg Γ Q := ⟨q', a, b, L, R⟩
           have hs : MicroCfg.moving .rightStart p ∈ step M (.stable ⟨q, a, L, b :: R⟩) := by
-            simp only [step, TM0Window.step, hM, Option.map_some, Option.mem_def, p]
+            simp only [step, Turing.TM0Window.step, hM, Option.map_some, Option.mem_def, p]
           exact .head hs (finish_right M p)
 
 /-- Each original window instruction has its exact finite micro-computation. -/
 theorem respects (M : TM0.Machine Γ Q) :
-    Respects (TM0Window.step M) (step M) (fun c d => MicroCfg.stable c = d) := by
+    Respects (Turing.TM0Window.step M) (step M) (fun c d => MicroCfg.stable c = d) := by
   apply fun_respects.mpr
   intro c
-  cases hc : TM0Window.step M c with
+  cases hc : Turing.TM0Window.step M c with
   | none => simp only [FRespects, step, hc, Option.map_none]
   | some d => exact run_of_step hc
 
 /-- The phase expansion preserves reachability of each stable halted target. -/
 theorem reaches_halted_iff (M : TM0.Machine Γ Q) (c d : Cfg Γ Q)
-    (hd : TM0Window.step M d = none) :
-    Reaches (step M) (.stable c) (.stable d) ↔ Reaches (TM0Window.step M) c d := by
+    (hd : Turing.TM0Window.step M d = none) :
+    Reaches (step M) (.stable c) (.stable d) ↔ Reaches (Turing.TM0Window.step M) c d := by
   constructor
   · intro hr
     have hd' : step M (.stable d) = none := by simp only [step, hd, Option.map_none]

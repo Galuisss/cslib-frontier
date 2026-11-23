@@ -25,6 +25,7 @@ right-symbol suffix. This recovers a machine transition from an arbitrary rule o
 public section
 
 namespace Cslib.Complexity.NCL.TM0Window.Rules
+open Turing.TM0Window
 open Cslib.PostCorrespondence.OfTM0.Letter
 variable {Γ Q : Type*}
 
