@@ -83,7 +83,7 @@ private def ofFnSimulation {n m : ℕ} (G : ConstraintGraph (Fin n) (Fin m)) :
 def planarizeDiagramSimulation (g : AndOrGraph) (h : g.Valid) (hl : g.graph.LoopFree) :
     ConstraintGraph.Simulation g.graph ((planarizeDiagram g h).graph Prim.interp) :=
   (ofFnSimulation g.graph).trans
-    (Embedding.planeSimulation (List.ofFn g.graph) (ofFn_andOr g.graph h.2.1)
+    (Embedding.planeSimulation (List.ofFn g.graph) (ofFn_andOr g.graph (by exact h.2.1))
       (by exact ofFn_wellFormed g.graph h.2.2) (ofFn_loopFree g.graph hl))
 
 /-- An original edge's representative in the plane diagram. -/
@@ -98,7 +98,7 @@ theorem planarizeDiagramSimulation_abs (g : AndOrGraph) (h : g.Valid) (hl : g.gr
   simp only [planarizeDiagramSimulation, ConstraintGraph.Simulation.trans, NCL.Simulation.trans,
     ofFnSimulation, ConstraintGraph.Simulation.ofLegalEquiv, Function.comp_apply,
     Equiv.coe_refl, Function.comp_id, planarizeDiagramEdge]
-  exact Embedding.planeSimulation_abs (List.ofFn g.graph) (ofFn_andOr g.graph h.2.1)
+  exact Embedding.planeSimulation_abs (List.ofFn g.graph) (ofFn_andOr g.graph (by exact h.2.1))
     (ofFn_wellFormed g.graph h.2.2) (ofFn_loopFree g.graph hl) s e
 
 /-- The compiled plane word simulates the original finite graph. -/
@@ -127,17 +127,17 @@ theorem planarize_planar (g : AndOrGraph) (h : g.Valid) : (planarizeDiagram g h)
 /-- Every vertex of the canonical output diagram is AND or OR. -/
 theorem planarize_isAndOr (g : AndOrGraph) (h : g.Valid) :
     ((planarizeDiagram g h).graph Prim.interp).IsAndOr :=
-  Embedding.plane_isAndOr _ (ofFn_andOr g.graph h.2.1) _
+  Embedding.plane_isAndOr _ (ofFn_andOr g.graph (by exact h.2.1)) _
 
 /-- The canonical output diagram has no self-loops. -/
 theorem planarize_loopFree (g : AndOrGraph) (h : g.Valid) :
     ((planarizeDiagram g h).graph Prim.interp).LoopFree :=
-  Embedding.plane_loopFree _ (ofFn_andOr g.graph h.2.1) _
+  Embedding.plane_loopFree _ (ofFn_andOr g.graph (by exact h.2.1)) _
 
 /-- The canonical output diagram has consistent two-ended incidences. -/
 theorem planarize_wellFormed (g : AndOrGraph) (h : g.Valid) :
     ((planarizeDiagram g h).graph Prim.interp).WellFormed :=
-  Embedding.plane_wellFormed _ (ofFn_andOr g.graph h.2.1) _
+  Embedding.plane_wellFormed _ (ofFn_andOr g.graph (by exact h.2.1)) _
 
 /-- The output word is closed and well typed. -/
 theorem planarize_wellTyped (g : AndOrGraph) (h : g.Valid) :
@@ -146,12 +146,12 @@ theorem planarize_wellTyped (g : AndOrGraph) (h : g.Valid) :
 /-- Every output word layer is a standard single-vertex plane cell. -/
 theorem planarize_checkPlane (g : AndOrGraph) (h : g.Valid) :
     (planarize g h).checkPlane = true :=
-  Embedding.checkPlane_word _ (ofFn_andOr g.graph h.2.1) _
+  Embedding.checkPlane_word _ (ofFn_andOr g.graph (by exact h.2.1)) _
 
 /-- Compiling the output word gives valid finite AND/OR graph data. -/
 theorem planarize_compile_valid (g : AndOrGraph) (h : g.Valid) :
     (Word.compile (planarize g h)).Valid :=
-  Embedding.compile_valid_word _ (ofFn_andOr g.graph h.2.1)
+  Embedding.compile_valid_word _ (ofFn_andOr g.graph (by exact h.2.1))
     (by exact ofFn_wellFormed g.graph h.2.2)
 
 /-- The compiled output graph has polynomially many vertices. -/
