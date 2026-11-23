@@ -10,7 +10,6 @@ module
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.Cells
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.Legality
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Diagram.Replacement.Incidence
-public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.Bandwidth
 
 /-!
 # Compiling selector networks to AND/OR graphs
@@ -417,13 +416,6 @@ private theorem local_shared_endpoint (v : Vert U C R) (w : (cell N A v).diagram
     rcases Multiset.mem_add.mp hx with hx | hx <;>
       have hx' := Multiset.mem_singleton.mp hx <;> simp [hx'] at he
 
-private theorem source_port (v : Vert U C R) (w : (cell N A v).diagram.Vtx Prim.interp)
-    (p : WeightedPort (Edge C R ⊕ Diagram.Replacement.Inner (cell N A v).openSim))
-    (hp : p ∈ (localGraph N A v w).ports) (e : Edge C R) (he : p.port.edge = .inl e) :
-    ∃ d weight, ⟨⟨e, d⟩, weight⟩ ∈ (N.graph v).ports :=
-  ⟨p.port.dir, N.endpoints.weight e, (N.endpoints.mem_ports _ _ _ _).mpr
-    ⟨N.mem_edges e, rfl, local_shared_endpoint N A v w p hp e he⟩⟩
-
 /-- The original source cell containing an implementation port of the indicated direction. -/
 @[expose] def cellEndpoint : Edge C R ⊕ Private N A → Bool → Vert U C R
   | .inl e, d => N.endpoints.endpoint e d
@@ -440,37 +432,6 @@ theorem cellEndpoint_of_mem (v : TargetVertex N A) (p : WeightedPort (Edge C R �
   · simpa only [WeightedPort.map, Port.map, he, Sum.map_inl, id_eq, cellEndpoint] using
       local_shared_endpoint N A v w p hp' e he
   · simp only [WeightedPort.map, Port.map, he, Sum.map_inr, cellEndpoint]
-
-/-- Shared implementation ports retain the source order's span; private wires stay in one cell. -/
-theorem origin_span {bound : ℕ} (B : ConstraintGraph.BandwidthCertificate N.graph bound)
-    (u v : TargetVertex N A) (p : WeightedPort (Edge C R ⊕ Private N A))
-    (hp : p ∈ (graph N A u).ports) (r : WeightedPort (Edge C R ⊕ Private N A))
-    (hr : r ∈ (graph N A v).ports) (he : p.port.edge = r.port.edge) :
-    Nat.dist (B.order u.1).val (B.order v.1).val ≤ bound := by
-  rcases u with ⟨u, w⟩
-  rcases v with ⟨v, z⟩
-  change p ∈ ((localGraph N A u w).ports.map
-    (WeightedPort.map (Sum.map id (Sigma.mk u)))) at hp
-  change r ∈ ((localGraph N A v z).ports.map
-    (WeightedPort.map (Sum.map id (Sigma.mk v)))) at hr
-  obtain ⟨p, hp', rfl⟩ := List.mem_map.mp hp
-  obtain ⟨r, hr', rfl⟩ := List.mem_map.mp hr
-  change Sum.map id (fun i : Diagram.Replacement.Inner (cell N A u).openSim =>
-      (⟨u, i⟩ : Private N A)) p.port.edge =
-    Sum.map id (fun i : Diagram.Replacement.Inner (cell N A v).openSim =>
-      (⟨v, i⟩ : Private N A)) r.port.edge at he
-  rcases hpe : p.port.edge with e | i <;> rcases hre : r.port.edge with f | j
-  · have hef : e = f := Sum.inl.inj (by simpa only [hpe, hre, Sum.map_inl, id_eq] using he)
-    subst f
-    obtain ⟨d, weight, hd⟩ := source_port N A u w p hp' e hpe
-    obtain ⟨d', weight', hd'⟩ := source_port N A v z r hr' e hre
-    exact B.span u v _ hd _ hd' rfl
-  · simp [hpe, hre] at he
-  · simp [hpe, hre] at he
-  · have huv : u = v := congrArg Sigma.fst (Sum.inr.inj
-      (show (Sum.inr (⟨u, i⟩ : Private N A) : Edge C R ⊕ Private N A) = .inr ⟨v, j⟩ from
-        by simpa only [hpe, hre, Sum.map_inr] using he))
-    simp [huv]
 
 /-- The joined standard graph has exactly two opposite, equally weighted ports per edge. -/
 theorem wellFormed [Fintype U] [Fintype C] [Fintype R] : (graph N A).WellFormed := by

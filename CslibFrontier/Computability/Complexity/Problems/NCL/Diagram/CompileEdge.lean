@@ -17,7 +17,7 @@ semantic simulations of drawings to the finite graph format used by the decision
 
 ## Main definitions
 
-* `Diagram.compileEdge`: a diagram edge in the compiled finite graph.
+* `Diagram.compileEdgeEquiv`: diagram edges numbered in the compiled finite graph.
 
 ## Main results
 
@@ -30,13 +30,13 @@ namespace Cslib.Complexity.NCL.Diagram
 
 variable {Γ : List Color → List Color → Type} (I : Interp Γ)
 
-/-- The creation-order number of a diagram edge, with its compiled finite bound. -/
-@[expose] def compileEdge (D : Diagram Γ [] []) (e : D.Edge) :
-    Fin (Word.compile (D.toWord I 0)).edgeCount :=
-  ⟨D.num e, num_lt_compile I D e⟩
+/-- Actual diagram edges numbered in the compiled creation order. -/
+@[expose] def compileEdgeEquiv (D : Diagram Γ [] []) :
+    D.Edge ≃ Fin (Word.compile (D.toWord I 0)).edgeCount :=
+  D.numEquiv.trans (finCongr (by rw [compile_toWord]; rfl))
 
-@[simp] theorem compileEdge_val (D : Diagram Γ [] []) (e : D.Edge) :
-    (compileEdge I D e).val = D.num e := rfl
+@[simp] theorem compileEdgeEquiv_val (D : Diagram Γ [] []) (e : D.Edge) :
+    (compileEdgeEquiv I D e).val = D.num e := D.numEquiv_val e
 
 private theorem transport_abs {V E : Type*} [DecidableEq E] (G : ConstraintGraph V E)
     {g g' : AndOrGraph} (h : g = g') (S : ConstraintGraph.Simulation G g'.graph)
@@ -49,13 +49,13 @@ private theorem transport_abs {V E : Type*} [DecidableEq E] (G : ConstraintGraph
 /-- Compilation reads the representative with the same creation-order edge number. -/
 theorem compileSimulation_abs (D : Diagram Γ [] [])
     (s : Fin (Word.compile (D.toWord I 0)).edgeCount → Bool) (e : D.Edge) :
-    (compileSimulation I D).abs s e = s (compileEdge I D e) := by
+    (compileSimulation I D).abs s e = s (compileEdgeEquiv I D e) := by
   unfold compileSimulation
   rw [transport_abs (D.graph I) (compile_toWord I D)]
   simp only [ConstraintGraph.Simulation.trans, NCL.Simulation.trans, Function.comp_apply,
     finiteSimulation, AndOrGraph.ofFiniteSimulation, ConstraintGraph.Simulation.ofLegalEquiv]
   apply congrArg s
   apply Fin.ext
-  exact D.numEquiv_val e
+  rfl
 
 end Cslib.Complexity.NCL.Diagram

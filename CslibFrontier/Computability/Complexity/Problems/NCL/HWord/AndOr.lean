@@ -8,15 +8,13 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Complexity.Problems.NCL.HWord.PortGraph
-public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.AndOrBandwidth
-import Mathlib.Algebra.Order.BigOperators.Group.Finset
+public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.AndOr
 
 /-!
 # Standard AND/OR networks for word reconfiguration
 
 Each position uses the zero symbol as its final row port. The complete network implements
-canonical word configurations exactly and has a constant implementation budget per source
-vertex when the alphabet is fixed.
+canonical word configurations exactly, with input arity bounded by the fixed alphabet.
 
 ## Main definitions
 
@@ -26,7 +24,6 @@ vertex when the alphabet is fixed.
 ## Main results
 
 * `HWord.AndOr.reachable_orientation_iff`: exact word reconfiguration.
-* `HWord.AndOr.card_vertices_le`: linear vertex bound at fixed alphabet size.
 -/
 
 public section
@@ -37,7 +34,6 @@ attribute [local implicit_reducible] Cslib.Complexity.NCL.Diagram.Inner
 namespace Cslib.Complexity.NCL.HWord.AndOr
 
 open SelectorNetwork
-open scoped BigOperators
 
 variable {q n : ℕ} (H : Digraph (Fin q)) [DecidableRel H.Adj] (hq : 0 < q)
 
@@ -123,61 +119,5 @@ theorem slot_budget_le (v : Vert (Fin n) (Fin n × Fin q) (RelationSite q n)) :
   have h := ((SelectorNetwork.AndOr.cell (PortGraph.network H n) (rowSection H hq) v).size_le).2
   have ha := input_arity_le H hq v
   omega
-
-private theorem budget_le :
-    (∑ v, (64 + 22 * (SelectorNetwork.AndOr.cell (PortGraph.network H n)
-      (rowSection H hq) v).top.length)) ≤ n * ((1 + (q + q * q)) * (64 + 66 * q)) := by
-  calc
-    _ ≤ ∑ _v : Vert (Fin n) (Fin n × Fin q) (RelationSite q n), (64 + 66 * q) := by
-      apply Finset.sum_le_sum
-      intro v _
-      have h := input_arity_le H hq v
-      omega
-    _ = _ := by
-      rw [Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
-      change Fintype.card (Vert (Fin n) (Fin n × Fin q) (RelationSite q n)) * _ = _
-      rw [PortGraph.card_vertices, Nat.mul_assoc]
-
-/-- The standard vertex count is linear in word length for each fixed alphabet. -/
-theorem card_vertices_le : Fintype.card (TargetVertex (n := n) H hq) ≤
-    n * ((1 + (q + q * q)) * (64 + 66 * q)) :=
-  (SelectorNetwork.AndOr.card_targetVertex_le _ _).trans (budget_le H hq)
-
-/-- The number of private implementation wires is linear in word length. -/
-theorem card_private_le :
-    Fintype.card (SelectorNetwork.AndOr.Private (PortGraph.network H n) (rowSection H hq)) ≤
-      n * ((1 + (q + q * q)) * (64 + 66 * q)) :=
-  (SelectorNetwork.AndOr.card_private_le _ _).trans (budget_le H hq)
-
-/-- The complete edge count, including all shared and private wires, is linear in word length. -/
-theorem card_edges_le : Fintype.card (TargetEdge (n := n) H hq) ≤
-    n * (q + 2 * (q * q) + (1 + (q + q * q)) * (64 + 66 * q)) := by
-  have hr : Fintype.card (RelationSite q n) = n * (q * q) := by
-    have h := PortGraph.card_vertices (q := q) (n := n)
-    simp only [Fintype.card_sum, Fintype.card_prod, Fintype.card_fin,
-      Nat.mul_add, Nat.mul_one] at h
-    omega
-  rw [Fintype.card_sum]
-  change Fintype.card (Edge (Fin n × Fin q) (RelationSite q n)) +
-    Fintype.card (SelectorNetwork.AndOr.Private (PortGraph.network H n) (rowSection H hq)) ≤ _
-  calc
-    _ ≤ Fintype.card (Edge (Fin n × Fin q) (RelationSite q n)) +
-        n * ((1 + (q + q * q)) * (64 + 66 * q)) := Nat.add_le_add_left (card_private_le H hq) _
-    _ = _ := by
-      simp only [Fintype.card_sum, Fintype.card_prod, Fintype.card_fin, Fintype.card_bool, hr]
-      ring
-
-/-- A fixed alphabet gives a bandwidth bound independent of word length. -/
-noncomputable def bandwidthCertificate : ConstraintGraph.BandwidthCertificate
-    (graph (n := n) H hq) ((64 + 66 * q) * (2 * (1 + (q + q * q))) - 1) := by
-  have hbudget (v : Vert (Fin n) (Fin n × Fin q) (RelationSite q n)) :
-      64 + 22 * (SelectorNetwork.AndOr.cell (PortGraph.network H n)
-        (rowSection H hq) v).top.length ≤ 64 + 66 * q := by
-    have h := input_arity_le H hq v
-    omega
-  have h := SelectorNetwork.AndOr.bandwidthCertificate (PortGraph.network H n)
-    (rowSection H hq) (PortGraph.bandwidthCertificate H) hbudget
-  have heq : 2 * (1 + (q + q * q)) - 1 + 1 = 2 * (1 + (q + q * q)) := by omega
-  simpa only [heq, graph] using h
 
 end Cslib.Complexity.NCL.HWord.AndOr

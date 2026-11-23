@@ -7,7 +7,7 @@ Authors: Xuyang Peng
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Complexity.Problems.NCL.Diagram.Compile
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Diagram.CompileEdge
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Diagram.Vertices
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.BandwidthTransport
 
@@ -20,7 +20,6 @@ Transport along these numberings preserves a supplied bandwidth order.
 ## Main definitions
 
 * `Diagram.compileVertexEquiv`: actual diagram vertices in compiled list order.
-* `Diagram.compileEdgeEquiv`: actual diagram edges in compiled creation order.
 * `Diagram.compileBandwidthCertificate`: retain an order when compiling a closed diagram.
 -/
 
@@ -36,11 +35,6 @@ variable {Γ : List Color → List Color → Type} (I : Interp Γ)
   (vertexEquiv I D).trans (finCongr (by
     rw [compile_toWord]
     simp only [AndOrGraph.ofFinite, List.length_ofFn]))
-
-/-- Actual diagram edges numbered in the compiled creation order. -/
-@[expose] def compileEdgeEquiv (D : Diagram Γ [] []) :
-    D.Edge ≃ Fin (Word.compile (D.toWord I 0)).edgeCount :=
-  D.numEquiv.trans (finCongr (by rw [compile_toWord]; rfl))
 
 /-- Inverting the compiled vertex numbering preserves the actual list index. -/
 theorem compileVertexEquiv_symm_val (D : Diagram Γ [] [])

@@ -109,7 +109,7 @@ def planarizeSimulation (g : AndOrGraph) (h : g.Valid) (hl : g.graph.LoopFree) :
 /-- An original edge's creation-order number in the compiled plane graph. -/
 def planarizeEdge (g : AndOrGraph) (h : g.Valid) (e : Fin g.edgeCount) :
     Fin (Word.compile (planarize g h)).edgeCount :=
-  compileEdge Prim.interp (planarizeDiagram g h) (planarizeDiagramEdge g h e)
+  compileEdgeEquiv Prim.interp (planarizeDiagram g h) (planarizeDiagramEdge g h e)
 
 /-- The finite compiled simulation reads exactly the representative of each original edge. -/
 theorem planarizeSimulation_abs (g : AndOrGraph) (h : g.Valid) (hl : g.graph.LoopFree)

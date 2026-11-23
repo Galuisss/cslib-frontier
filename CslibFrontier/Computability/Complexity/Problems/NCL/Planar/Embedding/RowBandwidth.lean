@@ -9,20 +9,20 @@ module
 
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.Embedding.RowLabels
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Planar.OriginCount
-public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.RowBandwidth
 import Mathlib.Tactic.Ring
 
 /-!
-# Bandwidth of the actual row-ordered planarization
+# Row capacity of the actual planarization
 
 Each row receives original source vertices, bounded cap gadgets, and bounded crossover gadgets.
-The same actual vertex-row function gives both the row budget and the endpoint distance bound.
-A supplied row-sorted order is retained in the resulting bandwidth certificate.
 
 ## Main definitions
 
 * `Planar.Embedding.rowBudget`: source, cap, and crossing contributions to one row.
-* `Planar.Embedding.rowBandwidthCertificate`: certify the supplied actual order.
+
+## Main results
+
+* `Planar.Embedding.planeVertexRow_card_le`: the actual output respects the row budget.
 -/
 
 public section
@@ -70,19 +70,6 @@ theorem planeVertexRow_card_le (r : ℕ) :
       Nat.add_le_add (Nat.add_le_add (hA r) (Nat.mul_le_mul_left 16 (hE r)))
         (Nat.mul_le_mul_left 286 hx)
     _ = rowBudget A E B := by unfold rowBudget; ring
-
-variable (hports : ∀ i p, p ∈ (vs.get i).ports →
-    vertexRow i ≤ ownerRow p.port.edge + 1 ∧ ownerRow p.port.edge ≤ vertexRow i + 1)
-
-/-- The supplied order of actual output vertices has bandwidth below three consecutive rows. -/
-@[expose] def rowBandwidthCertificate {n : ℕ}
-    (order : (planeDiagram vs hw).Vtx Prim.interp ≃ Fin n)
-    (hs : Monotone (fun i => planeVertexRow vs hw vertexRow ownerRow (order.symm i))) :
-    ConstraintGraph.BandwidthCertificate ((planeDiagram vs hw).graph Prim.interp)
-      (3 * rowBudget A E B - 1) :=
-  ConstraintGraph.BandwidthCertificate.ofRowOrder _ order (planeVertexRow vs hw vertexRow ownerRow)
-    (planeVertexRow_card_le vs hw vertexRow srcRow ownerRow hxs hys hrow A E B hA hE hB) hs
-    (planeVertexRow_edge_bounds vs hw vertexRow srcRow ownerRow hxs hys hrow hports)
 
 end Layout
 end Cslib.Complexity.NCL.Planar.Embedding

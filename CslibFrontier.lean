@@ -3063,8 +3063,6 @@ public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGrap
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.Run
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.AndOr
-public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.AndOrBandwidth
-public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.AndOrSize
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.Boundary
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.Cells
 public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.Emission

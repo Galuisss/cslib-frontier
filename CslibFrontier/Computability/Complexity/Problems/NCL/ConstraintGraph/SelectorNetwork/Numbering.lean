@@ -7,8 +7,9 @@ Authors: Xuyang Peng
 module
 -- upstream: candidate
 
-public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.AndOrBandwidth
+public import CslibFrontier.Computability.Complexity.Problems.NCL.ConstraintGraph.SelectorNetwork.AndOr
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Diagram.Replacement.Enumeration
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Diagram.Vertices
 public import CslibFrontier.Computability.Complexity.Problems.NCL.Instance
 import Mathlib.Data.List.ProdSigma
 import Mathlib.Data.List.NodupEquivFin
