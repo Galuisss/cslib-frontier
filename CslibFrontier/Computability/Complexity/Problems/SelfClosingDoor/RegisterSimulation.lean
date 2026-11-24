@@ -533,19 +533,16 @@ theorem compile_reachability_iff (p : Program) :
   change Wiring.compile (principalDoors p) (wiring p) (external p.start) (external p.target) ∈
     SelfClosingDoor.Reachability ↔ p.Accepts
   rw [Wiring.compile_reachability_iff, principal_initial]
+  have hs : (boundary p p.initialState).Valid p := ⟨rfl, List.length_replicate⟩
   constructor
   · rintro ⟨t, hr, hp⟩
-    have hs : (boundary p p.initialState).Valid p := by
-      simp [MachineState.Valid, boundary, Program.initialState]
     obtain ⟨u, hu, he⟩ := actual_reachable_complete hs hr
     apply (certified_reachable hu).accepts
     apply Place.code_injective
     exact (congrArg State.location he).trans hp
   · rintro ⟨t, hr, hp⟩
     refine ⟨(boundary p t).toState, ?_, ?_⟩
-    · exact machine_reachable_actual (by
-        simp [MachineState.Valid, boundary, Program.initialState])
-        (machine_program_path rfl hr)
+    · exact machine_reachable_actual hs (machine_program_path rfl hr)
     · simp only [boundary, MachineState.toState, Place.code, hp]
 
 

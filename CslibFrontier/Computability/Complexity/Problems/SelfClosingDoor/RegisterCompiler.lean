@@ -83,7 +83,7 @@ end Compiler
 /-- Compile an arbitrary finite register program to an explicit door network. Out-of-range
 register instructions enter a core with no register door and have no successful return. -/
 def compile (p : Program) : Instance :=
-  ⟨Compiler.principalDoors p ++ (Compiler.wiring p).map Wiring.diode,
-    Compiler.external p.start, Compiler.external p.target⟩
+  Wiring.compile (Compiler.principalDoors p) (Compiler.wiring p)
+    (Compiler.external p.start) (Compiler.external p.target)
 
 end Cslib.Complexity.SelfClosingDoor.RegisterProgram

@@ -157,7 +157,7 @@ polynomial time, with binary labels and the explicitly listed register contents.
   have hw := wiring_polyTime
   have hd := diode_polyTime
   have hx := external_polyTime
-  unfold compile principalDoors
+  unfold compile Wiring.compile principalDoors
   fun_prop
 
 end Cslib.Complexity.SelfClosingDoor.RegisterProgram

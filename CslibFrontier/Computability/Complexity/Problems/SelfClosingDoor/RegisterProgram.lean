@@ -56,7 +56,7 @@ structure Program where
   target : ℕ
   deriving DecidableEq, Inhabited
 
-/-- Executing a guarded instruction preserves the register-list length. -/
+/-- Test the old value at an allocated register and write the prescribed new value. -/
 @[expose] def Instruction.Step (i : Instruction) (s t : State) : Prop :=
   i.register < s.bits.length ∧ s.location = i.source ∧
     s.bits.getD i.register false = i.guard ∧

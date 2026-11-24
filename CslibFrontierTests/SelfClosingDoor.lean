@@ -1,3 +1,9 @@
+/-
+Copyright (c) 2026 Xuyang Peng. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Xuyang Peng
+-/
+
 import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.PSPACE
 
 open Cslib.Complexity.SelfClosingDoor
@@ -41,7 +47,7 @@ example : ¬ Step oneWay.doors ⟨0, []⟩ ⟨1, []⟩ := by
   rw [← checkStep_eq_true_iff]
   decide +kernel
 
--- With no doors, an empty path accepts precisely when already at the target.
+-- With no doors, an empty path accepts when already at the target.
 example : (⟨[], 5, 5⟩ : Instance) ∈ Reachability :=
   ⟨⟨5, []⟩, Relation.ReflTransGen.refl, rfl⟩
 

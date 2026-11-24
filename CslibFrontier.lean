@@ -3594,6 +3594,17 @@ public import CslibFrontier.Computability.Complexity.Problems.STCON.SubdivisionE
 public import CslibFrontier.Computability.Complexity.Problems.STCON.WeightedSubdivisionCall
 public import CslibFrontier.Computability.Complexity.Problems.STCON.WeightedSubdivisionSpace
 public import CslibFrontier.Computability.Complexity.Problems.STCON.Writer
+public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.Basic
+public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.Completeness
+public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.Encoding
+public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.NCLProgram
+public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.PSPACE
+public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.RegisterCompiler
+public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.RegisterCompilerPolyTime
+public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.RegisterEncoding
+public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.RegisterProgram
+public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.RegisterSimulation
+public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.Wiring
 public import CslibFrontier.Computability.Complexity.Problems.SetCover
 public import CslibFrontier.Computability.Complexity.Problems.SetSplitting
 public import CslibFrontier.Computability.Complexity.Problems.SharpCycle
