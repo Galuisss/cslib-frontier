@@ -12,6 +12,7 @@ public import CslibFrontier.Computability.Complexity.Classes.Space
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.Space.Reachability
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolySpace.Plain
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.BitString
 import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Decoder
 import CslibFrontier.Foundations.Data.BitString.ShortWords
 
@@ -52,18 +53,18 @@ private def budget (I : Instance) : ℕ := 3 * (encInstance I).length + 1
 
 private def width (I : Instance) : ℕ := 2 * budget I + 2
 
-private def code (I : Instance) (s : State) : List Bool :=
+private def stateWord (I : Instance) (s : State) : List Bool :=
   false :: BitString.padWord (budget I) (encState s)
 
 private def accept (I : Instance) : List Bool :=
   true :: List.replicate (2 * budget I + 1) false
 
-private theorem decode_code (I : Instance) (s : State) : decode (code I s) = s := by
-  simp only [decode, code, List.tail_cons, BitString.padWord, unframe_frame_append,
+private theorem decode_stateWord (I : Instance) (s : State) : decode (stateWord I s) = s := by
+  simp only [decode, stateWord, List.tail_cons, BitString.padWord, unframe_frame_append,
     stateDecoder.decode_enc]
 
-private theorem code_ne_accept (I : Instance) (s : State) : code I s ≠ accept I := by
-  simp [code, accept]
+private theorem stateWord_ne_accept (I : Instance) (s : State) : stateWord I s ≠ accept I := by
+  simp [stateWord, accept]
 
 private theorem length_accept (I : Instance) : (accept I).length = width I := by
   simp [accept, width]
@@ -95,20 +96,20 @@ private theorem state_bound {I : Instance} {s : State}
   change s.bits.length = I.doors.length at hv
   omega
 
-private theorem length_code {I : Instance} {s : State}
-    (hr : Reachable I.doors I.initial s) : (code I s).length = width I := by
-  simp only [code, List.length_cons, BitString.length_padWord (state_bound hr), width]
+private theorem length_stateWord {I : Instance} {s : State}
+    (hr : Reachable I.doors I.initial s) : (stateWord I s).length = width I := by
+  simp only [stateWord, List.length_cons, BitString.length_padWord (state_bound hr), width]
 
 private def wordEdge (I : Instance) (a b : List Bool) : Bool :=
-  decide (a = code I (decode a)) &&
+  decide (a = stateWord I (decode a)) &&
     ((decide (b = accept I) && decide ((decode a).location = I.target)) ||
-      (decide (b = code I (decode b)) && checkStep I.doors (decode a) (decode b)))
+      (decide (b = stateWord I (decode b)) && checkStep I.doors (decode a) (decode b)))
 
-private theorem wordEdge_code (I : Instance) (s : State) (b : List Bool) :
-    wordEdge I (code I s) b = true ↔
+private theorem wordEdge_stateWord (I : Instance) (s : State) (b : List Bool) :
+    wordEdge I (stateWord I s) b = true ↔
       (b = accept I ∧ s.location = I.target) ∨
-        ∃ t, b = code I t ∧ Step I.doors s t := by
-  simp only [wordEdge, decode_code, decide_true, Bool.true_and, Bool.or_eq_true,
+        ∃ t, b = stateWord I t ∧ Step I.doors s t := by
+  simp only [wordEdge, decode_stateWord, decide_true, Bool.true_and, Bool.or_eq_true,
     Bool.and_eq_true, decide_eq_true_eq, checkStep_eq_true_iff]
   constructor
   · rintro (h | ⟨hb, hs⟩)
@@ -117,13 +118,13 @@ private theorem wordEdge_code (I : Instance) (s : State) (b : List Bool) :
   · rintro (h | ⟨t, rfl, hs⟩)
     · exact Or.inl h
     · right
-      rw [decode_code]
+      rw [decode_stateWord]
       exact ⟨rfl, hs⟩
 
 private theorem wordEdge_accept (I : Instance) (b : List Bool) :
     wordEdge I (accept I) b = false := by
-  have h : decide (accept I = code I (decode (accept I))) = false :=
-    decide_eq_false (code_ne_accept I (decode (accept I))).symm
+  have h : decide (accept I = stateWord I (decode (accept I))) = false :=
+    decide_eq_false (stateWord_ne_accept I (decode (accept I))).symm
   rw [wordEdge, h, Bool.false_and]
 
 private def CodeStep (I : Instance) (a b : List Bool) : Prop :=
@@ -131,22 +132,22 @@ private def CodeStep (I : Instance) (a b : List Bool) : Prop :=
 
 private theorem code_reachable {I : Instance} {s : State}
     (hr : Reachable I.doors I.initial s) :
-    Relation.ReflTransGen (CodeStep I) (code I I.initial) (code I s) := by
+    Relation.ReflTransGen (CodeStep I) (stateWord I I.initial) (stateWord I s) := by
   induction hr with
   | refl => exact .refl
   | @tail t u hprefix hstep ih =>
-    refine ih.tail ⟨length_code hprefix, length_code (hprefix.tail hstep), ?_⟩
-    exact (wordEdge_code I t (code I u)).2 (Or.inr ⟨u, rfl, hstep⟩)
+    refine ih.tail ⟨length_stateWord hprefix, length_stateWord (hprefix.tail hstep), ?_⟩
+    exact (wordEdge_stateWord I t (stateWord I u)).2 (Or.inr ⟨u, rfl, hstep⟩)
 
 private theorem decode_reachable {I : Instance} {word : List Bool}
-    (hr : Relation.ReflTransGen (CodeStep I) (code I I.initial) word) :
+    (hr : Relation.ReflTransGen (CodeStep I) (stateWord I I.initial) word) :
     ∃ s, Reachable I.doors I.initial s ∧
-      (word = code I s ∨ word = accept I ∧ s.location = I.target) := by
+      (word = stateWord I s ∨ word = accept I ∧ s.location = I.target) := by
   induction hr with
   | refl => exact ⟨I.initial, .refl, Or.inl rfl⟩
   | @tail a b _ hstep ih =>
     obtain ⟨s, hs, rfl | ⟨rfl, hgoal⟩⟩ := ih
-    · rcases (wordEdge_code I s b).1 hstep.2.2 with h | ⟨t, rfl, hst⟩
+    · rcases (wordEdge_stateWord I s b).1 hstep.2.2 with h | ⟨t, rfl, hst⟩
       · exact ⟨s, hs, Or.inr h⟩
       · exact ⟨t, hs.tail hst, Or.inl rfl⟩
     · have he := hstep.2.2
@@ -154,31 +155,31 @@ private theorem decode_reachable {I : Instance} {word : List Bool}
       cases he
 
 private theorem accepts_iff_code_reachable (I : Instance) : I ∈ Reachability ↔
-    Relation.ReflTransGen (CodeStep I) (code I I.initial) (accept I) := by
+    Relation.ReflTransGen (CodeStep I) (stateWord I I.initial) (accept I) := by
   constructor
   · rintro ⟨s, hr, hgoal⟩
-    refine (code_reachable hr).tail ⟨length_code hr, length_accept I, ?_⟩
-    exact (wordEdge_code I s (accept I)).2 (Or.inl ⟨rfl, hgoal⟩)
+    refine (code_reachable hr).tail ⟨length_stateWord hr, length_accept I, ?_⟩
+    exact (wordEdge_stateWord I s (accept I)).2 (Or.inl ⟨rfl, hgoal⟩)
   · intro hr
     obtain ⟨s, hs, heq | ⟨_, hgoal⟩⟩ := decode_reachable hr
-    · exact False.elim ((code_ne_accept I s) heq.symm)
+    · exact False.elim ((stateWord_ne_accept I s) heq.symm)
     · exact ⟨s, hs, hgoal⟩
 
 private def solve (I : Instance) : Bool :=
   Cslib.Reachability.savitch (wordEdge I) (width I) (width I)
-    (code I I.initial) (accept I)
+    (stateWord I I.initial) (accept I)
 
 private theorem solve_eq_true_iff (I : Instance) : solve I = true ↔ I ∈ Reachability := by
-  have hsrc : (code I I.initial).length = width I := length_code .refl
+  have hsrc : (stateWord I I.initial).length = width I := length_stateWord .refl
   have hcard : {word | Relation.ReflTransGen (CodeStep I)
-      (code I I.initial) word}.encard ≤ 2 ^ width I + 1 := by
+      (stateWord I I.initial) word}.encard ≤ 2 ^ width I + 1 := by
     refine (Set.encard_le_encard fun word hword => ?_).trans
       ((BitString.encard_setOf_length_eq _).le.trans le_self_add)
     induction hword with
     | refl => exact hsrc
     | tail _ hstep _ => exact hstep.2.1
   rw [solve, Cslib.Reachability.savitch_iff hsrc (length_accept I)]
-  change Relation.RelatesWithinSteps (CodeStep I) (code I I.initial) (accept I)
+  change Relation.RelatesWithinSteps (CodeStep I) (stateWord I I.initial) (accept I)
     (2 ^ width I) ↔ _
   rw [← Relation.reflTransGen_iff_relatesWithinSteps_of_encard_le hcard]
   exact (accepts_iff_code_reachable I).symm
@@ -200,7 +201,7 @@ private theorem width_polyTime : ComputableInPolyTime width encInstance encUnary
     (ComputableInPolyTime.const 2)
 
 private theorem code_polyTime :
-    ComputableInPolyTime (fun p : Instance × State => code p.1 p.2)
+    ComputableInPolyTime (fun p : Instance × State => stateWord p.1 p.2)
       (encPair encInstance encState) encBits := by
   have hb := budget_polyTime.comp (ComputableInPolyTime.fst encInstance encState)
   have he : ComputableInPolyTime (fun p : Instance × State => encState p.2)
@@ -246,7 +247,7 @@ private theorem wordEdge_polyTime :
 
 private theorem arguments_polyTime :
     ComputableInPolyTime (fun I : Instance =>
-      (I, width I, width I, code I I.initial, accept I))
+      (I, width I, width I, stateWord I I.initial, accept I))
       encInstance (Cslib.Reachability.encArgs encInstance) := by
   have hw := width_polyTime
   have hi := Instance.computableInPolyTime_initial
@@ -259,7 +260,7 @@ private theorem arguments_polyTime :
 is in PSPACE under the explicit door-list encoding with binary location labels. -/
 theorem Reachability_mem_PSPACE : Reachability ∈ PSPACE encInstance := by
   obtain ⟨time, space, hspace, hc⟩ := Cslib.Reachability.exists_polyBounded_space_savitch
-    wordEdge_polyTime arguments_polyTime (fun _ => length_code .refl) length_accept
+    wordEdge_polyTime arguments_polyTime (fun _ => length_stateWord .refl) length_accept
   apply mem_PSPACE_of_computableInTimeAndSpace hspace hc
   exact fun I => (solve_eq_true_iff I).symm
 

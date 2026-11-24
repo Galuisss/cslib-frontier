@@ -10,8 +10,8 @@ module
 public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.Basic
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Structure
 public import CslibFrontier.Computability.Machines.Turing.MultiTape.Encodings.Nat.Bits
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.BitString
-public import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Captured
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.BitString
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Captured
 import Mathlib.Data.List.Enum
 
 /-!
@@ -72,27 +72,29 @@ enc_structure encState : State where
   unfold Instance.initial
   fun_prop
 
-private def checkTraversal (s t : State) (door : Door) (index : ℕ) : Bool :=
-  let tunnel := door.tunnel (s.bits.getD index false)
-  decide (s.location = tunnel.source) &&
-    (decide (t.location = tunnel.target) &&
-      decide (t.bits = s.bits.set index (!s.bits.getD index false)))
-
 /-- Check the state width and each explicitly listed, indexed door. -/
-def checkStep (doors : List Door) (s t : State) : Bool :=
+@[expose] def checkStep (doors : List Door) (s t : State) : Bool :=
   decide (s.bits.length = doors.length) &&
-    doors.zipIdx.any (fun p => checkTraversal s t p.1 p.2)
+    doors.zipIdx.any fun (door, index) =>
+      let tunnel := door.tunnel (s.bits.getD index false)
+      decide (s.location = tunnel.source) &&
+        (decide (t.location = tunnel.target) &&
+          decide (t.bits = s.bits.set index (!s.bits.getD index false)))
 
 /-- The local Boolean check recognizes exactly the traversal relation. -/
 theorem checkStep_eq_true_iff (doors : List Door) (s t : State) :
     checkStep doors s t = true ↔ Step doors s t := by
   simp only [checkStep, Bool.and_eq_true, decide_eq_true_eq, List.any_eq_true,
-    List.exists_mem_zipIdx', checkTraversal, Step, State.Valid, Fin.exists_iff, State.ext_iff,
+    List.exists_mem_zipIdx', Step, State.Valid, Fin.exists_iff, State.ext_iff,
     Fin.getElem_fin]
 
 private theorem checkTraversal_polyTime :
     ComputableInPolyTime
-      (fun q : (State × State) × (Door × ℕ) => checkTraversal q.1.1 q.1.2 q.2.1 q.2.2)
+      (fun q : (State × State) × (Door × ℕ) =>
+        let tunnel := q.2.1.tunnel (q.1.1.bits.getD q.2.2 false)
+        decide (q.1.1.location = tunnel.source) &&
+          (decide (q.1.2.location = tunnel.target) &&
+            decide (q.1.2.bits = q.1.1.bits.set q.2.2 (!q.1.1.bits.getD q.2.2 false))))
       (encPair (encPair encState encState) (encPair encDoor encUnary)) encBool := by
   have hs : ComputableInPolyTime
       (fun q : (State × State) × (Door × ℕ) => q.1.1.bits)

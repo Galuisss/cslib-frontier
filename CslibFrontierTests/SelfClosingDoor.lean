@@ -4,11 +4,16 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Xuyang Peng
 -/
 
-import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.PSPACE
+module
+-- upstream: local-only (tests)
 
-open Cslib.Complexity.SelfClosingDoor
+import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.Completeness
 
-namespace SelfClosingDoorTests
+open Cslib.Complexity Cslib.Complexity.SelfClosingDoor
+
+set_option linter.privateModule false
+
+namespace CslibFrontierTests.SelfClosingDoor
 
 private def loopNetwork : Instance :=
   ⟨[⟨⟨0, 0⟩, ⟨0, 1⟩, false⟩], 0, 1⟩
@@ -29,6 +34,22 @@ example : oneWay ∈ Reachability := by
   have h : Step oneWay.doors oneWay.initial ⟨1, [true]⟩ :=
     (checkStep_eq_true_iff _ _ _).1 (by decide +kernel)
   exact ⟨⟨1, [true]⟩, Relation.ReflTransGen.single h, rfl⟩
+
+private def blockedDoor : Instance :=
+  ⟨[⟨⟨1, 2⟩, ⟨0, 3⟩, false⟩], 0, 3⟩
+
+-- The tunnel starting at the player is disabled, so no accepting path starts.
+example : blockedDoor ∉ Reachability := by
+  have hblocked (s : State) : ¬ Step blockedDoor.doors blockedDoor.initial s := by
+    rintro ⟨_, i, hp, _⟩
+    have hi : i.val = 0 := by have := i.isLt; change i.val < 1 at this; omega
+    norm_num [blockedDoor, Instance.initial, Door.tunnel, hi] at hp
+  rintro ⟨s, hr, hp⟩
+  rcases hr.cases_head with he | ⟨t, ht, _⟩
+  · subst s
+    change 0 = 3 at hp
+    omega
+  · exact hblocked t ht
 
 private def parallel : List Door :=
   [⟨⟨0, 1⟩, ⟨1, 0⟩, false⟩, ⟨⟨0, 1⟩, ⟨1, 0⟩, false⟩]
@@ -51,4 +72,7 @@ example : ¬ Step oneWay.doors ⟨0, []⟩ ⟨1, []⟩ := by
 example : (⟨[], 5, 5⟩ : Instance) ∈ Reachability :=
   ⟨⟨5, []⟩, Relation.ReflTransGen.refl, rfl⟩
 
-end SelfClosingDoorTests
+-- The headline theorem is available through its ordinary public module interface.
+example : PSPACEComplete encInstance Reachability := Reachability_pspaceComplete
+
+end CslibFrontierTests.SelfClosingDoor

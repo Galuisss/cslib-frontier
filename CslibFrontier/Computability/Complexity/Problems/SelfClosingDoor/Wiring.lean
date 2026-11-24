@@ -48,7 +48,7 @@ abbrev Reachable (doors : List Door) (arcs : List Tunnel) :=
   ⟨doors ++ arcs.map diode, start, target⟩
 
 /-- Forget the auxiliary diode states. -/
-@[expose] def project (doors : List Door) (s : State) : State :=
+private def project (doors : List Door) (s : State) : State :=
   ⟨s.location, s.bits.take doors.length⟩
 
 /-- A directed jump, like a door traversal, preserves the configuration width. -/
@@ -65,7 +65,7 @@ private theorem project_valid {doors : List Door} {arcs : List Tunnel} {s : Stat
   omega
 
 /-- Every actual traversal projects to stuttering or a legal step with directed wiring. -/
-theorem project_step {doors : List Door} {arcs : List Tunnel} {s t : State}
+private theorem project_step {doors : List Door} {arcs : List Tunnel} {s t : State}
     (h : SelfClosingDoor.Step (doors ++ arcs.map diode) s t) :
     project doors s = project doors t ∨ Step doors arcs (project doors s) (project doors t) := by
   obtain ⟨hs, i, hp, rfl⟩ := h
@@ -107,7 +107,7 @@ theorem project_step {doors : List Door} {arcs : List Tunnel} {s t : State}
         · simpa only [project, hbit] using hb
 
 /-- Forgetting auxiliary diode bits maps complete paths to paths with directed wiring. -/
-theorem project_reachable {doors : List Door} {arcs : List Tunnel} {s t : State}
+private theorem project_reachable {doors : List Door} {arcs : List Tunnel} {s t : State}
     (h : SelfClosingDoor.Reachable (doors ++ arcs.map diode) s t) :
     Reachable doors arcs (project doors s) (project doors t) := by
   induction h with
@@ -188,7 +188,7 @@ private theorem lift_arc {doors : List Door} {arcs : List Tunnel} (s : State)
       simpa only [hak, Bool.not_true, Bool.false_eq_true, ↓reduceIte, aux'] using hsecond)
 
 /-- Every wired step lifts while retaining the principal bits and some auxiliary diode bits. -/
-theorem lift_step {doors : List Door} {arcs : List Tunnel} {s t : State}
+private theorem lift_step {doors : List Door} {arcs : List Tunnel} {s t : State}
     (h : Step doors arcs s t) (aux : List Bool) (hlen : aux.length = arcs.length) :
     ∃ aux', aux'.length = arcs.length ∧
       SelfClosingDoor.Reachable (doors ++ arcs.map diode) ⟨s.location, s.bits ++ aux⟩
@@ -198,7 +198,7 @@ theorem lift_step {doors : List Door} {arcs : List Tunnel} {s t : State}
   · exact lift_arc s hs aux hlen a ha hp
 
 /-- A complete wired path lifts for every initial assignment of auxiliary diode states. -/
-theorem lift_reachable {doors : List Door} {arcs : List Tunnel} {s t : State}
+private theorem lift_reachable {doors : List Door} {arcs : List Tunnel} {s t : State}
     (h : Reachable doors arcs s t) (aux : List Bool) (hlen : aux.length = arcs.length) :
     ∃ aux', aux'.length = arcs.length ∧
       SelfClosingDoor.Reachable (doors ++ arcs.map diode) ⟨s.location, s.bits ++ aux⟩

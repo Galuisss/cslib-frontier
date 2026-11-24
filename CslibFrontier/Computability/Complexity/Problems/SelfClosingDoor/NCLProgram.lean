@@ -8,8 +8,11 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.RegisterEncoding
-public import CslibFrontier.Computability.Complexity.Problems.NCL.Instance.StepPolyTime
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Encoding
+import CslibFrontier.Computability.Complexity.Problems.NCL.Instance.StepPolyTime
 import CslibFrontier.Computability.Complexity.Problems.NCL.Reachability
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.BitString
+import CslibFrontier.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Nat.Binary
 import Mathlib.Data.List.GetD
 
 /-!

@@ -16,7 +16,8 @@ register_result "directed-symmetric-self-closing-door-pspace" where
   sources := [
     { paper := AniBosboomDemaineEtAl2021,
       theorem := "Corollary 2.4 (directed symmetric case)",
-      locator := "Section 2.2, printed p. 3:5 (PDF p. 5); model in Section 2.1, p. 3:4" }
+      locator := "Section 2.2, p. 3:5 (PDF p. 5); model in Section 1, p. 3:3, \
+        and Section 2.1, p. 3:4" }
   ]
   theorems := [
     Cslib.Complexity.SelfClosingDoor.Reachability_pspaceHard,
@@ -27,4 +28,5 @@ register_result "directed-symmetric-self-closing-door-pspace" where
     door bits. Location labels encode freely connected wiring components, allowing identified \
     endpoints, loops and parallel doors; no planarity restriction. Explicit framed door lists \
     and binary location labels, uniform multitape polynomial-time many-one reductions. \
-    Completeness combines the directed symmetric hardness case with a Savitch space upper bound."
+    Completeness combines the directed symmetric hardness case with a Savitch space upper bound. \
+    Source check: https://github.com/cslib-community/cslib-frontier/pull/8343#issuecomment-7138309266"

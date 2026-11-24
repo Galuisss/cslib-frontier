@@ -4,12 +4,19 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Xuyang Peng
 -/
 
+module
+-- upstream: local-only (tests)
+
 import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.NCLProgram
+import CslibFrontier.Computability.Complexity.Problems.NCL.Instance.Step
+import CslibFrontier.Computability.Complexity.Problems.NCL.Instance.Incidence
 
 /-! A loop reversal and malformed-target rejection through the NCL register compiler. -/
 
 open Cslib.Complexity Cslib.Complexity.NCL
 open Cslib.Complexity.SelfClosingDoor.RegisterProgram
+
+set_option linter.privateModule false
 
 namespace CslibFrontierTests.SelfClosingDoorNCL
 

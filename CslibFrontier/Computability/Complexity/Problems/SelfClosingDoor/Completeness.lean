@@ -8,9 +8,9 @@ module
 -- upstream: candidate
 
 public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.PSPACE
-public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.NCLProgram
-public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.RegisterSimulation
-public import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.RegisterCompilerPolyTime
+public import CslibFrontier.Computability.Complexity.Problems.NCL.Encoding
+import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.NCLProgram
+import CslibFrontier.Computability.Complexity.Problems.SelfClosingDoor.RegisterCompiler
 import CslibFrontier.Computability.Complexity.Problems.NCL.Hardness
 
 /-!
